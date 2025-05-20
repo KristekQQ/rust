@@ -6,7 +6,10 @@ inside the browser.
 
 ## Building
 
-Install the WebAssembly target for Rust and build with `wasm-pack`:
+Install the WebAssembly target for Rust and build with `wasm-pack`.
+The WebGPU API in `web-sys` is still unstable, so compilation requires
+enabling those APIs via `RUSTFLAGS`. The `wgpu` crate also needs the
+`webgpu` feature enabled (already set in `Cargo.toml`).
 
 ```bash
 rustup target add wasm32-unknown-unknown
@@ -15,7 +18,7 @@ rustup target add wasm32-unknown-unknown
 # (Do **not** include this comment after the command.)
 cargo install wasm-pack
 
-wasm-pack build --target web
+RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build --target web
 ```
 
 This will create a `pkg/` directory with the generated JavaScript and
