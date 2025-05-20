@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>WebGPU with Rust/WASM</title>
+</head>
+<body>
+    <canvas id="gpu-canvas" width="640" height="480"></canvas>
+    <script type="module">
+        import init from './pkg/webgpu_wasm.js';
+        init();
+    </script>
+</body>
+</html>
