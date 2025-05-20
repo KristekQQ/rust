@@ -10,7 +10,10 @@ Install the WebAssembly target for Rust and build with `wasm-pack`:
 
 ```bash
 rustup target add wasm32-unknown-unknown
-cargo install wasm-pack    # if not already installed
+
+# Install `wasm-pack` if it is not already available
+cargo install wasm-pack
+
 wasm-pack build --target web
 ```
 
