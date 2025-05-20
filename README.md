@@ -39,7 +39,8 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 This repository ships the file `vendor.tar.zst` containing all required
 crates so that builds can happen without network connectivity.  Run the
 provided `./evendor` script to unpack the archive and prepare the `vendor/`
-directory before building:
+directory before building. The script relies on the `zstd` tool to
+
 
 ```bash
 ./evendor

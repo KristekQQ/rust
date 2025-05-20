@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+
+# Ensure zstd is available for decompression
+command -v zstd >/dev/null || { echo "zstd is required" >&2; exit 1; }
+
 # Extract vendored crates from the archived vendor.tar.zst file
 # Requires `zstd` to be installed.
 
