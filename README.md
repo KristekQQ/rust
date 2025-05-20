@@ -33,3 +33,43 @@ python3 -m http.server
 ```
 
 Then open `http://localhost:8000` in a browser with WebGPU enabled.
+
+## Offline usage
+
+If you need to work in an environment without internet access, vendor all
+dependencies and prepare WebAssembly artifacts ahead of time.
+
+1. Vendor the crates and configure Cargo to use them:
+
+```bash
+cargo vendor --sync ./vendor
+```
+
+Create `.cargo/config.toml` with:
+
+```toml
+[source.crates-io]
+replace-with = "vendored"
+
+[source.vendored]
+directory = "vendor"
+```
+
+2. Build and test completely offline:
+
+```bash
+cargo test --offline
+cargo build --target wasm32-unknown-unknown --release --offline
+```
+
+3. Run `wasm-bindgen` before entering the offline sandbox and copy the
+   resulting files along with any required runners (for example `node` or
+   `wasmtime`):
+
+```bash
+wasm-bindgen --target web --out-dir wasm_out \
+  target/wasm32-unknown-unknown/release/webgpu_wasm.wasm
+```
+
+After copying the repository, `vendor/` and `wasm_out/` directories and the
+runner binaries allow you to run the example without network access.
