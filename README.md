@@ -8,8 +8,7 @@ inside the browser.
 
 Install the WebAssembly target for Rust and build with `wasm-pack`.
 The WebGPU API in `web-sys` is still unstable, so compilation requires
-enabling those APIs via `RUSTFLAGS`. The `wgpu` crate also needs the
-`webgpu` feature enabled (already set in `Cargo.toml`).
+enabling those APIs via `RUSTFLAGS`.
 
 ```bash
 rustup target add wasm32-unknown-unknown
