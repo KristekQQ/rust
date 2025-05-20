@@ -36,35 +36,43 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 
 ## Offline usage
 
-If you need to work in an environment without internet access, vendor all
-dependencies and prepare WebAssembly artifacts ahead of time.
+This repository ships the file `vendor.tar.zst` containing all required
+crates so that builds can happen without network connectivity.  Run the
+provided `./evendor` script to unpack the archive and prepare the `vendor/`
+directory before building. The script relies on the `zstd` tool to
+decompress the archive, so make sure it is installed:
 
-1. Vendor the crates and configure Cargo to use them:
+```bash
+./evendor
+```
+
+The script also synchronizes Cargo's metadata with the extracted crates. If
+you later change dependencies you can refresh the vendor directory using:
 
 ```bash
 cargo vendor --sync ./vendor
 ```
 
-Create `.cargo/config.toml` with:
+Cargo is configured in `.cargo/config.toml` to use these local sources:
 
 ```toml
 [source.crates-io]
-replace-with = "vendored"
+replace-with = "vendored-sources"
 
-[source.vendored]
+[source.vendored-sources]
 directory = "vendor"
 ```
 
-2. Build and test completely offline:
+After unpacking the vendor directory you can build and test completely
+offline:
 
 ```bash
 cargo test --offline
 cargo build --target wasm32-unknown-unknown --release --offline
 ```
 
-3. Run `wasm-bindgen` before entering the offline sandbox and copy the
-   resulting files along with any required runners (for example `node` or
-   `wasmtime`):
+Run `wasm-bindgen` before entering the offline sandbox and copy the resulting
+files along with any required runners (for example `node` or `wasmtime`):
 
 ```bash
 wasm-bindgen --target web --out-dir wasm_out \
