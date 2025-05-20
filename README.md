@@ -40,7 +40,7 @@ This repository ships the file `vendor.tar.zst` containing all required
 crates so that builds can happen without network connectivity.  Run the
 provided `./evendor` script to unpack the archive and prepare the `vendor/`
 directory before building. The script relies on the `zstd` tool to
-
+decompress the archive, so make sure it is installed:
 
 ```bash
 ./evendor
