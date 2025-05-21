@@ -36,44 +36,22 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 
 ## Offline usage
 
-This repository ships the file `vendor.tar.zst` containing all required
-crates so that builds can happen without network connectivity.  Run the
-provided `./evendor` script to unpack the archive and prepare the `vendor/`
-directory before building. The script relies on the `zstd` tool to
-decompress the archive, so make sure it is installed. On macOS you can
-install it via Homebrew and on Debian-based systems via `apt`:
-
-```bash
-brew install zstd     # macOS
-sudo apt-get install zstd  # Debian/Ubuntu
-```
-
-Then run:
+This repository ships the file `vendor.tar.gz` containing all required
+crates so that builds can happen without network connectivity. Run the
+provided `./evendor` script to unpack the archive and prepare the
+`vendor/` directory before building.
 
 ```bash
 ./evendor
 ```
 
-If `zstd` is not available you can repackage the vendor directory as
-`vendor.tar.gz` or `vendor.zip` on another machine and extract that
-instead. After extracting, run `cargo vendor --sync ./vendor` once to
-update Cargo's metadata:
+The script extracts the archive and synchronizes Cargo's metadata via
+`cargo vendor --sync ./vendor`.  It is idempotent: if a `vendor/`
+directory already exists it will skip the extraction step so previously
+downloaded crates are reused.
 
-```bash
-# On a machine with `zstd` available
-tar -I zstd -xf vendor.tar.zst
-tar -czf vendor.tar.gz vendor  # or: zip -r vendor.zip vendor
-
-# On the target system without `zstd`
-tar -xzf vendor.tar.gz         # or: unzip vendor.zip
-cargo vendor --sync ./vendor
-```
-
-The script is idempotent: if a `vendor/` directory already exists it will skip
-the extraction step so previously downloaded crates are reused.
-
-The script also synchronizes Cargo's metadata with the extracted crates. If
-you later change dependencies you can refresh the vendor directory using:
+If you modify dependencies you can regenerate the archive with
+`./build_vendor.sh` and refresh the vendor directory using:
 
 ```bash
 cargo vendor --sync ./vendor
