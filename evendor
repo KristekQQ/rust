@@ -8,6 +8,13 @@ if [ -d "vendor" ]; then
   exit 0
 fi
 
+# Warn if the WebAssembly target is not installed. Building will fail
+# offline without it.
+if ! rustup target list --installed | grep -q "wasm32-unknown-unknown"; then
+  echo "warning: target 'wasm32-unknown-unknown' not installed." >&2
+  echo "         run 'rustup target add wasm32-unknown-unknown' while online" >&2
+fi
+
 
 # Extract vendored crates from vendor.tar.gz
 tar -xzvf vendor.tar.gz
