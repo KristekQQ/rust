@@ -1,7 +1,10 @@
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
 
-#[wasm_bindgen(start)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
+#[cfg(target_arch = "wasm32")]
 pub async fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
@@ -15,7 +18,7 @@ pub async fn start() -> Result<(), JsValue> {
 
     // Initialize wgpu
     let instance = wgpu::Instance::default();
-    let surface = unsafe { instance.create_surface(&canvas) }?;
+    let surface = instance.create_surface_from_canvas(canvas.clone())?;
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -31,13 +34,14 @@ pub async fn start() -> Result<(), JsValue> {
         .await
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
+    let caps = surface.get_capabilities(&adapter);
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: surface.get_supported_formats(&adapter)[0],
+        format: caps.formats[0],
         width: canvas.width(),
         height: canvas.height(),
-        present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode: wgpu::CompositeAlphaMode::Auto,
+        present_mode: caps.present_modes[0],
+        alpha_mode: caps.alpha_modes[0],
         view_formats: vec![],
     };
     surface.configure(&device, &config);
@@ -76,6 +80,12 @@ pub async fn start() -> Result<(), JsValue> {
     queue.submit(std::iter::once(encoder.finish()));
     frame.present();
 
+    Ok(())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn start() -> Result<(), ()> {
+    // No-op when not targeting WebAssembly
     Ok(())
 }
 
