@@ -9,6 +9,16 @@ ARCHIVE="vendor.tar.gz"
 CARGO_FLAGS=(--locked)     # přidej např. --offline, pokud chceš
 GZIP_LEVEL="-9"            # -1 rychlejší, -9 nejmenší archiv
 
+TARGET="wasm32-unknown-unknown"
+
+# zkontroluj, že std-lib pro target je v toolchainu
+if ! rustup target list --installed | grep -qx "$TARGET"; then
+  echo "❌  Target '$TARGET' není nainstalován."
+  echo "    Spusť jednorázově:  rustup target add $TARGET"
+  exit 1
+fi
+
+
 # ----------------------------------------------------------------------
 # 1) Vyčisti staré artefakty
 # ----------------------------------------------------------------------

@@ -1,0 +1,7 @@
+
+[toolchain]
+channel = "stable"                    # nebo "nightly-2024-12-01", pokud fixuješ nightly
+targets  = [ "wasm32-unknown-unknown" ]
+
+# Nepovinné:
+# components = [ "rustfmt", "clippy" ]
