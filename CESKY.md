@@ -1,0 +1,1 @@
+Odpovídej prosím v češtině.

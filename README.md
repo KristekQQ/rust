@@ -40,7 +40,15 @@ This repository ships the file `vendor.tar.zst` containing all required
 crates so that builds can happen without network connectivity.  Run the
 provided `./evendor` script to unpack the archive and prepare the `vendor/`
 directory before building. The script relies on the `zstd` tool to
-decompress the archive, so make sure it is installed:
+decompress the archive, so make sure it is installed. On macOS you can
+install it via Homebrew and on Debian-based systems via `apt`:
+
+```bash
+brew install zstd     # macOS
+sudo apt-get install zstd  # Debian/Ubuntu
+```
+
+Then run:
 
 ```bash
 ./evendor
