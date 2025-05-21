@@ -46,6 +46,21 @@ decompress the archive, so make sure it is installed:
 ./evendor
 ```
 
+If `zstd` is not available you can repackage the vendor directory as
+`vendor.tar.gz` or `vendor.zip` on another machine and extract that
+instead. After extracting, run `cargo vendor --sync ./vendor` once to
+update Cargo's metadata:
+
+```bash
+# On a machine with `zstd` available
+tar -I zstd -xf vendor.tar.zst
+tar -czf vendor.tar.gz vendor  # or: zip -r vendor.zip vendor
+
+# On the target system without `zstd`
+tar -xzf vendor.tar.gz         # or: unzip vendor.zip
+cargo vendor --sync ./vendor
+```
+
 The script is idempotent: if a `vendor/` directory already exists it will skip
 the extraction step so previously downloaded crates are reused.
 

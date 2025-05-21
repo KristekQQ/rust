@@ -15,7 +15,7 @@ pub async fn start() -> Result<(), JsValue> {
 
     // Initialize wgpu
     let instance = wgpu::Instance::default();
-    let surface = unsafe { instance.create_surface_from_canvas(&canvas) }?;
+    let surface = unsafe { instance.create_surface(&canvas) }?;
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -28,7 +28,8 @@ pub async fn start() -> Result<(), JsValue> {
 
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor::default(), None)
-        .await?;
+        .await
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     let config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
