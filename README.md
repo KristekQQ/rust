@@ -17,7 +17,7 @@ rustup target add wasm32-unknown-unknown
 # (Do **not** include this comment after the command.)
 cargo install wasm-pack
 
-RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build --target web
+RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build --target web --offline
 ```
 
 This will create a `pkg/` directory with the generated JavaScript and
@@ -45,6 +45,9 @@ decompress the archive, so make sure it is installed:
 ```bash
 ./evendor
 ```
+
+The script is idempotent: if a `vendor/` directory already exists it will skip
+the extraction step so previously downloaded crates are reused.
 
 The script also synchronizes Cargo's metadata with the extracted crates. If
 you later change dependencies you can refresh the vendor directory using:
