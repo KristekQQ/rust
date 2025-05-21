@@ -75,6 +75,14 @@ cargo test --offline
 cargo build --target wasm32-unknown-unknown --release --offline
 ```
 
+Ensure that the `wasm32-unknown-unknown` target is installed **before**
+going offline.  If it is missing the build will fail with an error like
+`can't find crate for 'core'`.  Install it while online via:
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
 Run `wasm-bindgen` before entering the offline sandbox and copy the resulting
 files along with any required runners (for example `node` or `wasmtime`):
 
