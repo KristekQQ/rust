@@ -31,10 +31,19 @@ pub async fn start() -> Result<(), JsValue> {
         .await
         .ok_or("failed to find an appropriate adapter")?;
 
-    let (device, queue) = adapter
-        .request_device(&wgpu::DeviceDescriptor::default(), None)
-        .await
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    // Po odstranění starého limitu `maxInterStageShaderComponents` musí být
+    // vytvoření zařízení explicitní, abychom nepožadovali neznámé limity.
+    let (device, queue) = {
+        let desc = wgpu::DeviceDescriptor {
+            label: None,
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits::default(),
+        };
+        adapter
+            .request_device(&desc, None)
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?
+    };
 
     let caps = surface.get_capabilities(&adapter);
     let config = wgpu::SurfaceConfiguration {
