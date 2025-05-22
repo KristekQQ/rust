@@ -11,13 +11,14 @@ GZIP_LEVEL="-9"            # -1 rychlejší, -9 nejmenší archiv
 
 TARGET="wasm32-unknown-unknown"
 
-# zkontroluj, že std-lib pro target je v toolchainu
+# ----------------------------------------------------------------------
+# Kontrola targetu
+# ----------------------------------------------------------------------
 if ! rustup target list --installed | grep -qx "$TARGET"; then
   echo "❌  Target '$TARGET' není nainstalován."
   echo "    Spusť jednorázově:  rustup target add $TARGET"
   exit 1
 fi
-
 
 # ----------------------------------------------------------------------
 # 1) Vyčisti staré artefakty
@@ -32,24 +33,24 @@ rm -f "$ARCHIVE"
 # 2) Vygeneruj nový vendor z Cargo.lock
 # ----------------------------------------------------------------------
 echo "📦  Running 'cargo vendor' → $VENDOR_DIR"
-cargo vendor "${CARGO_FLAGS[@]}" "$VENDOR_DIR" \
-  | sed 's/^/    /'          # jen kosmetické odsazení logu
+cargo vendor "${CARGO_FLAGS[@]}" "$VENDOR_DIR" | sed 's/^/    /'
 
 # ----------------------------------------------------------------------
 # 3) Zabal do gzipu
 # ----------------------------------------------------------------------
 echo "📦  Creating $ARCHIVE (gzip ${GZIP_LEVEL/-/})"
-# pokud je k dispozici pigz (paralelní gzip), použij ho
 if command -v pigz >/dev/null 2>&1; then
+  # paralelní komprese, pokud je pigz k dispozici
   tar -I "pigz $GZIP_LEVEL" -cvf "$ARCHIVE" "$VENDOR_DIR"
 else
-  tar -czvf "$ARCHIVE" "$VENDOR_DIR" $GZIP_LEVEL
+  # standardní gzip s nastavenou úrovní
+  tar -I "gzip $GZIP_LEVEL" -cvf "$ARCHIVE" "$VENDOR_DIR"
 fi
 
 echo "✅  $ARCHIVE ready ($(du -h "$ARCHIVE" | cut -f1))"
 
 # ----------------------------------------------------------------------
-# 4) Ukaž rychlý návod na obnovu (pro další devy/CI)
+# 4) Krátký návod k obnově (offline)
 # ----------------------------------------------------------------------
 cat <<EOF
 

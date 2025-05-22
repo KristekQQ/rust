@@ -12,3 +12,10 @@ tar -cf - \
 
 cd ~/.cargo
 tar -cf - registry git | gzip -9 | split -b 50M -d - /mnt/c/WebstormProjects/rust/cargo_cache.part.
+7
+
+# 1) případně změň verze v Cargo.toml / Cargo.lock
+# 2) když přecházíš na nový Rust:
+rustup toolchain install 1.88.0
+rustup default 1.88.0
+rustup target add wasm32-unknown-unknown --toolchain 1.88.0

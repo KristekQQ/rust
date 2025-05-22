@@ -1,7 +1,10 @@
-
+# rust-toolchain.toml
 [toolchain]
-channel = "stable"                    # nebo "nightly-2024-12-01", pokud fixuješ nightly
-targets  = [ "wasm32-unknown-unknown" ]
+channel = "1.87.0"
+targets = [ "x86_64-unknown-linux-gnu", "wasm32-unknown-unknown" ]
+profile = "minimal"
 
-# Nepovinné:
-# components = [ "rustfmt", "clippy" ]
+
+
+# volitelné doplňky (přidej, pokud je potřebuješ)
+# components = ["rustfmt", "clippy"]
