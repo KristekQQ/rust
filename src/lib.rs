@@ -150,6 +150,7 @@ impl State {
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
+
                     },
                 })],
                 depth_stencil_attachment: None,
