@@ -1,20 +1,22 @@
 struct Uniforms {
-    mvp : mat4x4<f32>;
-    model: mat4x4<f32>;
-    light_dir: vec4<f32>;
-};
+    mvp : mat4x4<f32>,
+    model: mat4x4<f32>,
+    light_dir: vec4<f32>,
+}
+
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 
 struct VertexInput {
-    @location(0) position: vec3<f32>;
-    @location(1) normal: vec3<f32>;
-};
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+}
 
 struct VertexOutput {
-    @builtin(position) pos: vec4<f32>;
-    @location(0) normal: vec3<f32>;
-};
+    @builtin(position) pos: vec4<f32>,
+    @location(0) normal: vec3<f32>,
+}
+
 
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
