@@ -4,6 +4,7 @@ struct Uniforms {
     light_dir: vec4<f32>,
 }
 
+
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 
 struct VertexInput {
@@ -15,6 +16,7 @@ struct VertexOutput {
     @builtin(position) pos: vec4<f32>,
     @location(0) normal: vec3<f32>,
 }
+
 
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
