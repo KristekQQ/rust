@@ -33,11 +33,15 @@ pub async fn start() -> Result<(), JsValue> {
 
     // Po odstranění starého limitu `maxInterStageShaderComponents` musí být
     // vytvoření zařízení explicitní, abychom nepožadovali neznámé limity.
+    // Request only the limits supported by the current adapter to avoid
+    // mismatches on browsers that changed WebGPU limit names.
+    let adapter_limits = adapter.limits();
+
     let (device, queue) = {
         let desc = wgpu::DeviceDescriptor {
             label: None,
             required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
+            required_limits: adapter_limits,
         };
         adapter
             .request_device(&desc, None)
