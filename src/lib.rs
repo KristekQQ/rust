@@ -317,7 +317,8 @@ impl State {
 
         let aspect = config.width as f32 / config.height as f32;
         let proj = perspective(aspect, 45f32.to_radians(), 0.1, 10.0);
-        let view = look_at([0.0, 0.0, 5.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]);
+        // Move the camera slightly so the cube is clearly visible
+        let view = look_at([3.0, 2.0, 5.0], [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]);
         let proj_view = mat4_mul(proj, view);
 
         Ok(Self {
