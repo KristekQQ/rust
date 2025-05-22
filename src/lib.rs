@@ -18,7 +18,9 @@ pub async fn start() -> Result<(), JsValue> {
 
     // Initialize wgpu
     let instance = wgpu::Instance::default();
-    let surface = instance.create_surface_from_canvas(canvas.clone())?;
+    let surface = instance
+        .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -40,6 +42,7 @@ pub async fn start() -> Result<(), JsValue> {
         format: caps.formats[0],
         width: canvas.width(),
         height: canvas.height(),
+        desired_maximum_frame_latency: 2,
         present_mode: caps.present_modes[0],
         alpha_mode: caps.alpha_modes[0],
         view_formats: vec![],
@@ -70,10 +73,12 @@ pub async fn start() -> Result<(), JsValue> {
                         b: 0.3,
                         a: 1.0,
                     }),
-                    store: true,
+                    store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None,
         });
     }
 
