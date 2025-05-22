@@ -54,7 +54,7 @@ pub fn perspective(aspect: f32, fovy: f32, znear: f32, zfar: f32) -> [[f32; 4]; 
     [
         [f / aspect, 0.0, 0.0, 0.0],
         [0.0, f, 0.0, 0.0],
-        [0.0, 0.0, (zfar + znear) * nf, -1.0],
-        [0.0, 0.0, (2.0 * zfar * znear) * nf, 0.0],
+        [0.0, 0.0, zfar * nf, -1.0],
+        [0.0, 0.0, znear * zfar * nf, 0.0],
     ]
 }
