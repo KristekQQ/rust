@@ -15,7 +15,7 @@ cat cargo_cache.part.* > cargo_cache.tar.gz
 mkdir -p "$CARGO_HOME"
 tar -xzf cargo_cache.tar.gz -C "$CARGO_HOME"
 
-# ── (volitelné) zaregistruj toolchain pod jménem offline ───────────────
-rustup toolchain link offline "$RUSTUP_HOME/toolchains/stable-x86_64-unknown-linux-gnu"
+# ── (volitelné) zaregistruj toolchain pod jménem stable-offline ────────
+rustup toolchain link stable-offline "$RUSTUP_HOME/toolchains/stable-x86_64-unknown-linux-gnu"
 
 echo "✅ Rust toolchain a cache složeny (offline ready)"

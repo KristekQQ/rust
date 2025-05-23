@@ -71,7 +71,8 @@ After unpacking the vendor directory you can build and test completely
 offline:
 
 ```bash
-cargo test --offline
+RUSTUP_TOOLCHAIN=stable-offline \
+cargo test --offline --target x86_64-unknown-linux-gnu
 cargo build --target wasm32-unknown-unknown --release --offline
 ```
 
