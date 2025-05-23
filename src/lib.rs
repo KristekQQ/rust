@@ -203,6 +203,7 @@ impl State {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Cw,
                 ..Default::default()
             },
             depth_stencil: None,
