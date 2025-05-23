@@ -3,21 +3,24 @@ set -euo pipefail
 export RUSTUP_HOME="$PWD/.rustup"
 export CARGO_HOME="$PWD/.cargo"
 
-# Rozbal toolchain
-[ -d "$RUSTUP_HOME" ] || {
-  mkdir -p "$RUSTUP_HOME"
-  tar -xzf rustup_cache.tar.gz -C "$RUSTUP_HOME"
-}
-[ -d "$CARGO_HOME" ]  || {
-  mkdir -p "$CARGO_HOME"
-  tar -xzf cargo_cache.tar.gz -C "$CARGO_HOME"
-}
+# ── složit cache z chunků ─────────────────────────────────────────────
+cat rustup_cache.part.* | tar -xz
+cat cargo_cache.part.* | tar -xz
 
-# Rozbal crate vendor
+# ── link offline toolchain pod jménem stable-offline ───────────────────
+OFFLINE_NAME="stable-offline"
+OFFLINE_PATH="$RUSTUP_HOME/toolchains/stable-x86_64-unknown-linux-gnu"
+if ! rustup toolchain list | grep -q "$OFFLINE_NAME"; then
+  rustup toolchain link "$OFFLINE_NAME" "$OFFLINE_PATH"
+fi
+
+# ── rozbal vendored crates ─────────────────────────────────────────────
 tar -xzvf vendor.tar.gz
 
-# Pro jistotu zaregistruj toolchain pod jménem "offline"
-rustup toolchain link offline "$RUSTUP_HOME/toolchains/stable-x86_64-unknown-linux-gnu"
+# ── spustit testy s offline toolchainem ────────────────────────────────
+export RUSTUP_TOOLCHAIN="$OFFLINE_NAME"
+cargo test --offline --target x86_64-unknown-linux-gnu
 
-# Sestav projekt čistě offline
-cargo +offline build --target wasm32-unknown-unknown --release --offline
+# (volitelné) formátování – funguje jen pokud máš rustfmt v cache
+# cargo fmt --all -- --check
+

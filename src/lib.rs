@@ -34,23 +34,32 @@ impl Vertex {
 }
 
 #[cfg(target_arch = "wasm32")]
-const BASE_VERTICES: [[f32; 2]; 3] = [
-    [-0.5, -0.5],
-    [0.5, -0.5],
-    [0.0, 0.5],
-];
+const BASE_VERTICES: [[f32; 2]; 3] = [[-0.5, -0.5], [0.5, -0.5], [0.0, 0.5]];
 
+#[cfg(target_arch = "wasm32")]
 const CENTER: [f32; 2] = [0.0, -0.16666667];
 
+#[cfg(target_arch = "wasm32")]
 const VERTICES: &[Vertex] = &[
-    Vertex { position: BASE_VERTICES[0] },
-    Vertex { position: BASE_VERTICES[1] },
-    Vertex { position: BASE_VERTICES[2] },
+    Vertex {
+        position: BASE_VERTICES[0],
+    },
+    Vertex {
+        position: BASE_VERTICES[1],
+    },
+    Vertex {
+        position: BASE_VERTICES[2],
+    },
 ];
 
 #[cfg(target_arch = "wasm32")]
 fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * std::mem::size_of::<T>()) }
+    unsafe {
+        std::slice::from_raw_parts(
+            data.as_ptr() as *const u8,
+            data.len() * std::mem::size_of::<T>(),
+        )
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -164,7 +173,14 @@ impl State {
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
-        let uniform = Uniforms { mvp: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]] };
+        let uniform = Uniforms {
+            mvp: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+        };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("uniform buffer"),
             contents: as_bytes(&[uniform]),
@@ -179,7 +195,15 @@ impl State {
             label: Some("bind group"),
         });
 
-        Ok(Self { surface, device, queue, pipeline, vertex_buffer, uniform_buffer, bind_group })
+        Ok(Self {
+            surface,
+            device,
+            queue,
+            pipeline,
+            vertex_buffer,
+            uniform_buffer,
+            bind_group,
+        })
     }
 
     fn update(&mut self, angle: f32) {
@@ -195,10 +219,14 @@ impl State {
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let frame = self.surface.get_current_texture()?;
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("encoder"),
-        });
+        let view = frame
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("encoder"),
+            });
         {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
@@ -208,7 +236,6 @@ impl State {
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
-
                     },
                 })],
                 depth_stencil_attachment: None,
