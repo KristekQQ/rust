@@ -2,6 +2,13 @@ struct VertexInput {
     @location(0) position: vec2<f32>,
 };
 
+struct Uniforms {
+    model: mat4x4<f32>,
+};
+
+@group(0) @binding(0)
+var<uniform> uniforms: Uniforms;
+
 struct VertexOutput {
     @builtin(position) pos: vec4<f32>,
 };
@@ -9,7 +16,7 @@ struct VertexOutput {
 @vertex
 fn vs_main(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.pos = vec4<f32>(input.position, 0.0, 1.0);
+    out.pos = uniforms.model * vec4<f32>(input.position, 0.0, 1.0);
     return out;
 }
 
