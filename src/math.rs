@@ -127,4 +127,5 @@ mod tests {
         let t = transpose(transpose(m));
         assert_eq!(m, t);
     }
+
 }
