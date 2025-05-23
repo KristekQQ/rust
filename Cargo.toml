@@ -12,6 +12,6 @@ wasm-bindgen-futures = "0.4"
 # z 0.17 -> 0.18  (nejmenší API změny; když zvládneš, klidně 0.20.1)
 wgpu = { version = "0.20.1", features = ["webgpu", "wgsl"] }
 console_error_panic_hook = "0.1"
-web-sys = { version = "0.3", features = ["HtmlCanvasElement", "Window", "Document"] }
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "Window", "Document", "console"] }
 js-sys = "0.3"
 

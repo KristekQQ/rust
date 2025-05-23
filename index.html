@@ -5,11 +5,10 @@
     <title>WebGPU with Rust/WASM</title>
     <style>
         body { margin: 0; overflow: hidden; }
-        #camera, #gpu-canvas { position: absolute; top: 0; left: 0; }
+        #gpu-canvas { position: absolute; top: 0; left: 0; }
     </style>
 </head>
 <body>
-    <video id="camera" width="640" height="480" autoplay playsinline></video>
     <canvas id="gpu-canvas" width="640" height="480"></canvas>
     <script type="module">
         // Patch outdated WebGPU limit name for newer Chrome versions.
@@ -23,11 +22,6 @@
             }
             return origRequestDevice.call(this, desc);
         };
-
-        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-            const video = document.getElementById('camera');
-            video.srcObject = stream;
-        }).catch(console.error);
 
         import init from './pkg/webgpu_wasm.js';
         init();

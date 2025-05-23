@@ -171,6 +171,7 @@ impl State {
 #[cfg(target_arch = "wasm32")]
 pub async fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
+    web_sys::console::log_1(&"Test 321".into());
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     let canvas = document
