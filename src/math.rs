@@ -19,6 +19,26 @@ pub fn rotation_y(angle: f32) -> [[f32; 4]; 4] {
     ]
 }
 
+pub fn rotation_z(angle: f32) -> [[f32; 4]; 4] {
+    let c = angle.cos();
+    let s = angle.sin();
+    [
+        [c, -s, 0.0, 0.0],
+        [s, c, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
+pub fn translation(tx: f32, ty: f32, tz: f32) -> [[f32; 4]; 4] {
+    [
+        [1.0, 0.0, 0.0, tx],
+        [0.0, 1.0, 0.0, ty],
+        [0.0, 0.0, 1.0, tz],
+        [0.0, 0.0, 0.0, 1.0],
+    ]
+}
+
 fn normalize(v: [f32; 3]) -> [f32; 3] {
     let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
     [v[0] / l, v[1] / l, v[2] / l]
