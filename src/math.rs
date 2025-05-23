@@ -78,3 +78,53 @@ pub fn perspective(aspect: f32, fovy: f32, znear: f32, zfar: f32) -> [[f32; 4]; 
         [0.0, 0.0, znear * zfar * nf, 0.0],
     ]
 }
+
+pub fn transpose(m: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
+    let mut t = [[0.0; 4]; 4];
+    for i in 0..4 {
+        for j in 0..4 {
+            t[i][j] = m[j][i];
+        }
+    }
+    t
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotation_z_pi() {
+        let r = rotation_z(std::f32::consts::PI);
+        let expected = [
+            [-1.0, 0.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        for i in 0..4 {
+            for j in 0..4 {
+                assert!((r[i][j] - expected[i][j]).abs() < 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn perspective_identity_aspect_one() {
+        let m = perspective(1.0, std::f32::consts::FRAC_PI_2, 0.1, 10.0);
+        assert!((m[0][0] - 1.0).abs() < 0.0001);
+        assert!((m[1][1] - 1.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn transpose_roundtrip() {
+        let m = [
+            [1.0, 2.0, 3.0, 4.0],
+            [5.0, 6.0, 7.0, 8.0],
+            [9.0, 10.0, 11.0, 12.0],
+            [13.0, 14.0, 15.0, 16.0],
+        ];
+        let t = transpose(transpose(m));
+        assert_eq!(m, t);
+    }
+}
