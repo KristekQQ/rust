@@ -7,49 +7,77 @@ use wasm_bindgen::{closure::Closure, JsCast};
 #[cfg(target_arch = "wasm32")]
 use wgpu::util::DeviceExt;
 
-#[cfg(target_arch = "wasm32")]
 mod math;
 
-#[cfg(target_arch = "wasm32")]
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Vertex {
-    position: [f32; 2],
+    position: [f32; 3],
+    color: [f32; 3],
 }
 
-#[cfg(target_arch = "wasm32")]
 impl Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem;
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[wgpu::VertexAttribute {
-                offset: 0,
-                shader_location: 0,
-                format: wgpu::VertexFormat::Float32x2,
-            }],
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+            ],
         }
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-const BASE_VERTICES: [[f32; 2]; 3] = [[-0.5, -0.5], [0.5, -0.5], [0.0, 0.5]];
-
-#[cfg(target_arch = "wasm32")]
-const CENTER: [f32; 2] = [0.0, -0.16666667];
-
-#[cfg(target_arch = "wasm32")]
 const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: BASE_VERTICES[0],
-    },
-    Vertex {
-        position: BASE_VERTICES[1],
-    },
-    Vertex {
-        position: BASE_VERTICES[2],
-    },
+    // front - red
+    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [-0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    // back - green
+    Vertex { position: [0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    // left - blue
+    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 0.0, 1.0] },
+    // right - yellow
+    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 1.0, 0.0] },
+    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 1.0, 0.0] },
+    Vertex { position: [0.5, 0.5, -0.5], color: [1.0, 1.0, 0.0] },
+    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 1.0, 0.0] },
+    // top - cyan
+    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
+    Vertex { position: [0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
+    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
+    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
+    // bottom - magenta
+    Vertex { position: [-0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
+];
+
+const INDICES: &[u16] = &[
+    0, 1, 2, 0, 2, 3, // front
+    4, 5, 6, 4, 6, 7, // back
+    8, 9, 10, 8, 10, 11, // left
+    12, 13, 14, 12, 14, 15, // right
+    16, 17, 18, 16, 18, 19, // top
+    20, 21, 22, 20, 22, 23, // bottom
 ];
 
 #[cfg(target_arch = "wasm32")]
@@ -75,8 +103,10 @@ struct State {
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    aspect: f32,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -117,6 +147,7 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
+        let aspect = config.width as f32 / config.height as f32;
 
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
@@ -124,6 +155,11 @@ impl State {
             label: Some("vertex buffer"),
             contents: as_bytes(VERTICES),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("index buffer"),
+            contents: as_bytes(INDICES),
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -201,17 +237,19 @@ impl State {
             queue,
             pipeline,
             vertex_buffer,
+            index_buffer,
             uniform_buffer,
             bind_group,
+            aspect,
         })
     }
 
     fn update(&mut self, angle: f32) {
-        use crate::math::{mat4_mul, rotation_z, translation};
-        let t1 = translation(-CENTER[0], -CENTER[1], 0.0);
-        let rot = rotation_z(angle);
-        let t2 = translation(CENTER[0], CENTER[1], 0.0);
-        let m = mat4_mul(t2, mat4_mul(rot, t1));
+        use crate::math::{look_at, mat4_mul, perspective, rotation_z};
+        let model = rotation_z(angle);
+        let view = look_at([2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+        let proj = perspective(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
+        let m = mat4_mul(proj, mat4_mul(view, model));
         let uniform = Uniforms { mvp: m };
         self.queue
             .write_buffer(&self.uniform_buffer, 0, as_bytes(&[uniform]));
@@ -245,7 +283,8 @@ impl State {
             rp.set_pipeline(&self.pipeline);
             rp.set_bind_group(0, &self.bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            rp.draw(0..3, 0..1);
+            rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            rp.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
         frame.present();
@@ -295,4 +334,19 @@ pub async fn start() -> Result<(), JsValue> {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start() -> Result<(), ()> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cube_vertex_count() {
+        assert_eq!(VERTICES.len(), 24);
+    }
+
+    #[test]
+    fn cube_index_count() {
+        assert_eq!(INDICES.len(), 36);
+    }
 }
