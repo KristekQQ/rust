@@ -203,6 +203,7 @@ impl State {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
+                cull_mode: None,
                 front_face: wgpu::FrontFace::Cw,
                 ..Default::default()
             },
@@ -246,10 +247,10 @@ impl State {
     }
 
     fn update(&mut self, angle: f32) {
-        use crate::math::{look_at, mat4_mul, perspective, rotation_z, transpose};
+        use crate::math::{look_at, mat4_mul, perspective_lh, rotation_z, transpose};
         let model = rotation_z(angle);
         let view = look_at([2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
-        let proj = perspective(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
+        let proj = perspective_lh(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
         let m = transpose(mat4_mul(proj, mat4_mul(view, model)));
         let uniform = Uniforms { mvp: m };
         self.queue
@@ -273,7 +274,7 @@ impl State {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.1, g: 0.1, b: 0.3, a: 1.0 }),
                         store: wgpu::StoreOp::Store,
                     },
                 })],

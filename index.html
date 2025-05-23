@@ -23,6 +23,10 @@
             return origRequestDevice.call(this, desc);
         };
 
+        const canvas = document.getElementById("gpu-canvas");
+        canvas.width  = canvas.clientWidth  || 800;
+        canvas.height = canvas.clientHeight || 600;
+
         import init from './pkg/webgpu_wasm.js';
         init();
     </script>
