@@ -79,6 +79,18 @@ pub fn perspective(aspect: f32, fovy: f32, znear: f32, zfar: f32) -> [[f32; 4]; 
     ]
 }
 
+/// Levostranná perspektivní matice pro WebGPU (z ∈ [0‥1])
+pub fn perspective_lh(aspect: f32, fovy: f32, znear: f32, zfar: f32) -> [[f32; 4]; 4] {
+    let f = 1.0 / (fovy * 0.5).tan();
+    let nf = 1.0 / (zfar - znear);
+    [
+        [f / aspect, 0.0, 0.0, 0.0],
+        [0.0, f, 0.0, 0.0],
+        [0.0, 0.0, zfar * nf, 1.0],
+        [0.0, 0.0, -znear * zfar * nf, 0.0],
+    ]
+}
+
 pub fn transpose(m: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
     let mut t = [[0.0; 4]; 4];
     for i in 0..4 {
