@@ -245,11 +245,11 @@ impl State {
     }
 
     fn update(&mut self, angle: f32) {
-        use crate::math::{look_at, mat4_mul, perspective, rotation_z};
+        use crate::math::{look_at, mat4_mul, perspective, rotation_z, transpose};
         let model = rotation_z(angle);
         let view = look_at([2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
         let proj = perspective(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
-        let m = mat4_mul(proj, mat4_mul(view, model));
+        let m = transpose(mat4_mul(proj, mat4_mul(view, model)));
         let uniform = Uniforms { mvp: m };
         self.queue
             .write_buffer(&self.uniform_buffer, 0, as_bytes(&[uniform]));
