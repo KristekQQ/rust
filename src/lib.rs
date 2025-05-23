@@ -8,6 +8,9 @@ use wasm_bindgen::{closure::Closure, JsCast};
 use wgpu::util::DeviceExt;
 
 #[cfg(target_arch = "wasm32")]
+mod math;
+
+#[cfg(target_arch = "wasm32")]
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Vertex {
@@ -31,10 +34,18 @@ impl Vertex {
 }
 
 #[cfg(target_arch = "wasm32")]
+const BASE_VERTICES: [[f32; 2]; 3] = [
+    [-0.5, -0.5],
+    [0.5, -0.5],
+    [0.0, 0.5],
+];
+
+const CENTER: [f32; 2] = [0.0, -0.16666667];
+
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [-0.5, -0.5] },
-    Vertex { position: [0.5, -0.5] },
-    Vertex { position: [0.0, 0.5] },
+    Vertex { position: BASE_VERTICES[0] },
+    Vertex { position: BASE_VERTICES[1] },
+    Vertex { position: BASE_VERTICES[2] },
 ];
 
 #[cfg(target_arch = "wasm32")]
@@ -43,12 +54,20 @@ fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Uniforms {
+    mvp: [[f32; 4]; 4],
+}
+
 struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
+    uniform_buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -95,12 +114,26 @@ impl State {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
             contents: as_bytes(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("bind group layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("pipeline layout"),
-            bind_group_layouts: &[],
+            bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -131,8 +164,33 @@ impl State {
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
+        let uniform = Uniforms { mvp: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]] };
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("uniform buffer"),
+            contents: as_bytes(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buffer.as_entire_binding(),
+            }],
+            label: Some("bind group"),
+        });
 
-        Ok(Self { surface, device, queue, pipeline, vertex_buffer })
+        Ok(Self { surface, device, queue, pipeline, vertex_buffer, uniform_buffer, bind_group })
+    }
+
+    fn update(&mut self, angle: f32) {
+        use crate::math::{mat4_mul, rotation_z, translation};
+        let t1 = translation(-CENTER[0], -CENTER[1], 0.0);
+        let rot = rotation_z(angle);
+        let t2 = translation(CENTER[0], CENTER[1], 0.0);
+        let m = mat4_mul(t2, mat4_mul(rot, t1));
+        let uniform = Uniforms { mvp: m };
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, as_bytes(&[uniform]));
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -158,6 +216,7 @@ impl State {
                 timestamp_writes: None,
             });
             rp.set_pipeline(&self.pipeline);
+            rp.set_bind_group(0, &self.bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.draw(0..3, 0..1);
         }
@@ -180,13 +239,19 @@ pub async fn start() -> Result<(), JsValue> {
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
+    let performance = window.performance().unwrap();
+    let start_time = performance.now();
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
+    let perf_c = performance.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+        let elapsed = (perf_c.now() - start_time) as f32 / 1000.0;
+        let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut st = state.borrow_mut();
+            st.update(angle);
             if st.render().is_err() {
                 return;
             }
