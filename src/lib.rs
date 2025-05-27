@@ -16,6 +16,109 @@ struct Vertex {
     color: [f32; 3],
 }
 
+#[cfg(target_arch = "wasm32")]
+struct Input {
+    forward: bool,
+    back: bool,
+    left: bool,
+    right: bool,
+    mouse_down: bool,
+    last_x: f32,
+    last_y: f32,
+    dx: f32,
+    dy: f32,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Input {
+    fn new() -> Self {
+        Self {
+            forward: false,
+            back: false,
+            left: false,
+            right: false,
+            mouse_down: false,
+            last_x: 0.0,
+            last_y: 0.0,
+            dx: 0.0,
+            dy: 0.0,
+        }
+    }
+
+    fn consume_mouse_delta(&mut self) -> (f32, f32) {
+        let d = (self.dx, self.dy);
+        self.dx = 0.0;
+        self.dy = 0.0;
+        d
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+struct Camera {
+    position: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Camera {
+    fn new() -> Self {
+        Self {
+            position: [0.0, 0.0, 2.0],
+            yaw: 0.0,
+            pitch: 0.0,
+        }
+    }
+
+    fn update(&mut self, input: &mut Input, dt: f32) {
+        let speed = 2.0 * dt;
+        let (dx, dy) = input.consume_mouse_delta();
+        if input.mouse_down {
+            self.yaw += dx * 0.005;
+            self.pitch += dy * 0.005;
+        }
+
+        let (cy, sy) = (self.yaw.cos(), self.yaw.sin());
+        let (cp, sp) = (self.pitch.cos(), self.pitch.sin());
+        let forward = [cy * cp, sp, sy * cp];
+        let right = [cy, 0.0, sy * -1.0];
+
+        if input.forward {
+            for i in 0..3 {
+                self.position[i] += forward[i] * speed;
+            }
+        }
+        if input.back {
+            for i in 0..3 {
+                self.position[i] -= forward[i] * speed;
+            }
+        }
+        if input.right {
+            for i in 0..3 {
+                self.position[i] += right[i] * speed;
+            }
+        }
+        if input.left {
+            for i in 0..3 {
+                self.position[i] -= right[i] * speed;
+            }
+        }
+    }
+
+    fn view(&self) -> [[f32; 4]; 4] {
+        use crate::math::look_at;
+        let (cy, sy) = (self.yaw.cos(), self.yaw.sin());
+        let (cp, sp) = (self.pitch.cos(), self.pitch.sin());
+        let forward = [cy * cp, sp, sy * cp];
+        let target = [
+            self.position[0] + forward[0],
+            self.position[1] + forward[1],
+            self.position[2] + forward[2],
+        ];
+        look_at(self.position, target, [0.0, 1.0, 0.0])
+    }
+}
+
 impl Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         use std::mem;
@@ -39,46 +142,12 @@ impl Vertex {
 }
 
 const VERTICES: &[Vertex] = &[
-    // front - red
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    // back - green
-    Vertex { position: [0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    // left - blue
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    // right - yellow
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    // top - cyan
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    // bottom - magenta
-    Vertex { position: [-0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.0, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
 ];
 
-const INDICES: &[u16] = &[
-    0, 1, 2, 0, 2, 3, // front
-    4, 5, 6, 4, 6, 7, // back
-    8, 9, 10, 8, 10, 11, // left
-    12, 13, 14, 12, 14, 15, // right
-    16, 17, 18, 16, 18, 19, // top
-    20, 21, 22, 20, 22, 23, // bottom
-];
+const INDICES: &[u16] = &[0, 1, 2];
 
 #[cfg(target_arch = "wasm32")]
 fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
@@ -97,6 +166,7 @@ struct Uniforms {
     mvp: [[f32; 4]; 4],
 }
 
+#[cfg(target_arch = "wasm32")]
 struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -107,6 +177,8 @@ struct State {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     aspect: f32,
+    camera: Camera,
+    input: Input,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -243,18 +315,21 @@ impl State {
             uniform_buffer,
             bind_group,
             aspect,
+            camera: Camera::new(),
+            input: Input::new(),
         })
     }
 
-    fn update(&mut self, angle: f32) {
-        use crate::math::{look_at, mat4_mul, perspective_lh, rotation_z, transpose};
+    fn update(&mut self, angle: f32, dt: f32) {
+        use crate::math::{mat4_mul, perspective_lh, rotation_z, transpose};
+        self.camera.update(&mut self.input, dt);
         let model = rotation_z(angle);
-        let view = look_at([2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+        let view = self.camera.view();
+        web_sys::console::log_1(&format!("{:?}", view).into());
         let proj = perspective_lh(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
         let m = transpose(mat4_mul(proj, mat4_mul(view, model)));
         let uniform = Uniforms { mvp: m };
-        self.queue
-            .write_buffer(&self.uniform_buffer, 0, as_bytes(&[uniform]));
+        self.queue.write_buffer(&self.uniform_buffer, 0, as_bytes(&[uniform]));
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -309,17 +384,87 @@ pub async fn start() -> Result<(), JsValue> {
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
     let performance = window.performance().unwrap();
     let start_time = performance.now();
+    let last_time = Rc::new(RefCell::new(start_time));
+
+    {
+        let st = state.clone();
+        let cb = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            let mut s = st.borrow_mut();
+            match e.key().as_str() {
+                "w" | "W" => s.input.forward = true,
+                "s" | "S" => s.input.back = true,
+                "a" | "A" => s.input.left = true,
+                "d" | "D" => s.input.right = true,
+                _ => {}
+            }
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())?;
+        cb.forget();
+    }
+    {
+        let st = state.clone();
+        let cb = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            let mut s = st.borrow_mut();
+            match e.key().as_str() {
+                "w" | "W" => s.input.forward = false,
+                "s" | "S" => s.input.back = false,
+                "a" | "A" => s.input.left = false,
+                "d" | "D" => s.input.right = false,
+                _ => {}
+            }
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("keyup", cb.as_ref().unchecked_ref())?;
+        cb.forget();
+    }
+    {
+        let st = state.clone();
+        let cb = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
+            let mut s = st.borrow_mut();
+            s.input.mouse_down = true;
+            s.input.last_x = e.client_x() as f32;
+            s.input.last_y = e.client_y() as f32;
+        }) as Box<dyn FnMut(_)>);
+        canvas.add_event_listener_with_callback("mousedown", cb.as_ref().unchecked_ref())?;
+        cb.forget();
+    }
+    {
+        let st = state.clone();
+        let cb = Closure::wrap(Box::new(move |_e: web_sys::MouseEvent| {
+            let mut s = st.borrow_mut();
+            s.input.mouse_down = false;
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("mouseup", cb.as_ref().unchecked_ref())?;
+        cb.forget();
+    }
+    {
+        let st = state.clone();
+        let cb = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
+            let mut s = st.borrow_mut();
+            let x = e.client_x() as f32;
+            let y = e.client_y() as f32;
+            s.input.dx += x - s.input.last_x;
+            s.input.dy += y - s.input.last_y;
+            s.input.last_x = x;
+            s.input.last_y = y;
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("mousemove", cb.as_ref().unchecked_ref())?;
+        cb.forget();
+    }
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();
+    let last_c = last_time.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        let elapsed = (perf_c.now() - start_time) as f32 / 1000.0;
+        let now = perf_c.now();
+        let elapsed = (now - start_time) as f32 / 1000.0;
+        let dt = (now - *last_c.borrow()) as f32 / 1000.0;
+        *last_c.borrow_mut() = now;
         let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut st = state.borrow_mut();
-            st.update(angle);
+            st.update(angle, dt);
             if st.render().is_err() {
                 return;
             }
@@ -343,12 +488,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cube_vertex_count() {
-        assert_eq!(VERTICES.len(), 24);
+    fn triangle_vertex_count() {
+        assert_eq!(VERTICES.len(), 3);
     }
 
     #[test]
-    fn cube_index_count() {
-        assert_eq!(INDICES.len(), 36);
+    fn triangle_index_count() {
+        assert_eq!(INDICES.len(), 3);
     }
 }
