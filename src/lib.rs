@@ -39,46 +39,12 @@ impl Vertex {
 }
 
 const VERTICES: &[Vertex] = &[
-    // front - red
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    // back - green
-    Vertex { position: [0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    // left - blue
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    // right - yellow
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    // top - cyan
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    // bottom - magenta
-    Vertex { position: [-0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.0, 0.5, 0.0], color: [0.0, 1.0, 0.0] },
 ];
 
-const INDICES: &[u16] = &[
-    0, 1, 2, 0, 2, 3, // front
-    4, 5, 6, 4, 6, 7, // back
-    8, 9, 10, 8, 10, 11, // left
-    12, 13, 14, 12, 14, 15, // right
-    16, 17, 18, 16, 18, 19, // top
-    20, 21, 22, 20, 22, 23, // bottom
-];
+const INDICES: &[u16] = &[0, 1, 2];
 
 #[cfg(target_arch = "wasm32")]
 fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
@@ -97,6 +63,39 @@ struct Uniforms {
     mvp: [[f32; 4]; 4],
 }
 
+struct Camera {
+    pos: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+}
+
+impl Camera {
+    fn view(&self) -> [[f32; 4]; 4] {
+        use crate::math::look_at;
+        let forward = [
+            self.yaw.cos() * self.pitch.cos(),
+            self.yaw.sin() * self.pitch.cos(),
+            self.pitch.sin(),
+        ];
+        let target = [
+            self.pos[0] + forward[0],
+            self.pos[1] + forward[1],
+            self.pos[2] + forward[2],
+        ];
+        look_at(self.pos, target, [0.0, 0.0, 1.0])
+    }
+}
+
+struct Input {
+    forward: bool,
+    back: bool,
+    left: bool,
+    right: bool,
+    mouse_down: bool,
+    last_x: f32,
+    last_y: f32,
+}
+
 struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -107,6 +106,7 @@ struct State {
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     aspect: f32,
+    camera: Camera,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -233,6 +233,12 @@ impl State {
             label: Some("bind group"),
         });
 
+        let camera = Camera {
+            pos: [0.0, 0.0, 2.0],
+            yaw: 0.0,
+            pitch: 0.0,
+        };
+
         Ok(Self {
             surface,
             device,
@@ -243,13 +249,41 @@ impl State {
             uniform_buffer,
             bind_group,
             aspect,
+            camera,
         })
     }
 
-    fn update(&mut self, angle: f32) {
-        use crate::math::{look_at, mat4_mul, perspective_lh, rotation_z, transpose};
+    fn update(&mut self, angle: f32, input: &Input, dt: f32) {
+        use crate::math::{mat4_mul, perspective_lh, rotation_z, transpose};
+
+        let move_speed = 2.0;
+        let forward = [
+            self.camera.yaw.cos() * self.camera.pitch.cos(),
+            self.camera.yaw.sin() * self.camera.pitch.cos(),
+            self.camera.pitch.sin(),
+        ];
+        let right = [-forward[1], forward[0], 0.0];
+        if input.forward {
+            self.camera.pos[0] += forward[0] * move_speed * dt;
+            self.camera.pos[1] += forward[1] * move_speed * dt;
+            self.camera.pos[2] += forward[2] * move_speed * dt;
+        }
+        if input.back {
+            self.camera.pos[0] -= forward[0] * move_speed * dt;
+            self.camera.pos[1] -= forward[1] * move_speed * dt;
+            self.camera.pos[2] -= forward[2] * move_speed * dt;
+        }
+        if input.left {
+            self.camera.pos[0] -= right[0] * move_speed * dt;
+            self.camera.pos[1] -= right[1] * move_speed * dt;
+        }
+        if input.right {
+            self.camera.pos[0] += right[0] * move_speed * dt;
+            self.camera.pos[1] += right[1] * move_speed * dt;
+        }
+
         let model = rotation_z(angle);
-        let view = look_at([2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+        let view = self.camera.view();
         let proj = perspective_lh(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
         let m = transpose(mat4_mul(proj, mat4_mul(view, model)));
         let uniform = Uniforms { mvp: m };
@@ -307,19 +341,105 @@ pub async fn start() -> Result<(), JsValue> {
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
+    let input = Rc::new(RefCell::new(Input {
+        forward: false,
+        back: false,
+        left: false,
+        right: false,
+        mouse_down: false,
+        last_x: 0.0,
+        last_y: 0.0,
+    }));
+
+    {
+        let input = input.clone();
+        let closure = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            match e.key().as_str() {
+                "w" | "W" => input.borrow_mut().forward = true,
+                "s" | "S" => input.borrow_mut().back = true,
+                "a" | "A" => input.borrow_mut().left = true,
+                "d" | "D" => input.borrow_mut().right = true,
+                _ => {}
+            }
+        }) as Box<dyn FnMut(_)>);
+        window
+            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    {
+        let input = input.clone();
+        let closure = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            match e.key().as_str() {
+                "w" | "W" => input.borrow_mut().forward = false,
+                "s" | "S" => input.borrow_mut().back = false,
+                "a" | "A" => input.borrow_mut().left = false,
+                "d" | "D" => input.borrow_mut().right = false,
+                _ => {}
+            }
+        }) as Box<dyn FnMut(_)>);
+        window
+            .add_event_listener_with_callback("keyup", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    {
+        let input = input.clone();
+        let closure = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
+            input.borrow_mut().mouse_down = true;
+            input.borrow_mut().last_x = e.client_x() as f32;
+            input.borrow_mut().last_y = e.client_y() as f32;
+        }) as Box<dyn FnMut(_)>);
+        window
+            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    {
+        let input = input.clone();
+        let closure = Closure::wrap(Box::new(move |_e: web_sys::MouseEvent| {
+            input.borrow_mut().mouse_down = false;
+        }) as Box<dyn FnMut(_)>);
+        window
+            .add_event_listener_with_callback("mouseup", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    {
+        let input = input.clone();
+        let state_c = state.clone();
+        let closure = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
+            let mut inp = input.borrow_mut();
+            if inp.mouse_down {
+                let dx = e.client_x() as f32 - inp.last_x;
+                let dy = e.client_y() as f32 - inp.last_y;
+                inp.last_x = e.client_x() as f32;
+                inp.last_y = e.client_y() as f32;
+                let mut st = state_c.borrow_mut();
+                st.camera.yaw -= dx * 0.005;
+                st.camera.pitch = (st.camera.pitch - dy * 0.005)
+                    .clamp(-1.54, 1.54);
+            }
+        }) as Box<dyn FnMut(_)>);
+        window
+            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
     let performance = window.performance().unwrap();
     let start_time = performance.now();
+    let last_time = Rc::new(RefCell::new(start_time));
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();
+    let input_c = input.clone();
+    let last_c = last_time.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        let elapsed = (perf_c.now() - start_time) as f32 / 1000.0;
+        let now = perf_c.now();
+        let elapsed = (now - start_time) as f32 / 1000.0;
+        let dt = (now - *last_c.borrow()) as f32 / 1000.0;
+        *last_c.borrow_mut() = now;
         let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut st = state.borrow_mut();
-            st.update(angle);
+            st.update(angle, &input_c.borrow(), dt);
             if st.render().is_err() {
                 return;
             }
@@ -343,12 +463,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cube_vertex_count() {
-        assert_eq!(VERTICES.len(), 24);
+    fn triangle_vertex_count() {
+        assert_eq!(VERTICES.len(), 3);
     }
 
     #[test]
-    fn cube_index_count() {
-        assert_eq!(INDICES.len(), 36);
+    fn triangle_index_count() {
+        assert_eq!(INDICES.len(), 3);
     }
 }
