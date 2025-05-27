@@ -1,10 +1,6 @@
-#[cfg(target_arch = "wasm32")]
 use std::{cell::RefCell, rc::Rc};
-#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{closure::Closure, JsCast};
-#[cfg(target_arch = "wasm32")]
 use wgpu::util::DeviceExt;
 
 mod math;
@@ -13,7 +9,6 @@ mod math;
 #[derive(Clone, Copy)]
 struct Vertex {
     position: [f32; 3],
-    color: [f32; 3],
 }
 
 impl Vertex {
@@ -22,79 +17,91 @@ impl Vertex {
         wgpu::VertexBufferLayout {
             array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
+            attributes: &[wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 0,
+                format: wgpu::VertexFormat::Float32x3,
+            }],
         }
     }
 }
 
 const VERTICES: &[Vertex] = &[
-    // front - red
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    // back - green
-    Vertex { position: [0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    // left - blue
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    // right - yellow
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    // top - cyan
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    // bottom - magenta
-    Vertex { position: [-0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.0] },
+    Vertex { position: [0.5, -0.5, 0.0] },
+    Vertex { position: [0.0, 0.5, 0.0] },
 ];
 
-const INDICES: &[u16] = &[
-    0, 1, 2, 0, 2, 3, // front
-    4, 5, 6, 4, 6, 7, // back
-    8, 9, 10, 8, 10, 11, // left
-    12, 13, 14, 12, 14, 15, // right
-    16, 17, 18, 16, 18, 19, // top
-    20, 21, 22, 20, 22, 23, // bottom
-];
-
-#[cfg(target_arch = "wasm32")]
 fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
-    unsafe {
-        std::slice::from_raw_parts(
-            data.as_ptr() as *const u8,
-            data.len() * std::mem::size_of::<T>(),
-        )
-    }
+    unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * std::mem::size_of::<T>()) }
 }
 
-#[cfg(target_arch = "wasm32")]
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Uniforms {
     mvp: [[f32; 4]; 4],
+}
+
+struct Camera {
+    pos: [f32; 3],
+    yaw: f32,
+    pitch: f32,
+}
+
+impl Camera {
+    fn new() -> Self {
+        Self { pos: [0.0, 0.0, 2.0], yaw: -std::f32::consts::FRAC_PI_2, pitch: 0.0 }
+    }
+
+    fn view_matrix(&self) -> [[f32; 4]; 4] {
+        let (sy, cy) = self.yaw.sin_cos();
+        let (sp, cp) = self.pitch.sin_cos();
+        let forward = [cp * cy, sp, cp * sy];
+        let target = [
+            self.pos[0] + forward[0],
+            self.pos[1] + forward[1],
+            self.pos[2] + forward[2],
+        ];
+        math::look_at(self.pos, target, [0.0, 1.0, 0.0])
+    }
+
+    fn update(&mut self, input: &InputState, dt: f32) {
+        let speed = 2.0 * dt;
+        let (sy, cy) = self.yaw.sin_cos();
+        let forward = [cy, 0.0, sy];
+        let right = [forward[2], 0.0, -forward[0]];
+        if input.forward {
+            self.pos[0] += forward[0] * speed;
+            self.pos[2] += forward[2] * speed;
+        }
+        if input.back {
+            self.pos[0] -= forward[0] * speed;
+            self.pos[2] -= forward[2] * speed;
+        }
+        if input.left {
+            self.pos[0] -= right[0] * speed;
+            self.pos[2] -= right[2] * speed;
+        }
+        if input.right {
+            self.pos[0] += right[0] * speed;
+            self.pos[2] += right[2] * speed;
+        }
+    }
+
+    fn add_mouse_delta(&mut self, dx: f32, dy: f32) {
+        const SENS: f32 = 0.002;
+        self.yaw += dx * SENS;
+        self.pitch -= dy * SENS;
+        self.pitch = self.pitch.clamp(-1.55, 1.55);
+    }
+}
+
+#[derive(Default)]
+struct InputState {
+    forward: bool,
+    back: bool,
+    left: bool,
+    right: bool,
 }
 
 struct State {
@@ -103,7 +110,6 @@ struct State {
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     aspect: f32,
@@ -156,11 +162,6 @@ impl State {
             contents: as_bytes(VERTICES),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("index buffer"),
-            contents: as_bytes(INDICES),
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        });
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("bind group layout"),
@@ -203,22 +204,13 @@ impl State {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: None,
-                front_face: wgpu::FrontFace::Cw,
                 ..Default::default()
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
         });
-        let uniform = Uniforms {
-            mvp: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-        };
+        let uniform = Uniforms { mvp: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]] };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("uniform buffer"),
             contents: as_bytes(&[uniform]),
@@ -233,25 +225,15 @@ impl State {
             label: Some("bind group"),
         });
 
-        Ok(Self {
-            surface,
-            device,
-            queue,
-            pipeline,
-            vertex_buffer,
-            index_buffer,
-            uniform_buffer,
-            bind_group,
-            aspect,
-        })
+        Ok(Self { surface, device, queue, pipeline, vertex_buffer, uniform_buffer, bind_group, aspect })
     }
 
-    fn update(&mut self, angle: f32) {
-        use crate::math::{look_at, mat4_mul, perspective_lh, rotation_z, transpose};
-        let model = rotation_z(angle);
-        let view = look_at([2.0, 2.0, 2.0], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
-        let proj = perspective_lh(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
-        let m = transpose(mat4_mul(proj, mat4_mul(view, model)));
+    fn update(&mut self, angle: f32, camera: &Camera) {
+        use crate::math::{mat4_mul, perspective, rotation_y};
+        let model = rotation_y(angle);
+        let view = camera.view_matrix();
+        let proj = perspective(self.aspect, std::f32::consts::FRAC_PI_4, 0.1, 10.0);
+        let m = mat4_mul(proj, mat4_mul(view, model));
         let uniform = Uniforms { mvp: m };
         self.queue
             .write_buffer(&self.uniform_buffer, 0, as_bytes(&[uniform]));
@@ -259,14 +241,10 @@ impl State {
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let frame = self.surface.get_current_texture()?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("encoder"),
-            });
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("encoder"),
+        });
         {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
@@ -274,8 +252,9 @@ impl State {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.1, g: 0.1, b: 0.3, a: 1.0 }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
                         store: wgpu::StoreOp::Store,
+
                     },
                 })],
                 depth_stencil_attachment: None,
@@ -285,8 +264,7 @@ impl State {
             rp.set_pipeline(&self.pipeline);
             rp.set_bind_group(0, &self.bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            rp.draw_indexed(0..INDICES.len() as u32, 0, 0..1);
+            rp.draw(0..3, 0..1);
         }
         self.queue.submit(Some(encoder.finish()));
         frame.present();
@@ -307,19 +285,71 @@ pub async fn start() -> Result<(), JsValue> {
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
+    let camera = Rc::new(RefCell::new(Camera::new()));
+    let input = Rc::new(RefCell::new(InputState::default()));
     let performance = window.performance().unwrap();
     let start_time = performance.now();
+    let last_time = Rc::new(RefCell::new(start_time));
+
+    {
+        let inp = input.clone();
+        let keydown = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            match e.key().as_str() {
+                "w" | "W" => inp.borrow_mut().forward = true,
+                "s" | "S" => inp.borrow_mut().back = true,
+                "a" | "A" => inp.borrow_mut().left = true,
+                "d" | "D" => inp.borrow_mut().right = true,
+                _ => {}
+            }
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("keydown", keydown.as_ref().unchecked_ref())?;
+        keydown.forget();
+    }
+    {
+        let inp = input.clone();
+        let keyup = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            match e.key().as_str() {
+                "w" | "W" => inp.borrow_mut().forward = false,
+                "s" | "S" => inp.borrow_mut().back = false,
+                "a" | "A" => inp.borrow_mut().left = false,
+                "d" | "D" => inp.borrow_mut().right = false,
+                _ => {}
+            }
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("keyup", keyup.as_ref().unchecked_ref())?;
+        keyup.forget();
+    }
+    {
+        let cam = camera.clone();
+        let mouse = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
+            cam.borrow_mut().add_mouse_delta(e.movement_x() as f32, e.movement_y() as f32);
+        }) as Box<dyn FnMut(_)>);
+        canvas.add_event_listener_with_callback("mousemove", mouse.as_ref().unchecked_ref())?;
+        mouse.forget();
+    }
+    {
+        let c = canvas.clone();
+        let click = Closure::wrap(Box::new(move |_e: web_sys::MouseEvent| {
+            c.request_pointer_lock();
+        }) as Box<dyn FnMut(_)>);
+        canvas.add_event_listener_with_callback("click", click.as_ref().unchecked_ref())?;
+        click.forget();
+    }
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        let elapsed = (perf_c.now() - start_time) as f32 / 1000.0;
+        let now = perf_c.now();
+        let elapsed = (now - start_time) as f32 / 1000.0;
+        let dt = (now - *last_time.borrow()) as f32 / 1000.0;
+        *last_time.borrow_mut() = now;
+        camera.borrow_mut().update(&input.borrow(), dt);
         let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut st = state.borrow_mut();
-            st.update(angle);
+            st.update(angle, &camera.borrow());
             if st.render().is_err() {
                 return;
             }
@@ -343,12 +373,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cube_vertex_count() {
-        assert_eq!(VERTICES.len(), 24);
-    }
-
-    #[test]
-    fn cube_index_count() {
-        assert_eq!(INDICES.len(), 36);
+    fn triangle_vertex_count() {
+        assert_eq!(VERTICES.len(), 3);
     }
 }
+
