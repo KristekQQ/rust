@@ -56,15 +56,16 @@ fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
+/// Pohledová matice pro levostranný souřadný systém (WebGPU).
 pub fn look_at(eye: [f32; 3], center: [f32; 3], up: [f32; 3]) -> [[f32; 4]; 4] {
     let f = normalize([center[0] - eye[0], center[1] - eye[1], center[2] - eye[2]]);
-    let s = normalize(cross(f, up));
-    let u = cross(s, f);
+    let s = normalize(cross(up, f));
+    let u = cross(f, s);
     [
-        [s[0], u[0], -f[0], 0.0],
-        [s[1], u[1], -f[1], 0.0],
-        [s[2], u[2], -f[2], 0.0],
-        [-dot(s, eye), -dot(u, eye), dot(f, eye), 1.0],
+        [s[0], u[0], f[0], 0.0],
+        [s[1], u[1], f[1], 0.0],
+        [s[2], u[2], f[2], 0.0],
+        [-dot(s, eye), -dot(u, eye), -dot(f, eye), 1.0],
     ]
 }
 
