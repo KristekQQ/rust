@@ -13,5 +13,6 @@ wasm-bindgen-futures = "0.4"
 wgpu = { version = "0.20.1", features = ["webgpu", "wgsl"] }
 console_error_panic_hook = "0.1"
 web-sys = { version = "0.3", features = ["HtmlCanvasElement", "Window", "Document", "console", "Performance"] }
+glam    = { version = "0.30.3", default-features = false, features = ["libm","serde"] }
 js-sys = "0.3"
 
