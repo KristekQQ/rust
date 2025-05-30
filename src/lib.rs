@@ -43,12 +43,46 @@ impl Vertex {
 }
 
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+    // front - red
+    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [-0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
+    // back - green
+    Vertex { position: [0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
+    // left - blue
+    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 0.0, 1.0] },
+    // right - yellow
+    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 1.0, 0.0] },
+    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 1.0, 0.0] },
+    Vertex { position: [0.5, 0.5, -0.5], color: [1.0, 1.0, 0.0] },
+    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 1.0, 0.0] },
+    // top - cyan
+    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
+    Vertex { position: [0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
+    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
+    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
+    // bottom - magenta
+    Vertex { position: [-0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
+    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
 ];
 
-const INDICES: &[u16] = &[0, 1, 2];
+const INDICES: &[u16] = &[
+    0, 1, 2, 0, 2, 3, // front
+    4, 5, 6, 4, 6, 7, // back
+    8, 9, 10, 8, 10, 11, // left
+    12, 13, 14, 12, 14, 15, // right
+    16, 17, 18, 16, 18, 19, // top
+    20, 21, 22, 20, 22, 23, // bottom
+];
 
 #[cfg(target_arch = "wasm32")]
 fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
@@ -345,12 +379,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn triangle_vertex_count() {
-        assert_eq!(VERTICES.len(), 3);
+    fn cube_vertex_count() {
+        assert_eq!(VERTICES.len(), 24);
     }
 
     #[test]
-    fn triangle_index_count() {
-        assert_eq!(INDICES.len(), 3);
+    fn cube_index_count() {
+        assert_eq!(INDICES.len(), 36);
     }
 }
