@@ -39,7 +39,7 @@ impl Camera {
 
     pub fn update(&mut self, dt: f32) {
         let forward = self.forward();
-        let right = forward.cross(Vec3::Z).normalize();
+        let right = Vec3::Y.cross(forward).normalize();
         if self.pressed.contains("KeyW") {
             self.position += forward * self.speed * dt;
         }
@@ -55,7 +55,7 @@ impl Camera {
     }
 
     pub fn matrix(&self) -> Mat4 {
-        let view = Mat4::look_at_lh(self.position, self.position + self.forward(), Vec3::Z);
+        let view = Mat4::look_at_lh(self.position, self.position + self.forward(), Vec3::Y);
         let proj = Mat4::perspective_lh(std::f32::consts::FRAC_PI_4, self.aspect, 0.1, 100.0);
         proj * view
     }
