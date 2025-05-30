@@ -281,7 +281,7 @@ impl State {
 
     fn update(&mut self, angle: f32, cam_matrix: Mat4) {
         let model = Mat4::from_rotation_z(angle);
-        let mvp = (cam_matrix * model).transpose();
+        let mvp = (cam_matrix * model);
         let uniform = Uniforms {
             mvp: mvp.to_cols_array_2d(),
         };
