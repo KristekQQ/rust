@@ -9,7 +9,9 @@ use crate::render::data::{self, SceneUniforms, Light};
 use crate::render::{depth, pipeline};
 
 pub struct State {
+    instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
+    canvas: HtmlCanvasElement,
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::RenderPipeline,
@@ -26,11 +28,10 @@ pub struct State {
 impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let instance = wgpu::Instance::default();
+        let canvas = canvas.clone();
         let surface = instance
-            .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
+            .create_surface(&canvas)
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-        let surface =
-            unsafe { std::mem::transmute::<wgpu::Surface<'_>, wgpu::Surface<'static>>(surface) };
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
@@ -134,7 +135,9 @@ impl State {
         });
 
         Ok(Self {
+            instance,
             surface,
+            canvas,
             device,
             queue,
             pipeline,
