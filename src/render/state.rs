@@ -9,6 +9,7 @@ use crate::render::data::{self, SceneUniforms, Light};
 use crate::render::{depth, pipeline};
 
 pub struct State {
+    instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -134,6 +135,7 @@ impl State {
         });
 
         Ok(Self {
+            instance,
             surface,
             device,
             queue,
