@@ -5,7 +5,7 @@ use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
-use crate::render::data::{self, Uniforms};
+use crate::render::data::{self, SceneUniforms, Light};
 use crate::render::{depth, pipeline};
 
 pub struct State {
@@ -83,7 +83,7 @@ impl State {
             label: Some("bind group layout"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -95,12 +95,28 @@ impl State {
 
         let pipeline = pipeline::build(&device, config.format, &bind_group_layout);
 
-        let uniform = Uniforms {
+        let uniform = SceneUniforms {
             mvp: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
+            ],
+            camera_pos: [0.0, 0.0, 0.0],
+            _pad0: 0.0,
+            lights: [
+                Light {
+                    position: [1.5, 1.0, 2.0],
+                    _pad_p: 0.0,
+                    color: [1.0, 1.0, 1.0],
+                    _pad_c: 0.0,
+                },
+                Light {
+                    position: [-1.5, 1.0, -2.0],
+                    _pad_p: 0.0,
+                    color: [1.0, 0.0, 0.0],
+                    _pad_c: 0.0,
+                },
             ],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -133,9 +149,25 @@ impl State {
         })
     }
 
-    pub fn update(&self, mvp: Mat4) {
-        let uniform = Uniforms {
+    pub fn update(&self, mvp: Mat4, camera_pos: glam::Vec3) {
+        let uniform = SceneUniforms {
             mvp: mvp.to_cols_array_2d(),
+            camera_pos: camera_pos.into(),
+            _pad0: 0.0,
+            lights: [
+                Light {
+                    position: [1.5, 1.0, 2.0],
+                    _pad_p: 0.0,
+                    color: [1.0, 1.0, 1.0],
+                    _pad_c: 0.0,
+                },
+                Light {
+                    position: [-1.5, 1.0, -2.0],
+                    _pad_p: 0.0,
+                    color: [1.0, 0.0, 0.0],
+                    _pad_c: 0.0,
+                },
+            ],
         };
         self.queue
             .write_buffer(&self.uniform_buffer, 0, data::as_bytes(&[uniform]));
