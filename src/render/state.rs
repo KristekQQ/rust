@@ -9,6 +9,7 @@ use crate::render::data::{self, SceneUniforms, Light};
 use crate::render::{depth, pipeline};
 
 pub struct State {
+    instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -25,7 +26,12 @@ pub struct State {
 
 impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
+        // Surfaces keep a reference to the `Instance`.  If the instance gets
+        // dropped, rendering may fail on some platforms (notably Windows).
         let instance = wgpu::Instance::default();
+
+        // `HtmlCanvasElement` itself doesn't implement `Into<SurfaceTarget>`,
+        // so use the explicit `Canvas` variant when creating the surface.
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
@@ -134,6 +140,7 @@ impl State {
         });
 
         Ok(Self {
+            instance,
             surface,
             device,
             queue,
