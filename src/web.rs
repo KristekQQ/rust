@@ -47,11 +47,12 @@ pub async fn start() -> Result<(), JsValue> {
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
+            let cam_pos = cam.position;
             let cam_matrix = cam.matrix();
             let model = Mat4::from_rotation_z(angle);
             let mvp = cam_matrix * model;
             let mut st = state_c.borrow_mut();
-            st.update(mvp);
+            st.update(mvp, cam_pos);
             if st.render().is_err() {
                 return;
             }
