@@ -24,8 +24,7 @@ pub struct State {
 impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let instance = wgpu::Instance::default();
-        let surface_temp = unsafe { instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone())) }
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let surface_temp = unsafe { instance.create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone())) };
         let surface: wgpu::Surface<'static> = unsafe { std::mem::transmute(surface_temp) };
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
