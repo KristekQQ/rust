@@ -1,12 +1,13 @@
 #![cfg(target_arch = "wasm32")]
 
 use wgpu::VertexBufferLayout;
-
+use glam::Vec3;
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub color: [f32; 3],
+    pub normal: [f32; 3],
 }
 
 impl Vertex {
@@ -26,6 +27,11 @@ impl Vertex {
                     shader_location: 1,
                     format: wgpu::VertexFormat::Float32x3,
                 },
+                wgpu::VertexAttribute {
+                    offset: (mem::size_of::<[f32; 3]>() * 2) as wgpu::BufferAddress,
+                    shader_location: 2,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
             ],
         }
     }
@@ -36,103 +42,127 @@ pub const VERTICES: &[Vertex] = &[
     Vertex {
         position: [-0.5, -0.5, 0.5],
         color: [1.0, 0.0, 0.0],
+        normal: [0.0, 0.0, 1.0],
     },
     Vertex {
         position: [0.5, -0.5, 0.5],
         color: [1.0, 0.0, 0.0],
+        normal: [0.0, 0.0, 1.0],
     },
     Vertex {
         position: [0.5, 0.5, 0.5],
         color: [1.0, 0.0, 0.0],
+        normal: [0.0, 0.0, 1.0],
     },
     Vertex {
         position: [-0.5, 0.5, 0.5],
         color: [1.0, 0.0, 0.0],
+        normal: [0.0, 0.0, 1.0],
     },
     // back - green
     Vertex {
         position: [0.5, -0.5, -0.5],
         color: [0.0, 1.0, 0.0],
+        normal: [0.0, 0.0, -1.0],
     },
     Vertex {
         position: [-0.5, -0.5, -0.5],
         color: [0.0, 1.0, 0.0],
+        normal: [0.0, 0.0, -1.0],
     },
     Vertex {
         position: [-0.5, 0.5, -0.5],
         color: [0.0, 1.0, 0.0],
+        normal: [0.0, 0.0, -1.0],
     },
     Vertex {
         position: [0.5, 0.5, -0.5],
         color: [0.0, 1.0, 0.0],
+        normal: [0.0, 0.0, -1.0],
     },
     // left - blue
     Vertex {
         position: [-0.5, -0.5, -0.5],
         color: [0.0, 0.0, 1.0],
+        normal: [-1.0, 0.0, 0.0],
     },
     Vertex {
         position: [-0.5, -0.5, 0.5],
         color: [0.0, 0.0, 1.0],
+        normal: [-1.0, 0.0, 0.0],
     },
     Vertex {
         position: [-0.5, 0.5, 0.5],
         color: [0.0, 0.0, 1.0],
+        normal: [-1.0, 0.0, 0.0],
     },
     Vertex {
         position: [-0.5, 0.5, -0.5],
         color: [0.0, 0.0, 1.0],
+        normal: [-1.0, 0.0, 0.0],
     },
     // right - yellow
     Vertex {
         position: [0.5, -0.5, 0.5],
         color: [1.0, 1.0, 0.0],
+        normal: [1.0, 0.0, 0.0],
     },
     Vertex {
         position: [0.5, -0.5, -0.5],
         color: [1.0, 1.0, 0.0],
+        normal: [1.0, 0.0, 0.0],
     },
     Vertex {
         position: [0.5, 0.5, -0.5],
         color: [1.0, 1.0, 0.0],
+        normal: [1.0, 0.0, 0.0],
     },
     Vertex {
         position: [0.5, 0.5, 0.5],
         color: [1.0, 1.0, 0.0],
+        normal: [1.0, 0.0, 0.0],
     },
     // top - cyan
     Vertex {
         position: [-0.5, 0.5, 0.5],
         color: [0.0, 1.0, 1.0],
+        normal: [0.0, 1.0, 0.0],
     },
     Vertex {
         position: [0.5, 0.5, 0.5],
         color: [0.0, 1.0, 1.0],
+        normal: [0.0, 1.0, 0.0],
     },
     Vertex {
         position: [0.5, 0.5, -0.5],
         color: [0.0, 1.0, 1.0],
+        normal: [0.0, 1.0, 0.0],
     },
     Vertex {
         position: [-0.5, 0.5, -0.5],
         color: [0.0, 1.0, 1.0],
+        normal: [0.0, 1.0, 0.0],
     },
     // bottom - magenta
     Vertex {
         position: [-0.5, -0.5, -0.5],
         color: [1.0, 0.0, 1.0],
+        normal: [0.0, -1.0, 0.0],
     },
     Vertex {
         position: [0.5, -0.5, -0.5],
         color: [1.0, 0.0, 1.0],
+        normal: [0.0, -1.0, 0.0],
     },
     Vertex {
         position: [0.5, -0.5, 0.5],
         color: [1.0, 0.0, 1.0],
+        normal: [0.0, -1.0, 0.0],
     },
     Vertex {
         position: [-0.5, -0.5, 0.5],
         color: [1.0, 0.0, 1.0],
+        normal: [0.0, -1.0, 0.0],
     },
 ];
 
@@ -156,6 +186,17 @@ pub fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct Uniforms {
+pub struct Light {
+    pub position: Vec3,
+    pub color: Vec3,
+    pub _pad: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
+    pub camera_pos: [f32; 3],
+    pub _pad0: f32,
+    pub lights: [Light; 2],
 }
