@@ -9,90 +9,12 @@ use wgpu::util::DeviceExt;
 use glam::{Mat4, Vec3};
 
 #[cfg(target_arch = "wasm32")]
-use crate::camera::Camera;
+use crate::input::camera::Camera;
+use crate::graphics::{self, vertex::{Vertex, VERTICES, INDICES, as_bytes}};
 
-mod camera;
+pub mod graphics;
+pub mod input;
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
-}
-
-impl Vertex {
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        use std::mem;
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
-        }
-    }
-}
-
-const VERTICES: &[Vertex] = &[
-    // front - red
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [1.0, 0.0, 0.0] },
-    // back - green
-    Vertex { position: [0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 0.0] },
-    // left - blue
-    Vertex { position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 0.0, 1.0] },
-    // right - yellow
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [1.0, 1.0, 0.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [1.0, 1.0, 0.0] },
-    // top - cyan
-    Vertex { position: [-0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, 0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    Vertex { position: [-0.5, 0.5, -0.5], color: [0.0, 1.0, 1.0] },
-    // bottom - magenta
-    Vertex { position: [-0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, -0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
-    Vertex { position: [-0.5, -0.5, 0.5], color: [1.0, 0.0, 1.0] },
-];
-
-const INDICES: &[u16] = &[
-    0, 1, 2, 0, 2, 3, // front
-    4, 5, 6, 4, 6, 7, // back
-    8, 9, 10, 8, 10, 11, // left
-    12, 13, 14, 12, 14, 15, // right
-    16, 17, 18, 16, 18, 19, // top
-    20, 21, 22, 20, 22, 23, // bottom
-];
-
-#[cfg(target_arch = "wasm32")]
-fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
-    unsafe {
-        std::slice::from_raw_parts(
-            data.as_ptr() as *const u8,
-            data.len() * std::mem::size_of::<T>(),
-        )
-    }
-}
 
 #[cfg(target_arch = "wasm32")]
 #[repr(C)]
@@ -157,23 +79,12 @@ impl State {
         let aspect = config.width as f32 / config.height as f32;
 
         let depth_format = wgpu::TextureFormat::Depth32Float;
-        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("depth texture"),
-            size: wgpu::Extent3d {
-                width: config.width,
-                height: config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: depth_format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        });
-        let depth_view = depth_texture.create_view(&Default::default());
-
-        let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+        let (depth_texture, depth_view) = graphics::depth::create_depth_texture(
+            &device,
+            depth_format,
+            config.width,
+            config.height,
+        );
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
@@ -200,47 +111,7 @@ impl State {
             }],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("pipeline layout"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[Vertex::desc()],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: Some(wgpu::Face::Front),
-                front_face: wgpu::FrontFace::Ccw,
-                ..Default::default()
-            },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: depth_format,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
+        let pipeline = graphics::pipeline::create_pipeline(&device, &config, &bind_group_layout);
         let uniform = Uniforms {
             mvp: [
                 [1.0, 0.0, 0.0, 0.0],
@@ -350,26 +221,7 @@ pub async fn start() -> Result<(), JsValue> {
     let aspect = state.borrow().aspect;
     let camera = Rc::new(RefCell::new(Camera::new(aspect)));
 
-    let cam_key = camera.clone();
-    let key_down = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
-        cam_key.borrow_mut().key_down(e.code());
-    }) as Box<dyn FnMut(_)>);
-    window.add_event_listener_with_callback("keydown", key_down.as_ref().unchecked_ref())?;
-    key_down.forget();
-
-    let cam_key_up = camera.clone();
-    let key_up = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
-        cam_key_up.borrow_mut().key_up(e.code());
-    }) as Box<dyn FnMut(_)>);
-    window.add_event_listener_with_callback("keyup", key_up.as_ref().unchecked_ref())?;
-    key_up.forget();
-
-    let cam_mouse = camera.clone();
-    let mouse_move = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
-        cam_mouse.borrow_mut().mouse_move(e.movement_x() as f32, e.movement_y() as f32);
-    }) as Box<dyn FnMut(_)>);
-    window.add_event_listener_with_callback("mousemove", mouse_move.as_ref().unchecked_ref())?;
-    mouse_move.forget();
+    input::controls::attach(&window, camera.clone())?;
 
     let start_time = performance.now();
     let prev_time = Rc::new(RefCell::new(start_time));
