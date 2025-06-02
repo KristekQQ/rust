@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use glam::Mat4;
+use glam::{Mat4, Mat3};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
@@ -102,6 +102,17 @@ impl State {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            normal_matrix: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ],
             camera_pos: [0.0, 0.0, 0.0],
             _pad0: 0.0,
             lights: [
@@ -149,9 +160,15 @@ impl State {
         })
     }
 
-    pub fn update(&self, mvp: Mat4, camera_pos: glam::Vec3) {
+    pub fn update(&self, mvp: Mat4, model: Mat4, normal_matrix: Mat3, camera_pos: glam::Vec3) {
         let uniform = SceneUniforms {
             mvp: mvp.to_cols_array_2d(),
+            model: model.to_cols_array_2d(),
+            normal_matrix: [
+                [normal_matrix.x_axis.x, normal_matrix.x_axis.y, normal_matrix.x_axis.z, 0.0],
+                [normal_matrix.y_axis.x, normal_matrix.y_axis.y, normal_matrix.y_axis.z, 0.0],
+                [normal_matrix.z_axis.x, normal_matrix.z_axis.y, normal_matrix.z_axis.z, 0.0],
+            ],
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
             lights: [
