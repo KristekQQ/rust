@@ -94,3 +94,11 @@ wasm-bindgen --target web --out-dir wasm_out \
 
 After copying the repository, `vendor/` and `wasm_out/` directories and the
 runner binaries allow you to run the example without network access.
+
+## Dumping sources
+
+Run `scripts/dump_sources.sh` to generate `all_sources.txt` containing all Rust
+sources, shader files and the `Cargo.toml`. This is convenient when sending the
+project to GPT or other tools. To run it automatically before each push, copy
+`scripts/pre-push` to `.git/hooks/pre-push` in your local clone.
+
