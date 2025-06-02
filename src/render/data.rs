@@ -196,6 +196,10 @@ pub struct Light {
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
+    pub model: [[f32; 4]; 4],
+    /// Normal matrix derived from `model` with translation removed.
+    /// The 3x3 matrix is padded to vec4 rows so that the layout matches WGSL
+    pub normal_matrix: [[f32; 4]; 3],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; 2],

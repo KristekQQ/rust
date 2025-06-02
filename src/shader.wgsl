@@ -7,6 +7,9 @@ struct Light {
 
 struct SceneUniforms {
     mvp: mat4x4<f32>,
+    model: mat4x4<f32>,
+    // (model^-1)^T without translation. Padding is handled in Rust.
+    normal_matrix: mat3x3<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, 2>,
@@ -31,9 +34,9 @@ struct VertexOutput {
 fn vs_main(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.pos = scene.mvp * vec4<f32>(input.position, 1.0);
+    out.world_pos = (scene.model * vec4<f32>(input.position, 1.0)).xyz;
+    out.world_normal = normalize(scene.normal_matrix * input.normal);
     out.color = input.color;
-    out.world_pos = input.position;
-    out.world_normal = input.normal;
     return out;
 }
 
