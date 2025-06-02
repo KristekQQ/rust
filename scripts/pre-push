@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Git pre-push hook to dump sources into all_sources.txt
+
+# Determine repo root
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+scripts/dump_sources.sh
+
+exit 0
