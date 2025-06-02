@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{closure::Closure, JsCast};
 
-use glam::Mat4;
+use glam::{Mat4, Mat3};
 
 use crate::input::camera::Camera;
 use crate::input::{keyboard, mouse};
@@ -50,9 +50,10 @@ pub async fn start() -> Result<(), JsValue> {
             let cam_pos = cam.position;
             let cam_matrix = cam.matrix();
             let model = Mat4::from_rotation_z(angle);
+            let normal_matrix = Mat3::from_mat4(model).inverse().transpose();
             let mvp = cam_matrix * model;
             let mut st = state_c.borrow_mut();
-            st.update(mvp, cam_pos);
+            st.update(mvp, model, normal_matrix, cam_pos);
             if st.render().is_err() {
                 return;
             }
