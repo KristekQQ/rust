@@ -3,8 +3,3 @@
 # defaultní target pro offline build přímo `cargo build`
 target = "wasm32-unknown-unknown"
 
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"
