@@ -48,17 +48,21 @@ impl OrbitCamera {
     }
 
     pub fn update(&mut self, dt: f32) {
+        // Directions relative to the current camera orientation
+        let forward = (self.target - self.position).normalize();
+        let right = Vec3::Y.cross(forward).normalize();
+
         if self.pressed.contains("KeyW") {
-            self.target.z -= self.speed * dt;
+            self.target += forward * self.speed * dt;
         }
         if self.pressed.contains("KeyS") {
-            self.target.z += self.speed * dt;
+            self.target -= forward * self.speed * dt;
         }
         if self.pressed.contains("KeyA") {
-            self.target.x -= self.speed * dt;
+            self.target -= right * self.speed * dt;
         }
         if self.pressed.contains("KeyD") {
-            self.target.x += self.speed * dt;
+            self.target += right * self.speed * dt;
         }
         if self.pressed.contains("Equal") || self.pressed.contains("NumpadAdd") {
             self.radius = (self.radius - self.speed * dt).max(0.5);
