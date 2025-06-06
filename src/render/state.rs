@@ -38,7 +38,7 @@ impl State {
                 force_fallback_adapter: false,
             })
             .await
-            .ok_or("failed to find adapter")?;
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
