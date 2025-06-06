@@ -200,3 +200,18 @@ pub struct SceneUniforms {
     pub _pad0: f32,
     pub lights: [Light; 2],
 }
+
+pub fn grid_vertices(size: i32) -> Vec<Vertex> {
+    let mut verts = Vec::new();
+    let color = [0.3, 0.3, 0.3];
+    let normal = [0.0, 1.0, 0.0];
+    for i in -size..=size {
+        let f = i as f32;
+        verts.push(Vertex { position: [-size as f32, 0.0, f], color, normal });
+        verts.push(Vertex { position: [size as f32, 0.0, f], color, normal });
+        verts.push(Vertex { position: [f, 0.0, -size as f32], color, normal });
+        verts.push(Vertex { position: [f, 0.0, size as f32], color, normal });
+    }
+    verts
+}
+

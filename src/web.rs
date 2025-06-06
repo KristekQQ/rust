@@ -12,7 +12,17 @@ use crate::input::{keyboard, mouse};
 use crate::render::state::State;
 
 thread_local! {
+    static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+}
+
+#[wasm_bindgen]
+pub fn set_grid_visible(show: bool) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().set_grid_visible(show);
+        }
+    });
 }
 
 #[wasm_bindgen]
@@ -40,6 +50,7 @@ pub async fn start() -> Result<(), JsValue> {
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
+    STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
     let performance = window.performance().unwrap();
     let aspect = state.borrow().aspect;
     let camera = Rc::new(RefCell::new(ActiveCamera::new(aspect)));
@@ -70,9 +81,8 @@ pub async fn start() -> Result<(), JsValue> {
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
             let model = Mat4::from_rotation_z(angle);
-            let mvp = cam_matrix * model;
             let mut st = state_c.borrow_mut();
-            st.update(mvp, cam_pos);
+            st.update(cam_matrix, model, cam_pos);
             if st.render().is_err() {
                 return;
             }
