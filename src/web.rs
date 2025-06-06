@@ -6,9 +6,28 @@ use wasm_bindgen::{closure::Closure, JsCast};
 
 use glam::Mat4;
 
-use crate::input::camera::Camera;
+use crate::input::active_camera::{ActiveCamera, CameraType};
+use crate::input::camera::CameraController;
 use crate::input::{keyboard, mouse};
 use crate::render::state::State;
+
+thread_local! {
+    static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+}
+
+#[wasm_bindgen]
+pub fn set_camera_mode(mode: &str) {
+    CAMERA.with(|c| {
+        if let Some(cam) = &*c.borrow() {
+            let mut cam = cam.borrow_mut();
+            match mode {
+                "free" => cam.set_type(CameraType::Free),
+                "orbit" => cam.set_type(CameraType::Orbit),
+                _ => {}
+            }
+        }
+    });
+}
 
 #[wasm_bindgen(start)]
 pub async fn start() -> Result<(), JsValue> {
@@ -23,7 +42,8 @@ pub async fn start() -> Result<(), JsValue> {
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
     let performance = window.performance().unwrap();
     let aspect = state.borrow().aspect;
-    let camera = Rc::new(RefCell::new(Camera::new(aspect)));
+    let camera = Rc::new(RefCell::new(ActiveCamera::new(aspect)));
+    CAMERA.with(|c| *c.borrow_mut() = Some(camera.clone()));
 
     keyboard::attach(&window, camera.clone());
     mouse::attach(&window, camera.clone());
@@ -47,7 +67,7 @@ pub async fn start() -> Result<(), JsValue> {
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
-            let cam_pos = cam.position;
+            let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
             let model = Mat4::from_rotation_z(angle);
             let mvp = cam_matrix * model;

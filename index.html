@@ -9,6 +9,8 @@
     </style>
 </head>
 <body>
+    <button id="orbit-btn" style="position:absolute;top:10px;left:10px;z-index:1;">Orbit</button>
+    <button id="free-btn" style="position:absolute;top:40px;left:10px;z-index:1;">Free</button>
     <canvas id="gpu-canvas" width="640" height="480"></canvas>
     <script type="module">
         // Patch outdated WebGPU limit name for newer Chrome versions.
@@ -27,8 +29,11 @@
         canvas.width  = canvas.clientWidth  || 800;
         canvas.height = canvas.clientHeight || 600;
 
-        import init from './pkg/webgpu_wasm.js';
-        init();
+        import init, { set_camera_mode } from './pkg/webgpu_wasm.js';
+        await init();
+
+        document.getElementById('orbit-btn').onclick = () => set_camera_mode('orbit');
+        document.getElementById('free-btn').onclick = () => set_camera_mode('free');
     </script>
 </body>
 </html>
