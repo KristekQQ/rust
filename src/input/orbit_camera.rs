@@ -96,5 +96,17 @@ impl CameraController for OrbitCamera {
     fn mouse_move(&mut self, dx: f32, dy: f32) {
         OrbitCamera::mouse_move(self, dx, dy);
     }
+
+    fn update(&mut self, dt: f32) {
+        OrbitCamera::update(self, dt);
+    }
+
+    fn matrix(&self) -> Mat4 {
+        OrbitCamera::matrix(self)
+    }
+
+    fn position(&self) -> Vec3 {
+        self.position
+    }
 }
 

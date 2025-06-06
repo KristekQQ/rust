@@ -5,6 +5,10 @@ pub trait CameraController {
     fn key_down(&mut self, code: String);
     fn key_up(&mut self, code: String);
     fn mouse_move(&mut self, dx: f32, dy: f32);
+
+    fn update(&mut self, dt: f32);
+    fn matrix(&self) -> Mat4;
+    fn position(&self) -> Vec3;
 }
 
 pub struct Camera {
@@ -87,5 +91,17 @@ impl CameraController for Camera {
 
     fn mouse_move(&mut self, dx: f32, dy: f32) {
         Camera::mouse_move(self, dx, dy);
+    }
+
+    fn update(&mut self, dt: f32) {
+        Camera::update(self, dt);
+    }
+
+    fn matrix(&self) -> Mat4 {
+        Camera::matrix(self)
+    }
+
+    fn position(&self) -> Vec3 {
+        self.position
     }
 }
