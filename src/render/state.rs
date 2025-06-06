@@ -45,8 +45,9 @@ impl State {
                     label: None,
                     required_features: wgpu::Features::empty(),
                     required_limits: adapter.limits(),
+                    memory_hints: wgpu::MemoryHints::default(),
+                    trace: wgpu::Trace::default(),
                 },
-                None,
             )
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
