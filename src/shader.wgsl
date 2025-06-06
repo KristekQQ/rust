@@ -7,6 +7,7 @@ struct Light {
 
 struct SceneUniforms {
     mvp: mat4x4<f32>,
+    model: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, 2>,
@@ -32,8 +33,10 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.pos = scene.mvp * vec4<f32>(input.position, 1.0);
     out.color = input.color;
-    out.world_pos = input.position;
-    out.world_normal = input.normal;
+    out.world_pos = (scene.model * vec4<f32>(input.position, 1.0)).xyz;
+    // Transform the normal by the model matrix without applying translation
+    // (w = 0). This keeps lighting separate from camera rotation.
+    out.world_normal = normalize((scene.model * vec4<f32>(input.normal, 0.0)).xyz);
     return out;
 }
 

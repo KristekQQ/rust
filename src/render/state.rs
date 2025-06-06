@@ -12,6 +12,8 @@ pub struct State {
     grid_pipeline: wgpu::RenderPipeline,
     grid_vertex_buffer: wgpu::Buffer,
     grid_vertex_count: u32,
+    light_vertex_buffer: wgpu::Buffer,
+    light_vertex_count: u32,
     pub draw_grid: bool,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -117,6 +119,12 @@ impl State {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             camera_pos: [0.0, 0.0, 0.0],
             _pad0: 0.0,
             lights: [
@@ -134,6 +142,14 @@ impl State {
                 },
             ],
         };
+
+        let light_vertices = data::light_rays(&uniform.lights);
+        let light_vertex_count = light_vertices.len() as u32;
+        let light_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("light vertex buffer"),
+            contents: data::as_bytes(&light_vertices),
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        });
         let cube_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("cube uniform buffer"),
             contents: data::as_bytes(&[uniform]),
@@ -165,6 +181,8 @@ impl State {
             grid_pipeline,
             grid_vertex_buffer,
             grid_vertex_count,
+            light_vertex_buffer,
+            light_vertex_count,
             draw_grid: true,
             surface,
             device,
@@ -192,6 +210,7 @@ impl State {
         let cube_mvp = camera_matrix * model;
         let cube_uniform = SceneUniforms {
             mvp: cube_mvp.to_cols_array_2d(),
+            model: model.to_cols_array_2d(),
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
             lights: [
@@ -211,6 +230,12 @@ impl State {
         };
         let grid_uniform = SceneUniforms {
             mvp: camera_matrix.to_cols_array_2d(),
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
             lights: [
@@ -232,6 +257,9 @@ impl State {
             .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
         self.queue
             .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
+        let light_vertices = data::light_rays(&cube_uniform.lights);
+        self.queue
+            .write_buffer(&self.light_vertex_buffer, 0, data::as_bytes(&light_vertices));
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -281,6 +309,8 @@ impl State {
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                 rp.draw(0..self.grid_vertex_count, 0..1);
+                rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                rp.draw(0..self.light_vertex_count, 0..1);
             }
         }
         self.queue.submit(Some(encoder.finish()));
