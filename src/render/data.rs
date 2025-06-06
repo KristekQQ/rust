@@ -216,3 +216,24 @@ pub fn grid_vertices(size: i32) -> Vec<Vertex> {
     verts
 }
 
+pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
+    let mut verts = Vec::new();
+    let normal = [0.0_f32, 1.0, 0.0];
+    let cross = 0.2_f32;
+    for l in lights {
+        let p = l.position;
+        let color = l.color;
+        // small cross marking the light position
+        verts.push(Vertex { position: [p[0] - cross, p[1], p[2]], color, normal });
+        verts.push(Vertex { position: [p[0] + cross, p[1], p[2]], color, normal });
+        verts.push(Vertex { position: [p[0], p[1] - cross, p[2]], color, normal });
+        verts.push(Vertex { position: [p[0], p[1] + cross, p[2]], color, normal });
+        verts.push(Vertex { position: [p[0], p[1], p[2] - cross], color, normal });
+        verts.push(Vertex { position: [p[0], p[1], p[2] + cross], color, normal });
+        // line from light to origin
+        verts.push(Vertex { position: p, color, normal });
+        verts.push(Vertex { position: [0.0, 0.0, 0.0], color, normal });
+    }
+    verts
+}
+
