@@ -48,17 +48,17 @@ impl OrbitCamera {
     }
 
     pub fn update(&mut self, dt: f32) {
-        if self.pressed.contains("KeyA") {
-            self.yaw += self.speed * dt;
-        }
-        if self.pressed.contains("KeyD") {
-            self.yaw -= self.speed * dt;
-        }
         if self.pressed.contains("KeyW") {
-            self.pitch += self.speed * dt;
+            self.target.z -= self.speed * dt;
         }
         if self.pressed.contains("KeyS") {
-            self.pitch -= self.speed * dt;
+            self.target.z += self.speed * dt;
+        }
+        if self.pressed.contains("KeyA") {
+            self.target.x -= self.speed * dt;
+        }
+        if self.pressed.contains("KeyD") {
+            self.target.x += self.speed * dt;
         }
         if self.pressed.contains("Equal") || self.pressed.contains("NumpadAdd") {
             self.radius = (self.radius - self.speed * dt).max(0.5);
