@@ -117,6 +117,12 @@ impl State {
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             camera_pos: [0.0, 0.0, 0.0],
             _pad0: 0.0,
             lights: [
@@ -192,6 +198,7 @@ impl State {
         let cube_mvp = camera_matrix * model;
         let cube_uniform = SceneUniforms {
             mvp: cube_mvp.to_cols_array_2d(),
+            model: model.to_cols_array_2d(),
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
             lights: [
@@ -211,6 +218,12 @@ impl State {
         };
         let grid_uniform = SceneUniforms {
             mvp: camera_matrix.to_cols_array_2d(),
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
             lights: [
