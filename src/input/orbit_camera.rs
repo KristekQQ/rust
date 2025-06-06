@@ -15,9 +15,9 @@ pub struct OrbitCamera {
 
 impl OrbitCamera {
     pub fn new(aspect: f32) -> Self {
-        let radius = 3.0;
-        let yaw = 0.0;
-        let pitch = 0.0;
+        let radius: f32 = 3.0;
+        let yaw: f32 = 0.0;
+        let pitch: f32 = 0.0;
         let target = Vec3::ZERO;
         let position = target
             + Vec3::new(radius * yaw.cos() * pitch.cos(), radius * pitch.sin(), radius * yaw.sin() * pitch.cos());
