@@ -9,6 +9,10 @@ use crate::render::data::{self, SceneUniforms, Light};
 use crate::render::{depth, pipeline};
 
 pub struct State {
+    grid_pipeline: wgpu::RenderPipeline,
+    grid_vertex_buffer: wgpu::Buffer,
+    grid_vertex_count: u32,
+    pub draw_grid: bool,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -95,6 +99,14 @@ impl State {
         });
 
         let pipeline = pipeline::build(&device, config.format, &bind_group_layout);
+        let grid_pipeline = pipeline::build_lines(&device, config.format, &bind_group_layout);
+        let grid_vertices = data::grid_vertices(10);
+        let grid_vertex_count = grid_vertices.len() as u32;
+        let grid_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("grid vertex buffer"),
+            contents: data::as_bytes(&grid_vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         let uniform = SceneUniforms {
             mvp: [
@@ -135,6 +147,10 @@ impl State {
         });
 
         Ok(Self {
+            grid_pipeline,
+            grid_vertex_buffer,
+            grid_vertex_count,
+            draw_grid: true,
             surface,
             device,
             queue,
@@ -149,6 +165,11 @@ impl State {
             aspect,
         })
     }
+    pub fn set_grid_visible(&mut self, show: bool) {
+        self.draw_grid = show;
+    }
+
+
 
     pub fn update(&self, mvp: Mat4, camera_pos: glam::Vec3) {
         let uniform = SceneUniforms {
@@ -216,6 +237,12 @@ impl State {
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            if self.draw_grid {
+                rp.set_pipeline(&self.grid_pipeline);
+                rp.set_bind_group(0, &self.bind_group, &[]);
+                rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+                rp.draw(0..self.grid_vertex_count, 0..1);
+            }
         }
         self.queue.submit(Some(encoder.finish()));
         frame.present();

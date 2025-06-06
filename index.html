@@ -11,6 +11,7 @@
 <body>
     <button id="orbit-btn" style="position:absolute;top:10px;left:10px;z-index:1;">Orbit</button>
     <button id="free-btn" style="position:absolute;top:40px;left:10px;z-index:1;">Free</button>
+    <button id="grid-btn" style="position:absolute;top:70px;left:10px;z-index:1;">Hide Grid</button>
     <canvas id="gpu-canvas" width="640" height="480"></canvas>
     <script type="module">
         // Patch outdated WebGPU limit name for newer Chrome versions.
@@ -28,9 +29,16 @@
         const canvas = document.getElementById("gpu-canvas");
         canvas.width  = canvas.clientWidth  || 800;
         canvas.height = canvas.clientHeight || 600;
+        let grid = true;
 
-        import init, { set_camera_mode } from './pkg/webgpu_wasm.js';
+        import init, { set_camera_mode, set_grid_visible } from './pkg/webgpu_wasm.js';
         await init();
+        set_grid_visible(true);
+        document.getElementById("grid-btn").onclick = () => {
+            grid = !grid;
+            set_grid_visible(grid);
+            document.getElementById("grid-btn").textContent = grid ? "Hide Grid" : "Show Grid";
+        };
 
         document.getElementById('orbit-btn').onclick = () => set_camera_mode('orbit');
         document.getElementById('free-btn').onclick = () => set_camera_mode('free');
