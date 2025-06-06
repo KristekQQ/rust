@@ -1,6 +1,12 @@
 use glam::{Mat4, Vec3};
 use std::collections::HashSet;
 
+pub trait CameraController {
+    fn key_down(&mut self, code: String);
+    fn key_up(&mut self, code: String);
+    fn mouse_move(&mut self, dx: f32, dy: f32);
+}
+
 pub struct Camera {
     pub position: Vec3,
     yaw: f32,
@@ -60,12 +66,26 @@ impl Camera {
         proj * view
     }
 
-    fn forward(&self) -> Vec3 {
+fn forward(&self) -> Vec3 {
         Vec3::new(
             self.yaw.cos() * self.pitch.cos(),
             self.pitch.sin(),
             self.yaw.sin() * self.pitch.cos(),
         )
         .normalize()
+    }
+}
+
+impl CameraController for Camera {
+    fn key_down(&mut self, code: String) {
+        Camera::key_down(self, code);
+    }
+
+    fn key_up(&mut self, code: String) {
+        Camera::key_up(self, code);
+    }
+
+    fn mouse_move(&mut self, dx: f32, dy: f32) {
+        Camera::mouse_move(self, dx, dy);
     }
 }

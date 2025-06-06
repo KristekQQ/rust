@@ -4,9 +4,12 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
 use web_sys::Window;
 
-use crate::input::camera::Camera;
+use crate::input::camera::CameraController;
 
-pub fn attach(window: &Window, cam: Rc<RefCell<Camera>>) {
+pub fn attach<T>(window: &Window, cam: Rc<RefCell<T>>)
+where
+    T: CameraController + 'static,
+{
     let cam_down = cam.clone();
     let key_down = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
         cam_down.borrow_mut().key_down(e.code());

@@ -6,7 +6,8 @@ use wasm_bindgen::{closure::Closure, JsCast};
 
 use glam::Mat4;
 
-use crate::input::camera::Camera;
+use crate::input::camera::CameraController;
+use crate::input::orbit_camera::OrbitCamera;
 use crate::input::{keyboard, mouse};
 use crate::render::state::State;
 
@@ -23,7 +24,7 @@ pub async fn start() -> Result<(), JsValue> {
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
     let performance = window.performance().unwrap();
     let aspect = state.borrow().aspect;
-    let camera = Rc::new(RefCell::new(Camera::new(aspect)));
+    let camera = Rc::new(RefCell::new(OrbitCamera::new(aspect)));
 
     keyboard::attach(&window, camera.clone());
     mouse::attach(&window, camera.clone());
