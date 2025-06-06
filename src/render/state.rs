@@ -19,8 +19,10 @@ pub struct State {
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
-    uniform_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    cube_uniform_buffer: wgpu::Buffer,
+    grid_uniform_buffer: wgpu::Buffer,
+    cube_bind_group: wgpu::BindGroup,
+    grid_bind_group: wgpu::BindGroup,
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
     depth_format: wgpu::TextureFormat,
@@ -132,18 +134,31 @@ impl State {
                 },
             ],
         };
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("uniform buffer"),
+        let cube_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("cube uniform buffer"),
             contents: data::as_bytes(&[uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let cube_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
+                resource: cube_uniform_buffer.as_entire_binding(),
             }],
             label: Some("bind group"),
+        });
+        let grid_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("grid uniform buffer"),
+            contents: data::as_bytes(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let grid_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: grid_uniform_buffer.as_entire_binding(),
+            }],
+            label: Some("grid bind group"),
         });
 
         Ok(Self {
@@ -157,8 +172,10 @@ impl State {
             pipeline,
             vertex_buffer,
             index_buffer,
-            uniform_buffer,
-            bind_group,
+            cube_uniform_buffer,
+            grid_uniform_buffer,
+            cube_bind_group,
+            grid_bind_group,
             depth_texture,
             depth_view,
             depth_format,
@@ -171,9 +188,29 @@ impl State {
 
 
 
-    pub fn update(&self, mvp: Mat4, camera_pos: glam::Vec3) {
-        let uniform = SceneUniforms {
-            mvp: mvp.to_cols_array_2d(),
+    pub fn update(&self, camera_matrix: Mat4, model: Mat4, camera_pos: glam::Vec3) {
+        let cube_mvp = camera_matrix * model;
+        let cube_uniform = SceneUniforms {
+            mvp: cube_mvp.to_cols_array_2d(),
+            camera_pos: camera_pos.into(),
+            _pad0: 0.0,
+            lights: [
+                Light {
+                    position: [1.5, 1.0, 2.0],
+                    _pad_p: 0.0,
+                    color: [1.0, 1.0, 1.0],
+                    _pad_c: 0.0,
+                },
+                Light {
+                    position: [-1.5, 1.0, -2.0],
+                    _pad_p: 0.0,
+                    color: [1.0, 0.0, 0.0],
+                    _pad_c: 0.0,
+                },
+            ],
+        };
+        let grid_uniform = SceneUniforms {
+            mvp: camera_matrix.to_cols_array_2d(),
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
             lights: [
@@ -192,7 +229,9 @@ impl State {
             ],
         };
         self.queue
-            .write_buffer(&self.uniform_buffer, 0, data::as_bytes(&[uniform]));
+            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
+        self.queue
+            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -233,13 +272,13 @@ impl State {
                 timestamp_writes: None,
             });
             rp.set_pipeline(&self.pipeline);
-            rp.set_bind_group(0, &self.bind_group, &[]);
+            rp.set_bind_group(0, &self.cube_bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
-                rp.set_bind_group(0, &self.bind_group, &[]);
+                rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                 rp.draw(0..self.grid_vertex_count, 0..1);
             }
