@@ -5,14 +5,14 @@
     <title>WebGPU with Rust/WASM</title>
     <style>
         body { margin: 0; overflow: hidden; }
-        #gpu-canvas { position: absolute; top: 0; left: 0; }
+        #gpu-canvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
     <button id="orbit-btn" style="position:absolute;top:10px;left:10px;z-index:1;">Orbit</button>
     <button id="free-btn" style="position:absolute;top:40px;left:10px;z-index:1;">Free</button>
     <button id="grid-btn" style="position:absolute;top:70px;left:10px;z-index:1;">Hide Grid</button>
-    <canvas id="gpu-canvas" width="640" height="480"></canvas>
+    <canvas id="gpu-canvas"></canvas>
     <script type="module">
         // Patch outdated WebGPU limit name for newer Chrome versions.
         const origRequestDevice = GPUAdapter.prototype.requestDevice;
@@ -27,12 +27,13 @@
         };
 
         const canvas = document.getElementById("gpu-canvas");
-        canvas.width  = canvas.clientWidth  || 800;
-        canvas.height = canvas.clientHeight || 600;
+        canvas.width  = window.innerWidth;
+        canvas.height = window.innerHeight;
         let grid = true;
 
-        import init, { set_camera_mode, set_grid_visible } from './pkg/webgpu_wasm.js';
+        import init, { set_camera_mode, set_grid_visible, resize } from './pkg/webgpu_wasm.js';
         await init();
+        resize(canvas.width, canvas.height);
         set_grid_visible(true);
         document.getElementById("grid-btn").onclick = () => {
             grid = !grid;
@@ -42,6 +43,12 @@
 
         document.getElementById('orbit-btn').onclick = () => set_camera_mode('orbit');
         document.getElementById('free-btn').onclick = () => set_camera_mode('free');
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            resize(canvas.width, canvas.height);
+        });
     </script>
 </body>
 </html>

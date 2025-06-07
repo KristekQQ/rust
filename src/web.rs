@@ -39,6 +39,20 @@ pub fn set_camera_mode(mode: &str) {
     });
 }
 
+#[wasm_bindgen]
+pub fn resize(width: u32, height: u32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().resize(width, height);
+        }
+    });
+    CAMERA.with(|c| {
+        if let Some(cam) = &*c.borrow() {
+            cam.borrow_mut().set_aspect(width as f32 / height as f32);
+        }
+    });
+}
+
 #[wasm_bindgen(start)]
 pub async fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();

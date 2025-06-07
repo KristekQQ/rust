@@ -27,6 +27,11 @@ impl ActiveCamera {
         self.active = ty;
     }
 
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.free.set_aspect(aspect);
+        self.orbit.set_aspect(aspect);
+    }
+
     fn active_mut(&mut self) -> &mut dyn CameraController {
         match self.active {
             CameraType::Free => &mut self.free,
