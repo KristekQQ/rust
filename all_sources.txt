@@ -56,6 +56,11 @@ impl ActiveCamera {
         self.active = ty;
     }
 
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.free.set_aspect(aspect);
+        self.orbit.set_aspect(aspect);
+    }
+
     fn active_mut(&mut self) -> &mut dyn CameraController {
         match self.active {
             CameraType::Free => &mut self.free,
@@ -132,6 +137,10 @@ impl Camera {
             pressed: HashSet::new(),
             aspect,
         }
+    }
+
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
     }
 
     pub fn key_down(&mut self, code: String) {
@@ -307,6 +316,10 @@ impl OrbitCamera {
             pressed: HashSet::new(),
             aspect,
         }
+    }
+
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
     }
 
     pub fn key_down(&mut self, code: String) {
@@ -705,8 +718,8 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode: Some(wgpu::Face::Front),
-            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: Some(wgpu::Face::Back),
+            front_face: wgpu::FrontFace::Cw,
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
@@ -751,7 +764,7 @@ pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLay
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::LineList,
             cull_mode: None,
-            front_face: wgpu::FrontFace::Ccw,
+            front_face: wgpu::FrontFace::Cw,
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
@@ -789,6 +802,7 @@ pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -831,15 +845,16 @@ impl State {
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let caps = surface.get_capabilities(&adapter);
+        let surface_format = caps.formats[0];
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: caps.formats[0],
+            format: surface_format,
             width: canvas.width(),
             height: canvas.height(),
             present_mode: caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
-            view_formats: vec![],
+            view_formats: vec![surface_format],
         };
         surface.configure(&device, &config);
         let aspect = config.width as f32 / config.height as f32;
@@ -958,6 +973,7 @@ impl State {
             surface,
             device,
             queue,
+            config,
             pipeline,
             vertex_buffer,
             index_buffer,
@@ -973,6 +989,20 @@ impl State {
     }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        self.config.width = width;
+        self.config.height = height;
+        self.aspect = width as f32 / height as f32;
+        self.surface.configure(&self.device, &self.config);
+        let (depth_texture, depth_view) =
+            depth::create(&self.device, width, height, self.depth_format);
+        self.depth_texture = depth_texture;
+        self.depth_view = depth_view;
     }
 
 
@@ -1197,6 +1227,20 @@ pub fn set_camera_mode(mode: &str) {
                 "orbit" => cam.set_type(CameraType::Orbit),
                 _ => {}
             }
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn resize(width: u32, height: u32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().resize(width, height);
+        }
+    });
+    CAMERA.with(|c| {
+        if let Some(cam) = &*c.borrow() {
+            cam.borrow_mut().set_aspect(width as f32 / height as f32);
         }
     });
 }
