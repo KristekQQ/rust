@@ -61,15 +61,16 @@ impl State {
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let caps = surface.get_capabilities(&adapter);
+        let surface_format = caps.formats[0];
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: caps.formats[0],
+            format: surface_format,
             width: canvas.width(),
             height: canvas.height(),
             present_mode: caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
-            view_formats: vec![],
+            view_formats: vec![surface_format],
         };
         surface.configure(&device, &config);
         let aspect = config.width as f32 / config.height as f32;
