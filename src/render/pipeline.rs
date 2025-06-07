@@ -31,8 +31,8 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode: Some(wgpu::Face::Front),
-            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: Some(wgpu::Face::Back),
+            front_face: wgpu::FrontFace::Cw,
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
@@ -77,7 +77,7 @@ pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLay
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::LineList,
             cull_mode: None,
-            front_face: wgpu::FrontFace::Ccw,
+            front_face: wgpu::FrontFace::Cw,
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
