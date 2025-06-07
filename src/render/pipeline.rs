@@ -1,5 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+pub static DEBUG_NO_CULL: AtomicBool = AtomicBool::new(false);
+
 use crate::render::data::Vertex;
 use wgpu::{BindGroupLayout, Device, RenderPipeline, TextureFormat};
 
@@ -31,7 +35,11 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
-            cull_mode: Some(wgpu::Face::Back),
+            cull_mode: if DEBUG_NO_CULL.load(Ordering::SeqCst) {
+                None
+            } else {
+                Some(wgpu::Face::Back)
+            },
             front_face: wgpu::FrontFace::Cw,
             ..Default::default()
         },

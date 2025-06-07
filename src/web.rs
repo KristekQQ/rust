@@ -63,6 +63,10 @@ pub async fn start() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
+    let dpr = window.device_pixel_ratio();
+    canvas.set_width((canvas.client_width() as f64 * dpr) as u32);
+    canvas.set_height((canvas.client_height() as f64 * dpr) as u32);
+
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
     STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
     let performance = window.performance().unwrap();

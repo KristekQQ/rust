@@ -34,20 +34,40 @@ pub struct State {
 
 impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
-        let instance = wgpu::Instance::default();
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::DX12 | wgpu::Backends::DX11 | wgpu::Backends::GL,
+            dx12_shader_compiler: Default::default(),
+        });
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         let surface =
             unsafe { std::mem::transmute::<wgpu::Surface<'_>, wgpu::Surface<'static>>(surface) };
-        let adapter = instance
+        let adapter = match instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
             .await
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        {
+            Ok(a) => {
+                let info = a.get_info();
+                web_sys::console::log_1(
+                    &format!("Using adapter: {} ({:?})", info.name, info.backend).into(),
+                );
+                a
+            }
+            Err(e) => {
+                web_sys::window()
+                    .unwrap()
+                    .alert_with_message(
+                        "WebGPU není povoleno – zapněte chrome://flags/#enable-unsafe-webgpu a #override-software-rendering-list",
+                    )
+                    .ok();
+                return Err(JsValue::from_str(&e.to_string()));
+            }
+        };
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
