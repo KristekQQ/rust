@@ -34,6 +34,10 @@ impl Camera {
         }
     }
 
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
+    }
+
     pub fn key_down(&mut self, code: String) {
         self.pressed.insert(code);
     }

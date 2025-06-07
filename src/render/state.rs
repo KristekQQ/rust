@@ -18,6 +18,7 @@ pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -187,6 +188,7 @@ impl State {
             surface,
             device,
             queue,
+            config,
             pipeline,
             vertex_buffer,
             index_buffer,
@@ -202,6 +204,20 @@ impl State {
     }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        self.config.width = width;
+        self.config.height = height;
+        self.aspect = width as f32 / height as f32;
+        self.surface.configure(&self.device, &self.config);
+        let (depth_texture, depth_view) =
+            depth::create(&self.device, width, height, self.depth_format);
+        self.depth_texture = depth_texture;
+        self.depth_view = depth_view;
     }
 
 
