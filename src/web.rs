@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{closure::Closure, JsCast};
 
-use glam::Mat4;
+use glam::{vec3, Mat4};
 
 use crate::input::active_camera::{ActiveCamera, CameraType};
 use crate::input::camera::CameraController;
@@ -53,6 +53,45 @@ pub fn resize(width: u32, height: u32) {
     });
 }
 
+#[wasm_bindgen]
+pub fn add_cube(size: f32, r: f32, g: f32, b: f32, x: f32, y: f32, z: f32) -> usize {
+    let mut id = 0usize;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            let mut st = st.borrow_mut();
+            id = st
+                .scene_mut()
+                .add_cube(size, [r, g, b], Mat4::from_translation(glam::vec3(x, y, z)))
+                .unwrap();
+        }
+    });
+    id
+}
+
+#[wasm_bindgen]
+pub fn add_light(r: f32, g: f32, b: f32, x: f32, y: f32, z: f32) -> usize {
+    let mut id = 0usize;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            id = st
+                .borrow_mut()
+                .scene_mut()
+                .add_light([x, y, z], [r, g, b])
+                .unwrap();
+        }
+    });
+    id
+}
+
+#[wasm_bindgen]
+pub fn remove_object(id: usize) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            let _ = st.borrow_mut().scene_mut().remove(id);
+        }
+    });
+}
+
 #[wasm_bindgen(start)]
 pub async fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
@@ -87,16 +126,13 @@ pub async fn start() -> Result<(), JsValue> {
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
-        let elapsed = (now - start_time) as f32 / 1000.0;
-        let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
-            let model = Mat4::from_rotation_z(angle);
             let mut st = state_c.borrow_mut();
-            st.update(cam_matrix, model, cam_pos);
+            st.update(cam_matrix, cam_pos);
             if st.render().is_err() {
                 return;
             }

@@ -5,8 +5,9 @@ use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
-use crate::render::data::{self, SceneUniforms, Light};
+use crate::render::data::{self, InstanceRaw, SceneUniforms, Light};
 use crate::render::{depth, pipeline};
+use crate::scene::{SceneManager, SceneObject};
 
 pub struct State {
     grid_pipeline: wgpu::RenderPipeline,
@@ -29,6 +30,10 @@ pub struct State {
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
     depth_format: wgpu::TextureFormat,
+    instance_buffer: wgpu::Buffer,
+    instance_capacity: usize,
+    instance_count: usize,
+    scene: SceneManager,
     pub aspect: f32,
 }
 
@@ -178,6 +183,16 @@ impl State {
             label: Some("grid bind group"),
         });
 
+        let instance_capacity = 1usize;
+        let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("instance buffer"),
+            size: (std::mem::size_of::<InstanceRaw>() * instance_capacity) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let scene = SceneManager::new();
+        let instance_count = 0usize;
+
         Ok(Self {
             grid_pipeline,
             grid_vertex_buffer,
@@ -199,6 +214,10 @@ impl State {
             depth_texture,
             depth_view,
             depth_format,
+            instance_buffer,
+            instance_capacity,
+            instance_count,
+            scene,
             aspect,
         })
     }
@@ -222,60 +241,70 @@ impl State {
 
 
 
-    pub fn update(&self, camera_matrix: Mat4, model: Mat4, camera_pos: glam::Vec3) {
-        let cube_mvp = camera_matrix * model;
-        let cube_uniform = SceneUniforms {
-            mvp: cube_mvp.to_cols_array_2d(),
-            model: model.to_cols_array_2d(),
+    pub fn update(&mut self, camera_matrix: Mat4, camera_pos: glam::Vec3) {
+        let mut lights = Vec::new();
+        let mut instances = Vec::new();
+
+        for obj in self.scene.iter() {
+            match obj {
+                SceneObject::Cube { size, color, model } => {
+                    let m = *model * Mat4::from_scale(glam::Vec3::splat(*size));
+                    instances.push(InstanceRaw {
+                        model: m.to_cols_array_2d(),
+                        color: *color,
+                        _pad: 0.0,
+                    });
+                }
+                SceneObject::Light { position, color } => {
+                    lights.push(Light {
+                        position: *position,
+                        _pad_p: 0.0,
+                        color: *color,
+                        _pad_c: 0.0,
+                    });
+                }
+            }
+        }
+
+        while lights.len() < 2 {
+            lights.push(Light {
+                position: [0.0, 0.0, 0.0],
+                _pad_p: 0.0,
+                color: [0.0, 0.0, 0.0],
+                _pad_c: 0.0,
+            });
+        }
+
+        let uniform = SceneUniforms {
+            vp: camera_matrix.to_cols_array_2d(),
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
+            lights: [lights[0], lights[1]],
         };
-        let grid_uniform = SceneUniforms {
-            mvp: camera_matrix.to_cols_array_2d(),
-            model: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
+
         self.queue
-            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
+            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[uniform]));
         self.queue
-            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
-        let light_vertices = data::light_rays(&cube_uniform.lights);
+            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[uniform]));
+
+        let light_vertices = data::light_rays(&uniform.lights);
         self.queue
             .write_buffer(&self.light_vertex_buffer, 0, data::as_bytes(&light_vertices));
+
+        self.instance_count = instances.len();
+        if self.instance_count > self.instance_capacity {
+            self.instance_capacity = self.instance_count.max(1);
+            self.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("instance buffer"),
+                size: (std::mem::size_of::<InstanceRaw>() * self.instance_capacity) as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        }
+        if self.instance_count > 0 {
+            self.queue
+                .write_buffer(&self.instance_buffer, 0, data::as_bytes(&instances));
+        }
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -318,8 +347,9 @@ impl State {
             rp.set_pipeline(&self.pipeline);
             rp.set_bind_group(0, &self.cube_bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            rp.set_vertex_buffer(1, self.instance_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..self.instance_count as u32);
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
@@ -332,5 +362,9 @@ impl State {
         self.queue.submit(Some(encoder.finish()));
         frame.present();
         Ok(())
+    }
+
+    pub fn scene_mut(&mut self) -> &mut SceneManager {
+        &mut self.scene
     }
 }

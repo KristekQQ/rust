@@ -195,11 +195,55 @@ pub struct Light {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
-    pub mvp: [[f32; 4]; 4],
-    pub model: [[f32; 4]; 4],
+    pub vp: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; 2],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct InstanceRaw {
+    pub model: [[f32; 4]; 4],
+    pub color: [f32; 3],
+    pub _pad: f32,
+}
+
+impl InstanceRaw {
+    pub fn layout<'a>() -> VertexBufferLayout<'a> {
+        use std::mem;
+        VertexBufferLayout {
+            array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 3,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 4,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress * 2,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress * 3,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress * 4,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+            ],
+        }
+    }
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {

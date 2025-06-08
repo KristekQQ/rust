@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use crate::render::data::Vertex;
+use crate::render::data::{InstanceRaw, Vertex};
 use wgpu::{BindGroupLayout, Device, RenderPipeline, TextureFormat};
 
 pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -> RenderPipeline {
@@ -17,7 +17,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Vertex::layout()],
+            buffers: &[Vertex::layout(), InstanceRaw::layout()],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
