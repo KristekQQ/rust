@@ -43,7 +43,7 @@ directory before building. The script relies on the `zstd` tool to
 decompress the archive, so make sure it is installed:
 
 ```bash
-./evendor
+./evendor.sh
 ```
 
 If `zstd` is not available you can repackage the vendor directory as
