@@ -7,4 +7,4 @@ rm -rf vendor
 cargo vendor vendor
 
 mv .cargo/config.off .cargo/config.toml
-./build_vendor.sh
+./offline.sh build-vendor

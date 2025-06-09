@@ -36,39 +36,42 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 
 ## Offline usage
 
-This repository ships the file `vendor.tar.zst` containing all required
+This repository ships the file `vendor.tar.gz` containing all required
 crates so that builds can happen without network connectivity. Run the
-provided `./evendor` script to unpack the archive and prepare the `vendor/`
-directory before building. The script relies on the `zstd` tool to
-decompress the archive, so make sure it is installed:
+provided `./evendor.sh` script to unpack the archive and prepare the
+`vendor/` directory. The script also accepts a `vendor.tar.zst` archive
+if present. To regenerate the archive with all dependencies, run
+`./build_vendor.sh`.
 
 ```bash
 ./evendor.sh
 ```
 
-If `zstd` is not available you can repackage the vendor directory as
-`vendor.tar.gz` or `vendor.zip` on another machine and extract that
-instead. After extracting, run `cargo vendor --sync ./vendor` once to
-update Cargo's metadata:
+If you later change dependencies you can regenerate the archive with
+`./build_vendor.sh` and refresh the metadata using:
 
 ```bash
-# On a machine with `zstd` available
-tar -I zstd -xf vendor.tar.zst
-tar -czf vendor.tar.gz vendor  # or: zip -r vendor.zip vendor
-
-# On the target system without `zstd`
-tar -xzf vendor.tar.gz         # or: unzip vendor.zip
 cargo vendor --sync ./vendor
 ```
 
 The script is idempotent: if a `vendor/` directory already exists it will skip
 the extraction step so previously downloaded crates are reused.
 
-The script also synchronizes Cargo's metadata with the extracted crates. If
-you later change dependencies you can refresh the vendor directory using:
+To build fully offline you also need a Rust toolchain that already contains
+the `wasm32-unknown-unknown` target. Place `rustup_cache.part.*` and
+`cargo_cache.part.*` next to the repository and run:
 
 ```bash
-cargo vendor --sync ./vendor
+./offline.sh join-toolchain
+```
+
+This registers the toolchain under the name `stable-offline`. Use it when
+running tests and building:
+
+```bash
+RUSTUP_TOOLCHAIN=stable-offline \
+cargo test --offline
+cargo build --target wasm32-unknown-unknown --release --offline
 ```
 
 Cargo is configured in `.cargo/config.toml` to use these local sources:
