@@ -56,7 +56,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let l1_dir = normalize(scene.lights[1].position - input.world_pos);
     let diff1 = max(dot(normal, l1_dir), 0.0);
     let spec1 = pow(max(dot(normal, normalize(l1_dir + view_dir)), 0.0), 32.0);
-    result += (diff1 * input.color + spec1) * scene.lights[1].color;pwd
+    result += (diff1 * input.color + spec1) * scene.lights[1].color;
 
     return vec4<f32>(result, 1.0);
 }
