@@ -60,7 +60,8 @@ the extraction step so previously downloaded crates are reused.
 ### Creating toolchain caches
 
 Run `./pack_toolchain.sh` on a machine with an initialized Rust toolchain to
-produce the `rustup_cache.part.*` and `cargo_cache.part.*` archives:
+produce the `rustup_cache.part.*` and `cargo_cache.part.*` archives. Each
+archive is split into 50 MB chunks:
 
 ```bash
 ./pack_toolchain.sh
