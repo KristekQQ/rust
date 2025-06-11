@@ -57,6 +57,18 @@ cargo vendor --sync ./vendor
 The script is idempotent: if a `vendor/` directory already exists it will skip
 the extraction step so previously downloaded crates are reused.
 
+### Creating toolchain caches
+
+Run `./pack_toolchain.sh` on a machine with an initialized Rust toolchain to
+produce the `rustup_cache.part.*` and `cargo_cache.part.*` archives:
+
+```bash
+./pack_toolchain.sh
+```
+
+Copy these files next to the repository so they can be assembled later with
+`./join_toolchain.sh`.
+
 To build fully offline you also need a Rust toolchain that already contains
 the `wasm32-unknown-unknown` target. Place `rustup_cache.part.*` and
 `cargo_cache.part.*` next to the repository and assemble the caches with
