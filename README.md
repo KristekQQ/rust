@@ -59,10 +59,11 @@ the extraction step so previously downloaded crates are reused.
 
 To build fully offline you also need a Rust toolchain that already contains
 the `wasm32-unknown-unknown` target. Place `rustup_cache.part.*` and
-`cargo_cache.part.*` next to the repository and run:
+`cargo_cache.part.*` next to the repository and assemble the caches with
+`./join_toolchain.sh` (or equivalently `./offline.sh join-toolchain`):
 
 ```bash
-./offline.sh join-toolchain
+./join_toolchain.sh
 ```
 
 This registers the toolchain under the name `stable-offline`. Use it when
@@ -72,6 +73,14 @@ running tests and building:
 RUSTUP_TOOLCHAIN=stable-offline \
 cargo test --offline
 cargo build --target wasm32-unknown-unknown --release --offline
+```
+
+When setting up a fresh machine or continuous integration worker, the
+`ci_offline_setup.sh` script reconstructs the cached toolchain, unpacks the
+`vendor` directory and runs the test suite in one step:
+
+```bash
+./ci_offline_setup.sh
 ```
 
 Cargo is configured in `.cargo/config.toml` to use these local sources:
