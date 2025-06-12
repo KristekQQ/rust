@@ -145,6 +145,8 @@ impl State {
             camera_pos: [0.0, 0.0, 0.0],
             light_count: default_lights.len() as u32,
             lights: lights_array,
+            tint: [1.0, 1.0, 1.0],
+            _pad_t: 0.0,
         };
 
         let light_vertices = data::light_rays(&uniform.lights);
