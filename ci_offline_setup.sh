@@ -8,8 +8,7 @@ export CARGO_HOME="$PWD/.cargo"
 # Assemble cached toolchain and unpack vendored crates.  This relies on
 # the helper script `offline.sh` so all offline setup logic lives in one
 # place.
-"$(dirname "$0")/offline.sh" join-toolchain
-"$(dirname "$0")/offline.sh" evendor
+"$(dirname "$0")/offline.sh" unpack-all
 
 # Run the test suite using the offline toolchain.
 export RUSTUP_TOOLCHAIN="stable-offline"

@@ -94,8 +94,16 @@ EOF2
     export RUSTUP_TOOLCHAIN="$OFFLINE_NAME"
     cargo test --offline --target x86_64-unknown-linux-gnu
     ;;
+  pack-all)
+    "$(dirname "$0")/pack_toolchain.sh"
+    "$0" build-vendor
+    ;;
+  unpack-all)
+    "$0" join-toolchain
+    "$0" evendor
+    ;;
   *)
-    echo "Usage: $0 {join-toolchain|build-vendor|evendor|ci-setup}"
+    echo "Usage: $0 {join-toolchain|build-vendor|evendor|ci-setup|pack-all|unpack-all}"
     exit 1
     ;;
 esac

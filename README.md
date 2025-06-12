@@ -36,19 +36,18 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 
 ## Offline usage
 
-This repository ships the file `vendor.tar.gz` containing all required
-crates so that builds can happen without network connectivity. Use the
-`offline.sh` helper to unpack the archive and prepare the `vendor/` directory:
+This repository ships `vendor.tar.gz` together with the
+`rustup_cache.part.*` and `cargo_cache.part.*` archives so builds can happen
+without network connectivity. Use the helper to unpack everything:
 
 ```bash
-./offline.sh evendor
+./offline.sh unpack-all
 ```
 
-The script also accepts a `vendor.tar.zst` archive if present.  To rebuild the
-archive with all dependencies, run:
+To rebuild the archives with all dependencies and toolchain caches run:
 
 ```bash
-./offline.sh build-vendor
+./offline.sh pack-all
 ```
 
 If you later change dependencies you can regenerate the archive and refresh the
@@ -58,33 +57,18 @@ metadata using:
 cargo vendor --sync ./vendor
 ```
 
+
 The script is idempotent: if a `vendor/` directory already exists it will skip
 the extraction step so previously downloaded crates are reused.
 
-### Creating toolchain caches
+### Creating offline archives
 
-Run `./pack_toolchain.sh` on a machine with an initialized Rust toolchain to
-produce the `rustup_cache.part.*` and `cargo_cache.part.*` archives. Each
-archive is split into 50 MB chunks:
+Run `./offline.sh pack-all` on a machine with an initialized toolchain to
+produce `vendor.tar.gz`, `rustup_cache.part.*` and `cargo_cache.part.*`.
 
-```bash
-./pack_toolchain.sh
-```
-
-Copy these files next to the repository so they can be assembled later with
-`./offline.sh join-toolchain`.
-
-To build fully offline you also need a Rust toolchain that already contains
-the `wasm32-unknown-unknown` target. Place `rustup_cache.part.*` and
-`cargo_cache.part.*` next to the repository and assemble the caches with
-`./offline.sh join-toolchain`:
-
-```bash
-./offline.sh join-toolchain
-```
-
-This registers the toolchain under the name `stable-offline`. Use it when
-running tests and building:
+Copy these files next to the repository so they can be unpacked later with
+`./offline.sh unpack-all`. This registers the toolchain under the name
+`stable-offline` which you can use when building and testing:
 
 ```bash
 RUSTUP_TOOLCHAIN=stable-offline \
