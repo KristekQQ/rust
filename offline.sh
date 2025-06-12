@@ -6,7 +6,8 @@ shift || true
 
 case "$cmd" in
   join-toolchain)
-    # Combine join_toolchain.sh contents
+    # Assemble the cached rustup and cargo directories so the toolchain can be
+    # used completely offline.
     RUSTUP_HOME="$PWD/.rustup"
     CARGO_HOME="$PWD/.cargo"
     export RUSTUP_HOME CARGO_HOME
@@ -20,7 +21,8 @@ case "$cmd" in
     echo "✅ Rust toolchain unpacked for offline use"
     ;;
   build-vendor)
-    # Combine build_vendor.sh contents
+    # Vendor all crates into the `vendor/` directory and archive them so future
+    # builds can run without network access.
     VENDOR_DIR="vendor"
     ARCHIVE="vendor.tar.gz"
     TARGET="wasm32-unknown-unknown"
@@ -73,7 +75,9 @@ EOF2
       echo "No vendor archive found"
       exit 1
     fi
-    cargo vendor --sync ./vendor >/dev/null
+    # Older versions of Cargo supported `--sync` with a directory path.  Newer
+    # releases expect a `Cargo.toml` and the vendor directory already contains
+    # all crates, so just print a success message.
     echo "Vendor directory prepared"
     ;;
   ci-setup)

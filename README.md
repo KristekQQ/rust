@@ -37,18 +37,22 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 ## Offline usage
 
 This repository ships the file `vendor.tar.gz` containing all required
-crates so that builds can happen without network connectivity. Run the
-provided `./evendor.sh` script to unpack the archive and prepare the
-`vendor/` directory. The script also accepts a `vendor.tar.zst` archive
-if present. To regenerate the archive with all dependencies, run
-`./build_vendor.sh`.
+crates so that builds can happen without network connectivity. Use the
+`offline.sh` helper to unpack the archive and prepare the `vendor/` directory:
 
 ```bash
-./evendor.sh
+./offline.sh evendor
 ```
 
-If you later change dependencies you can regenerate the archive with
-`./build_vendor.sh` and refresh the metadata using:
+The script also accepts a `vendor.tar.zst` archive if present.  To rebuild the
+archive with all dependencies, run:
+
+```bash
+./offline.sh build-vendor
+```
+
+If you later change dependencies you can regenerate the archive and refresh the
+metadata using:
 
 ```bash
 cargo vendor --sync ./vendor
@@ -68,15 +72,15 @@ archive is split into 50 MB chunks:
 ```
 
 Copy these files next to the repository so they can be assembled later with
-`./join_toolchain.sh`.
+`./offline.sh join-toolchain`.
 
 To build fully offline you also need a Rust toolchain that already contains
 the `wasm32-unknown-unknown` target. Place `rustup_cache.part.*` and
 `cargo_cache.part.*` next to the repository and assemble the caches with
-`./join_toolchain.sh` (or equivalently `./offline.sh join-toolchain`):
+`./offline.sh join-toolchain`:
 
 ```bash
-./join_toolchain.sh
+./offline.sh join-toolchain
 ```
 
 This registers the toolchain under the name `stable-offline`. Use it when

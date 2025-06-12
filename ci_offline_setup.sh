@@ -1,26 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Use local cache directories so we can run completely offline.
 export RUSTUP_HOME="$PWD/.rustup"
 export CARGO_HOME="$PWD/.cargo"
 
-# ── složit cache z chunků ─────────────────────────────────────────────
-cat rustup_cache.part.* | tar -xz
-cat cargo_cache.part.* | tar -xz
+# Assemble cached toolchain and unpack vendored crates.  This relies on
+# the helper script `offline.sh` so all offline setup logic lives in one
+# place.
+"$(dirname "$0")/offline.sh" join-toolchain
+"$(dirname "$0")/offline.sh" evendor
 
-# ── link offline toolchain pod jménem stable-offline ───────────────────
-OFFLINE_NAME="stable-offline"
-OFFLINE_PATH="$RUSTUP_HOME/toolchains/stable-x86_64-unknown-linux-gnu"
-if ! rustup toolchain list | grep -q "$OFFLINE_NAME"; then
-  rustup toolchain link "$OFFLINE_NAME" "$OFFLINE_PATH"
-fi
-
-# ── rozbal vendored crates ─────────────────────────────────────────────
-tar -xzvf vendor.tar.gz
-
-# ── spustit testy s offline toolchainem ────────────────────────────────
-export RUSTUP_TOOLCHAIN="$OFFLINE_NAME"
+# Run the test suite using the offline toolchain.
+export RUSTUP_TOOLCHAIN="stable-offline"
 cargo test --offline --target x86_64-unknown-linux-gnu
-
-# (volitelné) formátování – funguje jen pokud máš rustfmt v cache
-# cargo fmt --all -- --check
 
