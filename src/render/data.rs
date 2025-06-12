@@ -183,8 +183,19 @@ pub fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
     }
 }
 
+pub const MAX_LIGHTS: usize = 8;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
+pub struct Cube {
+    pub position: [f32; 3],
+    pub scale: f32,
+    pub color: [f32; 3],
+    pub _pad_c: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
 pub struct Light {
     pub position: [f32; 3],
     pub _pad_p: f32,
@@ -198,8 +209,10 @@ pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
-    pub _pad0: f32,
-    pub lights: [Light; 2],
+    pub light_count: u32,
+    pub lights: [Light; MAX_LIGHTS],
+    pub tint: [f32; 3],
+    pub _pad_t: f32,
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {

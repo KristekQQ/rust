@@ -10,6 +10,7 @@ use crate::input::active_camera::{ActiveCamera, CameraType};
 use crate::input::camera::CameraController;
 use crate::input::{keyboard, mouse};
 use crate::render::state::State;
+use crate::render::data::{Light, Cube};
 
 thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
@@ -49,6 +50,52 @@ pub fn resize(width: u32, height: u32) {
     CAMERA.with(|c| {
         if let Some(cam) = &*c.borrow() {
             cam.borrow_mut().set_aspect(width as f32 / height as f32);
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_light(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().add_light(Light {
+                position: [x, y, z],
+                _pad_p: 0.0,
+                color: [r, g, b],
+                _pad_c: 0.0,
+            });
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn clear_lights() {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().clear_lights();
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_cube(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32, scale: f32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().add_cube(Cube {
+                position: [x, y, z],
+                scale,
+                color: [r, g, b],
+                _pad_c: 0.0,
+            });
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn clear_cubes() {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().clear_cubes();
         }
     });
 }

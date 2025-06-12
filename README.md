@@ -38,11 +38,14 @@ Then open `http://localhost:8000` in a browser with WebGPU enabled.
 
 This repository ships `vendor.tar.gz` together with the
 `rustup_cache.part.*` and `cargo_cache.part.*` archives so builds can happen
-without network connectivity. Use the helper to unpack everything:
+without network connectivity. Use the helper to unpack everything and run
+the tests offline:
 
 ```bash
 ./offline.sh unpack-all
 ```
+Alternatively run `./ci_offline_setup.sh` to restore the cached toolchain and
+execute the test suite completely offline.
 
 To rebuild the archives with all dependencies and toolchain caches run:
 
