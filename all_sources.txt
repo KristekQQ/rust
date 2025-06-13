@@ -1398,10 +1398,13 @@ pub fn resize(width: u32, height: u32) {
 }
 
 #[wasm_bindgen]
-pub fn add_cube(position: &[f32], size: f32) -> usize {
-    let pos: [f32; 3] = position
-        .try_into()
-        .expect("position must have 3 elements");
+pub fn add_cube(position: js_sys::Array, size: f32) -> usize {
+    if position.length() != 3 { return 0; }
+    let pos = [
+        position.get(0).as_f64().unwrap_or(0.0) as f32,
+        position.get(1).as_f64().unwrap_or(0.0) as f32,
+        position.get(2).as_f64().unwrap_or(0.0) as f32,
+    ];
     SCENE_MANAGER.with(|s| {
         if let Some(scene) = &mut *s.borrow_mut() {
             let mut verts = crate::render::data::VERTICES.to_vec();
@@ -1417,13 +1420,18 @@ pub fn add_cube(position: &[f32], size: f32) -> usize {
 }
 
 #[wasm_bindgen]
-pub fn add_light(position: &[f32], color: &[f32]) -> usize {
-    let pos: [f32; 3] = position
-        .try_into()
-        .expect("position must have 3 elements");
-    let col: [f32; 3] = color
-        .try_into()
-        .expect("color must have 3 elements");
+pub fn add_light(position: js_sys::Array, color: js_sys::Array) -> usize {
+    if position.length() != 3 || color.length() != 3 { return 0; }
+    let pos = [
+        position.get(0).as_f64().unwrap_or(0.0) as f32,
+        position.get(1).as_f64().unwrap_or(0.0) as f32,
+        position.get(2).as_f64().unwrap_or(0.0) as f32,
+    ];
+    let col = [
+        color.get(0).as_f64().unwrap_or(1.0) as f32,
+        color.get(1).as_f64().unwrap_or(1.0) as f32,
+        color.get(2).as_f64().unwrap_or(1.0) as f32,
+    ];
     SCENE_MANAGER.with(|s| {
         if let Some(scene) = &mut *s.borrow_mut() {
             return scene.add_light(pos, col);
