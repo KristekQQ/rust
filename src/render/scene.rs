@@ -252,6 +252,12 @@ impl SceneManager {
         id
     }
 
+    pub fn remove(&mut self, id: usize) {
+        if id < self.objects.len() {
+            self.objects.remove(id);
+        }
+    }
+
     fn lights_array(&self) -> [SceneLight; 2] {
         let default = SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [1.0; 3], _pad_c: 0.0 };
         let mut arr = [default; 2];

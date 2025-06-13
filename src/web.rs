@@ -16,20 +16,23 @@ thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
     static SCENE_MANAGER: RefCell<Option<SceneManager>> = RefCell::new(None);
+    static GRID_ID: RefCell<Option<usize>> = RefCell::new(None);
 }
 
 #[wasm_bindgen]
 pub fn set_grid_visible(show: bool) {
-    STATE.with(|s| {
-        if let Some(st) = &*s.borrow() {
-            // grid handled via SceneManager
-            if show {
-                SCENE_MANAGER.with(|sc| {
-                    if let Some(mgr) = &mut *sc.borrow_mut() {
-                        if mgr.add_grid(10) == 0 { }
+    SCENE_MANAGER.with(|sc| {
+        if let Some(mgr) = &mut *sc.borrow_mut() {
+            GRID_ID.with(|id_cell| {
+                if show {
+                    if id_cell.borrow().is_none() {
+                        let id = mgr.add_grid(10);
+                        *id_cell.borrow_mut() = Some(id);
                     }
-                });
-            }
+                } else if let Some(id) = id_cell.borrow_mut().take() {
+                    mgr.remove(id);
+                }
+            });
         }
     });
 }
