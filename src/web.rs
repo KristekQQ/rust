@@ -7,6 +7,7 @@ use wasm_bindgen::{closure::Closure, JsCast};
 use glam::Mat4;
 
 use crate::input::active_camera::{ActiveCamera, CameraType};
+use crate::input::camera::CameraController;
 use crate::input::{keyboard, mouse};
 use crate::render::scene::SceneManager;
 use crate::render::data;
@@ -66,26 +67,35 @@ pub fn resize(width: u32, height: u32) {
 }
 
 #[wasm_bindgen]
-pub fn add_cube(position: &[f32;3], size: f32) -> usize {
+pub fn add_cube(position: &[f32], size: f32) -> usize {
+    let pos: [f32; 3] = position
+        .try_into()
+        .expect("position must have 3 elements");
     SCENE_MANAGER.with(|s| {
         if let Some(scene) = &mut *s.borrow_mut() {
             let mut verts = crate::render::data::VERTICES.to_vec();
             for v in verts.iter_mut() {
-                v.position[0] = v.position[0] * size + position[0];
-                v.position[1] = v.position[1] * size + position[1];
-                v.position[2] = v.position[2] * size + position[2];
+                v.position[0] = v.position[0] * size + pos[0];
+                v.position[1] = v.position[1] * size + pos[1];
+                v.position[2] = v.position[2] * size + pos[2];
             }
-            scene.add_mesh(&verts, crate::render::data::INDICES, Mat4::IDENTITY)
+            return scene.add_mesh(&verts, crate::render::data::INDICES, Mat4::IDENTITY);
         }
         0
     })
 }
 
 #[wasm_bindgen]
-pub fn add_light(position: &[f32;3], color: &[f32;3]) -> usize {
+pub fn add_light(position: &[f32], color: &[f32]) -> usize {
+    let pos: [f32; 3] = position
+        .try_into()
+        .expect("position must have 3 elements");
+    let col: [f32; 3] = color
+        .try_into()
+        .expect("color must have 3 elements");
     SCENE_MANAGER.with(|s| {
         if let Some(scene) = &mut *s.borrow_mut() {
-            return scene.add_light(*position, *color);
+            return scene.add_light(pos, col);
         }
         0
     })
@@ -126,7 +136,6 @@ pub async fn start() -> Result<(), JsValue> {
     let window_c = window.clone();
     let perf_c = performance.clone();
     let camera_c = camera.clone();
-    let state_c = state.clone();
     let prev_time_c = prev_time.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
@@ -142,8 +151,8 @@ pub async fn start() -> Result<(), JsValue> {
                 mgr.update(dt);
                 mgr.set_camera(cam_matrix, cam_pos);
                 STATE.with(|st| {
-                    if let Some(state) = &mut *st.borrow_mut() {
-                        if state.render(mgr).is_err() {
+                    if let Some(state) = &*st.borrow() {
+                        if state.borrow_mut().render(mgr).is_err() {
                             return;
                         }
                     }

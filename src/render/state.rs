@@ -2,7 +2,6 @@
 
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
-use wgpu::util::DeviceExt;
 
 use super::{depth, scene::SceneManager};
 
