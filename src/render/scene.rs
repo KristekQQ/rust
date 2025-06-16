@@ -9,7 +9,7 @@ use super::pipeline;
 pub trait SceneObject {
     fn update(&mut self, dt: f32);
     fn draw<'r>(&'r self, pass: &mut wgpu::RenderPass<'r>, bind_group_layout: &wgpu::BindGroupLayout);
-    fn set_camera(&mut self, _view_proj: Mat4, _cam_pos: Vec3, _lights: &[SceneLight; 2]) {}
+    fn set_camera(&mut self, _view_proj: Mat4, _cam_pos: Vec3, _lights: &[SceneLight; 3]) {}
     fn light_data(&self) -> Option<SceneLight> { None }
 }
 
@@ -41,7 +41,7 @@ impl Mesh {
             model: model.to_cols_array_2d(),
             camera_pos: [0.0;3],
             _pad0: 0.0,
-            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 2],
+            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 3],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh uniform"),
@@ -94,7 +94,7 @@ impl SceneObject for Mesh {
         pass.draw_indexed(0..self.index_count, 0, 0..1);
     }
 
-    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 2]) {
+    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 3]) {
         let mvp = view_proj * self.model;
         let uniform = SceneUniforms {
             mvp: mvp.to_cols_array_2d(),
@@ -132,7 +132,7 @@ impl Light {
             model: Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: [0.0;3],
             _pad0: 0.0,
-            lights: [SceneLight { position: [0.0;3], _pad_p: 0.0, color: [0.0;3], _pad_c: 0.0 }; 2],
+            lights: [SceneLight { position: [0.0;3], _pad_p: 0.0, color: [0.0;3], _pad_c: 0.0 }; 3],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("light uniform"),
@@ -168,7 +168,7 @@ impl SceneObject for Light {
         pass.draw(0..self.vertex_count, 0..1);
     }
 
-    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 2]) {
+    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 3]) {
         let uniform = SceneUniforms {
             mvp: view_proj.to_cols_array_2d(),
             model: Mat4::IDENTITY.to_cols_array_2d(),
@@ -206,7 +206,7 @@ impl Grid {
             model: Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: [0.0; 3],
             _pad0: 0.0,
-            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 2],
+            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 3],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("grid uniform"),
@@ -233,7 +233,7 @@ impl SceneObject for Grid {
         pass.draw(0..self.vertex_count, 0..1);
     }
 
-    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 2]) {
+    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 3]) {
         let uniform = SceneUniforms {
             mvp: view_proj.to_cols_array_2d(),
             model: Mat4::IDENTITY.to_cols_array_2d(),
@@ -299,13 +299,13 @@ impl SceneManager {
         }
     }
 
-    fn lights_array(&self) -> [SceneLight; 2] {
+    fn lights_array(&self) -> [SceneLight; 3] {
         let default = SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [1.0; 3], _pad_c: 0.0 };
-        let mut arr = [default; 2];
+        let mut arr = [default; 3];
         let mut i = 0;
         for o in self.objects.iter() {
             if let Some(l) = o.light_data() {
-                if i < 2 { arr[i] = l; i += 1; }
+                if i < 3 { arr[i] = l; i += 1; }
             }
         }
         arr

@@ -199,7 +199,7 @@ pub struct SceneUniforms {
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
-    pub lights: [Light; 2],
+    pub lights: [Light; 3],
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {
@@ -219,7 +219,7 @@ pub fn grid_vertices(size: i32) -> Vec<Vertex> {
 pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
     let mut verts = Vec::new();
     let normal = [0.0_f32, 1.0, 0.0];
-    let cross = 0.2_f32;
+    let cross = 0.3_f32;
     for l in lights {
         let p = l.position;
         let color = l.color;

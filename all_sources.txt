@@ -613,7 +613,7 @@ pub struct SceneUniforms {
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
-    pub lights: [Light; 2],
+    pub lights: [Light; 3],
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {
@@ -633,7 +633,7 @@ pub fn grid_vertices(size: i32) -> Vec<Vertex> {
 pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
     let mut verts = Vec::new();
     let normal = [0.0_f32, 1.0, 0.0];
-    let cross = 0.2_f32;
+    let cross = 0.3_f32;
     for l in lights {
         let p = l.position;
         let color = l.color;
@@ -794,7 +794,7 @@ use super::pipeline;
 pub trait SceneObject {
     fn update(&mut self, dt: f32);
     fn draw<'r>(&'r self, pass: &mut wgpu::RenderPass<'r>, bind_group_layout: &wgpu::BindGroupLayout);
-    fn set_camera(&mut self, _view_proj: Mat4, _cam_pos: Vec3, _lights: &[SceneLight; 2]) {}
+    fn set_camera(&mut self, _view_proj: Mat4, _cam_pos: Vec3, _lights: &[SceneLight; 3]) {}
     fn light_data(&self) -> Option<SceneLight> { None }
 }
 
@@ -826,7 +826,7 @@ impl Mesh {
             model: model.to_cols_array_2d(),
             camera_pos: [0.0;3],
             _pad0: 0.0,
-            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 2],
+            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 3],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("mesh uniform"),
@@ -879,7 +879,7 @@ impl SceneObject for Mesh {
         pass.draw_indexed(0..self.index_count, 0, 0..1);
     }
 
-    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 2]) {
+    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 3]) {
         let mvp = view_proj * self.model;
         let uniform = SceneUniforms {
             mvp: mvp.to_cols_array_2d(),
@@ -917,7 +917,7 @@ impl Light {
             model: Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: [0.0;3],
             _pad0: 0.0,
-            lights: [SceneLight { position: [0.0;3], _pad_p: 0.0, color: [0.0;3], _pad_c: 0.0 }; 2],
+            lights: [SceneLight { position: [0.0;3], _pad_p: 0.0, color: [0.0;3], _pad_c: 0.0 }; 3],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("light uniform"),
@@ -953,7 +953,7 @@ impl SceneObject for Light {
         pass.draw(0..self.vertex_count, 0..1);
     }
 
-    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 2]) {
+    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 3]) {
         let uniform = SceneUniforms {
             mvp: view_proj.to_cols_array_2d(),
             model: Mat4::IDENTITY.to_cols_array_2d(),
@@ -991,7 +991,7 @@ impl Grid {
             model: Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: [0.0; 3],
             _pad0: 0.0,
-            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 2],
+            lights: [SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 }; 3],
         };
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("grid uniform"),
@@ -1018,7 +1018,7 @@ impl SceneObject for Grid {
         pass.draw(0..self.vertex_count, 0..1);
     }
 
-    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 2]) {
+    fn set_camera(&mut self, view_proj: Mat4, cam_pos: Vec3, lights: &[SceneLight; 3]) {
         let uniform = SceneUniforms {
             mvp: view_proj.to_cols_array_2d(),
             model: Mat4::IDENTITY.to_cols_array_2d(),
@@ -1084,13 +1084,13 @@ impl SceneManager {
         }
     }
 
-    fn lights_array(&self) -> [SceneLight; 2] {
+    fn lights_array(&self) -> [SceneLight; 3] {
         let default = SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [1.0; 3], _pad_c: 0.0 };
-        let mut arr = [default; 2];
+        let mut arr = [default; 3];
         let mut i = 0;
         for o in self.objects.iter() {
             if let Some(l) = o.light_data() {
-                if i < 2 { arr[i] = l; i += 1; }
+                if i < 3 { arr[i] = l; i += 1; }
             }
         }
         arr
@@ -1272,7 +1272,7 @@ struct SceneUniforms {
     model: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
-    lights: array<Light, 2>,
+    lights: array<Light, 3>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -1319,6 +1319,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let diff1 = max(dot(normal, l1_dir), 0.0);
     let spec1 = pow(max(dot(normal, normalize(l1_dir + view_dir)), 0.0), 32.0);
     result += (diff1 * input.color + spec1) * scene.lights[1].color;
+
+    // light 2
+    let l2_dir = normalize(scene.lights[2].position - input.world_pos);
+    let diff2 = max(dot(normal, l2_dir), 0.0);
+    let spec2 = pow(max(dot(normal, normalize(l2_dir + view_dir)), 0.0), 32.0);
+    result += (diff2 * input.color + spec2) * scene.lights[2].color;
 
     return vec4<f32>(result, 1.0);
 }

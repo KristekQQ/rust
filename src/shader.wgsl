@@ -10,7 +10,7 @@ struct SceneUniforms {
     model: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
-    lights: array<Light, 2>,
+    lights: array<Light, 3>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -57,6 +57,12 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let diff1 = max(dot(normal, l1_dir), 0.0);
     let spec1 = pow(max(dot(normal, normalize(l1_dir + view_dir)), 0.0), 32.0);
     result += (diff1 * input.color + spec1) * scene.lights[1].color;
+
+    // light 2
+    let l2_dir = normalize(scene.lights[2].position - input.world_pos);
+    let diff2 = max(dot(normal, l2_dir), 0.0);
+    let spec2 = pow(max(dot(normal, normalize(l2_dir + view_dir)), 0.0), 32.0);
+    result += (diff2 * input.color + spec2) * scene.lights[2].color;
 
     return vec4<f32>(result, 1.0);
 }
