@@ -31,10 +31,13 @@
         canvas.height = window.innerHeight;
         let grid = true;
 
-        import init, { set_camera_mode, set_grid_visible, resize } from './pkg/webgpu_wasm.js';
+        import init, { set_camera_mode, set_grid_visible, resize, add_light } from './pkg/webgpu_wasm.js';
         await init();
         resize(canvas.width, canvas.height);
         set_grid_visible(true);
+        // Priklad pridani svetel z JavaScriptu
+        add_light([1.5, 1.0, 2.0], [1.0, 1.0, 1.0]);
+        add_light([-1.5, 1.0, -2.0], [1.0, 0.0, 0.0]);
         document.getElementById("grid-btn").onclick = () => {
             grid = !grid;
             set_grid_visible(grid);
