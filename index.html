@@ -35,9 +35,7 @@
         await init();
         resize(canvas.width, canvas.height);
         set_grid_visible(true);
-        // Priklad pridani svetel z JavaScriptu
-        add_light([1.5, 1.0, 2.0], [1.0, 1.0, 1.0]);
-        add_light([-1.5, 1.0, -2.0], [1.0, 0.0, 0.0]);
+        // Volitelne pridani dalsich svetel z JavaScriptu
         document.getElementById("grid-btn").onclick = () => {
             grid = !grid;
             set_grid_visible(grid);
