@@ -127,9 +127,6 @@ pub async fn start() -> Result<(), JsValue> {
     );
     manager.add_grid(10);
     manager.add_mesh(data::VERTICES, data::INDICES, Mat4::IDENTITY);
-    // základní osvětlení scény
-    manager.add_light([1.5, 1.0, 2.0], [1.0, 1.0, 1.0]);
-    manager.add_light([-1.5, 1.0, -2.0], [1.0, 0.0, 0.0]);
     STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
     SCENE_MANAGER.with(|sc| *sc.borrow_mut() = Some(manager));
     let performance = window.performance().unwrap();

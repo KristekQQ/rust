@@ -35,7 +35,10 @@
         await init();
         resize(canvas.width, canvas.height);
         set_grid_visible(true);
-        // Volitelne pridani dalsich svetel z JavaScriptu
+        // Základní osvětlovací setup čistě z JavaScriptu
+        add_light([1.5, 1.0, 2.0], [1.0, 1.0, 1.0]);
+        add_light([-1.5, 1.0, -2.0], [1.0, 0.0, 0.0]);
+        add_light([0.0, -1.0, 0.0], [0.0, 1.0, 0.0]);
         document.getElementById("grid-btn").onclick = () => {
             grid = !grid;
             set_grid_visible(grid);
