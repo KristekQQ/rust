@@ -1085,7 +1085,8 @@ impl SceneManager {
     }
 
     fn lights_array(&self) -> [SceneLight; 3] {
-        let default = SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [1.0; 3], _pad_c: 0.0 };
+        // Pokud není přidáno žádné světlo, chceme mít prázdné sloty
+        let default = SceneLight { position: [0.0; 3], _pad_p: 0.0, color: [0.0; 3], _pad_c: 0.0 };
         let mut arr = [default; 3];
         let mut i = 0;
         for o in self.objects.iter() {
