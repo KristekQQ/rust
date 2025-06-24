@@ -9,8 +9,8 @@ struct SceneUniforms {
     mvp: mat4x4<f32>,
     model: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    _pad0: f32,
-    lights: array<Light, 2>,
+    light_count: u32,
+    lights: array<Light, 8>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -46,17 +46,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let view_dir = normalize(scene.camera_pos - input.world_pos);
     var result = input.color * 0.1; // ambient
 
-    // light 0
-    let l0_dir = normalize(scene.lights[0].position - input.world_pos);
-    let diff0 = max(dot(normal, l0_dir), 0.0);
-    let spec0 = pow(max(dot(normal, normalize(l0_dir + view_dir)), 0.0), 32.0);
-    result += (diff0 * input.color + spec0) * scene.lights[0].color;
-
-    // light 1
-    let l1_dir = normalize(scene.lights[1].position - input.world_pos);
-    let diff1 = max(dot(normal, l1_dir), 0.0);
-    let spec1 = pow(max(dot(normal, normalize(l1_dir + view_dir)), 0.0), 32.0);
-    result += (diff1 * input.color + spec1) * scene.lights[1].color;
+    var i: u32 = 0u;
+    loop {
+        if (i >= scene.light_count) { break; }
+        let light = scene.lights[i];
+        let l_dir = normalize(light.position - input.world_pos);
+        let diff = max(dot(normal, l_dir), 0.0);
+        let spec = pow(max(dot(normal, normalize(l_dir + view_dir)), 0.0), 32.0);
+        result += (diff * input.color + spec) * light.color;
+        i = i + 1u;
+    }
 
     return vec4<f32>(result, 1.0);
 }

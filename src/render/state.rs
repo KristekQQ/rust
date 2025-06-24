@@ -5,7 +5,7 @@ use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
-use crate::render::data::{self, SceneUniforms, Light};
+use crate::render::data::{self, SceneUniforms, Light, MAX_LIGHTS};
 use crate::render::{depth, pipeline};
 
 pub struct State {
@@ -30,6 +30,8 @@ pub struct State {
     depth_view: wgpu::TextureView,
     depth_format: wgpu::TextureFormat,
     pub aspect: f32,
+    lights: Vec<Light>,
+    cube_models: Vec<Mat4>,
 }
 
 impl State {
@@ -127,28 +129,15 @@ impl State {
                 [0.0, 0.0, 0.0, 1.0],
             ],
             camera_pos: [0.0, 0.0, 0.0],
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
+            light_count: 0,
+            lights: [Light::default(); MAX_LIGHTS],
         };
 
-        let light_vertices = data::light_rays(&uniform.lights);
-        let light_vertex_count = light_vertices.len() as u32;
+        let light_vertices: &[data::Vertex] = &[];
+        let light_vertex_count = 0;
         let light_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("light vertex buffer"),
-            contents: data::as_bytes(&light_vertices),
+            contents: data::as_bytes(light_vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
         let cube_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -200,6 +189,8 @@ impl State {
             depth_view,
             depth_format,
             aspect,
+            lights: Vec::new(),
+            cube_models: Vec::new(),
         })
     }
     pub fn set_grid_visible(&mut self, show: bool) {
@@ -222,63 +213,46 @@ impl State {
 
 
 
-    pub fn update(&self, camera_matrix: Mat4, model: Mat4, camera_pos: glam::Vec3) {
-        let cube_mvp = camera_matrix * model;
-        let cube_uniform = SceneUniforms {
-            mvp: cube_mvp.to_cols_array_2d(),
-            model: model.to_cols_array_2d(),
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
-        let grid_uniform = SceneUniforms {
-            mvp: camera_matrix.to_cols_array_2d(),
-            model: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
-        self.queue
-            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
-        self.queue
-            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
-        let light_vertices = data::light_rays(&cube_uniform.lights);
-        self.queue
-            .write_buffer(&self.light_vertex_buffer, 0, data::as_bytes(&light_vertices));
+    pub fn add_light(&mut self, position: [f32; 3], color: [f32; 3]) {
+        if self.lights.len() < MAX_LIGHTS {
+            self.lights.push(Light {
+                position,
+                _pad_p: 0.0,
+                color,
+                _pad_c: 0.0,
+            });
+        }
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn add_cube(&mut self, x: f32, y: f32, z: f32) {
+        self.cube_models.push(Mat4::from_translation(glam::vec3(x, y, z)));
+    }
+
+    pub fn render(
+        &mut self,
+        camera_matrix: Mat4,
+        camera_pos: glam::Vec3,
+    ) -> Result<(), wgpu::SurfaceError> {
+        let mut lights_array = [Light::default(); MAX_LIGHTS];
+        for (i, l) in self.lights.iter().take(MAX_LIGHTS).enumerate() {
+            lights_array[i] = *l;
+        }
+        let light_vertices = data::light_rays(&self.lights);
+        self.light_vertex_count = light_vertices.len() as u32;
+        self.queue.write_buffer(
+            &self.light_vertex_buffer,
+            0,
+            data::as_bytes(&light_vertices),
+        );
+        let grid_uniform = SceneUniforms {
+            mvp: camera_matrix.to_cols_array_2d(),
+            model: Mat4::IDENTITY.to_cols_array_2d(),
+            camera_pos: camera_pos.into(),
+            light_count: self.lights.len() as u32,
+            lights: lights_array,
+        };
+        self.queue.write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
+
         let frame = self.surface.get_current_texture()?;
         let view = frame
             .texture
@@ -316,10 +290,24 @@ impl State {
                 timestamp_writes: None,
             });
             rp.set_pipeline(&self.pipeline);
-            rp.set_bind_group(0, &self.cube_bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            for model in &self.cube_models {
+                let cube_uniform = SceneUniforms {
+                    mvp: (camera_matrix * *model).to_cols_array_2d(),
+                    model: model.to_cols_array_2d(),
+                    camera_pos: camera_pos.into(),
+                    light_count: self.lights.len() as u32,
+                    lights: lights_array,
+                };
+                self.queue.write_buffer(
+                    &self.cube_uniform_buffer,
+                    0,
+                    data::as_bytes(&[cube_uniform]),
+                );
+                rp.set_bind_group(0, &self.cube_bind_group, &[]);
+                rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            }
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);

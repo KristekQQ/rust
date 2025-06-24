@@ -192,14 +192,27 @@ pub struct Light {
     pub _pad_c: f32,
 }
 
+impl Default for Light {
+    fn default() -> Self {
+        Self {
+            position: [0.0; 3],
+            _pad_p: 0.0,
+            color: [0.0; 3],
+            _pad_c: 0.0,
+        }
+    }
+}
+
+pub const MAX_LIGHTS: usize = 8;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
-    pub _pad0: f32,
-    pub lights: [Light; 2],
+    pub light_count: u32,
+    pub lights: [Light; MAX_LIGHTS],
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {

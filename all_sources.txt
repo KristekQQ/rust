@@ -606,14 +606,27 @@ pub struct Light {
     pub _pad_c: f32,
 }
 
+impl Default for Light {
+    fn default() -> Self {
+        Self {
+            position: [0.0; 3],
+            _pad_p: 0.0,
+            color: [0.0; 3],
+            _pad_c: 0.0,
+        }
+    }
+}
+
+pub const MAX_LIGHTS: usize = 8;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
-    pub _pad0: f32,
-    pub lights: [Light; 2],
+    pub light_count: u32,
+    pub lights: [Light; MAX_LIGHTS],
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {
@@ -789,7 +802,7 @@ use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
-use crate::render::data::{self, SceneUniforms, Light};
+use crate::render::data::{self, SceneUniforms, Light, MAX_LIGHTS};
 use crate::render::{depth, pipeline};
 
 pub struct State {
@@ -814,6 +827,8 @@ pub struct State {
     depth_view: wgpu::TextureView,
     depth_format: wgpu::TextureFormat,
     pub aspect: f32,
+    lights: Vec<Light>,
+    cube_models: Vec<Mat4>,
 }
 
 impl State {
@@ -911,28 +926,15 @@ impl State {
                 [0.0, 0.0, 0.0, 1.0],
             ],
             camera_pos: [0.0, 0.0, 0.0],
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
+            light_count: 0,
+            lights: [Light::default(); MAX_LIGHTS],
         };
 
-        let light_vertices = data::light_rays(&uniform.lights);
-        let light_vertex_count = light_vertices.len() as u32;
+        let light_vertices: &[data::Vertex] = &[];
+        let light_vertex_count = 0;
         let light_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("light vertex buffer"),
-            contents: data::as_bytes(&light_vertices),
+            contents: data::as_bytes(light_vertices),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
         let cube_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -984,6 +986,8 @@ impl State {
             depth_view,
             depth_format,
             aspect,
+            lights: Vec::new(),
+            cube_models: Vec::new(),
         })
     }
     pub fn set_grid_visible(&mut self, show: bool) {
@@ -1006,63 +1010,46 @@ impl State {
 
 
 
-    pub fn update(&self, camera_matrix: Mat4, model: Mat4, camera_pos: glam::Vec3) {
-        let cube_mvp = camera_matrix * model;
-        let cube_uniform = SceneUniforms {
-            mvp: cube_mvp.to_cols_array_2d(),
-            model: model.to_cols_array_2d(),
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
-        let grid_uniform = SceneUniforms {
-            mvp: camera_matrix.to_cols_array_2d(),
-            model: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
-        self.queue
-            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
-        self.queue
-            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
-        let light_vertices = data::light_rays(&cube_uniform.lights);
-        self.queue
-            .write_buffer(&self.light_vertex_buffer, 0, data::as_bytes(&light_vertices));
+    pub fn add_light(&mut self, position: [f32; 3], color: [f32; 3]) {
+        if self.lights.len() < MAX_LIGHTS {
+            self.lights.push(Light {
+                position,
+                _pad_p: 0.0,
+                color,
+                _pad_c: 0.0,
+            });
+        }
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn add_cube(&mut self, x: f32, y: f32, z: f32) {
+        self.cube_models.push(Mat4::from_translation(glam::vec3(x, y, z)));
+    }
+
+    pub fn render(
+        &mut self,
+        camera_matrix: Mat4,
+        camera_pos: glam::Vec3,
+    ) -> Result<(), wgpu::SurfaceError> {
+        let mut lights_array = [Light::default(); MAX_LIGHTS];
+        for (i, l) in self.lights.iter().take(MAX_LIGHTS).enumerate() {
+            lights_array[i] = *l;
+        }
+        let light_vertices = data::light_rays(&self.lights);
+        self.light_vertex_count = light_vertices.len() as u32;
+        self.queue.write_buffer(
+            &self.light_vertex_buffer,
+            0,
+            data::as_bytes(&light_vertices),
+        );
+        let grid_uniform = SceneUniforms {
+            mvp: camera_matrix.to_cols_array_2d(),
+            model: Mat4::IDENTITY.to_cols_array_2d(),
+            camera_pos: camera_pos.into(),
+            light_count: self.lights.len() as u32,
+            lights: lights_array,
+        };
+        self.queue.write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
+
         let frame = self.surface.get_current_texture()?;
         let view = frame
             .texture
@@ -1100,10 +1087,24 @@ impl State {
                 timestamp_writes: None,
             });
             rp.set_pipeline(&self.pipeline);
-            rp.set_bind_group(0, &self.cube_bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            for model in &self.cube_models {
+                let cube_uniform = SceneUniforms {
+                    mvp: (camera_matrix * *model).to_cols_array_2d(),
+                    model: model.to_cols_array_2d(),
+                    camera_pos: camera_pos.into(),
+                    light_count: self.lights.len() as u32,
+                    lights: lights_array,
+                };
+                self.queue.write_buffer(
+                    &self.cube_uniform_buffer,
+                    0,
+                    data::as_bytes(&[cube_uniform]),
+                );
+                rp.set_bind_group(0, &self.cube_bind_group, &[]);
+                rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            }
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
@@ -1131,8 +1132,8 @@ struct SceneUniforms {
     mvp: mat4x4<f32>,
     model: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    _pad0: f32,
-    lights: array<Light, 2>,
+    light_count: u32,
+    lights: array<Light, 8>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -1168,17 +1169,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let view_dir = normalize(scene.camera_pos - input.world_pos);
     var result = input.color * 0.1; // ambient
 
-    // light 0
-    let l0_dir = normalize(scene.lights[0].position - input.world_pos);
-    let diff0 = max(dot(normal, l0_dir), 0.0);
-    let spec0 = pow(max(dot(normal, normalize(l0_dir + view_dir)), 0.0), 32.0);
-    result += (diff0 * input.color + spec0) * scene.lights[0].color;
-
-    // light 1
-    let l1_dir = normalize(scene.lights[1].position - input.world_pos);
-    let diff1 = max(dot(normal, l1_dir), 0.0);
-    let spec1 = pow(max(dot(normal, normalize(l1_dir + view_dir)), 0.0), 32.0);
-    result += (diff1 * input.color + spec1) * scene.lights[1].color;
+    var i: u32 = 0u;
+    loop {
+        if (i >= scene.light_count) { break; }
+        let light = scene.lights[i];
+        let l_dir = normalize(light.position - input.world_pos);
+        let diff = max(dot(normal, l_dir), 0.0);
+        let spec = pow(max(dot(normal, normalize(l_dir + view_dir)), 0.0), 32.0);
+        result += (diff * input.color + spec) * light.color;
+        i = i + 1u;
+    }
 
     return vec4<f32>(result, 1.0);
 }
@@ -1244,6 +1244,24 @@ pub fn resize(width: u32, height: u32) {
     });
 }
 
+#[wasm_bindgen]
+pub fn add_light(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().add_light([x, y, z], [r, g, b]);
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_cube(x: f32, y: f32, z: f32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().add_cube(x, y, z);
+        }
+    });
+}
+
 #[wasm_bindgen(start)]
 pub async fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
@@ -1264,8 +1282,7 @@ pub async fn start() -> Result<(), JsValue> {
     keyboard::attach(&window, camera.clone());
     mouse::attach(&window, camera.clone());
 
-    let start_time = performance.now();
-    let prev_time = Rc::new(RefCell::new(start_time));
+    let prev_time = Rc::new(RefCell::new(performance.now()));
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
@@ -1278,17 +1295,13 @@ pub async fn start() -> Result<(), JsValue> {
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
-        let elapsed = (now - start_time) as f32 / 1000.0;
-        let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
-            let model = Mat4::from_rotation_z(angle);
             let mut st = state_c.borrow_mut();
-            st.update(cam_matrix, model, cam_pos);
-            if st.render().is_err() {
+            if st.render(cam_matrix, cam_pos).is_err() {
                 return;
             }
         }

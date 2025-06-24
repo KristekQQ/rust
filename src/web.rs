@@ -53,6 +53,24 @@ pub fn resize(width: u32, height: u32) {
     });
 }
 
+#[wasm_bindgen]
+pub fn add_light(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().add_light([x, y, z], [r, g, b]);
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_cube(x: f32, y: f32, z: f32) {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().add_cube(x, y, z);
+        }
+    });
+}
+
 #[wasm_bindgen(start)]
 pub async fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
@@ -73,8 +91,7 @@ pub async fn start() -> Result<(), JsValue> {
     keyboard::attach(&window, camera.clone());
     mouse::attach(&window, camera.clone());
 
-    let start_time = performance.now();
-    let prev_time = Rc::new(RefCell::new(start_time));
+    let prev_time = Rc::new(RefCell::new(performance.now()));
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
@@ -87,17 +104,13 @@ pub async fn start() -> Result<(), JsValue> {
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
-        let elapsed = (now - start_time) as f32 / 1000.0;
-        let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
-            let model = Mat4::from_rotation_z(angle);
             let mut st = state_c.borrow_mut();
-            st.update(cam_matrix, model, cam_pos);
-            if st.render().is_err() {
+            if st.render(cam_matrix, cam_pos).is_err() {
                 return;
             }
         }
