@@ -12,9 +12,8 @@ where
 {
     let cam_mouse = cam.clone();
     let mouse_move = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
-        cam_mouse
-            .borrow_mut()
-            .mouse_move(e.movement_x() as f32, e.movement_y() as f32);
+        let mut cam = cam_mouse.borrow_mut();
+        cam.mouse_move(e.movement_x() as f32, e.movement_y() as f32);
     }) as Box<dyn FnMut(_)>);
     window
         .add_event_listener_with_callback("mousemove", mouse_move.as_ref().unchecked_ref())
