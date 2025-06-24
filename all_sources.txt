@@ -1053,7 +1053,24 @@ impl State {
             _pad0: [0; 4],
             lights: lights_array,
         };
-        self.queue.write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
+        self.queue
+            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
+
+        for model in &self.cube_models {
+            let cube_uniform = SceneUniforms {
+                mvp: (camera_matrix * *model).to_cols_array_2d(),
+                model: model.to_cols_array_2d(),
+                camera_pos: camera_pos.into(),
+                light_count: self.lights.len() as u32,
+                _pad0: [0; 4],
+                lights: lights_array,
+            };
+            self.queue.write_buffer(
+                &self.cube_uniform_buffer,
+                0,
+                data::as_bytes(&[cube_uniform]),
+            );
+        }
 
         let frame = self.surface.get_current_texture()?;
         let view = frame
@@ -1094,20 +1111,7 @@ impl State {
             rp.set_pipeline(&self.pipeline);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            for model in &self.cube_models {
-                let cube_uniform = SceneUniforms {
-                    mvp: (camera_matrix * *model).to_cols_array_2d(),
-                    model: model.to_cols_array_2d(),
-                    camera_pos: camera_pos.into(),
-                    light_count: self.lights.len() as u32,
-                    _pad0: [0; 4],
-                    lights: lights_array,
-                };
-                self.queue.write_buffer(
-                    &self.cube_uniform_buffer,
-                    0,
-                    data::as_bytes(&[cube_uniform]),
-                );
+            for _ in &self.cube_models {
                 rp.set_bind_group(0, &self.cube_bind_group, &[]);
                 rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
             }
