@@ -931,12 +931,13 @@ impl State {
             lights: [Light::default(); MAX_LIGHTS],
         };
 
-        let light_vertices: &[data::Vertex] = &[];
         let light_vertex_count = 0;
-        let light_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let max_light_verts = (data::MAX_LIGHTS * 8) as u64;
+        let light_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("light vertex buffer"),
-            contents: data::as_bytes(light_vertices),
+            size: max_light_verts * std::mem::size_of::<data::Vertex>() as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
         let cube_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("cube uniform buffer"),
@@ -1037,11 +1038,13 @@ impl State {
         }
         let light_vertices = data::light_rays(&self.lights);
         self.light_vertex_count = light_vertices.len() as u32;
-        self.queue.write_buffer(
-            &self.light_vertex_buffer,
-            0,
-            data::as_bytes(&light_vertices),
-        );
+        if self.light_vertex_count > 0 {
+            self.queue.write_buffer(
+                &self.light_vertex_buffer,
+                0,
+                data::as_bytes(&light_vertices),
+            );
+        }
         let grid_uniform = SceneUniforms {
             mvp: camera_matrix.to_cols_array_2d(),
             model: Mat4::IDENTITY.to_cols_array_2d(),
@@ -1113,8 +1116,11 @@ impl State {
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                 rp.draw(0..self.grid_vertex_count, 0..1);
-                rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
-                rp.draw(0..self.light_vertex_count, 0..1);
+
+                if self.light_vertex_count > 0 {
+                    rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                    rp.draw(0..self.light_vertex_count, 0..1);
+                }
             }
         }
         self.queue.submit(Some(encoder.finish()));
