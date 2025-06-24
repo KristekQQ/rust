@@ -10,6 +10,7 @@ struct SceneUniforms {
     model: mat4x4<f32>,
     camera_pos: vec3<f32>,
     light_count: u32,
+    _pad0: vec3<u32>,
     lights: array<Light, 8>,
 };
 

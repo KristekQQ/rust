@@ -212,6 +212,7 @@ pub struct SceneUniforms {
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub light_count: u32,
+    pub _pad0: [u32; 3],
     pub lights: [Light; MAX_LIGHTS],
 }
 

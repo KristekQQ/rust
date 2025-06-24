@@ -130,6 +130,7 @@ impl State {
             ],
             camera_pos: [0.0, 0.0, 0.0],
             light_count: 0,
+            _pad0: [0; 3],
             lights: [Light::default(); MAX_LIGHTS],
         };
 
@@ -249,6 +250,7 @@ impl State {
             model: Mat4::IDENTITY.to_cols_array_2d(),
             camera_pos: camera_pos.into(),
             light_count: self.lights.len() as u32,
+            _pad0: [0; 3],
             lights: lights_array,
         };
         self.queue.write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
@@ -298,6 +300,7 @@ impl State {
                     model: model.to_cols_array_2d(),
                     camera_pos: camera_pos.into(),
                     light_count: self.lights.len() as u32,
+                    _pad0: [0; 3],
                     lights: lights_array,
                 };
                 self.queue.write_buffer(
