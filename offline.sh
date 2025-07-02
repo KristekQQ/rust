@@ -33,16 +33,8 @@ case "$cmd" in
       exit 1
     fi
     rm -rf "$VENDOR_DIR" "$ARCHIVE"
-    CONFIG_MOVED=0
-    if [ -f .cargo/config.toml ]; then
-      mv .cargo/config.toml .cargo/config.off
-      CONFIG_MOVED=1
-    fi
     echo "📦  cargo vendor → $VENDOR_DIR"
     cargo vendor "$VENDOR_DIR"
-    if [ "$CONFIG_MOVED" -eq 1 ]; then
-      mv .cargo/config.off .cargo/config.toml
-    fi
     echo "📦  balím $ARCHIVE"
     if command -v pigz >/dev/null 2>&1; then
       if tar --version 2>/dev/null | grep -q 'GNU tar'; then
@@ -101,6 +93,9 @@ EOF2
   unpack-all)
     "$0" join-toolchain
     "$0" evendor
+    if [ -f .cargo/config.offline.toml ]; then
+      cp .cargo/config.offline.toml .cargo/config.toml
+    fi
     ;;
   *)
     echo "Usage: $0 {join-toolchain|build-vendor|evendor|ci-setup|pack-all|unpack-all}"

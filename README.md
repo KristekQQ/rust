@@ -23,6 +23,12 @@ RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build --target web
 This will create a `pkg/` directory with the generated JavaScript and
 WebAssembly files.
 
+If the command fails with an error mentioning `console_error_panic_hook` or a
+missing `vendor` directory, rename `.cargo/config.toml` to
+`.cargo/config.offline.toml` and rerun the build. The default configuration uses
+a vendored crate source which requires the `vendor/` directory produced by the
+offline helper scripts.
+
 ## Running
 
 Serve the `index.html` file with any static web server so that the
@@ -84,7 +90,9 @@ When setting up a fresh machine or continuous integration worker, the
 ./ci_offline_setup.sh
 ```
 
-Cargo is configured in `.cargo/config.toml` to use these local sources:
+The file `.cargo/config.offline.toml` configures Cargo to use these local
+sources. Copy it to `.cargo/config.toml` when building without network
+access:
 
 ```toml
 [source.crates-io]
