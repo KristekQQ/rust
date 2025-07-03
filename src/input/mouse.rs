@@ -15,11 +15,15 @@ where
     // Start dragging only when the left button is pressed on the canvas
     {
         let dragging = dragging.clone();
-        let canvas = canvas.clone();
+        let canvas_clone = canvas.clone();
         let on_down = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
             if e.button() == 0 {
                 if let Some(target) = e.target() {
-                    if target == canvas.clone().dyn_into::<web_sys::EventTarget>().unwrap() {
+                    if target == canvas_clone
+                        .clone()
+                        .dyn_into::<web_sys::EventTarget>()
+                        .unwrap()
+                    {
                         *dragging.borrow_mut() = true;
                     }
                 }
