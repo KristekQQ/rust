@@ -180,7 +180,7 @@ impl Camera {
         proj * view
     }
 
-    fn forward(&self) -> Vec3 {
+fn forward(&self) -> Vec3 {
         Vec3::new(
             self.yaw.cos() * self.pitch.cos(),
             self.pitch.sin(),
@@ -251,18 +251,18 @@ where
 \n# File: src/input/mod.rs
 #![cfg(target_arch = "wasm32")]
 
-pub mod active_camera;
 pub mod camera;
+pub mod orbit_camera;
+pub mod active_camera;
 pub mod keyboard;
 pub mod mouse;
-pub mod orbit_camera;
 
 \n# File: src/input/mouse.rs
 #![cfg(target_arch = "wasm32")]
 
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::{HtmlCanvasElement, PointerEvent, Window};
+use web_sys::{Window, HtmlCanvasElement, PointerEvent};
 
 use crate::input::camera::CameraController;
 
@@ -279,11 +279,10 @@ where
         let on_down = Closure::wrap(Box::new(move |e: PointerEvent| {
             if e.buttons() & 1 == 1 {
                 if let Some(target) = e.target() {
-                    if target
-                        == canvas_clone
-                            .clone()
-                            .dyn_into::<web_sys::EventTarget>()
-                            .unwrap()
+                    if target == canvas_clone
+                        .clone()
+                        .dyn_into::<web_sys::EventTarget>()
+                        .unwrap()
                     {
                         *dragging.borrow_mut() = true;
                     }
@@ -349,11 +348,7 @@ impl OrbitCamera {
         let pitch: f32 = 0.0;
         let target = Vec3::ZERO;
         let position = target
-            + Vec3::new(
-                radius * yaw.cos() * pitch.cos(),
-                radius * pitch.sin(),
-                radius * yaw.sin() * pitch.cos(),
-            );
+            + Vec3::new(radius * yaw.cos() * pitch.cos(), radius * pitch.sin(), radius * yaw.sin() * pitch.cos());
         Self {
             position,
             target,
@@ -416,7 +411,7 @@ impl OrbitCamera {
             );
     }
 
-    pub fn matrix(&self) -> Mat4 {
+pub fn matrix(&self) -> Mat4 {
         let view = Mat4::look_at_lh(self.position, self.target, Vec3::Y);
         let proj = Mat4::perspective_lh(std::f32::consts::FRAC_PI_4, self.aspect, 0.1, 100.0);
         proj * view
@@ -450,6 +445,7 @@ impl CameraController for OrbitCamera {
         self.position
     }
 }
+
 
 \n# File: src/lib.rs
 #[cfg(target_arch = "wasm32")]
@@ -672,26 +668,10 @@ pub fn grid_vertices(size: i32) -> Vec<Vertex> {
     let normal = [0.0, 1.0, 0.0];
     for i in -size..=size {
         let f = i as f32;
-        verts.push(Vertex {
-            position: [-size as f32, 0.0, f],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [size as f32, 0.0, f],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [f, 0.0, -size as f32],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [f, 0.0, size as f32],
-            color,
-            normal,
-        });
+        verts.push(Vertex { position: [-size as f32, 0.0, f], color, normal });
+        verts.push(Vertex { position: [size as f32, 0.0, f], color, normal });
+        verts.push(Vertex { position: [f, 0.0, -size as f32], color, normal });
+        verts.push(Vertex { position: [f, 0.0, size as f32], color, normal });
     }
     verts
 }
@@ -704,50 +684,19 @@ pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
         let p = l.position;
         let color = l.color;
         // small cross marking the light position
-        verts.push(Vertex {
-            position: [p[0] - cross, p[1], p[2]],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [p[0] + cross, p[1], p[2]],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [p[0], p[1] - cross, p[2]],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [p[0], p[1] + cross, p[2]],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [p[0], p[1], p[2] - cross],
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [p[0], p[1], p[2] + cross],
-            color,
-            normal,
-        });
+        verts.push(Vertex { position: [p[0] - cross, p[1], p[2]], color, normal });
+        verts.push(Vertex { position: [p[0] + cross, p[1], p[2]], color, normal });
+        verts.push(Vertex { position: [p[0], p[1] - cross, p[2]], color, normal });
+        verts.push(Vertex { position: [p[0], p[1] + cross, p[2]], color, normal });
+        verts.push(Vertex { position: [p[0], p[1], p[2] - cross], color, normal });
+        verts.push(Vertex { position: [p[0], p[1], p[2] + cross], color, normal });
         // line from light to origin
-        verts.push(Vertex {
-            position: p,
-            color,
-            normal,
-        });
-        verts.push(Vertex {
-            position: [0.0, 0.0, 0.0],
-            color,
-            normal,
-        });
+        verts.push(Vertex { position: p, color, normal });
+        verts.push(Vertex { position: [0.0, 0.0, 0.0], color, normal });
     }
     verts
 }
+
 
 \n# File: src/render/depth.rs
 #![cfg(target_arch = "wasm32")]
@@ -832,11 +781,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
     })
 }
 
-pub fn build_lines(
-    device: &Device,
-    format: TextureFormat,
-    layout: &BindGroupLayout,
-) -> RenderPipeline {
+pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("grid pipeline layout"),
@@ -880,6 +825,7 @@ pub fn build_lines(
         cache: None,
     })
 }
+
 
 \n# File: src/render/state.rs
 #![cfg(target_arch = "wasm32")]

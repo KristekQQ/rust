@@ -40,6 +40,19 @@ python3 -m http.server
 
 Then open `http://localhost:8000` in a browser with WebGPU enabled.
 
+The JavaScript demo adds scene objects at runtime via functions exported from
+`wasm-bindgen`.  After calling `start()` you can create more cubes and lights
+like so:
+
+```js
+import init, { start, add_cube, add_light, set_camera_mode } from './pkg/webgpu_wasm.js';
+await init();
+await start();
+add_cube(0, 0, 0, -1);        // root cube
+add_light(1.5, 1, 2, 1, 1, 1); // white light
+set_camera_mode('orbit');
+```
+
 ## Offline usage
 
 This repository ships `vendor.tar.gz` together with the
