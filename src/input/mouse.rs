@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::{Window, HtmlCanvasElement};
+use web_sys::{Window, HtmlCanvasElement, PointerEvent};
 
 use crate::input::camera::CameraController;
 
@@ -16,8 +16,8 @@ where
     {
         let dragging = dragging.clone();
         let canvas_clone = canvas.clone();
-        let on_down = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
-            if e.button() == 0 {
+        let on_down = Closure::wrap(Box::new(move |e: PointerEvent| {
+            if e.buttons() & 1 == 1 {
                 if let Some(target) = e.target() {
                     if target == canvas_clone
                         .clone()
@@ -30,7 +30,7 @@ where
             }
         }) as Box<dyn FnMut(_)>);
         canvas
-            .add_event_listener_with_callback("mousedown", on_down.as_ref().unchecked_ref())
+            .add_event_listener_with_callback("pointerdown", on_down.as_ref().unchecked_ref())
             .unwrap();
         on_down.forget();
     }
@@ -38,11 +38,11 @@ where
     // Stop dragging on mouseup anywhere in the window
     {
         let dragging = dragging.clone();
-        let on_up = Closure::wrap(Box::new(move |_e: web_sys::MouseEvent| {
+        let on_up = Closure::wrap(Box::new(move |_e: PointerEvent| {
             *dragging.borrow_mut() = false;
         }) as Box<dyn FnMut(_)>);
         window
-            .add_event_listener_with_callback("mouseup", on_up.as_ref().unchecked_ref())
+            .add_event_listener_with_callback("pointerup", on_up.as_ref().unchecked_ref())
             .unwrap();
         on_up.forget();
     }
@@ -51,7 +51,7 @@ where
     {
         let dragging = dragging.clone();
         let cam_mouse = cam.clone();
-        let mouse_move = Closure::wrap(Box::new(move |e: web_sys::MouseEvent| {
+        let mouse_move = Closure::wrap(Box::new(move |e: PointerEvent| {
             if *dragging.borrow() && e.buttons() & 1 == 1 {
                 cam_mouse
                     .borrow_mut()
@@ -59,7 +59,7 @@ where
             }
         }) as Box<dyn FnMut(_)>);
         window
-            .add_event_listener_with_callback("mousemove", mouse_move.as_ref().unchecked_ref())
+            .add_event_listener_with_callback("pointermove", mouse_move.as_ref().unchecked_ref())
             .unwrap();
         mouse_move.forget();
     }
