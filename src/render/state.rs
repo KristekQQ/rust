@@ -1,12 +1,13 @@
 #![cfg(target_arch = "wasm32")]
 
-use glam::Mat4;
+use glam::{Mat4, Vec3};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
-use crate::render::data::{self, SceneUniforms, Light};
+use crate::render::data::{self, Light as ShaderLight, SceneUniforms};
 use crate::render::{depth, pipeline};
+use crate::scene::{Light, Node, Scene};
 
 pub struct State {
     grid_pipeline: wgpu::RenderPipeline,
@@ -15,6 +16,9 @@ pub struct State {
     light_vertex_buffer: wgpu::Buffer,
     light_vertex_count: u32,
     pub draw_grid: bool,
+    pub scene: Scene,
+    instance_uniform_buffer: wgpu::Buffer,
+    light_uniform_buffer: wgpu::Buffer,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -30,6 +34,8 @@ pub struct State {
     depth_view: wgpu::TextureView,
     depth_format: wgpu::TextureFormat,
     pub aspect: f32,
+    camera_matrix: Mat4,
+    camera_pos: glam::Vec3,
 }
 
 impl State {
@@ -49,15 +55,13 @@ impl State {
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: adapter.limits(),
-                    memory_hints: wgpu::MemoryHints::default(),
-                    trace: wgpu::Trace::default(),
-                },
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: adapter.limits(),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: wgpu::Trace::default(),
+            })
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let caps = surface.get_capabilities(&adapter);
@@ -91,16 +95,38 @@ impl State {
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("bind group layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
 
         let pipeline = pipeline::build(&device, config.format, &bind_group_layout);
@@ -111,6 +137,37 @@ impl State {
             label: Some("grid vertex buffer"),
             contents: data::as_bytes(&grid_vertices),
             usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        let mut scene = Scene::new();
+        scene.nodes.push(Node {
+            model: Mat4::IDENTITY.to_cols_array_2d(),
+            parent: -1,
+            _pad: [0; 3],
+        });
+        scene.lights.push(Light {
+            position: [1.5, 1.0, 2.0],
+            _pad_p: 0.0,
+            color: [1.0, 1.0, 1.0],
+            _pad_c: 0.0,
+        });
+        scene.lights.push(Light {
+            position: [-1.5, 1.0, -2.0],
+            _pad_p: 0.0,
+            color: [1.0, 0.0, 0.0],
+            _pad_c: 0.0,
+        });
+
+        let instance_uniform_buffer =
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("instance buffer"),
+                contents: data::as_bytes(&scene.nodes),
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            });
+        let light_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("light buffer"),
+            contents: data::as_bytes(&scene.lights),
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         });
 
         let uniform = SceneUniforms {
@@ -129,13 +186,13 @@ impl State {
             camera_pos: [0.0, 0.0, 0.0],
             _pad0: 0.0,
             lights: [
-                Light {
+                ShaderLight {
                     position: [1.5, 1.0, 2.0],
                     _pad_p: 0.0,
                     color: [1.0, 1.0, 1.0],
                     _pad_c: 0.0,
                 },
-                Light {
+                ShaderLight {
                     position: [-1.5, 1.0, -2.0],
                     _pad_p: 0.0,
                     color: [1.0, 0.0, 0.0],
@@ -158,10 +215,20 @@ impl State {
         });
         let cube_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: cube_uniform_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: cube_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: instance_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: light_uniform_buffer.as_entire_binding(),
+                },
+            ],
             label: Some("bind group"),
         });
         let grid_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -171,10 +238,20 @@ impl State {
         });
         let grid_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: grid_uniform_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: grid_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: instance_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: light_uniform_buffer.as_entire_binding(),
+                },
+            ],
             label: Some("grid bind group"),
         });
 
@@ -185,6 +262,9 @@ impl State {
             light_vertex_buffer,
             light_vertex_count,
             draw_grid: true,
+            scene,
+            instance_uniform_buffer,
+            light_uniform_buffer,
             surface,
             device,
             queue,
@@ -200,6 +280,8 @@ impl State {
             depth_view,
             depth_format,
             aspect,
+            camera_matrix: Mat4::IDENTITY,
+            camera_pos: Vec3::ZERO,
         })
     }
     pub fn set_grid_visible(&mut self, show: bool) {
@@ -220,30 +302,26 @@ impl State {
         self.depth_view = depth_view;
     }
 
-
-
-    pub fn update(&self, camera_matrix: Mat4, model: Mat4, camera_pos: glam::Vec3) {
-        let cube_mvp = camera_matrix * model;
-        let cube_uniform = SceneUniforms {
-            mvp: cube_mvp.to_cols_array_2d(),
-            model: model.to_cols_array_2d(),
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
+    pub fn update(&mut self, camera_matrix: Mat4, model: Mat4, camera_pos: Vec3) {
+        self.camera_matrix = camera_matrix;
+        self.camera_pos = camera_pos;
+        if let Some(node) = self.scene.nodes.get_mut(0) {
+            node.model = model.to_cols_array_2d();
+        }
+        let mut lights_arr = [ShaderLight {
+            position: [0.0; 3],
+            _pad_p: 0.0,
+            color: [0.0; 3],
+            _pad_c: 0.0,
+        }; 2];
+        for (i, l) in self.scene.lights.iter().take(2).enumerate() {
+            lights_arr[i] = ShaderLight {
+                position: l.position,
+                _pad_p: l._pad_p,
+                color: l.color,
+                _pad_c: l._pad_c,
+            };
+        }
         let grid_uniform = SceneUniforms {
             mvp: camera_matrix.to_cols_array_2d(),
             model: [
@@ -254,28 +332,29 @@ impl State {
             ],
             camera_pos: camera_pos.into(),
             _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
+            lights: lights_arr,
         };
-        self.queue
-            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
-        self.queue
-            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
-        let light_vertices = data::light_rays(&cube_uniform.lights);
-        self.queue
-            .write_buffer(&self.light_vertex_buffer, 0, data::as_bytes(&light_vertices));
+        self.queue.write_buffer(
+            &self.grid_uniform_buffer,
+            0,
+            data::as_bytes(&[grid_uniform]),
+        );
+        self.queue.write_buffer(
+            &self.instance_uniform_buffer,
+            0,
+            data::as_bytes(&self.scene.nodes),
+        );
+        self.queue.write_buffer(
+            &self.light_uniform_buffer,
+            0,
+            data::as_bytes(&self.scene.lights),
+        );
+        let light_vertices = data::light_rays(&lights_arr);
+        self.queue.write_buffer(
+            &self.light_vertex_buffer,
+            0,
+            data::as_bytes(&light_vertices),
+        );
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -319,7 +398,45 @@ impl State {
             rp.set_bind_group(0, &self.cube_bind_group, &[]);
             rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+
+            let mut lights_arr = [ShaderLight {
+                position: [0.0; 3],
+                _pad_p: 0.0,
+                color: [0.0; 3],
+                _pad_c: 0.0,
+            }; 2];
+            for (i, l) in self.scene.lights.iter().take(2).enumerate() {
+                lights_arr[i] = ShaderLight {
+                    position: l.position,
+                    _pad_p: l._pad_p,
+                    color: l.color,
+                    _pad_c: l._pad_c,
+                };
+            }
+
+            for (i, node) in self.scene.nodes.iter().enumerate() {
+                let mut model = Mat4::from_cols_array_2d(&node.model);
+                let mut p = node.parent;
+                while p >= 0 {
+                    let parent = &self.scene.nodes[p as usize];
+                    model = Mat4::from_cols_array_2d(&parent.model) * model;
+                    p = parent.parent;
+                }
+                let mvp = self.camera_matrix * model;
+                let cube_uniform = SceneUniforms {
+                    mvp: mvp.to_cols_array_2d(),
+                    model: model.to_cols_array_2d(),
+                    camera_pos: self.camera_pos.into(),
+                    _pad0: 0.0,
+                    lights: lights_arr,
+                };
+                self.queue.write_buffer(
+                    &self.cube_uniform_buffer,
+                    0,
+                    data::as_bytes(&[cube_uniform]),
+                );
+                rp.draw_indexed(0..data::INDICES.len() as u32, 0, i as u32..i as u32 + 1);
+            }
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
