@@ -6,5 +6,5 @@ cd /mnt/c/WebstormProjects/rust
 rm -rf vendor
 cargo vendor vendor
 
-mv .cargo/config.off .cargo/config.toml
+cp .cargo/config.offline.toml .cargo/config.toml
 ./offline.sh build-vendor

@@ -20,7 +20,8 @@ web-sys = { version = "0.3", features = [
     "Performance",
     "EventTarget",
     "KeyboardEvent",
-    "MouseEvent"
+    "MouseEvent",
+    "PointerEvent"
 ] }
 glam    = { version = "0.30.3", default-features = false, features = ["libm","serde"] }
 js-sys = "0.3"

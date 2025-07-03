@@ -1,5 +1,3 @@
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"
+# Default Cargo config for online builds. Offline builds copy
+# `config.offline.toml` to this path so Cargo uses the vendored
+# dependencies in `vendor/`.

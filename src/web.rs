@@ -71,7 +71,7 @@ pub async fn start() -> Result<(), JsValue> {
     CAMERA.with(|c| *c.borrow_mut() = Some(camera.clone()));
 
     keyboard::attach(&window, camera.clone());
-    mouse::attach(&window, camera.clone());
+    mouse::attach(&window, &canvas, camera.clone());
 
     let start_time = performance.now();
     let prev_time = Rc::new(RefCell::new(start_time));
