@@ -4,7 +4,8 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{closure::Closure, JsCast};
 
-use glam::Mat4;
+use crate::scene::{Light, Node};
+use glam::{Mat4, Vec3};
 
 use crate::input::active_camera::{ActiveCamera, CameraType};
 use crate::input::camera::CameraController;
@@ -14,6 +15,12 @@ use crate::render::state::State;
 thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+    static COMMANDS: RefCell<Vec<Command>> = RefCell::new(Vec::new());
+}
+
+enum Command {
+    AddNode { model: Mat4, parent: i32 },
+    AddLight { pos: [f32; 3], color: [f32; 3] },
 }
 
 #[wasm_bindgen]
@@ -36,6 +43,26 @@ pub fn set_camera_mode(mode: &str) {
                 _ => {}
             }
         }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_cube(x: f32, y: f32, z: f32, parent: i32) {
+    COMMANDS.with(|q| {
+        q.borrow_mut().push(Command::AddNode {
+            model: Mat4::from_translation(Vec3::new(x, y, z)),
+            parent,
+        });
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_light(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) {
+    COMMANDS.with(|q| {
+        q.borrow_mut().push(Command::AddLight {
+            pos: [x, y, z],
+            color: [r, g, b],
+        });
     });
 }
 
@@ -89,6 +116,32 @@ pub async fn start() -> Result<(), JsValue> {
         *prev_time_c.borrow_mut() = now;
         let elapsed = (now - start_time) as f32 / 1000.0;
         let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
+        COMMANDS.with(|q| {
+            let mut q = q.borrow_mut();
+            if !q.is_empty() {
+                let mut st = state_c.borrow_mut();
+                for cmd in q.drain(..) {
+                    match cmd {
+                        Command::AddNode { model, parent } => {
+                            st.scene.nodes.push(Node {
+                                model: model.to_cols_array_2d(),
+                                parent,
+                                _pad: [0; 3],
+                            });
+                        }
+                        Command::AddLight { pos, color } => {
+                            st.scene.lights.push(Light {
+                                position: pos,
+                                _pad_p: 0.0,
+                                color,
+                                _pad_c: 0.0,
+                            });
+                        }
+                    }
+                }
+                st.ensure_capacity();
+            }
+        });
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
