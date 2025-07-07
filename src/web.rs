@@ -139,6 +139,7 @@ pub async fn start() -> Result<(), JsValue> {
                         }
                     }
                 }
+                st.ensure_capacity();
             }
         });
         {

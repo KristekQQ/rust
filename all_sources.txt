@@ -838,6 +838,10 @@ use wgpu::util::DeviceExt;
 use crate::render::data::{self, Light as ShaderLight, SceneUniforms};
 use crate::render::{depth, pipeline};
 use crate::scene::{Light, Node, Scene};
+use std::mem;
+
+const NODE_SIZE: wgpu::BufferAddress = mem::size_of::<Node>() as wgpu::BufferAddress;
+const LIGHT_SIZE: wgpu::BufferAddress = mem::size_of::<Light>() as wgpu::BufferAddress;
 
 pub struct State {
     grid_pipeline: wgpu::RenderPipeline,
@@ -849,6 +853,9 @@ pub struct State {
     pub scene: Scene,
     instance_uniform_buffer: wgpu::Buffer,
     light_uniform_buffer: wgpu::Buffer,
+    node_capacity: usize,
+    light_capacity: usize,
+    bind_group_layout: wgpu::BindGroupLayout,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -969,35 +976,21 @@ impl State {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let mut scene = Scene::new();
-        scene.nodes.push(Node {
-            model: Mat4::IDENTITY.to_cols_array_2d(),
-            parent: -1,
-            _pad: [0; 3],
-        });
-        scene.lights.push(Light {
-            position: [1.5, 1.0, 2.0],
-            _pad_p: 0.0,
-            color: [1.0, 1.0, 1.0],
-            _pad_c: 0.0,
-        });
-        scene.lights.push(Light {
-            position: [-1.5, 1.0, -2.0],
-            _pad_p: 0.0,
-            color: [1.0, 0.0, 0.0],
-            _pad_c: 0.0,
-        });
+        let scene = Scene::new();
 
-        let instance_uniform_buffer =
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("instance buffer"),
-                contents: data::as_bytes(&scene.nodes),
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            });
-        let light_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("light buffer"),
-            contents: data::as_bytes(&scene.lights),
+        let node_capacity = 1usize;
+        let light_capacity = 1usize;
+        let instance_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("instance buffer"),
+            size: NODE_SIZE * node_capacity as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let light_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("light buffer"),
+            size: LIGHT_SIZE * light_capacity as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         let uniform = SceneUniforms {
@@ -1017,15 +1010,15 @@ impl State {
             _pad0: 0.0,
             lights: [
                 ShaderLight {
-                    position: [1.5, 1.0, 2.0],
+                    position: [0.0, 0.0, 0.0],
                     _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
+                    color: [0.0, 0.0, 0.0],
                     _pad_c: 0.0,
                 },
                 ShaderLight {
-                    position: [-1.5, 1.0, -2.0],
+                    position: [0.0, 0.0, 0.0],
                     _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
+                    color: [0.0, 0.0, 0.0],
                     _pad_c: 0.0,
                 },
             ],
@@ -1095,6 +1088,9 @@ impl State {
             scene,
             instance_uniform_buffer,
             light_uniform_buffer,
+            node_capacity,
+            light_capacity,
+            bind_group_layout,
             surface,
             device,
             queue,
@@ -1135,6 +1131,7 @@ impl State {
     pub fn update(&mut self, camera_matrix: Mat4, model: Mat4, camera_pos: Vec3) {
         self.camera_matrix = camera_matrix;
         self.camera_pos = camera_pos;
+        self.ensure_capacity();
         if let Some(node) = self.scene.nodes.get_mut(0) {
             node.model = model.to_cols_array_2d();
         }
@@ -1279,6 +1276,56 @@ impl State {
         self.queue.submit(Some(encoder.finish()));
         frame.present();
         Ok(())
+    }
+
+    pub fn ensure_capacity(&mut self) {
+        let mut changed = false;
+        let needed_nodes = self.scene.nodes.len().max(1);
+        if needed_nodes > self.node_capacity {
+            while self.node_capacity < needed_nodes {
+                self.node_capacity *= 2;
+            }
+            self.instance_uniform_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("instance buffer"),
+                size: NODE_SIZE * self.node_capacity as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            changed = true;
+        }
+        let needed_lights = self.scene.lights.len().max(1);
+        if needed_lights > self.light_capacity {
+            while self.light_capacity < needed_lights {
+                self.light_capacity *= 2;
+            }
+            self.light_uniform_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("light buffer"),
+                size: LIGHT_SIZE * self.light_capacity as wgpu::BufferAddress,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            changed = true;
+        }
+        if changed {
+            self.cube_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: self.cube_uniform_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: self.instance_uniform_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 2, resource: self.light_uniform_buffer.as_entire_binding() },
+                ],
+                label: Some("bind group"),
+            });
+            self.grid_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &self.bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: self.grid_uniform_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: self.instance_uniform_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 2, resource: self.light_uniform_buffer.as_entire_binding() },
+                ],
+                label: Some("grid bind group"),
+            });
+        }
     }
 }
 
@@ -1535,6 +1582,7 @@ pub async fn start() -> Result<(), JsValue> {
                         }
                     }
                 }
+                st.ensure_capacity();
             }
         });
         {
