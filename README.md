@@ -4,6 +4,10 @@ This repository contains a minimal example of using WebGPU from Rust
 compiled to WebAssembly. The example clears a canvas with a color
 inside the browser.
 
+The build enables both the WebGPU and WebGL backends of `wgpu`. Browsers
+that lack WebGPU will transparently fall back to WebGL so the demo still
+runs, while WebGPU is preferred when available.
+
 ## Building
 
 Install the WebAssembly target for Rust and build with `wasm-pack`.
@@ -39,6 +43,43 @@ python3 -m http.server
 ```
 
 Then open `http://localhost:8000` in a browser with WebGPU enabled.
+
+### Checking WebGPU support
+
+You can verify whether your browser runtime supports WebGPU and WebGL
+without compiling the example. Install the Puppeteer dependency and run
+the helper script:
+
+```bash
+npm i
+node check_webgpu.js
+```
+
+The script will print whether WebGPU and WebGL are available in a fresh
+headless Chromium instance.
+
+### Capturing a screenshot
+
+You can verify the WebGL cube renders correctly by taking a screenshot:
+
+```bash
+npm i
+node screenshot_render.js
+```
+
+The script starts a temporary HTTP server, loads `cube.html` in headless
+Chromium and saves `render.png` in the repository root (the file is ignored by
+Git). The same image is also written to `render_base64.txt` for convenient
+copy‑paste.
+
+If Chromium fails to launch because of missing system libraries, install them
+with `apt` first. A minimal set of packages is:
+
+```bash
+sudo apt-get install libatk1.0-0 libgtk-3-0 libnss3 libx11-xcb1 \
+  libxcb-dri3-0 libxcomposite1 libxdamage1 libxfixes3 libxkbcommon0 \
+  libxrandr2 libgbm1 libasound2
+```
 
 ## Offline usage
 

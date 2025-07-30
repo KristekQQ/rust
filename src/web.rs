@@ -87,14 +87,14 @@ pub async fn start() -> Result<(), JsValue> {
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
-        let elapsed = (now - start_time) as f32 / 1000.0;
-        let angle = elapsed / 5.0 * (2.0 * std::f32::consts::PI);
+        let _elapsed = (now - start_time) as f32 / 1000.0;
+        let rot = std::f32::consts::FRAC_PI_4;
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
-            let model = Mat4::from_rotation_z(angle);
+            let model = Mat4::from_rotation_y(rot) * Mat4::from_rotation_x(rot);
             let mut st = state_c.borrow_mut();
             st.update(cam_matrix, model, cam_pos);
             if st.render().is_err() {

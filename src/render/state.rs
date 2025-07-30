@@ -34,20 +34,22 @@ pub struct State {
 
 impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
-        let instance = wgpu::Instance::default();
+        let instance_desc = wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        };
+        let instance = wgpu::util::new_instance_with_webgpu_detection(&instance_desc).await;
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         let surface =
             unsafe { std::mem::transmute::<wgpu::Surface<'_>, wgpu::Surface<'static>>(surface) };
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let adapter = wgpu::util::initialize_adapter_from_env_or_default(
+            &instance,
+            Some(&surface),
+        )
+        .await
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
