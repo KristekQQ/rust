@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Rust – renderovací cíle</title>
+<style>
+body { margin: 0; background: #191924; color: white; font: 16px system-ui; }
+canvas { display: block; max-width: 100%; }
+.panel { position: fixed; top: 16px; left: 16px; padding: 16px; border-radius: 12px; background: #151524ed; }
+button { padding: 8px 12px; margin: 4px; } button:focus-visible { outline: 3px solid #b8caff; }
+pre { white-space: pre-wrap; } a { color: #c7d8ff; }
+</style>
+<canvas id="gpu-canvas"></canvas>
+<div class="panel">
+<strong>Rust – výstup do canvasu / textury</strong>
+<p>Stejná scéna, kamera a culling v obou režimech.</p>
+<button id="canvas">Přímo do canvasu</button><button id="texture">Přes texturu</button>
+<button id="resize">Změnit rozlišení</button><button id="check">Ověřit přepínání a resize</button>
+<pre id="result" role="status">Inicializace…</pre>
+<a href="../index.html">Hlavní scéna</a>
+</div>
+<script type="module">
+const result = document.getElementById('result');
+try {
+    const { initEngine } = await import(`../js/engine.js?v=${Date.now()}`);
+    const engine = await initEngine(document.getElementById('gpu-canvas'), {
+        backend: new URLSearchParams(location.search).get('backend') || 'auto',
+    });
+    engine.scene.loadExample();
+    let mode = 'canvas', small = false, message = '';
+    const frames = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
+    const setMode = value => {
+        if (!engine.set_output_mode(value)) throw new Error('Odmítnutý výstup');
+        mode = value;
+    };
+    const size = () => engine.resize(small ? 640 : innerWidth, small ? 360 : innerHeight);
+    document.getElementById('canvas').onclick = () => setMode('canvas');
+    document.getElementById('texture').onclick = () => setMode('texture');
+    document.getElementById('resize').onclick = () => { small = !small; size(); };
+    document.getElementById('check').onclick = async () => {
+        try {
+            if (engine.set_output_mode('invalid')) throw new Error('Neplatný režim musí být odmítnut');
+            for (const next of ['texture', 'canvas', 'texture']) {
+                setMode(next); small = !small; size(); await frames();
+                const stats = engine.renderer_stats();
+                if (stats.total !== 3 || stats.visible === 0 || stats.drawCalls === 0) throw new Error('Chybí scéna');
+            }
+            small = false; size(); await frames();
+            message = 'PASS: přepínání, změna rozlišení, scéna a odmítnutí neplatného režimu';
+        } catch (error) { message = `FAIL: ${error.message}`; console.error(error); }
+    };
+    setInterval(() => {
+        const stats = engine.renderer_stats();
+        const canvas = document.getElementById('gpu-canvas');
+        result.textContent = `${message}\n${engine.renderer_backend()} · ${mode} · ${canvas.width} × ${canvas.height}\n${stats.fps.toFixed(1)} FPS · viditelné ${stats.visible}/${stats.total}`;
+    }, 250);
+} catch (error) { result.textContent = `FAIL: ${error.message}`; console.error(error); }
+</script>
+</html>

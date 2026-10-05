@@ -20,6 +20,9 @@ spawning out of the example unless requested.
 - Changes to exported functions in `src/web.rs` must stay consistent with the
   API in `js/engine.js` and callers in `js/scene.js` / `js/app.js`. Rebuild `pkg/` to test them;
   generated JavaScript and WASM are ignored by Git.
+- `src/render/renderer.rs` owns scene GPU resources and accepts RenderView/RenderTarget;
+  `output.rs` owns canvas/surface presentation, and `state.rs` connects them. Verify
+  `tests/render-target.html` in WebGPU and WebGL when changing output paths.
 - Keep Rust GPU data layouts in `src/render/data.rs` consistent with
   `src/shader.wgsl`, including padding and the light count.
 - Native `cargo test` covers the SceneManager and camera modules but not the renderer and

@@ -609,6 +609,11 @@ pub mod web;
 #[path = "render/data.rs"]
 mod render_data_tests;
 
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "render/target.rs"]
+mod render_target_tests;
+
 \n# File: src/render/data.rs
 use wgpu::VertexBufferLayout;
 #[repr(C)]
@@ -1060,13 +1065,349 @@ pub mod depth;
 pub mod pipeline;
 pub mod state;
 
+pub mod output;
+pub mod renderer;
+pub mod target;
+
+\n# File: src/render/output.rs
+//! Browser presentation adapter. Only this module knows about canvas/surfaces.
+use super::{
+    depth,
+    target::{RenderTarget, Viewport},
+};
+use wasm_bindgen::JsValue;
+use web_sys::HtmlCanvasElement;
+const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
+pub struct CanvasFrame {
+    frame: wgpu::SurfaceTexture,
+    view: wgpu::TextureView,
+    reconfigure: bool,
+}
+struct TextureOutput {
+    _color: wgpu::Texture,
+    color: wgpu::TextureView,
+    _depth: wgpu::Texture,
+    depth: wgpu::TextureView,
+    bind_group: wgpu::BindGroup,
+    pipeline: wgpu::RenderPipeline,
+}
+pub struct CanvasOutput {
+    instance: wgpu::Instance,
+    surface: wgpu::Surface<'static>,
+    canvas: HtmlCanvasElement,
+    config: wgpu::SurfaceConfiguration,
+    depth_texture: wgpu::Texture,
+    depth_view: wgpu::TextureView,
+    pub offscreen: bool,
+    texture_output: Option<TextureOutput>,
+}
+impl CanvasOutput {
+    pub async fn new(
+        canvas: &HtmlCanvasElement,
+    ) -> Result<(Self, wgpu::Device, wgpu::Queue, String), JsValue> {
+        let instance_desc = wgpu::InstanceDescriptor {
+            backends: if canvas.get_attribute("data-backend").as_deref() == Some("webgl") {
+                wgpu::Backends::GL
+            } else {
+                wgpu::Backends::all()
+            },
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        };
+        let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
+        let surface = instance
+            .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
+            .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
+        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let backend = format!("{:?}", adapter.get_info().backend);
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(adapter.limits()),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: wgpu::Trace::default(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let caps = surface.get_capabilities(&adapter);
+        let format = caps
+            .formats
+            .iter()
+            .copied()
+            .find(wgpu::TextureFormat::is_srgb)
+            .unwrap_or(caps.formats[0]);
+        let view_format = format.add_srgb_suffix();
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format,
+            width: canvas.width().max(1),
+            height: canvas.height().max(1),
+            present_mode: caps.present_modes[0],
+            desired_maximum_frame_latency: 2,
+            alpha_mode: caps.alpha_modes[0],
+            view_formats: vec![view_format],
+            color_space: wgpu::SurfaceColorSpace::Auto,
+        };
+        surface.configure(&device, &config);
+
+        let depth_format = wgpu::TextureFormat::Depth32Float;
+        let (depth_texture, depth_view) =
+            depth::create(&device, config.width, config.height, depth_format);
+
+        Ok((
+            Self {
+                instance,
+                surface,
+                canvas: canvas.clone(),
+                config,
+                depth_texture,
+                depth_view,
+                offscreen: false,
+                texture_output: None,
+            },
+            device,
+            queue,
+            backend,
+        ))
+    }
+    pub fn aspect(&self) -> f32 {
+        self.config.width as f32 / self.config.height as f32
+    }
+    pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        if self.config.width == width && self.config.height == height {
+            return;
+        }
+        self.canvas.set_width(width);
+        self.canvas.set_height(height);
+        self.config.width = width;
+        self.config.height = height;
+        self.surface.configure(device, &self.config);
+        (self.depth_texture, self.depth_view) = depth::create(device, width, height, DEPTH_FORMAT);
+        // Recreate attachments and their bind group together on the next frame.
+        self.texture_output = None;
+    }
+    pub fn acquire(&mut self, device: &wgpu::Device) -> Result<Option<CanvasFrame>, JsValue> {
+        let (frame, reconfigure) = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame) => (frame, false),
+            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => (frame, true),
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return Ok(None);
+            }
+            wgpu::CurrentSurfaceTexture::Outdated => {
+                self.surface.configure(device, &self.config);
+                return Ok(None);
+            }
+            wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface = self
+                    .instance
+                    .create_surface(wgpu::SurfaceTarget::Canvas(self.canvas.clone()))
+                    .map_err(|error| JsValue::from_str(&error.to_string()))?;
+                self.surface.configure(device, &self.config);
+                return Ok(None);
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                return Err(JsValue::from_str("GPU surface validation failed"));
+            }
+        };
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.config.format.add_srgb_suffix()),
+            ..Default::default()
+        });
+        Ok(Some(CanvasFrame {
+            frame,
+            view,
+            reconfigure,
+        }))
+    }
+    pub fn ensure_target(&mut self, device: &wgpu::Device) {
+        if !self.offscreen || self.texture_output.is_some() {
+            return;
+        }
+        let format = self.config.format.add_srgb_suffix();
+        let color_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("offscreen scene color"),
+            size: wgpu::Extent3d {
+                width: self.config.width,
+                height: self.config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let color = color_texture.create_view(&Default::default());
+        let (depth_texture, depth) =
+            depth::create(device, self.config.width, self.config.height, DEPTH_FORMAT);
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("present texture layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("present sampler"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("present texture"),
+            layout: &layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&color),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        let shader = device.create_shader_module(wgpu::include_wgsl!("present.wgsl"));
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("present layout"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("present offscreen scene"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        self.texture_output = Some(TextureOutput {
+            _color: color_texture,
+            color,
+            _depth: depth_texture,
+            depth,
+            bind_group,
+            pipeline,
+        });
+    }
+    pub fn target<'a>(&'a self, frame: &'a CanvasFrame) -> RenderTarget<'a> {
+        let (color, depth) = if self.offscreen {
+            let output = self
+                .texture_output
+                .as_ref()
+                .expect("ensure_target before target");
+            (&output.color, &output.depth)
+        } else {
+            (&frame.view, &self.depth_view)
+        };
+        RenderTarget {
+            color,
+            depth,
+            color_format: self.config.format.add_srgb_suffix(),
+            depth_format: DEPTH_FORMAT,
+            width: self.config.width,
+            height: self.config.height,
+            viewport: Viewport::full(self.config.width, self.config.height),
+            color_load: wgpu::LoadOp::Clear(wgpu::Color {
+                r: 0.1,
+                g: 0.1,
+                b: 0.3,
+                a: 1.0,
+            }),
+            depth_load: wgpu::LoadOp::Clear(1.0),
+        }
+    }
+    pub fn present(&mut self, frame: CanvasFrame, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if self.offscreen {
+            let output = self
+                .texture_output
+                .as_ref()
+                .expect("ensure_target before present");
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("present encoder"),
+            });
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("present texture"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &frame.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                pass.set_pipeline(&output.pipeline);
+                pass.set_bind_group(0, &output.bind_group, &[]);
+                pass.draw(0..3, 0..1);
+            }
+            queue.submit(Some(encoder.finish()));
+        }
+        queue.present(frame.frame);
+        if frame.reconfigure {
+            self.surface.configure(device, &self.config);
+        }
+    }
+}
+
 \n# File: src/render/pipeline.rs
 #![cfg(target_arch = "wasm32")]
 
 use crate::render::data::Vertex;
 use wgpu::{BindGroupLayout, Device, RenderPipeline, TextureFormat};
 
-pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -> RenderPipeline {
+pub fn build(
+    device: &Device,
+    format: TextureFormat,
+    depth_format: TextureFormat,
+    layout: &BindGroupLayout,
+) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
@@ -1104,7 +1445,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
+            format: depth_format,
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
@@ -1119,6 +1460,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
 pub fn build_lines(
     device: &Device,
     format: TextureFormat,
+    depth_format: TextureFormat,
     layout: &BindGroupLayout,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
@@ -1153,7 +1495,7 @@ pub fn build_lines(
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
+            format: depth_format,
             depth_write_enabled: Some(false),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
@@ -1165,20 +1507,36 @@ pub fn build_lines(
     })
 }
 
-\n# File: src/render/state.rs
-#![cfg(target_arch = "wasm32")]
+\n# File: src/render/present.wgsl
+@group(0) @binding(0) var scene_texture: texture_2d<f32>;
+@group(0) @binding(1) var scene_sampler: sampler;
+struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
+@vertex fn vs_main(@builtin(vertex_index) index: u32) -> Output {
+    let positions = array<vec2<f32>, 3>(vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+    let p = positions[index];
+    var output: Output;
+    output.position = vec4(p, 0.0, 1.0);
+    output.uv = vec2((p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5);
+    return output;
+}
+@fragment fn fs_main(input: Output) -> @location(0) vec4<f32> {
+    return textureSample(scene_texture, scene_sampler, input.uv);
+}
 
+\n# File: src/render/renderer.rs
 use crate::scene::{MeshKind, SceneManager};
 use crate::visibility::{InstanceData, RenderQueue};
 use glam::{Mat4, Vec3};
-use wasm_bindgen::JsValue;
-use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
 use crate::render::data::{
     self, Light, SceneUniforms, Vertex, EMPTY_LIGHT, LIGHT_VERTICES_PER_LIGHT, MAX_LIGHTS,
 };
-use crate::render::{depth, pipeline};
+use crate::render::{
+    pipeline,
+    target::{RenderTarget, RenderView},
+};
+use std::collections::HashMap;
 
 struct InstanceBatch {
     buffer: wgpu::Buffer,
@@ -1270,30 +1628,24 @@ fn build_uniform(
     }
 }
 
-pub struct State {
-    grid_pipeline: wgpu::RenderPipeline,
+pub struct SceneRenderer {
     grid_vertex_buffer: wgpu::Buffer,
     grid_vertex_count: u32,
     light_vertex_buffer: wgpu::Buffer,
     light_vertex_count: u32,
     pub draw_grid: bool,
-    surface: wgpu::Surface<'static>,
-    instance: wgpu::Instance,
-    canvas: HtmlCanvasElement,
-    pub backend: String,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    pipeline: wgpu::RenderPipeline,
+    pub(super) device: wgpu::Device,
+    pub(super) queue: wgpu::Queue,
+    pipelines: HashMap<
+        (wgpu::TextureFormat, wgpu::TextureFormat),
+        (wgpu::RenderPipeline, wgpu::RenderPipeline),
+    >,
+    bind_group_layout: wgpu::BindGroupLayout,
     cube_mesh: Mesh,
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
-    depth_texture: wgpu::Texture,
-    depth_view: wgpu::TextureView,
-    depth_format: wgpu::TextureFormat,
-    pub aspect: f32,
     pub scene: SceneManager,
     render_queue: RenderQueue,
     extraction_key: Option<(Mat4, u64, bool)>,
@@ -1305,62 +1657,8 @@ pub struct State {
     last_lights: [Light; MAX_LIGHTS],
 }
 
-impl State {
-    pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
-        let instance_desc = wgpu::InstanceDescriptor {
-            backends: if canvas.get_attribute("data-backend").as_deref() == Some("webgl") {
-                wgpu::Backends::GL
-            } else {
-                wgpu::Backends::all()
-            },
-            ..wgpu::InstanceDescriptor::new_without_display_handle()
-        };
-        let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
-        let surface = instance
-            .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
-            .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
-            .await
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        let backend = format!("{:?}", adapter.get_info().backend);
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                label: None,
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(adapter.limits()),
-                memory_hints: wgpu::MemoryHints::default(),
-                trace: wgpu::Trace::default(),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        let caps = surface.get_capabilities(&adapter);
-        let format = caps
-            .formats
-            .iter()
-            .copied()
-            .find(wgpu::TextureFormat::is_srgb)
-            .unwrap_or(caps.formats[0]);
-        let view_format = format.add_srgb_suffix();
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format,
-            width: canvas.width(),
-            height: canvas.height(),
-            present_mode: caps.present_modes[0],
-            desired_maximum_frame_latency: 2,
-            alpha_mode: caps.alpha_modes[0],
-            view_formats: vec![view_format],
-            color_space: wgpu::SurfaceColorSpace::Auto,
-        };
-        surface.configure(&device, &config);
-        let aspect = config.width as f32 / config.height as f32;
-
-        let depth_format = wgpu::TextureFormat::Depth32Float;
-        let (depth_texture, depth_view) =
-            depth::create(&device, config.width, config.height, depth_format);
-
+impl SceneRenderer {
+    pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Self {
         let cube_mesh = Mesh::new(&device, "cube", data::VERTICES, data::INDICES);
         let (plane_vertices, plane_indices) = data::plane_mesh();
         let plane_mesh = Mesh::new(&device, "plane", &plane_vertices, &plane_indices);
@@ -1381,8 +1679,6 @@ impl State {
             }],
         });
 
-        let pipeline = pipeline::build(&device, view_format, &bind_group_layout);
-        let grid_pipeline = pipeline::build_lines(&device, view_format, &bind_group_layout);
         let grid_vertices = data::grid_vertices(10);
         let grid_vertex_count = grid_vertices.len() as u32;
         let grid_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -1418,30 +1714,21 @@ impl State {
             label: Some("grid bind group"),
         });
         let batches = std::array::from_fn(|_| InstanceBatch::new(&device, 1));
-        Ok(Self {
-            grid_pipeline,
+        Self {
             grid_vertex_buffer,
             grid_vertex_count,
             light_vertex_buffer,
             light_vertex_count,
             draw_grid: true,
-            surface,
-            instance,
-            canvas: canvas.clone(),
-            backend,
             device,
             queue,
-            config,
-            pipeline,
+            pipelines: HashMap::new(),
+            bind_group_layout,
             cube_mesh,
             plane_mesh,
             sphere_mesh,
             grid_uniform_buffer,
             grid_bind_group,
-            depth_texture,
-            depth_view,
-            depth_format,
-            aspect,
             scene: SceneManager::default(),
             render_queue: RenderQueue::default(),
             extraction_key: None,
@@ -1451,24 +1738,10 @@ impl State {
             prepare_ms: 0.0,
             frame_metrics: crate::frame_metrics::FrameMetrics::default(),
             last_lights: lights_array,
-        })
+        }
     }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        if width == 0 || height == 0 {
-            return;
-        }
-        self.config.width = width;
-        self.config.height = height;
-        self.aspect = width as f32 / height as f32;
-        self.surface.configure(&self.device, &self.config);
-        let (depth_texture, depth_view) =
-            depth::create(&self.device, width, height, self.depth_format);
-        self.depth_texture = depth_texture;
-        self.depth_view = depth_view;
     }
 
     fn mesh(&self, kind: MeshKind) -> &Mesh {
@@ -1479,9 +1752,15 @@ impl State {
         }
     }
 
-    pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+    /// Advance simulation once per frame, independently of the number of views.
+    pub fn advance_scene(&mut self, dt: f32) {
         self.frame_metrics.record(dt);
         self.scene.update(dt);
+    }
+
+    pub fn prepare_view(&mut self, view: RenderView) {
+        let camera_matrix = view.view_projection;
+        let camera_pos = view.camera_position;
         let active_lights: Vec<Light> = self
             .scene
             .lights()
@@ -1543,33 +1822,29 @@ impl State {
         ]
     }
 
-    pub fn render(&mut self) -> Result<(), JsValue> {
-        let (frame, reconfigure) = match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(frame) => (frame, false),
-            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => (frame, true),
-            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
-                return Ok(());
-            }
-            wgpu::CurrentSurfaceTexture::Outdated => {
-                self.surface.configure(&self.device, &self.config);
-                return Ok(());
-            }
-            wgpu::CurrentSurfaceTexture::Lost => {
-                self.surface = self
-                    .instance
-                    .create_surface(wgpu::SurfaceTarget::Canvas(self.canvas.clone()))
-                    .map_err(|error| JsValue::from_str(&error.to_string()))?;
-                self.surface.configure(&self.device, &self.config);
-                return Ok(());
-            }
-            wgpu::CurrentSurfaceTexture::Validation => {
-                return Err(JsValue::from_str("GPU surface validation failed"));
-            }
-        };
-        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(self.config.format.add_srgb_suffix()),
-            ..Default::default()
+    /// Prepare and submit one view. Simulation advances separately, once per frame.
+    /// Submission before the next view keeps shared buffer writes ordered correctly.
+    pub fn render_view(
+        &mut self,
+        view: RenderView,
+        target: &RenderTarget<'_>,
+    ) -> Result<(), String> {
+        target.validate()?;
+        self.prepare_view(view);
+        self.draw(target)
+    }
+
+    pub fn draw(&mut self, target: &RenderTarget<'_>) -> Result<(), String> {
+        target.validate()?;
+        let key = (target.color_format, target.depth_format);
+        self.pipelines.entry(key).or_insert_with(|| {
+            (
+                pipeline::build(&self.device, key.0, key.1, &self.bind_group_layout),
+                pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
+            )
         });
+        // Immutable lookup ends the map mutation before borrowing mesh resources.
+        let pipelines = &self.pipelines[&key];
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -1579,23 +1854,18 @@ impl State {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view: target.color,
                     resolve_target: None,
                     depth_slice: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.1,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
+                        load: target.color_load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_view,
+                    view: target.depth,
                     depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
+                        load: target.depth_load,
                         store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
@@ -1604,7 +1874,21 @@ impl State {
                 timestamp_writes: None,
                 multiview_mask: None,
             });
-            rp.set_pipeline(&self.pipeline);
+            rp.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.0,
+                1.0,
+            );
+            rp.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            rp.set_pipeline(&pipelines.0);
             rp.set_bind_group(0, &self.grid_bind_group, &[]);
             for (index, kind) in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere]
                 .into_iter()
@@ -1621,7 +1905,7 @@ impl State {
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
             if self.draw_grid {
-                rp.set_pipeline(&self.grid_pipeline);
+                rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                 rp.draw(0..self.grid_vertex_count, 0..1);
@@ -1630,11 +1914,180 @@ impl State {
             }
         }
         self.queue.submit(Some(encoder.finish()));
-        self.queue.present(frame);
-        if reconfigure {
-            self.surface.configure(&self.device, &self.config);
+        Ok(())
+    }
+}
+
+\n# File: src/render/state.rs
+//! Browser host connecting the scene renderer to a canvas output.
+use super::{output::CanvasOutput, renderer::SceneRenderer, target::RenderView};
+use glam::{Mat4, Vec3};
+use std::ops::{Deref, DerefMut};
+use wasm_bindgen::JsValue;
+use web_sys::HtmlCanvasElement;
+
+pub struct State {
+    renderer: SceneRenderer,
+    output: CanvasOutput,
+    pub backend: String,
+    pub aspect: f32,
+}
+impl Deref for State {
+    type Target = SceneRenderer;
+    fn deref(&self) -> &Self::Target {
+        &self.renderer
+    }
+}
+impl DerefMut for State {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.renderer
+    }
+}
+impl State {
+    pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
+        let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
+        let aspect = output.aspect();
+        Ok(Self {
+            renderer: SceneRenderer::new(device, queue),
+            output,
+            backend,
+            aspect,
+        })
+    }
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.output.resize(&self.renderer.device, width, height);
+        self.aspect = self.output.aspect();
+    }
+    pub fn set_output_mode(&mut self, mode: &str) -> bool {
+        match mode {
+            "canvas" => self.output.offscreen = false,
+            "texture" => self.output.offscreen = true,
+            _ => return false,
+        }
+        true
+    }
+    pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        self.renderer.advance_scene(dt);
+        self.renderer.prepare_view(RenderView {
+            view_projection: camera_matrix,
+            camera_position: camera_pos,
+        });
+    }
+    pub fn render(&mut self) -> Result<(), JsValue> {
+        let Some(frame) = self.output.acquire(&self.renderer.device)? else {
+            return Ok(());
+        };
+        self.output.ensure_target(&self.renderer.device);
+        let target = self.output.target(&frame);
+        self.renderer
+            .draw(&target)
+            .map_err(|e| JsValue::from_str(&e))?;
+        self.output
+            .present(frame, &self.renderer.device, &self.renderer.queue);
+        Ok(())
+    }
+}
+
+\n# File: src/render/target.rs
+//! Render inputs independent of any browser canvas or surface.
+use glam::{Mat4, Vec3};
+
+#[derive(Clone, Copy)]
+pub struct RenderView {
+    pub view_projection: Mat4,
+    pub camera_position: Vec3,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Viewport {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+impl Viewport {
+    pub fn full(width: u32, height: u32) -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }
+    }
+    pub fn validate(self, width: u32, height: u32) -> Result<(), String> {
+        if self.width == 0 || self.height == 0 || width == 0 || height == 0 {
+            return Err("Render target and viewport must have nonzero dimensions".into());
+        }
+        if self
+            .x
+            .checked_add(self.width)
+            .is_none_or(|right| right > width)
+            || self
+                .y
+                .checked_add(self.height)
+                .is_none_or(|bottom| bottom > height)
+        {
+            return Err("Viewport must fit inside the render target".into());
         }
         Ok(())
+    }
+}
+
+/// Single-sample color and depth attachments. Their formats and dimensions
+/// must match this descriptor; wgpu validates the underlying GPU resources.
+pub struct RenderTarget<'a> {
+    pub color: &'a wgpu::TextureView,
+    pub depth: &'a wgpu::TextureView,
+    pub color_format: wgpu::TextureFormat,
+    pub depth_format: wgpu::TextureFormat,
+    pub width: u32,
+    pub height: u32,
+    pub viewport: Viewport,
+    /// Use Load for additional views sharing an attachment; Clear clears the whole attachment.
+    pub color_load: wgpu::LoadOp<wgpu::Color>,
+    pub depth_load: wgpu::LoadOp<f32>,
+}
+impl RenderTarget<'_> {
+    pub fn validate(&self) -> Result<(), String> {
+        self.viewport.validate(self.width, self.height)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn viewport_accepts_full_target_and_subrect() {
+        assert!(Viewport::full(800, 600).validate(800, 600).is_ok());
+        assert!(Viewport {
+            x: 400,
+            y: 100,
+            width: 400,
+            height: 500
+        }
+        .validate(800, 600)
+        .is_ok());
+    }
+    #[test]
+    fn viewport_rejects_empty_outside_and_overflow() {
+        assert!(Viewport::full(0, 600).validate(800, 600).is_err());
+        assert!(Viewport::full(800, 600).validate(0, 600).is_err());
+        assert!(Viewport {
+            x: 401,
+            y: 0,
+            width: 400,
+            height: 600
+        }
+        .validate(800, 600)
+        .is_err());
+        assert!(Viewport {
+            x: u32::MAX,
+            y: 0,
+            width: 1,
+            height: 1
+        }
+        .validate(u32::MAX, 600)
+        .is_err());
     }
 }
 
@@ -2565,6 +3018,17 @@ use crate::render::state::State;
 thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+}
+
+/// Select browser presentation; scene rendering itself accepts GPU attachments.
+#[wasm_bindgen]
+pub fn set_output_mode(mode: &str) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().set_output_mode(mode))
+    })
 }
 
 #[wasm_bindgen]

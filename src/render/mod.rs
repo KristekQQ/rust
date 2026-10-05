@@ -4,3 +4,7 @@ pub mod data;
 pub mod depth;
 pub mod pipeline;
 pub mod state;
+
+pub mod output;
+pub mod renderer;
+pub mod target;

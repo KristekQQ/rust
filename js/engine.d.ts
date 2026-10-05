@@ -61,6 +61,6 @@ export interface RenderStats {
     fps: number;
     frameMs: number;
 }
-export type Engine = Readonly<RawEngine & { readonly scene: Scene; renderer_stats(): RenderStats }>;
+export type Engine = Readonly<RawEngine & { readonly scene: Scene; set_output_mode(mode: "canvas" | "texture"): boolean; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;

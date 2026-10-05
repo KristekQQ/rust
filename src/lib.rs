@@ -12,3 +12,8 @@ pub mod web;
 #[allow(dead_code)]
 #[path = "render/data.rs"]
 mod render_data_tests;
+
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "render/target.rs"]
+mod render_target_tests;

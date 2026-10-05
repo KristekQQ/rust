@@ -3,7 +3,12 @@
 use crate::render::data::Vertex;
 use wgpu::{BindGroupLayout, Device, RenderPipeline, TextureFormat};
 
-pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -> RenderPipeline {
+pub fn build(
+    device: &Device,
+    format: TextureFormat,
+    depth_format: TextureFormat,
+    layout: &BindGroupLayout,
+) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
@@ -41,7 +46,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
+            format: depth_format,
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
@@ -56,6 +61,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
 pub fn build_lines(
     device: &Device,
     format: TextureFormat,
+    depth_format: TextureFormat,
     layout: &BindGroupLayout,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
@@ -90,7 +96,7 @@ pub fn build_lines(
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
+            format: depth_format,
             depth_write_enabled: Some(false),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),

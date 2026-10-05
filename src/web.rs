@@ -14,6 +14,17 @@ thread_local! {
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
 }
 
+/// Select browser presentation; scene rendering itself accepts GPU attachments.
+#[wasm_bindgen]
+pub fn set_output_mode(mode: &str) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().set_output_mode(mode))
+    })
+}
+
 #[wasm_bindgen]
 pub fn set_frustum_culling(enabled: bool) {
     STATE.with(|state| {

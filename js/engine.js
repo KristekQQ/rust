@@ -88,6 +88,7 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         schedule_remove_light: wasm.schedule_remove_light,
         set_camera_mode: wasm.set_camera_mode,
         set_grid_visible: wasm.set_grid_visible,
+        set_output_mode: wasm.set_output_mode,
         resize: wasm.resize,
         renderer_backend: wasm.renderer_backend,
         set_frustum_culling: wasm.set_frustum_culling,

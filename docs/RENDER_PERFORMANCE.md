@@ -105,3 +105,33 @@ GPU timestamp queries doplnit podle schopností zařízení pro GPU bottlenecky.
   popisuje instanční rozsahy, nepřímé draws a požadavky jejich API.
 - [glam DirectX/WebGPU projekce](https://docs.rs/glam/latest/glam/camera/lh/proj/directx/index.html)
   dokumentuje projekce pro používané clip-space konvence.
+
+## Renderovací cíl oddělený od canvasu
+
+`renderer.rs` obsahuje SceneRenderer, GPU zdroje scény, culling, instance buffery
+a cache pipeline podle formátů barevné/hloubkové přílohy. Nepracuje s HTML,
+canvasem ani surface. `RenderView` předává view-projection a pozici kamery;
+`RenderTarget` předává TextureView pro barvu a hloubku, formáty, rozměry,
+viewport a operace Clear/Load. Podporovány jsou single-sample 2D přílohy.
+Rozměry viewportu se kontrolují před zahájením render passu, kompatibilitu
+GPU příloh kontroluje wgpu. Clear vymaže celou přílohu; při dalším pohledu do
+stejné přílohy musí volající zvolit Load pro zachování předchozího obrazu.
+
+`prepare_view` a `render_view` neposouvají simulaci. Host ji aktualizuje jednou
+za snímek, pak může připravit/renderovat jednotlivé pohledy. `render_view`
+submittuje každý pohled před přípravou dalšího, aby zápisy do sdílených
+uniformů a instance bufferů nebyly všechny použity s daty poslední kamery.
+Instancing a cache extrakce zůstávají zachovány; pipeline se nevytváří každý
+snímek. Plná VR integrace a WebXR binding zatím nejsou implementovány.
+
+`output.rs` je adaptér pro canvas: získá surface frame, řeší resize/ztrátu
+surface a prezentuje snímek. `state.rs` propojuje tento adaptér s rendererem.
+SDK `engine.set_output_mode("canvas" | "texture")` dovoluje ověřit dva výstupy:
+přímo do surface, nebo do samostatné textury s hloubkou a následnou prezentací
+fullscreen trojúhelníkem. Druhý režim přidává prezentovací pass a paměť textur;
+není automaticky rychlejší. Výchozí režim zůstává přímý. Textury se vytvářejí
+při prvním použití a znovu po resize, nikoliv každý snímek.
+
+`tests/render-target.html` testuje přepínání, odmítnutí neplatného režimu,
+resize a přítomnost scény. Viditelný obraz a konzoli je nutné ověřit i v
+prohlížeči, včetně `?backend=webgl`.

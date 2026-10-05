@@ -253,3 +253,11 @@ při změně dávky. Podrobná architektura, hranice a další kroky jsou v
 [docs/RENDER_PERFORMANCE.md](docs/RENDER_PERFORMANCE.md).
 Kontrolní stránka: `tests/render-stress.html` (také `?backend=webgl`).
 SDK nabízí `engine.renderer_stats()` a `engine.set_frustum_culling(bool)`.
+
+### Výstup rendereru
+
+Renderer přijímá GPU barevnou/hloubkovou přílohu a pohled kamery nezávisle na
+canvasu. Browser adaptér zajišťuje získání snímku a prezentaci. Přepnutí přes
+JS/TS: `engine.set_output_mode("texture")`, návrat: `engine.set_output_mode("canvas")`.
+[Ukázka renderovacích cílů](tests/render-target.html) vyžaduje lokální HTTP
+server. Podrobnosti a omezení jsou v [plánu rendereru](docs/RENDER_PERFORMANCE.md).
