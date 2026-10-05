@@ -135,3 +135,16 @@ nerovnoměrném měřítku a rozložení uniformů. `tests/lighting.html` nabíz
 kontrolu světla před/za/z boku, měřítka, rotace a změn pohledu. Browser MCP
 ověřil WebGPU i WebGL bez chyb, tmavou přivrácenou stranu při zadním světle,
 elipsoid a horní/dolní stranu roviny.
+# Výkon rendereru – aktuální změna 2026-10-05
+
+Renderer již nepoužívá objektové uniformy/bind groups. `visibility.rs` drží
+CPU extrakci frusta a RenderQueue; SceneObject cachuje model, normal matrix a
+world AABB při změnách transformací. Instance buffery se sdílejí podle meshe,
+rostou geometricky a nezměněné dávky se znovu nezapisují. SceneUniforms má
+pouze view_projection, kameru a světla (208 B), InstanceData model a normály
+(128 B). Historické offsety uniformů níže popisují předchozí renderer.
+Frustum používá WebGPU depth 0…W a nevypíná simulaci mimo záběr.
+Revize geometrického stavu + camera matrix + nastavení cullingu slouží jako
+klíč cache extrakce; statické snímky neopakují scan objektů a tvorbu dávek.
+`engine.renderer_stats()` / `set_frustum_culling(bool)` poskytují diagnostiku.
+Plán a omezení: `docs/RENDER_PERFORMANCE.md`; ověření: `tests/render-stress.html`.

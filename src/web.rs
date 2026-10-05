@@ -15,6 +15,27 @@ thread_local! {
 }
 
 #[wasm_bindgen]
+pub fn set_frustum_culling(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().frustum_culling = enabled;
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn renderer_stats() -> js_sys::Float64Array {
+    let values = STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().render_stats())
+            .unwrap_or([0.0; 6])
+    });
+    js_sys::Float64Array::from(values.as_slice())
+}
+
+#[wasm_bindgen]
 pub fn renderer_backend() -> String {
     STATE.with(|state| {
         state
@@ -434,7 +455,9 @@ pub async fn start() -> Result<(), JsValue> {
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
             let mut st = state_c.borrow_mut();
+            let prepare_start = perf_c.now();
             st.update(dt, cam_matrix, cam_pos);
+            st.prepare_ms = perf_c.now() - prepare_start;
             if let Err(error) = st.render() {
                 web_sys::console::error_1(&error);
                 if let Some(status) = web_sys::window()

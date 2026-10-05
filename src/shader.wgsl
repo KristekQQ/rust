@@ -8,9 +8,7 @@ struct Light {
 const LIGHT_COUNT: u32 = 4u;
 
 struct SceneUniforms {
-    mvp: mat4x4<f32>,
-    model: mat4x4<f32>,
-    normal_matrix: mat4x4<f32>,
+    view_projection: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, LIGHT_COUNT>,
@@ -31,15 +29,37 @@ struct VertexOutput {
     @location(2) world_normal: vec3<f32>,
 };
 
+struct InstanceInput {
+    @location(3) model0: vec4<f32>,
+    @location(4) model1: vec4<f32>,
+    @location(5) model2: vec4<f32>,
+    @location(6) model3: vec4<f32>,
+    @location(7) normal0: vec4<f32>,
+    @location(8) normal1: vec4<f32>,
+    @location(9) normal2: vec4<f32>,
+    @location(10) normal3: vec4<f32>,
+};
 @vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
+fn vs_main(input: VertexInput, instance: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
-    out.pos = scene.mvp * vec4<f32>(input.position, 1.0);
+    let model = mat4x4<f32>(instance.model0, instance.model1, instance.model2, instance.model3);
+    let normal_matrix = mat4x4<f32>(instance.normal0, instance.normal1, instance.normal2, instance.normal3);
+    out.pos = scene.view_projection * model * vec4<f32>(input.position, 1.0);
     out.color = input.color;
-    out.world_pos = (scene.model * vec4<f32>(input.position, 1.0)).xyz;
+    out.world_pos = (model * vec4<f32>(input.position, 1.0)).xyz;
     // Rust supplies the inverse transpose. Normalize after interpolation so
     // non-uniformly scaled smooth surfaces retain the correct normal field.
-    out.world_normal = (scene.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz;
+    out.world_normal = (normal_matrix * vec4<f32>(input.normal, 0.0)).xyz;
+    return out;
+}
+
+@vertex
+fn vs_lines(input: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.pos = scene.view_projection * vec4<f32>(input.position, 1.0);
+    out.color = input.color;
+    out.world_pos = input.position;
+    out.world_normal = input.normal;
     return out;
 }
 

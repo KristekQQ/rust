@@ -17,7 +17,10 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(Vertex::layout())],
+            buffers: &[
+                Some(Vertex::layout()),
+                Some(crate::visibility::InstanceData::layout()),
+            ],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -66,7 +69,7 @@ pub fn build_lines(
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: Some("vs_main"),
+            entry_point: Some("vs_lines"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[Some(Vertex::layout())],
         },

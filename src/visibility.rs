@@ -1,0 +1,234 @@
+//! CPU visibility and render extraction; shared by native tests and WASM.
+use crate::scene::{MeshKind, SceneManager, Transform};
+use glam::{Mat4, Vec3, Vec4};
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct InstanceData {
+    pub model: [[f32; 4]; 4],
+    pub normal_matrix: [[f32; 4]; 4],
+}
+
+pub(crate) struct ObjectRenderData {
+    instance: InstanceData,
+    center: Vec3,
+    half_extent: Vec3,
+}
+impl ObjectRenderData {
+    pub(crate) fn new(mesh: MeshKind, transform: Transform) -> Self {
+        let model = transform.model();
+        let local = match mesh {
+            MeshKind::Cube => Vec3::splat(0.5),
+            MeshKind::Plane => Vec3::new(0.5, 0.0, 0.5),
+            MeshKind::Sphere => Vec3::ONE,
+        };
+        Self {
+            instance: InstanceData {
+                model: model.to_cols_array_2d(),
+                normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
+            },
+            center: transform.position,
+            half_extent: model.x_axis.truncate().abs() * local.x
+                + model.y_axis.truncate().abs() * local.y
+                + model.z_axis.truncate().abs() * local.z,
+        }
+    }
+}
+
+pub struct Frustum {
+    planes: [Vec4; 6],
+    tolerance: [f32; 6],
+}
+impl Frustum {
+    pub fn from_view_projection(matrix: Mat4) -> Self {
+        let rows = matrix.transpose();
+        let (x, y, z, w) = (rows.x_axis, rows.y_axis, rows.z_axis, rows.w_axis);
+        // WebGPU clip volume: -w <= x,y <= w; 0 <= z <= w.
+        let planes = [w + x, w - x, w + y, w - y, z, w - z];
+        Self {
+            tolerance: planes.map(|p| 1e-5 * p.truncate().length()),
+            planes,
+        }
+    }
+    pub fn intersects_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
+        self.planes
+            .iter()
+            .zip(self.tolerance)
+            .all(|(plane, tolerance)| {
+                let normal = plane.truncate();
+                let distance = normal.dot(center) + plane.w;
+                let radius = normal.abs().dot(half_extent);
+                // Conservative tolerance, scaled for unnormalized planes.
+                distance + radius >= -tolerance
+            })
+    }
+}
+
+#[derive(Default)]
+pub struct RenderQueue {
+    pub batches: [Vec<InstanceData>; 3],
+    pub total: usize,
+    pub visible: usize,
+}
+impl RenderQueue {
+    pub fn extract(&mut self, scene: &SceneManager, view_projection: Mat4, culling: bool) {
+        for batch in &mut self.batches {
+            batch.clear();
+        }
+        self.total = scene.objects().len();
+        self.visible = 0;
+        let frustum = Frustum::from_view_projection(view_projection);
+        for object in scene.objects().values() {
+            let data = &object.render_data;
+            if culling && !frustum.intersects_aabb(data.center, data.half_extent) {
+                continue;
+            }
+            let index = match object.mesh {
+                MeshKind::Cube => 0,
+                MeshKind::Plane => 1,
+                MeshKind::Sphere => 2,
+            };
+            self.batches[index].push(data.instance);
+            self.visible += 1;
+        }
+    }
+    pub fn draw_calls(&self) -> usize {
+        self.batches
+            .iter()
+            .filter(|batch| !batch.is_empty())
+            .count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn camera() -> Mat4 {
+        glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
+    }
+    #[test]
+    fn moving_camera_and_intersecting_bounds_do_not_lose_visible_objects() {
+        let projection = camera();
+        let view = glam::camera::lh::view::look_at_mat4(
+            Vec3::new(5.0, 2.0, -3.0),
+            Vec3::new(5.0, 2.0, 0.0),
+            Vec3::Y,
+        );
+        let f = Frustum::from_view_projection(projection * view);
+        assert!(f.intersects_aabb(Vec3::new(5.0, 2.0, 0.0), Vec3::splat(0.1)));
+        assert!(!f.intersects_aabb(Vec3::new(5.0, 2.0, -5.0), Vec3::splat(0.1)));
+        // The center is outside, but the large object's bounds intersect the view.
+        assert!(Frustum::from_view_projection(projection)
+            .intersects_aabb(Vec3::new(2.0, 0.0, 1.0), Vec3::new(2.0, 0.1, 0.1),));
+    }
+    #[test]
+    fn animation_refreshes_cached_instance_and_normal_matrices() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(0.0, 0.0, 2.0));
+        scene.set_object_scale(id, Vec3::new(2.0, 0.5, 1.0));
+        scene.schedule_rotate(id, 0.0, 90.0, 0.0, 0.0, 1.0);
+        scene.update(0.5);
+        let object = &scene.objects()[&id];
+        assert_eq!(
+            object.render_data.instance.model,
+            object.transform.model().to_cols_array_2d()
+        );
+        assert_eq!(
+            object.render_data.instance.normal_matrix,
+            crate::scene::normal_matrix(object.transform.model()).to_cols_array_2d()
+        );
+        assert_eq!(std::mem::size_of::<InstanceData>(), 128);
+    }
+    #[test]
+    fn render_revision_invalidates_on_commands_and_animation_but_not_idle_frames() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        let mut previous = scene.render_revision();
+        scene.update(1.0);
+        assert_eq!(previous, scene.render_revision());
+        scene.set_object_position(id, Vec3::ONE);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.set_object_scale(id, Vec3::splat(2.0));
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.set_object_rotation(id, Vec3::ONE);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.set_object_transform(id, Vec3::ZERO, Vec3::ZERO, Vec3::ONE);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.schedule_rotate(id, 0.0, 90.0, 0.0, 0.0, 1.0);
+        scene.update(0.5);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.remove_object(id);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.clear_scene();
+        assert_ne!(previous, scene.render_revision());
+    }
+    #[test]
+    fn clips_all_six_planes_using_webgpu_depth_range() {
+        let f = Frustum::from_view_projection(camera());
+        let e = Vec3::splat(0.01);
+        assert!(f.intersects_aabb(Vec3::new(0.0, 0.0, 1.0), e));
+        for p in [
+            Vec3::new(-3.0, 0.0, 1.0),
+            Vec3::new(3.0, 0.0, 1.0),
+            Vec3::new(0.0, -3.0, 1.0),
+            Vec3::new(0.0, 3.0, 1.0),
+            Vec3::new(0.0, 0.0, 0.05),
+            Vec3::new(0.0, 0.0, 11.0),
+            Vec3::new(0.0, 0.0, -1.0),
+        ] {
+            assert!(!f.intersects_aabb(p, e), "{p:?}");
+        }
+        assert!(f.intersects_aabb(Vec3::new(0.0, 0.0, 0.1), e));
+        assert!(f.intersects_aabb(Vec3::new(0.0, 0.0, 10.0), e));
+    }
+    #[test]
+    fn bounds_are_conservative_for_rotated_scaled_and_flat_geometry() {
+        for mesh in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere] {
+            let t = Transform::new(
+                Vec3::new(2.0, 0.0, 2.0),
+                Vec3::new(0.4, 0.7, 0.3),
+                Vec3::new(-3.0, 0.4, 2.0),
+            );
+            let data = ObjectRenderData::new(mesh, t);
+            let ext = match mesh {
+                MeshKind::Cube => Vec3::splat(0.5),
+                MeshKind::Plane => Vec3::new(0.5, 0.0, 0.5),
+                MeshKind::Sphere => Vec3::ONE,
+            };
+            for x in [-1.0, 1.0] {
+                for y in [-1.0, 1.0] {
+                    for z in [-1.0, 1.0] {
+                        let point = t.model().transform_point3(Vec3::new(x, y, z) * ext);
+                        assert!(
+                            ((point - data.center).abs() - data.half_extent).max_element() < 1e-5
+                        );
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn culling_never_stops_simulation_and_reuses_queue_capacity() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(100.0, 0.0, 1.0));
+        let mut q = RenderQueue::default();
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.total, q.visible, q.draw_calls()), (1, 0, 0));
+        scene.set_object_position(id, Vec3::new(0.0, 0.0, 1.0));
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.visible, q.draw_calls()), (1, 1));
+        let capacity = q.batches[0].capacity();
+        scene.set_object_scale(id, Vec3::splat(2.0));
+        scene.schedule_remove_object(id, 0.1);
+        scene.update(0.2);
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.total, q.visible), (0, 0));
+        assert_eq!(capacity, q.batches[0].capacity());
+    }
+}

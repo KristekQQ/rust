@@ -1,8 +1,8 @@
 #![cfg(target_arch = "wasm32")]
 
 use crate::scene::{MeshKind, SceneManager};
+use crate::visibility::{InstanceData, RenderQueue};
 use glam::{Mat4, Vec3};
-use std::collections::BTreeMap;
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
@@ -12,30 +12,44 @@ use crate::render::data::{
 };
 use crate::render::{depth, pipeline};
 
-struct ObjectResources {
-    uniform_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+struct InstanceBatch {
+    buffer: wgpu::Buffer,
+    capacity: usize,
+    uploaded: Vec<InstanceData>,
 }
-
-impl ObjectResources {
-    fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, uniform: SceneUniforms) -> Self {
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("object uniform buffer"),
-            contents: data::as_bytes(&[uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-            label: Some("object bind group"),
-        });
+impl InstanceBatch {
+    fn new(device: &wgpu::Device, capacity: usize) -> Self {
         Self {
-            uniform_buffer,
-            bind_group,
+            buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("mesh instance buffer"),
+                size: (capacity * std::mem::size_of::<InstanceData>()) as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }),
+            capacity,
+            uploaded: Vec::new(),
         }
+    }
+    fn upload(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        instances: &[InstanceData],
+    ) -> usize {
+        if instances.len() > self.capacity {
+            *self = Self::new(device, instances.len().next_power_of_two());
+        }
+        if self.uploaded == instances {
+            return 0;
+        }
+        self.uploaded.clear();
+        self.uploaded.extend_from_slice(instances);
+        if instances.is_empty() {
+            return 0;
+        }
+        let bytes = data::as_bytes(instances);
+        queue.write_buffer(&self.buffer, 0, bytes);
+        bytes.len()
     }
 }
 
@@ -77,14 +91,11 @@ fn lights_array(lights: &[Light]) -> [Light; MAX_LIGHTS] {
 
 fn build_uniform(
     camera_matrix: Mat4,
-    model: Mat4,
     camera_pos: Vec3,
     lights: [Light; MAX_LIGHTS],
 ) -> SceneUniforms {
     SceneUniforms {
-        mvp: (camera_matrix * model).to_cols_array_2d(),
-        model: model.to_cols_array_2d(),
-        normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
+        view_projection: camera_matrix.to_cols_array_2d(),
         camera_pos: camera_pos.into(),
         _pad0: 0.0,
         lights,
@@ -106,7 +117,6 @@ pub struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
-    bind_group_layout: wgpu::BindGroupLayout,
     cube_mesh: Mesh,
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
@@ -117,7 +127,13 @@ pub struct State {
     depth_format: wgpu::TextureFormat,
     pub aspect: f32,
     pub scene: SceneManager,
-    gpu_objects: BTreeMap<u32, ObjectResources>,
+    render_queue: RenderQueue,
+    extraction_key: Option<(Mat4, u64, bool)>,
+    batches: [InstanceBatch; 3],
+    pub frustum_culling: bool,
+    pub upload_bytes: usize,
+    pub prepare_ms: f64,
+    last_lights: [Light; MAX_LIGHTS],
 }
 
 impl State {
@@ -208,7 +224,7 @@ impl State {
 
         let active_lights = Vec::new();
         let lights_array = lights_array(&active_lights);
-        let grid_uniform = build_uniform(Mat4::IDENTITY, Mat4::IDENTITY, Vec3::ZERO, lights_array);
+        let grid_uniform = build_uniform(Mat4::IDENTITY, Vec3::ZERO, lights_array);
 
         let light_vertices = data::light_rays(&active_lights);
         let light_vertex_count = light_vertices.len() as u32;
@@ -232,6 +248,7 @@ impl State {
             }],
             label: Some("grid bind group"),
         });
+        let batches = std::array::from_fn(|_| InstanceBatch::new(&device, 1));
         Ok(Self {
             grid_pipeline,
             grid_vertex_buffer,
@@ -247,7 +264,6 @@ impl State {
             queue,
             config,
             pipeline,
-            bind_group_layout,
             cube_mesh,
             plane_mesh,
             sphere_mesh,
@@ -258,7 +274,13 @@ impl State {
             depth_format,
             aspect,
             scene: SceneManager::default(),
-            gpu_objects: BTreeMap::new(),
+            render_queue: RenderQueue::default(),
+            extraction_key: None,
+            batches,
+            frustum_culling: true,
+            upload_bytes: 0,
+            prepare_ms: 0.0,
+            last_lights: lights_array,
         })
     }
     pub fn set_grid_visible(&mut self, show: bool) {
@@ -301,32 +323,51 @@ impl State {
             })
             .collect();
         let lights = lights_array(&active_lights);
-        self.gpu_objects
-            .retain(|id, _| self.scene.object_exists(*id));
-        for (id, object) in self.scene.objects() {
-            let uniform =
-                build_uniform(camera_matrix, object.transform.model(), camera_pos, lights);
-            let resources = self.gpu_objects.entry(*id).or_insert_with(|| {
-                ObjectResources::new(&self.device, &self.bind_group_layout, uniform)
-            });
-            self.queue
-                .write_buffer(&resources.uniform_buffer, 0, data::as_bytes(&[uniform]));
+        let key = (
+            camera_matrix,
+            self.scene.render_revision(),
+            self.frustum_culling,
+        );
+        self.upload_bytes = 0;
+        if self.extraction_key != Some(key) {
+            self.render_queue
+                .extract(&self.scene, camera_matrix, self.frustum_culling);
+            for (batch, instances) in self.batches.iter_mut().zip(&self.render_queue.batches) {
+                self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
+            }
+            self.extraction_key = Some(key);
         }
-        let grid_uniform = build_uniform(camera_matrix, Mat4::IDENTITY, camera_pos, lights);
+        let grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
         self.queue.write_buffer(
             &self.grid_uniform_buffer,
             0,
             data::as_bytes(&[grid_uniform]),
         );
-        let light_vertices = data::light_rays(&active_lights);
-        self.light_vertex_count = light_vertices.len() as u32;
-        if !light_vertices.is_empty() {
-            self.queue.write_buffer(
-                &self.light_vertex_buffer,
-                0,
-                data::as_bytes(&light_vertices),
-            );
+        self.upload_bytes += std::mem::size_of::<SceneUniforms>();
+        if self.last_lights != lights {
+            self.last_lights = lights;
+            let light_vertices = data::light_rays(&active_lights);
+            self.light_vertex_count = light_vertices.len() as u32;
+            if !light_vertices.is_empty() {
+                self.queue.write_buffer(
+                    &self.light_vertex_buffer,
+                    0,
+                    data::as_bytes(&light_vertices),
+                );
+                self.upload_bytes += light_vertices.len() * std::mem::size_of::<Vertex>();
+            }
         }
+    }
+
+    pub fn render_stats(&self) -> [f64; 6] {
+        [
+            self.render_queue.total as f64,
+            self.render_queue.visible as f64,
+            (self.render_queue.total - self.render_queue.visible) as f64,
+            self.render_queue.draw_calls() as f64,
+            self.upload_bytes as f64,
+            self.prepare_ms,
+        ]
     }
 
     pub fn render(&mut self) -> Result<(), JsValue> {
@@ -391,14 +432,20 @@ impl State {
                 multiview_mask: None,
             });
             rp.set_pipeline(&self.pipeline);
-            for (id, object) in self.scene.objects() {
-                if let Some(resources) = self.gpu_objects.get(id) {
-                    let mesh = self.mesh(object.mesh);
-                    rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                    rp.set_bind_group(0, &resources.bind_group, &[]);
-                    rp.draw_indexed(0..mesh.index_count, 0, 0..1);
+            rp.set_bind_group(0, &self.grid_bind_group, &[]);
+            for (index, kind) in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere]
+                .into_iter()
+                .enumerate()
+            {
+                let count = self.render_queue.batches[index].len() as u32;
+                if count == 0 {
+                    continue;
                 }
+                let mesh = self.mesh(kind);
+                rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                rp.set_vertex_buffer(1, self.batches[index].buffer.slice(..));
+                rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);

@@ -2,6 +2,7 @@ pub mod input;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod scene;
+pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
 

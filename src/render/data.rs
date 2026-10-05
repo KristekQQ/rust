@@ -182,7 +182,7 @@ pub fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Light {
     pub position: [f32; 3],
     pub _pad_p: f32,
@@ -202,9 +202,7 @@ pub const EMPTY_LIGHT: Light = Light {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
-    pub mvp: [[f32; 4]; 4],
-    pub model: [[f32; 4]; 4],
-    pub normal_matrix: [[f32; 4]; 4],
+    pub view_projection: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; MAX_LIGHTS],
@@ -398,9 +396,22 @@ mod tests {
 
     #[test]
     fn uniform_offsets_match_wgsl_alignment() {
-        assert_eq!(std::mem::offset_of!(SceneUniforms, normal_matrix), 128);
-        assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 192);
-        assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 208);
-        assert_eq!(std::mem::size_of::<SceneUniforms>(), 336);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 64);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 80);
+        assert_eq!(std::mem::size_of::<SceneUniforms>(), 208);
+    }
+}
+
+impl crate::visibility::InstanceData {
+    pub fn layout<'a>() -> VertexBufferLayout<'a> {
+        const ATTRIBUTES: [wgpu::VertexAttribute; 8] = wgpu::vertex_attr_array![
+            3 => Float32x4, 4 => Float32x4, 5 => Float32x4, 6 => Float32x4,
+            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4
+        ];
+        VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as u64,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &ATTRIBUTES,
+        }
     }
 }

@@ -245,3 +245,11 @@ project to GPT or other tools. To run it automatically before each push, copy
 `scripts/pre-push` to `.git/hooks/pre-push` in your local clone.
 
 codex resume 019b6b22-2111-7001-88fb-070400b19da1
+# Výkon rendereru
+
+Rust provádí konzervativní frustum culling a instancing podle meshe.
+Nezměněné transformace jsou cachované a instance se do GPU zapisují pouze
+při změně dávky. Podrobná architektura, hranice a další kroky jsou v
+[docs/RENDER_PERFORMANCE.md](docs/RENDER_PERFORMANCE.md).
+Kontrolní stránka: `tests/render-stress.html` (také `?backend=webgl`).
+SDK nabízí `engine.renderer_stats()` a `engine.set_frustum_culling(bool)`.

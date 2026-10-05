@@ -535,6 +535,7 @@ pub mod input;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod scene;
+pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
 
@@ -729,7 +730,7 @@ pub fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Light {
     pub position: [f32; 3],
     pub _pad_p: f32,
@@ -749,9 +750,7 @@ pub const EMPTY_LIGHT: Light = Light {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
-    pub mvp: [[f32; 4]; 4],
-    pub model: [[f32; 4]; 4],
-    pub normal_matrix: [[f32; 4]; 4],
+    pub view_projection: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; MAX_LIGHTS],
@@ -945,10 +944,23 @@ mod tests {
 
     #[test]
     fn uniform_offsets_match_wgsl_alignment() {
-        assert_eq!(std::mem::offset_of!(SceneUniforms, normal_matrix), 128);
-        assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 192);
-        assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 208);
-        assert_eq!(std::mem::size_of::<SceneUniforms>(), 336);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 64);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 80);
+        assert_eq!(std::mem::size_of::<SceneUniforms>(), 208);
+    }
+}
+
+impl crate::visibility::InstanceData {
+    pub fn layout<'a>() -> VertexBufferLayout<'a> {
+        const ATTRIBUTES: [wgpu::VertexAttribute; 8] = wgpu::vertex_attr_array![
+            3 => Float32x4, 4 => Float32x4, 5 => Float32x4, 6 => Float32x4,
+            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4
+        ];
+        VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as u64,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &ATTRIBUTES,
+        }
     }
 }
 
@@ -1004,7 +1016,10 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Some(Vertex::layout())],
+            buffers: &[
+                Some(Vertex::layout()),
+                Some(crate::visibility::InstanceData::layout()),
+            ],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -1053,7 +1068,7 @@ pub fn build_lines(
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: Some("vs_main"),
+            entry_point: Some("vs_lines"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[Some(Vertex::layout())],
         },
@@ -1090,8 +1105,8 @@ pub fn build_lines(
 #![cfg(target_arch = "wasm32")]
 
 use crate::scene::{MeshKind, SceneManager};
+use crate::visibility::{InstanceData, RenderQueue};
 use glam::{Mat4, Vec3};
-use std::collections::BTreeMap;
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
@@ -1101,30 +1116,44 @@ use crate::render::data::{
 };
 use crate::render::{depth, pipeline};
 
-struct ObjectResources {
-    uniform_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+struct InstanceBatch {
+    buffer: wgpu::Buffer,
+    capacity: usize,
+    uploaded: Vec<InstanceData>,
 }
-
-impl ObjectResources {
-    fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, uniform: SceneUniforms) -> Self {
-        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("object uniform buffer"),
-            contents: data::as_bytes(&[uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-            label: Some("object bind group"),
-        });
+impl InstanceBatch {
+    fn new(device: &wgpu::Device, capacity: usize) -> Self {
         Self {
-            uniform_buffer,
-            bind_group,
+            buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("mesh instance buffer"),
+                size: (capacity * std::mem::size_of::<InstanceData>()) as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }),
+            capacity,
+            uploaded: Vec::new(),
         }
+    }
+    fn upload(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        instances: &[InstanceData],
+    ) -> usize {
+        if instances.len() > self.capacity {
+            *self = Self::new(device, instances.len().next_power_of_two());
+        }
+        if self.uploaded == instances {
+            return 0;
+        }
+        self.uploaded.clear();
+        self.uploaded.extend_from_slice(instances);
+        if instances.is_empty() {
+            return 0;
+        }
+        let bytes = data::as_bytes(instances);
+        queue.write_buffer(&self.buffer, 0, bytes);
+        bytes.len()
     }
 }
 
@@ -1166,14 +1195,11 @@ fn lights_array(lights: &[Light]) -> [Light; MAX_LIGHTS] {
 
 fn build_uniform(
     camera_matrix: Mat4,
-    model: Mat4,
     camera_pos: Vec3,
     lights: [Light; MAX_LIGHTS],
 ) -> SceneUniforms {
     SceneUniforms {
-        mvp: (camera_matrix * model).to_cols_array_2d(),
-        model: model.to_cols_array_2d(),
-        normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
+        view_projection: camera_matrix.to_cols_array_2d(),
         camera_pos: camera_pos.into(),
         _pad0: 0.0,
         lights,
@@ -1195,7 +1221,6 @@ pub struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
-    bind_group_layout: wgpu::BindGroupLayout,
     cube_mesh: Mesh,
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
@@ -1206,7 +1231,13 @@ pub struct State {
     depth_format: wgpu::TextureFormat,
     pub aspect: f32,
     pub scene: SceneManager,
-    gpu_objects: BTreeMap<u32, ObjectResources>,
+    render_queue: RenderQueue,
+    extraction_key: Option<(Mat4, u64, bool)>,
+    batches: [InstanceBatch; 3],
+    pub frustum_culling: bool,
+    pub upload_bytes: usize,
+    pub prepare_ms: f64,
+    last_lights: [Light; MAX_LIGHTS],
 }
 
 impl State {
@@ -1297,7 +1328,7 @@ impl State {
 
         let active_lights = Vec::new();
         let lights_array = lights_array(&active_lights);
-        let grid_uniform = build_uniform(Mat4::IDENTITY, Mat4::IDENTITY, Vec3::ZERO, lights_array);
+        let grid_uniform = build_uniform(Mat4::IDENTITY, Vec3::ZERO, lights_array);
 
         let light_vertices = data::light_rays(&active_lights);
         let light_vertex_count = light_vertices.len() as u32;
@@ -1321,6 +1352,7 @@ impl State {
             }],
             label: Some("grid bind group"),
         });
+        let batches = std::array::from_fn(|_| InstanceBatch::new(&device, 1));
         Ok(Self {
             grid_pipeline,
             grid_vertex_buffer,
@@ -1336,7 +1368,6 @@ impl State {
             queue,
             config,
             pipeline,
-            bind_group_layout,
             cube_mesh,
             plane_mesh,
             sphere_mesh,
@@ -1347,7 +1378,13 @@ impl State {
             depth_format,
             aspect,
             scene: SceneManager::default(),
-            gpu_objects: BTreeMap::new(),
+            render_queue: RenderQueue::default(),
+            extraction_key: None,
+            batches,
+            frustum_culling: true,
+            upload_bytes: 0,
+            prepare_ms: 0.0,
+            last_lights: lights_array,
         })
     }
     pub fn set_grid_visible(&mut self, show: bool) {
@@ -1390,32 +1427,51 @@ impl State {
             })
             .collect();
         let lights = lights_array(&active_lights);
-        self.gpu_objects
-            .retain(|id, _| self.scene.object_exists(*id));
-        for (id, object) in self.scene.objects() {
-            let uniform =
-                build_uniform(camera_matrix, object.transform.model(), camera_pos, lights);
-            let resources = self.gpu_objects.entry(*id).or_insert_with(|| {
-                ObjectResources::new(&self.device, &self.bind_group_layout, uniform)
-            });
-            self.queue
-                .write_buffer(&resources.uniform_buffer, 0, data::as_bytes(&[uniform]));
+        let key = (
+            camera_matrix,
+            self.scene.render_revision(),
+            self.frustum_culling,
+        );
+        self.upload_bytes = 0;
+        if self.extraction_key != Some(key) {
+            self.render_queue
+                .extract(&self.scene, camera_matrix, self.frustum_culling);
+            for (batch, instances) in self.batches.iter_mut().zip(&self.render_queue.batches) {
+                self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
+            }
+            self.extraction_key = Some(key);
         }
-        let grid_uniform = build_uniform(camera_matrix, Mat4::IDENTITY, camera_pos, lights);
+        let grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
         self.queue.write_buffer(
             &self.grid_uniform_buffer,
             0,
             data::as_bytes(&[grid_uniform]),
         );
-        let light_vertices = data::light_rays(&active_lights);
-        self.light_vertex_count = light_vertices.len() as u32;
-        if !light_vertices.is_empty() {
-            self.queue.write_buffer(
-                &self.light_vertex_buffer,
-                0,
-                data::as_bytes(&light_vertices),
-            );
+        self.upload_bytes += std::mem::size_of::<SceneUniforms>();
+        if self.last_lights != lights {
+            self.last_lights = lights;
+            let light_vertices = data::light_rays(&active_lights);
+            self.light_vertex_count = light_vertices.len() as u32;
+            if !light_vertices.is_empty() {
+                self.queue.write_buffer(
+                    &self.light_vertex_buffer,
+                    0,
+                    data::as_bytes(&light_vertices),
+                );
+                self.upload_bytes += light_vertices.len() * std::mem::size_of::<Vertex>();
+            }
         }
+    }
+
+    pub fn render_stats(&self) -> [f64; 6] {
+        [
+            self.render_queue.total as f64,
+            self.render_queue.visible as f64,
+            (self.render_queue.total - self.render_queue.visible) as f64,
+            self.render_queue.draw_calls() as f64,
+            self.upload_bytes as f64,
+            self.prepare_ms,
+        ]
     }
 
     pub fn render(&mut self) -> Result<(), JsValue> {
@@ -1480,14 +1536,20 @@ impl State {
                 multiview_mask: None,
             });
             rp.set_pipeline(&self.pipeline);
-            for (id, object) in self.scene.objects() {
-                if let Some(resources) = self.gpu_objects.get(id) {
-                    let mesh = self.mesh(object.mesh);
-                    rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                    rp.set_bind_group(0, &resources.bind_group, &[]);
-                    rp.draw_indexed(0..mesh.index_count, 0, 0..1);
+            rp.set_bind_group(0, &self.grid_bind_group, &[]);
+            for (index, kind) in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere]
+                .into_iter()
+                .enumerate()
+            {
+                let count = self.render_queue.batches[index].len() as u32;
+                if count == 0 {
+                    continue;
                 }
+                let mesh = self.mesh(kind);
+                rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                rp.set_vertex_buffer(1, self.batches[index].buffer.slice(..));
+                rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
@@ -1560,6 +1622,12 @@ impl Transform {
 pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
+    pub(crate) render_data: crate::visibility::ObjectRenderData,
+}
+impl SceneObject {
+    fn refresh_render_data(&mut self) {
+        self.render_data = crate::visibility::ObjectRenderData::new(self.mesh, self.transform);
+    }
 }
 #[derive(Clone, Copy)]
 pub struct Light {
@@ -1598,12 +1666,17 @@ pub struct SceneManager {
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
     next_id: u32,
+    render_revision: u64,
     time: f32,
     rotations: Vec<RotationAction>,
     removals: Vec<ScheduledRemoval>,
 }
 
 impl SceneManager {
+    pub fn render_revision(&self) -> u64 {
+        self.render_revision
+    }
+
     // IDs are never reused, including after clear/reset. Old handles stay invalid.
     fn allocate_id(&mut self) -> Option<u32> {
         if self.next_id >= i32::MAX as u32 {
@@ -1632,7 +1705,15 @@ impl SceneManager {
         let Some(id) = self.allocate_id() else {
             return INVALID_ID;
         };
-        self.objects.insert(id, SceneObject { mesh, transform });
+        self.objects.insert(
+            id,
+            SceneObject {
+                mesh,
+                transform,
+                render_data: crate::visibility::ObjectRenderData::new(mesh, transform),
+            },
+        );
+        self.render_revision = self.render_revision.wrapping_add(1);
         id
     }
     pub fn add_cube(&mut self, position: Vec3) -> u32 {
@@ -1655,6 +1736,7 @@ impl SceneManager {
     }
     pub fn clear_scene(&mut self) {
         self.objects.clear();
+        self.render_revision = self.render_revision.wrapping_add(1);
         self.rotations.clear();
         self.removals
             .retain(|r| matches!(r.kind, RemovalKind::Light));
@@ -1673,6 +1755,7 @@ impl SceneManager {
         if self.objects.remove(&id).is_none() {
             return false;
         }
+        self.render_revision = self.render_revision.wrapping_add(1);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -1693,6 +1776,8 @@ impl SceneManager {
             return false;
         };
         object.transform = transform;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
@@ -1703,6 +1788,8 @@ impl SceneManager {
             return false;
         };
         object.transform.position = position;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn set_object_rotation(&mut self, id: u32, rotation: Vec3) -> bool {
@@ -1713,6 +1800,8 @@ impl SceneManager {
             return false;
         };
         object.transform.rotation = rotation;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn set_object_scale(&mut self, id: u32, scale: Vec3) -> bool {
@@ -1723,6 +1812,8 @@ impl SceneManager {
             return false;
         };
         object.transform.scale = scale;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn add_light(&mut self, position: Vec3, color: Vec3) -> Option<u32> {
@@ -1871,6 +1962,8 @@ impl SceneManager {
             object.transform.rotation +=
                 rotation.delta * ((elapsed - rotation.elapsed) / rotation.duration);
             rotation.elapsed = elapsed;
+            object.refresh_render_data();
+            self.render_revision = self.render_revision.wrapping_add(1);
             elapsed < rotation.duration
         });
         for (id, orbit) in &self.light_orbits {
@@ -2018,9 +2111,7 @@ struct Light {
 const LIGHT_COUNT: u32 = 4u;
 
 struct SceneUniforms {
-    mvp: mat4x4<f32>,
-    model: mat4x4<f32>,
-    normal_matrix: mat4x4<f32>,
+    view_projection: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, LIGHT_COUNT>,
@@ -2041,15 +2132,37 @@ struct VertexOutput {
     @location(2) world_normal: vec3<f32>,
 };
 
+struct InstanceInput {
+    @location(3) model0: vec4<f32>,
+    @location(4) model1: vec4<f32>,
+    @location(5) model2: vec4<f32>,
+    @location(6) model3: vec4<f32>,
+    @location(7) normal0: vec4<f32>,
+    @location(8) normal1: vec4<f32>,
+    @location(9) normal2: vec4<f32>,
+    @location(10) normal3: vec4<f32>,
+};
 @vertex
-fn vs_main(input: VertexInput) -> VertexOutput {
+fn vs_main(input: VertexInput, instance: InstanceInput) -> VertexOutput {
     var out: VertexOutput;
-    out.pos = scene.mvp * vec4<f32>(input.position, 1.0);
+    let model = mat4x4<f32>(instance.model0, instance.model1, instance.model2, instance.model3);
+    let normal_matrix = mat4x4<f32>(instance.normal0, instance.normal1, instance.normal2, instance.normal3);
+    out.pos = scene.view_projection * model * vec4<f32>(input.position, 1.0);
     out.color = input.color;
-    out.world_pos = (scene.model * vec4<f32>(input.position, 1.0)).xyz;
+    out.world_pos = (model * vec4<f32>(input.position, 1.0)).xyz;
     // Rust supplies the inverse transpose. Normalize after interpolation so
     // non-uniformly scaled smooth surfaces retain the correct normal field.
-    out.world_normal = (scene.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz;
+    out.world_normal = (normal_matrix * vec4<f32>(input.normal, 0.0)).xyz;
+    return out;
+}
+
+@vertex
+fn vs_lines(input: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.pos = scene.view_projection * vec4<f32>(input.position, 1.0);
+    out.color = input.color;
+    out.world_pos = input.position;
+    out.world_normal = input.normal;
     return out;
 }
 
@@ -2085,6 +2198,242 @@ fn fs_color(input: VertexOutput) -> @location(0) vec4<f32> {
     return vec4<f32>(input.color, 1.0);
 }
 
+\n# File: src/visibility.rs
+//! CPU visibility and render extraction; shared by native tests and WASM.
+use crate::scene::{MeshKind, SceneManager, Transform};
+use glam::{Mat4, Vec3, Vec4};
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct InstanceData {
+    pub model: [[f32; 4]; 4],
+    pub normal_matrix: [[f32; 4]; 4],
+}
+
+pub(crate) struct ObjectRenderData {
+    instance: InstanceData,
+    center: Vec3,
+    half_extent: Vec3,
+}
+impl ObjectRenderData {
+    pub(crate) fn new(mesh: MeshKind, transform: Transform) -> Self {
+        let model = transform.model();
+        let local = match mesh {
+            MeshKind::Cube => Vec3::splat(0.5),
+            MeshKind::Plane => Vec3::new(0.5, 0.0, 0.5),
+            MeshKind::Sphere => Vec3::ONE,
+        };
+        Self {
+            instance: InstanceData {
+                model: model.to_cols_array_2d(),
+                normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
+            },
+            center: transform.position,
+            half_extent: model.x_axis.truncate().abs() * local.x
+                + model.y_axis.truncate().abs() * local.y
+                + model.z_axis.truncate().abs() * local.z,
+        }
+    }
+}
+
+pub struct Frustum {
+    planes: [Vec4; 6],
+    tolerance: [f32; 6],
+}
+impl Frustum {
+    pub fn from_view_projection(matrix: Mat4) -> Self {
+        let rows = matrix.transpose();
+        let (x, y, z, w) = (rows.x_axis, rows.y_axis, rows.z_axis, rows.w_axis);
+        // WebGPU clip volume: -w <= x,y <= w; 0 <= z <= w.
+        let planes = [w + x, w - x, w + y, w - y, z, w - z];
+        Self {
+            tolerance: planes.map(|p| 1e-5 * p.truncate().length()),
+            planes,
+        }
+    }
+    pub fn intersects_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
+        self.planes
+            .iter()
+            .zip(self.tolerance)
+            .all(|(plane, tolerance)| {
+                let normal = plane.truncate();
+                let distance = normal.dot(center) + plane.w;
+                let radius = normal.abs().dot(half_extent);
+                // Conservative tolerance, scaled for unnormalized planes.
+                distance + radius >= -tolerance
+            })
+    }
+}
+
+#[derive(Default)]
+pub struct RenderQueue {
+    pub batches: [Vec<InstanceData>; 3],
+    pub total: usize,
+    pub visible: usize,
+}
+impl RenderQueue {
+    pub fn extract(&mut self, scene: &SceneManager, view_projection: Mat4, culling: bool) {
+        for batch in &mut self.batches {
+            batch.clear();
+        }
+        self.total = scene.objects().len();
+        self.visible = 0;
+        let frustum = Frustum::from_view_projection(view_projection);
+        for object in scene.objects().values() {
+            let data = &object.render_data;
+            if culling && !frustum.intersects_aabb(data.center, data.half_extent) {
+                continue;
+            }
+            let index = match object.mesh {
+                MeshKind::Cube => 0,
+                MeshKind::Plane => 1,
+                MeshKind::Sphere => 2,
+            };
+            self.batches[index].push(data.instance);
+            self.visible += 1;
+        }
+    }
+    pub fn draw_calls(&self) -> usize {
+        self.batches
+            .iter()
+            .filter(|batch| !batch.is_empty())
+            .count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn camera() -> Mat4 {
+        glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
+    }
+    #[test]
+    fn moving_camera_and_intersecting_bounds_do_not_lose_visible_objects() {
+        let projection = camera();
+        let view = glam::camera::lh::view::look_at_mat4(
+            Vec3::new(5.0, 2.0, -3.0),
+            Vec3::new(5.0, 2.0, 0.0),
+            Vec3::Y,
+        );
+        let f = Frustum::from_view_projection(projection * view);
+        assert!(f.intersects_aabb(Vec3::new(5.0, 2.0, 0.0), Vec3::splat(0.1)));
+        assert!(!f.intersects_aabb(Vec3::new(5.0, 2.0, -5.0), Vec3::splat(0.1)));
+        // The center is outside, but the large object's bounds intersect the view.
+        assert!(Frustum::from_view_projection(projection)
+            .intersects_aabb(Vec3::new(2.0, 0.0, 1.0), Vec3::new(2.0, 0.1, 0.1),));
+    }
+    #[test]
+    fn animation_refreshes_cached_instance_and_normal_matrices() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(0.0, 0.0, 2.0));
+        scene.set_object_scale(id, Vec3::new(2.0, 0.5, 1.0));
+        scene.schedule_rotate(id, 0.0, 90.0, 0.0, 0.0, 1.0);
+        scene.update(0.5);
+        let object = &scene.objects()[&id];
+        assert_eq!(
+            object.render_data.instance.model,
+            object.transform.model().to_cols_array_2d()
+        );
+        assert_eq!(
+            object.render_data.instance.normal_matrix,
+            crate::scene::normal_matrix(object.transform.model()).to_cols_array_2d()
+        );
+        assert_eq!(std::mem::size_of::<InstanceData>(), 128);
+    }
+    #[test]
+    fn render_revision_invalidates_on_commands_and_animation_but_not_idle_frames() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        let mut previous = scene.render_revision();
+        scene.update(1.0);
+        assert_eq!(previous, scene.render_revision());
+        scene.set_object_position(id, Vec3::ONE);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.set_object_scale(id, Vec3::splat(2.0));
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.set_object_rotation(id, Vec3::ONE);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.set_object_transform(id, Vec3::ZERO, Vec3::ZERO, Vec3::ONE);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.schedule_rotate(id, 0.0, 90.0, 0.0, 0.0, 1.0);
+        scene.update(0.5);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.remove_object(id);
+        assert_ne!(previous, scene.render_revision());
+        previous = scene.render_revision();
+        scene.clear_scene();
+        assert_ne!(previous, scene.render_revision());
+    }
+    #[test]
+    fn clips_all_six_planes_using_webgpu_depth_range() {
+        let f = Frustum::from_view_projection(camera());
+        let e = Vec3::splat(0.01);
+        assert!(f.intersects_aabb(Vec3::new(0.0, 0.0, 1.0), e));
+        for p in [
+            Vec3::new(-3.0, 0.0, 1.0),
+            Vec3::new(3.0, 0.0, 1.0),
+            Vec3::new(0.0, -3.0, 1.0),
+            Vec3::new(0.0, 3.0, 1.0),
+            Vec3::new(0.0, 0.0, 0.05),
+            Vec3::new(0.0, 0.0, 11.0),
+            Vec3::new(0.0, 0.0, -1.0),
+        ] {
+            assert!(!f.intersects_aabb(p, e), "{p:?}");
+        }
+        assert!(f.intersects_aabb(Vec3::new(0.0, 0.0, 0.1), e));
+        assert!(f.intersects_aabb(Vec3::new(0.0, 0.0, 10.0), e));
+    }
+    #[test]
+    fn bounds_are_conservative_for_rotated_scaled_and_flat_geometry() {
+        for mesh in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere] {
+            let t = Transform::new(
+                Vec3::new(2.0, 0.0, 2.0),
+                Vec3::new(0.4, 0.7, 0.3),
+                Vec3::new(-3.0, 0.4, 2.0),
+            );
+            let data = ObjectRenderData::new(mesh, t);
+            let ext = match mesh {
+                MeshKind::Cube => Vec3::splat(0.5),
+                MeshKind::Plane => Vec3::new(0.5, 0.0, 0.5),
+                MeshKind::Sphere => Vec3::ONE,
+            };
+            for x in [-1.0, 1.0] {
+                for y in [-1.0, 1.0] {
+                    for z in [-1.0, 1.0] {
+                        let point = t.model().transform_point3(Vec3::new(x, y, z) * ext);
+                        assert!(
+                            ((point - data.center).abs() - data.half_extent).max_element() < 1e-5
+                        );
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn culling_never_stops_simulation_and_reuses_queue_capacity() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(100.0, 0.0, 1.0));
+        let mut q = RenderQueue::default();
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.total, q.visible, q.draw_calls()), (1, 0, 0));
+        scene.set_object_position(id, Vec3::new(0.0, 0.0, 1.0));
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.visible, q.draw_calls()), (1, 1));
+        let capacity = q.batches[0].capacity();
+        scene.set_object_scale(id, Vec3::splat(2.0));
+        scene.schedule_remove_object(id, 0.1);
+        scene.update(0.2);
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.total, q.visible), (0, 0));
+        assert_eq!(capacity, q.batches[0].capacity());
+    }
+}
+
 \n# File: src/web.rs
 #![cfg(target_arch = "wasm32")]
 
@@ -2100,6 +2449,27 @@ use crate::render::state::State;
 thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+}
+
+#[wasm_bindgen]
+pub fn set_frustum_culling(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().frustum_culling = enabled;
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn renderer_stats() -> js_sys::Float64Array {
+    let values = STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().render_stats())
+            .unwrap_or([0.0; 6])
+    });
+    js_sys::Float64Array::from(values.as_slice())
 }
 
 #[wasm_bindgen]
@@ -2522,7 +2892,9 @@ pub async fn start() -> Result<(), JsValue> {
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
             let mut st = state_c.borrow_mut();
+            let prepare_start = perf_c.now();
             st.update(dt, cam_matrix, cam_pos);
+            st.prepare_ms = perf_c.now() - prepare_start;
             if let Err(error) = st.render() {
                 web_sys::console::error_1(&error);
                 if let Some(status) = web_sys::window()

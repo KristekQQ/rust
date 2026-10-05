@@ -89,5 +89,10 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         set_grid_visible: wasm.set_grid_visible,
         resize: wasm.resize,
         renderer_backend: wasm.renderer_backend,
+        set_frustum_culling: wasm.set_frustum_culling,
+        renderer_stats() {
+            const [total, visible, culled, drawCalls, uploadBytes, prepareMs] = wasm.renderer_stats();
+            return {total, visible, culled, drawCalls, uploadBytes, prepareMs};
+        },
     });
 }

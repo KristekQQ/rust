@@ -50,6 +50,12 @@ impl Transform {
 pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
+    pub(crate) render_data: crate::visibility::ObjectRenderData,
+}
+impl SceneObject {
+    fn refresh_render_data(&mut self) {
+        self.render_data = crate::visibility::ObjectRenderData::new(self.mesh, self.transform);
+    }
 }
 #[derive(Clone, Copy)]
 pub struct Light {
@@ -88,12 +94,17 @@ pub struct SceneManager {
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
     next_id: u32,
+    render_revision: u64,
     time: f32,
     rotations: Vec<RotationAction>,
     removals: Vec<ScheduledRemoval>,
 }
 
 impl SceneManager {
+    pub fn render_revision(&self) -> u64 {
+        self.render_revision
+    }
+
     // IDs are never reused, including after clear/reset. Old handles stay invalid.
     fn allocate_id(&mut self) -> Option<u32> {
         if self.next_id >= i32::MAX as u32 {
@@ -122,7 +133,15 @@ impl SceneManager {
         let Some(id) = self.allocate_id() else {
             return INVALID_ID;
         };
-        self.objects.insert(id, SceneObject { mesh, transform });
+        self.objects.insert(
+            id,
+            SceneObject {
+                mesh,
+                transform,
+                render_data: crate::visibility::ObjectRenderData::new(mesh, transform),
+            },
+        );
+        self.render_revision = self.render_revision.wrapping_add(1);
         id
     }
     pub fn add_cube(&mut self, position: Vec3) -> u32 {
@@ -145,6 +164,7 @@ impl SceneManager {
     }
     pub fn clear_scene(&mut self) {
         self.objects.clear();
+        self.render_revision = self.render_revision.wrapping_add(1);
         self.rotations.clear();
         self.removals
             .retain(|r| matches!(r.kind, RemovalKind::Light));
@@ -163,6 +183,7 @@ impl SceneManager {
         if self.objects.remove(&id).is_none() {
             return false;
         }
+        self.render_revision = self.render_revision.wrapping_add(1);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -183,6 +204,8 @@ impl SceneManager {
             return false;
         };
         object.transform = transform;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
@@ -193,6 +216,8 @@ impl SceneManager {
             return false;
         };
         object.transform.position = position;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn set_object_rotation(&mut self, id: u32, rotation: Vec3) -> bool {
@@ -203,6 +228,8 @@ impl SceneManager {
             return false;
         };
         object.transform.rotation = rotation;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn set_object_scale(&mut self, id: u32, scale: Vec3) -> bool {
@@ -213,6 +240,8 @@ impl SceneManager {
             return false;
         };
         object.transform.scale = scale;
+        object.refresh_render_data();
+        self.render_revision = self.render_revision.wrapping_add(1);
         true
     }
     pub fn add_light(&mut self, position: Vec3, color: Vec3) -> Option<u32> {
@@ -361,6 +390,8 @@ impl SceneManager {
             object.transform.rotation +=
                 rotation.delta * ((elapsed - rotation.elapsed) / rotation.duration);
             rotation.elapsed = elapsed;
+            object.refresh_render_data();
+            self.render_revision = self.render_revision.wrapping_add(1);
             elapsed < rotation.duration
         });
         for (id, orbit) in &self.light_orbits {
