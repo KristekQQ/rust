@@ -120,3 +120,18 @@ Skutečný integrační test tests/scene-sdk.html přes browser MCP prošel:
 prázdný start, ukázka z Rustu, JS příkazy, Rustem časované odstranění,
 stabilní ID, odmítnutí starého handle, světla a vyčištění.
 Ukázka nepřidává objekty automaticky. Historie výše může popisovat dřívější demo.
+
+## Oprava osvětlení 2026-10-05
+
+Koule a obě strany roviny měly pořadí indexů opačné vůči normálám. Opravené
+meshe mají konzistentní vnější orientaci jako krychle. Front culling zůstává
+kvůli levotočivé projekci kamery, která převrací orientaci ve screen space.
+Rust předává shaderu inverzní transponovanou modelovou matici pro normály;
+normalizace probíhá až po interpolaci ve fragmentu. Blinn–Phong odlesk je
+omezen na povrchy přivrácené ke světlu i pohledu. Uniformy mají novou matici
+na offsetu 128, kameru na 192 a světla na 208, celkovou velikost 336 bajtů.
+Jedenáct nativních testů zahrnuje orientaci všech meshů, kolmost normál při
+nerovnoměrném měřítku a rozložení uniformů. `tests/lighting.html` nabízí ruční
+kontrolu světla před/za/z boku, měřítka, rotace a změn pohledu. Browser MCP
+ověřil WebGPU i WebGL bez chyb, tmavou přivrácenou stranu při zadním světle,
+elipsoid a horní/dolní stranu roviny.

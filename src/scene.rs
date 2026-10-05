@@ -5,6 +5,11 @@ use std::collections::BTreeMap;
 pub const MAX_LIGHTS: usize = 4;
 pub const INVALID_ID: u32 = u32::MAX;
 
+/// World-space normals must remain perpendicular to transformed tangents.
+pub(crate) fn normal_matrix(model: Mat4) -> Mat4 {
+    model.inverse().transpose()
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MeshKind {
     Cube,
@@ -394,6 +399,31 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn normal_transform_preserves_perpendicularity_under_nonuniform_scale() {
+        let transform = super::Transform::new(
+            glam::Vec3::new(3.0, -2.0, 5.0),
+            glam::Vec3::new(0.4, 0.7, -0.2),
+            glam::Vec3::new(2.0, 0.5, 3.0),
+        );
+        let model = transform.model();
+        let normal = glam::Vec3::new(1.0, 1.0, 1.0).normalize();
+        let tangent = glam::Vec3::new(1.0, -1.0, 0.0);
+        let world_normal = super::normal_matrix(model)
+            .transform_vector3(normal)
+            .normalize();
+        let world_tangent = model.transform_vector3(tangent).normalize();
+        assert!(world_normal.dot(world_tangent).abs() < 1e-5);
+        // The old model-matrix transformation fails this same geometry.
+        assert!(
+            model
+                .transform_vector3(normal)
+                .normalize()
+                .dot(world_tangent)
+                .abs()
+                > 0.1
+        );
+    }
     use super::*;
     #[test]
     fn animation_is_computed_by_rust_and_finishes_exactly() {

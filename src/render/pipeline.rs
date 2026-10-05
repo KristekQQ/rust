@@ -31,6 +31,8 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
+            // The left-handed camera projection reverses outward CCW meshes
+            // in screen space. Cull CCW here and keep their visible CW faces.
             cull_mode: Some(wgpu::Face::Front),
             front_face: wgpu::FrontFace::Ccw,
             ..Default::default()

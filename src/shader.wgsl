@@ -10,6 +10,7 @@ const LIGHT_COUNT: u32 = 4u;
 struct SceneUniforms {
     mvp: mat4x4<f32>,
     model: mat4x4<f32>,
+    normal_matrix: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, LIGHT_COUNT>,
@@ -36,9 +37,9 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     out.pos = scene.mvp * vec4<f32>(input.position, 1.0);
     out.color = input.color;
     out.world_pos = (scene.model * vec4<f32>(input.position, 1.0)).xyz;
-    // Transform the normal by the model matrix without applying translation
-    // (w = 0). This keeps lighting separate from camera rotation.
-    out.world_normal = normalize((scene.model * vec4<f32>(input.normal, 0.0)).xyz);
+    // Rust supplies the inverse transpose. Normalize after interpolation so
+    // non-uniformly scaled smooth surfaces retain the correct normal field.
+    out.world_normal = (scene.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz;
     return out;
 }
 
@@ -53,9 +54,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         if (all(light.color == vec3<f32>(0.0))) {
             continue;
         }
-        let l_dir = normalize(light.position - input.world_pos);
+        let light_delta = light.position - input.world_pos;
+        let l_dir = light_delta / max(length(light_delta), 0.00001);
         let diff = max(dot(normal, l_dir), 0.0);
-        let spec = pow(max(dot(normal, normalize(l_dir + view_dir)), 0.0), 32.0);
+        // Blinn-Phong: an unlit/back-facing surface cannot reflect this light.
+        var spec = 0.0;
+        if (diff > 0.0 && dot(normal, view_dir) > 0.0) {
+            let half_vector = l_dir + view_dir;
+            let halfway = half_vector / max(length(half_vector), 0.00001);
+            spec = pow(max(dot(normal, halfway), 0.0), 32.0);
+        }
         result += (diff * input.color + spec) * light.color;
     }
 

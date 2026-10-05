@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Rust – kontrola osvětlení</title>
+<style>
+body { margin:0; font:14px system-ui; background:#111; color:white; }
+canvas { display:block; width:100vw; height:100vh; }
+aside { position:fixed; top:12px; left:12px; background:#171727e8; padding:12px; border-radius:8px; max-width:290px; }
+button,select { margin:4px; padding:6px; }
+</style>
+<canvas id="gpu-canvas" aria-label="Kontrola osvětlení"></canvas>
+<aside>
+<strong>Kontrola Rust / Blinn–Phong</strong><br>
+<label>Objekt <select id="mesh"><option value="sphere">Koule</option><option value="plane">Rovina</option><option value="cube">Krychle</option></select></label><br>
+<button id="front">Světlo před objektem</button>
+<button id="back">Světlo za objektem</button>
+<button id="side">Světlo z boku</button><br>
+<label><input type="checkbox" id="scale"> Nerovnoměrné měřítko a rotace</label>
+<p id="status" role="status">Načítám…</p>
+<small>Tažením mimo panel měňte úhel pohledu. Odlesk sleduje pohled; difuzní osvětlení sleduje světlo.</small>
+</aside>
+<script type="module">
+try {
+    const { initEngine } = await import(`../js/engine.js?v=${Date.now()}`);
+    const canvas = document.getElementById("gpu-canvas");
+    const engine = await initEngine(canvas, {backend:new URLSearchParams(location.search).get("backend") || "auto"});
+    engine.set_grid_visible(false);
+    const mesh = document.getElementById("mesh");
+    const scale = document.getElementById("scale");
+    const status = document.getElementById("status");
+    let direction = "front";
+    const positions = {front:[5.3,2.7,5.3], back:[-5.3,-2.7,-5.3], side:[-5,3,5]};
+    function setup() {
+        engine.scene.clear();
+        const object = mesh.value === "sphere" ? engine.scene.createSphere() :
+            mesh.value === "plane" ? engine.scene.createPlane() : engine.scene.createCube();
+        object.setScale(mesh.value === "plane" ? [6,1,6] : [1.5,1.5,1.5]);
+        if (scale.checked) object.setScale([2.4,0.65,1.2]).setRotation([0.3,0.6,0.4]);
+        engine.scene.createLight({position:positions[direction], color:[0.65,0.65,0.65]});
+        status.textContent = `${engine.renderer_backend()} · ${mesh.selectedOptions[0].text} · světlo ${direction} · ${scale.checked ? "měřítko + rotace" : "základní transformace"}`;
+    }
+    mesh.onchange = scale.onchange = setup;
+    for (const id of ["front","back","side"]) document.getElementById(id).onclick = () => {direction=id; setup();};
+    addEventListener("resize", () => engine.resize(canvas.width=innerWidth, canvas.height=innerHeight));
+    setup();
+} catch(error) {
+    console.error(error);
+    document.getElementById("status").textContent = `FAIL: ${error.message}`;
+}
+</script>
+</html>

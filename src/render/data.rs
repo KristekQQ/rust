@@ -1,5 +1,3 @@
-#![cfg(target_arch = "wasm32")]
-
 use wgpu::VertexBufferLayout;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -206,6 +204,7 @@ pub const EMPTY_LIGHT: Light = Light {
 pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
     pub model: [[f32; 4]; 4],
+    pub normal_matrix: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; MAX_LIGHTS],
@@ -316,8 +315,8 @@ pub fn plane_mesh() -> (Vec<Vertex>, Vec<u16>) {
         });
     }
     let indices: Vec<u16> = vec![
-        0, 1, 2, 0, 2, 3, // top
-        4, 6, 5, 4, 7, 6, // bottom
+        0, 2, 1, 0, 3, 2, // top: winding agrees with +Y normal
+        4, 5, 6, 4, 6, 7, // bottom: winding agrees with -Y normal
     ];
     (vertices, indices)
 }
@@ -355,8 +354,53 @@ pub fn sphere_mesh(segments_u: u32, segments_v: u32) -> (Vec<Vertex>, Vec<u16>) 
             let i1 = (v * ring + u + 1) as u16;
             let i2 = ((v + 1) * ring + u) as u16;
             let i3 = ((v + 1) * ring + u + 1) as u16;
-            indices.extend_from_slice(&[i0, i2, i1, i1, i2, i3]);
+            indices.extend_from_slice(&[i0, i1, i2, i1, i3, i2]);
         }
     }
     (vertices, indices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec3;
+
+    fn assert_winding_matches_normals(vertices: &[Vertex], indices: &[u16]) {
+        let mut checked = 0;
+        for triangle in indices.chunks_exact(3) {
+            let a = vertices[triangle[0] as usize];
+            let b = vertices[triangle[1] as usize];
+            let c = vertices[triangle[2] as usize];
+            let face = (Vec3::from(b.position) - Vec3::from(a.position))
+                .cross(Vec3::from(c.position) - Vec3::from(a.position));
+            // UV-sphere pole triangles intentionally have zero area.
+            if face.length_squared() < 1e-12 {
+                continue;
+            }
+            let normal = Vec3::from(a.normal) + Vec3::from(b.normal) + Vec3::from(c.normal);
+            assert!(
+                face.dot(normal) > 0.0,
+                "triangle {triangle:?} faces against its normals"
+            );
+            checked += 1;
+        }
+        assert!(checked > 0);
+    }
+
+    #[test]
+    fn all_meshes_have_outward_winding_consistent_with_lighting() {
+        assert_winding_matches_normals(VERTICES, INDICES);
+        let (vertices, indices) = plane_mesh();
+        assert_winding_matches_normals(&vertices, &indices);
+        let (vertices, indices) = sphere_mesh(32, 16);
+        assert_winding_matches_normals(&vertices, &indices);
+    }
+
+    #[test]
+    fn uniform_offsets_match_wgsl_alignment() {
+        assert_eq!(std::mem::offset_of!(SceneUniforms, normal_matrix), 128);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 192);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 208);
+        assert_eq!(std::mem::size_of::<SceneUniforms>(), 336);
+    }
 }

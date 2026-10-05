@@ -538,9 +538,13 @@ pub mod scene;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
 
-\n# File: src/render/data.rs
-#![cfg(target_arch = "wasm32")]
+// Exercise the actual GPU mesh data and uniform layout on the native test host.
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "render/data.rs"]
+mod render_data_tests;
 
+\n# File: src/render/data.rs
 use wgpu::VertexBufferLayout;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -747,6 +751,7 @@ pub const EMPTY_LIGHT: Light = Light {
 pub struct SceneUniforms {
     pub mvp: [[f32; 4]; 4],
     pub model: [[f32; 4]; 4],
+    pub normal_matrix: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; MAX_LIGHTS],
@@ -857,8 +862,8 @@ pub fn plane_mesh() -> (Vec<Vertex>, Vec<u16>) {
         });
     }
     let indices: Vec<u16> = vec![
-        0, 1, 2, 0, 2, 3, // top
-        4, 6, 5, 4, 7, 6, // bottom
+        0, 2, 1, 0, 3, 2, // top: winding agrees with +Y normal
+        4, 5, 6, 4, 6, 7, // bottom: winding agrees with -Y normal
     ];
     (vertices, indices)
 }
@@ -896,10 +901,55 @@ pub fn sphere_mesh(segments_u: u32, segments_v: u32) -> (Vec<Vertex>, Vec<u16>) 
             let i1 = (v * ring + u + 1) as u16;
             let i2 = ((v + 1) * ring + u) as u16;
             let i3 = ((v + 1) * ring + u + 1) as u16;
-            indices.extend_from_slice(&[i0, i2, i1, i1, i2, i3]);
+            indices.extend_from_slice(&[i0, i1, i2, i1, i3, i2]);
         }
     }
     (vertices, indices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec3;
+
+    fn assert_winding_matches_normals(vertices: &[Vertex], indices: &[u16]) {
+        let mut checked = 0;
+        for triangle in indices.chunks_exact(3) {
+            let a = vertices[triangle[0] as usize];
+            let b = vertices[triangle[1] as usize];
+            let c = vertices[triangle[2] as usize];
+            let face = (Vec3::from(b.position) - Vec3::from(a.position))
+                .cross(Vec3::from(c.position) - Vec3::from(a.position));
+            // UV-sphere pole triangles intentionally have zero area.
+            if face.length_squared() < 1e-12 {
+                continue;
+            }
+            let normal = Vec3::from(a.normal) + Vec3::from(b.normal) + Vec3::from(c.normal);
+            assert!(
+                face.dot(normal) > 0.0,
+                "triangle {triangle:?} faces against its normals"
+            );
+            checked += 1;
+        }
+        assert!(checked > 0);
+    }
+
+    #[test]
+    fn all_meshes_have_outward_winding_consistent_with_lighting() {
+        assert_winding_matches_normals(VERTICES, INDICES);
+        let (vertices, indices) = plane_mesh();
+        assert_winding_matches_normals(&vertices, &indices);
+        let (vertices, indices) = sphere_mesh(32, 16);
+        assert_winding_matches_normals(&vertices, &indices);
+    }
+
+    #[test]
+    fn uniform_offsets_match_wgsl_alignment() {
+        assert_eq!(std::mem::offset_of!(SceneUniforms, normal_matrix), 128);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 192);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 208);
+        assert_eq!(std::mem::size_of::<SceneUniforms>(), 336);
+    }
 }
 
 \n# File: src/render/depth.rs
@@ -968,6 +1018,8 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
+            // The left-handed camera projection reverses outward CCW meshes
+            // in screen space. Cull CCW here and keep their visible CW faces.
             cull_mode: Some(wgpu::Face::Front),
             front_face: wgpu::FrontFace::Ccw,
             ..Default::default()
@@ -1121,6 +1173,7 @@ fn build_uniform(
     SceneUniforms {
         mvp: (camera_matrix * model).to_cols_array_2d(),
         model: model.to_cols_array_2d(),
+        normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
         camera_pos: camera_pos.into(),
         _pad0: 0.0,
         lights,
@@ -1461,6 +1514,11 @@ use std::collections::BTreeMap;
 
 pub const MAX_LIGHTS: usize = 4;
 pub const INVALID_ID: u32 = u32::MAX;
+
+/// World-space normals must remain perpendicular to transformed tangents.
+pub(crate) fn normal_matrix(model: Mat4) -> Mat4 {
+    model.inverse().transpose()
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MeshKind {
@@ -1851,6 +1909,31 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn normal_transform_preserves_perpendicularity_under_nonuniform_scale() {
+        let transform = super::Transform::new(
+            glam::Vec3::new(3.0, -2.0, 5.0),
+            glam::Vec3::new(0.4, 0.7, -0.2),
+            glam::Vec3::new(2.0, 0.5, 3.0),
+        );
+        let model = transform.model();
+        let normal = glam::Vec3::new(1.0, 1.0, 1.0).normalize();
+        let tangent = glam::Vec3::new(1.0, -1.0, 0.0);
+        let world_normal = super::normal_matrix(model)
+            .transform_vector3(normal)
+            .normalize();
+        let world_tangent = model.transform_vector3(tangent).normalize();
+        assert!(world_normal.dot(world_tangent).abs() < 1e-5);
+        // The old model-matrix transformation fails this same geometry.
+        assert!(
+            model
+                .transform_vector3(normal)
+                .normalize()
+                .dot(world_tangent)
+                .abs()
+                > 0.1
+        );
+    }
     use super::*;
     #[test]
     fn animation_is_computed_by_rust_and_finishes_exactly() {
@@ -1937,6 +2020,7 @@ const LIGHT_COUNT: u32 = 4u;
 struct SceneUniforms {
     mvp: mat4x4<f32>,
     model: mat4x4<f32>,
+    normal_matrix: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, LIGHT_COUNT>,
@@ -1963,9 +2047,9 @@ fn vs_main(input: VertexInput) -> VertexOutput {
     out.pos = scene.mvp * vec4<f32>(input.position, 1.0);
     out.color = input.color;
     out.world_pos = (scene.model * vec4<f32>(input.position, 1.0)).xyz;
-    // Transform the normal by the model matrix without applying translation
-    // (w = 0). This keeps lighting separate from camera rotation.
-    out.world_normal = normalize((scene.model * vec4<f32>(input.normal, 0.0)).xyz);
+    // Rust supplies the inverse transpose. Normalize after interpolation so
+    // non-uniformly scaled smooth surfaces retain the correct normal field.
+    out.world_normal = (scene.normal_matrix * vec4<f32>(input.normal, 0.0)).xyz;
     return out;
 }
 
@@ -1980,9 +2064,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         if (all(light.color == vec3<f32>(0.0))) {
             continue;
         }
-        let l_dir = normalize(light.position - input.world_pos);
+        let light_delta = light.position - input.world_pos;
+        let l_dir = light_delta / max(length(light_delta), 0.00001);
         let diff = max(dot(normal, l_dir), 0.0);
-        let spec = pow(max(dot(normal, normalize(l_dir + view_dir)), 0.0), 32.0);
+        // Blinn-Phong: an unlit/back-facing surface cannot reflect this light.
+        var spec = 0.0;
+        if (diff > 0.0 && dot(normal, view_dir) > 0.0) {
+            let half_vector = l_dir + view_dir;
+            let halfway = half_vector / max(length(half_vector), 0.00001);
+            spec = pow(max(dot(normal, halfway), 0.0), 32.0);
+        }
         result += (diff * input.color + spec) * light.color;
     }
 

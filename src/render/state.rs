@@ -84,6 +84,7 @@ fn build_uniform(
     SceneUniforms {
         mvp: (camera_matrix * model).to_cols_array_2d(),
         model: model.to_cols_array_2d(),
+        normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
         camera_pos: camera_pos.into(),
         _pad0: 0.0,
         lights,
