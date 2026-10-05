@@ -27,4 +27,12 @@ where
         .add_event_listener_with_callback("keyup", key_up.as_ref().unchecked_ref())
         .unwrap();
     key_up.forget();
+
+    let on_blur = Closure::wrap(Box::new(move || {
+        cam.borrow_mut().clear_input();
+    }) as Box<dyn FnMut()>);
+    window
+        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
+        .unwrap();
+    on_blur.forget();
 }

@@ -7,8 +7,8 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
-        bind_group_layouts: &[layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(layout)],
+        immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("pipeline"),
@@ -17,7 +17,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Vertex::layout()],
+            buffers: &[Some(Vertex::layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -31,29 +31,35 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
+            // The left-handed camera projection reverses outward CCW meshes
+            // in screen space. Cull CCW here and keep their visible CW faces.
             cull_mode: Some(wgpu::Face::Front),
             front_face: wgpu::FrontFace::Ccw,
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
             bias: Default::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }
 
-pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -> RenderPipeline {
+pub fn build_lines(
+    device: &Device,
+    format: TextureFormat,
+    layout: &BindGroupLayout,
+) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("grid pipeline layout"),
-        bind_group_layouts: &[layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(layout)],
+        immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("grid pipeline"),
@@ -62,7 +68,7 @@ pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLay
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Vertex::layout()],
+            buffers: &[Some(Vertex::layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -82,14 +88,13 @@ pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLay
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: false,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(false),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
             bias: Default::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }
-
