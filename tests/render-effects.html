@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Rust – stíny a zrcadlo</title>
+<style>
+body {margin:0;background:#191924;color:white;font:15px system-ui} canvas{display:block;width:100vw;height:100vh}
+.panel {position:fixed;top:16px;right:16px;width:310px;padding:16px;background:#141421ed;border-radius:12px}
+h1{font-size:19px;margin:0 0 12px} label{display:block;margin:9px 0} button{padding:8px;margin:4px 0} a{color:#c8d8ff}
+pre{white-space:pre-wrap;font-size:13px} :focus-visible{outline:3px solid #b8caff}
+</style>
+<canvas id="gpu-canvas"></canvas>
+<div class="panel">
+<h1>Stíny a rovinné zrcadlo · Rust</h1>
+<p>9 statických + 2 rotující objekty.<br>Táhni myší pro změnu pohledu.</p>
+<label><input id="shadows" type="checkbox" checked> Stíny</label>
+<label><input id="mirror" type="checkbox" checked> Zrcadlo</label>
+<label><input id="pause" type="checkbox"> Pozastavit pohyb (test cache)</label>
+<label><input id="culling" type="checkbox" checked> Frustum culling každého průchodu</label>
+<button id="reset">Obnovit scénu</button>
+<button id="verify">Ověřit cache a pohyb</button>
+<pre id="status" role="status">Načítám…</pre>
+<a href="../index.html">Hlavní scéna</a> · <a href="?backend=webgl">WebGL</a>
+</div>
+<script type="module">
+const status=document.getElementById('status');
+const control=id=>document.getElementById(id);
+try {
+    const {initEngine}=await import(`../js/engine.js?v=${Date.now()}`);
+    const engine=await initEngine(control('gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+    engine.scene.loadEffectsDemo();
+    let message='';
+    const apply=()=>engine.set_render_effects(control('shadows').checked,control('mirror').checked);
+    control('shadows').onchange=apply; control('mirror').onchange=apply;
+    control('pause').onchange=()=>engine.set_simulation_paused(control('pause').checked);
+    control('culling').onchange=()=>engine.set_frustum_culling(control('culling').checked);
+    control('reset').onclick=()=>{engine.scene.loadEffectsDemo();control('pause').checked=false;apply();};
+    window.addEventListener('resize',()=>engine.resize(innerWidth,innerHeight));
+    const frames=async(n=12)=>{for(let i=0;i<n;i++)await new Promise(requestAnimationFrame);};
+    control('verify').onclick=async()=>{
+        const assert=(ok,message)=>{if(!ok)throw new Error(message);};
+        try {
+            engine.scene.loadEffectsDemo(); control('shadows').checked=true;control('mirror').checked=true;control('pause').checked=true;
+            engine.set_render_effects(true,true);engine.set_simulation_paused(true);await frames();
+            const before=engine.effects_stats();await frames();const paused=engine.effects_stats();
+            assert(paused.staticUpdates===before.staticUpdates && paused.dynamicUpdates===before.dynamicUpdates && paused.reflectionUpdates===before.reflectionUpdates,'Cache se v klidu obnovuje');
+            assert(paused.passes===1,'Statický snímek musí vykreslit jen hlavní průchod');
+            engine.set_simulation_paused(false);await frames();const moving=engine.effects_stats();
+            assert(moving.staticUpdates===paused.staticUpdates,'Pohyb obnovil statickou mapu');
+            assert(moving.dynamicUpdates>paused.dynamicUpdates && moving.reflectionUpdates>paused.reflectionUpdates,'Pohyb neobnovil dynamické výstupy');
+            control('pause').checked=false;
+            engine.set_render_effects(false,false);await frames();assert(engine.effects_stats().passes===1,'Vypnuté efekty pořád běží');
+            engine.set_render_effects(true,true);await frames();
+            engine.resize(800,450);await frames();
+            const resized=engine.effects_stats();assert(resized.reflectionWidth===400 && resized.reflectionHeight===225,'Odraz nereaguje na resize');
+            engine.set_output_mode('texture');await frames();engine.set_output_mode('canvas');
+            engine.resize(innerWidth,innerHeight);await frames();
+            message='PASS: cache, pohyb, statické stíny, resize a výstup přes texturu';
+        }catch(error){message=`FAIL: ${error.message}`;console.error(error);}
+    };
+    setInterval(()=>{
+        const r=engine.renderer_stats(),e=engine.effects_stats();
+        status.textContent=`${message}\n${engine.renderer_backend()} · ${r.fps.toFixed(0)} FPS\nHlavní kamera: ${r.visible}/${r.total}\nStatické castery: ${e.staticVisible} · map ${e.staticUpdates}\nDynamické castery: ${e.dynamicVisible} · map ${e.dynamicUpdates}\nOdraz: ${e.reflectionVisible} · obnov ${e.reflectionUpdates}\nPrůchody tohoto snímku: ${e.passes}\nStíny ${e.shadowResolution}² · odraz ${e.reflectionWidth}×${e.reflectionHeight}`;
+    },250);
+}catch(error){status.textContent=`FAIL: ${error.message}`;console.error(error);}
+</script>
+</html>

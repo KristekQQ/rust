@@ -23,6 +23,10 @@ spawning out of the example unless requested.
 - `src/render/renderer.rs` owns scene GPU resources and accepts RenderView/RenderTarget;
   `output.rs` owns canvas/surface presentation, and `state.rs` connects them. Verify
   `tests/render-target.html` in WebGPU and WebGL when changing output paths.
+- `render/effects.rs` owns shadow/reflection pass ordering and dirty caches;
+  `render/textures.rs` owns reusable color/depth targets. Preserve independent
+  per-pass visibility and the static scene revision. Test `tests/render-effects.html`
+  and SDK integration in both WebGPU and WebGL. See `docs/RENDER_PASSES.md`.
 - Keep Rust GPU data layouts in `src/render/data.rs` consistent with
   `src/shader.wgsl`, including padding and the light count.
 - Native `cargo test` covers the SceneManager and camera modules but not the renderer and

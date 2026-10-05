@@ -14,6 +14,87 @@ thread_local! {
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
 }
 
+#[wasm_bindgen]
+pub fn load_effects_demo() {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            let mut state = state.borrow_mut();
+            state.scene.load_effects_demo();
+            state.set_effects(true, true);
+            state.set_grid_visible(false);
+        }
+    });
+}
+#[wasm_bindgen]
+pub fn set_render_effects(shadows: bool, reflections: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_effects(shadows, reflections);
+        }
+    });
+}
+#[wasm_bindgen]
+pub fn set_simulation_paused(paused: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().scene.paused = paused;
+        }
+    });
+}
+#[wasm_bindgen]
+pub fn effects_stats() -> js_sys::Float64Array {
+    let values = STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().effects_stats())
+            .unwrap_or([0.0; 10])
+    });
+    js_sys::Float64Array::from(values.as_slice())
+}
+#[wasm_bindgen]
+pub fn set_object_render_options(
+    id: u32,
+    is_static: bool,
+    casts_shadow: bool,
+    receives_shadow: bool,
+    reflectivity: f32,
+) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().scene.set_render_options(
+                id,
+                crate::scene::RenderOptions {
+                    is_static,
+                    casts_shadow,
+                    receives_shadow,
+                    reflectivity,
+                },
+            )
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn configure_planar_mirror(id: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.configure_mirror(id))
+    })
+}
+#[wasm_bindgen]
+pub fn set_object_spin(id: u32, x: f32, y: f32, z: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state
+                .borrow_mut()
+                .scene
+                .set_object_spin(id, glam::Vec3::new(x, y, z))
+        })
+    })
+}
+
 /// Select browser presentation; scene rendering itself accepts GPU attachments.
 #[wasm_bindgen]
 pub fn set_output_mode(mode: &str) -> bool {
@@ -477,7 +558,7 @@ pub async fn start() -> Result<(), JsValue> {
             let mut st = state_c.borrow_mut();
             let prepare_start = perf_c.now();
             st.update(dt, cam_matrix, cam_pos);
-            st.prepare_ms = perf_c.now() - prepare_start;
+
             if let Err(error) = st.render() {
                 web_sys::console::error_1(&error);
                 if let Some(status) = web_sys::window()
@@ -488,6 +569,7 @@ pub async fn start() -> Result<(), JsValue> {
                 }
                 return;
             }
+            st.prepare_ms = perf_c.now() - prepare_start;
         }
         window_c
             .request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref())

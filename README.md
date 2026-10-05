@@ -261,3 +261,11 @@ canvasu. Browser adaptér zajišťuje získání snímku a prezentaci. Přepnut�
 JS/TS: `engine.set_output_mode("texture")`, návrat: `engine.set_output_mode("canvas")`.
 [Ukázka renderovacích cílů](tests/render-target.html) vyžaduje lokální HTTP
 server. Podrobnosti a omezení jsou v [plánu rendereru](docs/RENDER_PERFORMANCE.md).
+
+### Stíny a zrcadlo
+
+[Ukázka statických/dynamických stínů a odrazu](tests/render-effects.html) má
+samostatné frustum culling a cache pro jednotlivé průchody; vše počítá Rust.
+SDK přidává `setRenderOptions`, `spin`, `scene.setMirror`, `loadEffectsDemo`,
+`set_render_effects`, `set_simulation_paused` a `effects_stats`.
+[Architektura, použití a současná omezení](docs/RENDER_PASSES.md).

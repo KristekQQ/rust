@@ -33,7 +33,11 @@ try {
     let rejected = false;
     try { cube.setPosition([0, 0, 0]); } catch { rejected = true; }
     assert(rejected && replacement.exists, "Stale handles are rejected by Rust");
+    replacement.setRenderOptions({ isStatic: true, castsShadow: false, receivesShadow: true }).spin([0, 0.5, 0]);
     replacement.remove();
+    const mirror = scene.createPlane([0, 0, -3]).setRenderOptions({ isStatic: true, castsShadow: false, reflectivity: 0.9 });
+    scene.setMirror(mirror);
+    mirror.setPosition([0, 0, -4]).remove();
     const light = scene.createLight({ position: [0, 3, 0], color: [1, 0, 0] });
     light.orbit({ radius: 2, height: 3, speed: 1 }).stopOrbit().set([0, 3, 0], [1, 1, 1]);
     assert(light.exists && scene.lightCount === 3, "Light SDK");

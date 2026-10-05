@@ -2,6 +2,7 @@ pub mod frame_metrics;
 pub mod input;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
+pub mod render_math;
 pub mod scene;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]

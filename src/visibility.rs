@@ -7,6 +7,7 @@ use glam::{Mat4, Vec3, Vec4};
 pub struct InstanceData {
     pub model: [[f32; 4]; 4],
     pub normal_matrix: [[f32; 4]; 4],
+    pub material: [f32; 4],
 }
 
 pub(crate) struct ObjectRenderData {
@@ -15,6 +16,14 @@ pub(crate) struct ObjectRenderData {
     half_extent: Vec3,
 }
 impl ObjectRenderData {
+    pub(crate) fn plane_normal(&self) -> Vec3 {
+        Mat4::from_cols_array_2d(&self.instance.normal_matrix)
+            .transform_vector3(Vec3::Y)
+            .normalize()
+    }
+    pub(crate) fn intersects(&self, frustum: &Frustum) -> bool {
+        frustum.intersects_aabb(self.center, self.half_extent)
+    }
     pub(crate) fn new(mesh: MeshKind, transform: Transform) -> Self {
         let model = transform.model();
         let local = match mesh {
@@ -26,6 +35,7 @@ impl ObjectRenderData {
             instance: InstanceData {
                 model: model.to_cols_array_2d(),
                 normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
+                material: [0.0, 1.0, 0.0, 0.0],
             },
             center: transform.position,
             half_extent: model.x_axis.truncate().abs() * local.x
@@ -64,6 +74,19 @@ impl Frustum {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RenderPassKind {
+    Main,
+    Reflection,
+    ShadowStatic,
+    ShadowDynamic,
+}
+impl RenderPassKind {
+    pub fn index(self) -> usize {
+        self as usize
+    }
+}
+
 #[derive(Default)]
 pub struct RenderQueue {
     pub batches: [Vec<InstanceData>; 3],
@@ -72,13 +95,33 @@ pub struct RenderQueue {
 }
 impl RenderQueue {
     pub fn extract(&mut self, scene: &SceneManager, view_projection: Mat4, culling: bool) {
+        self.extract_pass(scene, view_projection, culling, RenderPassKind::Main);
+    }
+    pub fn extract_pass(
+        &mut self,
+        scene: &SceneManager,
+        view_projection: Mat4,
+        culling: bool,
+        pass: RenderPassKind,
+    ) {
         for batch in &mut self.batches {
             batch.clear();
         }
-        self.total = scene.objects().len();
+        self.total = 0;
         self.visible = 0;
         let frustum = Frustum::from_view_projection(view_projection);
-        for object in scene.objects().values() {
+        for (id, object) in scene.objects() {
+            let options = object.render_options;
+            let included = match pass {
+                RenderPassKind::Main => true,
+                RenderPassKind::Reflection => Some(*id) != scene.mirror_object,
+                RenderPassKind::ShadowStatic => options.casts_shadow && options.is_static,
+                RenderPassKind::ShadowDynamic => options.casts_shadow && !options.is_static,
+            };
+            if !included {
+                continue;
+            }
+            self.total += 1;
             let data = &object.render_data;
             if culling && !frustum.intersects_aabb(data.center, data.half_extent) {
                 continue;
@@ -88,7 +131,18 @@ impl RenderQueue {
                 MeshKind::Plane => 1,
                 MeshKind::Sphere => 2,
             };
-            self.batches[index].push(data.instance);
+            let mut instance = data.instance;
+            instance.material = [
+                if Some(*id) == scene.mirror_object {
+                    options.reflectivity
+                } else {
+                    0.0
+                },
+                if options.receives_shadow { 1.0 } else { 0.0 },
+                0.0,
+                0.0,
+            ];
+            self.batches[index].push(instance);
             self.visible += 1;
         }
     }
@@ -105,6 +159,28 @@ mod tests {
     use super::*;
     fn camera() -> Mat4 {
         glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
+    }
+    #[test]
+    fn pass_filtering_partitions_casters_and_excludes_mirror_feedback() {
+        let mut scene = SceneManager::default();
+        scene.load_effects_demo();
+        let mut queue = RenderQueue::default();
+        queue.extract_pass(&scene, Mat4::IDENTITY, false, RenderPassKind::ShadowStatic);
+        assert_eq!(queue.visible, 7);
+        queue.extract_pass(&scene, Mat4::IDENTITY, false, RenderPassKind::ShadowDynamic);
+        assert_eq!(queue.visible, 2);
+        queue.extract_pass(&scene, Mat4::IDENTITY, false, RenderPassKind::Reflection);
+        assert_eq!(queue.visible, 10);
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        assert_eq!(queue.visible, 11);
+        // A caster outside the main frustum remains eligible in the light frustum.
+        let id = scene.add_cube(Vec3::new(5.0, 0.0, 0.0));
+        let main = Frustum::from_view_projection(camera());
+        assert!(!scene.objects()[&id].render_data.intersects(&main));
+        let light = Frustum::from_view_projection(crate::render_math::shadow_view_projection(
+            Vec3::new(-3.0, 7.0, 4.0),
+        ));
+        assert!(scene.objects()[&id].render_data.intersects(&light));
     }
     #[test]
     fn spatial_demo_spans_the_world_and_camera_can_leave_it() {
@@ -156,7 +232,7 @@ mod tests {
             object.render_data.instance.normal_matrix,
             crate::scene::normal_matrix(object.transform.model()).to_cols_array_2d()
         );
-        assert_eq!(std::mem::size_of::<InstanceData>(), 128);
+        assert_eq!(std::mem::size_of::<InstanceData>(), 144);
     }
     #[test]
     fn render_revision_invalidates_on_commands_and_animation_but_not_idle_frames() {

@@ -8,11 +8,13 @@ pub fn build(
     format: TextureFormat,
     depth_format: TextureFormat,
     layout: &BindGroupLayout,
+    effects: &BindGroupLayout,
+    reflected: bool,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
-        bind_group_layouts: &[Some(layout)],
+        bind_group_layouts: &[Some(layout), Some(effects)],
         immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -41,7 +43,11 @@ pub fn build(
             topology: wgpu::PrimitiveTopology::TriangleList,
             // The left-handed camera projection reverses outward CCW meshes
             // in screen space. Cull CCW here and keep their visible CW faces.
-            cull_mode: Some(wgpu::Face::Front),
+            cull_mode: Some(if reflected {
+                wgpu::Face::Back
+            } else {
+                wgpu::Face::Front
+            }),
             front_face: wgpu::FrontFace::Ccw,
             ..Default::default()
         },
@@ -103,6 +109,51 @@ pub fn build_lines(
             bias: Default::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
+pub fn build_shadow(
+    device: &Device,
+    layout: &BindGroupLayout,
+    format: TextureFormat,
+) -> RenderPipeline {
+    let shader = device.create_shader_module(wgpu::include_wgsl!("shadow.wgsl"));
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("shadow layout"),
+        bind_group_layouts: &[Some(layout)],
+        immediate_size: 0,
+    });
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("depth-only shadows"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &[
+                Some(Vertex::layout()),
+                Some(crate::visibility::InstanceData::layout()),
+            ],
+        },
+        fragment: None,
+        primitive: wgpu::PrimitiveState {
+            cull_mode: None,
+            ..Default::default()
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
+            stencil: Default::default(),
+            bias: wgpu::DepthBiasState {
+                constant: 2,
+                slope_scale: 2.0,
+                clamp: 0.0,
+            },
+        }),
+        multisample: Default::default(),
         multiview_mask: None,
         cache: None,
     })

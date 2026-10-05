@@ -18,14 +18,14 @@ JS/TS pouze posílá příkazy a čte diagnostiku. GPU vykonává WGSL shadery.
 - Tři opakovaně používané vektory obsahují viditelné instance krychlí, rovin a
   koulí. Každý neprázdný mesh má jeden `draw_indexed` s více instancemi.
 - Geometrie, pipeline a bind group se sdílí. Kamera a světla se zapisují
-  jednou do společného 208B uniformu. Instance mají 128 B a využívají vertex
+  pro každý vykreslený pohled do společného 208B uniformu. Instance mají 144 B a využívají vertex
   buffer s krokem Instance, takže řešení podporuje WebGPU i WebGL2.
 - GPU instance buffery rostou geometricky a používají se znovu. Nezměněná
   dávka se nezapisuje; změna transformace nebo viditelnosti aktualizuje dávku.
 - `engine.renderer_stats()` vrací total, visible, culled, drawCalls,
   uploadBytes a prepareMs; `engine.set_frustum_culling(bool)` umožňuje A/B
   porovnání. Draw calls nezahrnují pomocné čáry. prepareMs měří Rust simulaci,
-  extrakci a odeslání uploadu, nikoli GPU čas, prezentaci ani FPS.
+  přípravu/encoding/submission všech průchodů, nikoli GPU execution.
 
 ## Ověření a meze měření
 
@@ -135,3 +135,5 @@ při prvním použití a znovu po resize, nikoliv každý snímek.
 `tests/render-target.html` testuje přepínání, odmítnutí neplatného režimu,
 resize a přítomnost scény. Viditelný obraz a konzoli je nutné ověřit i v
 prohlížeči, včetně `?backend=webgl`.
+
+Stíny a odrazy: [aktuální architektura průchodů](RENDER_PASSES.md). InstanceData nyní obsahuje také 16 B materiálu a má 144 B.

@@ -47,9 +47,28 @@ impl Transform {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderOptions {
+    pub is_static: bool,
+    pub casts_shadow: bool,
+    pub receives_shadow: bool,
+    pub reflectivity: f32,
+}
+impl Default for RenderOptions {
+    fn default() -> Self {
+        Self {
+            is_static: false,
+            casts_shadow: true,
+            receives_shadow: true,
+            reflectivity: 0.0,
+        }
+    }
+}
+
 pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
+    pub render_options: RenderOptions,
     pub(crate) render_data: crate::visibility::ObjectRenderData,
 }
 impl SceneObject {
@@ -95,6 +114,10 @@ pub struct SceneManager {
     light_orbits: BTreeMap<u32, LightOrbit>,
     next_id: u32,
     render_revision: u64,
+    static_revision: u64,
+    spins: BTreeMap<u32, Vec3>,
+    pub paused: bool,
+    pub mirror_object: Option<u32>,
     time: f32,
     rotations: Vec<RotationAction>,
     removals: Vec<ScheduledRemoval>,
@@ -128,6 +151,77 @@ impl SceneManager {
         ] {
             self.add_light(position, Vec3::splat(0.35));
         }
+    }
+    pub fn configure_mirror(&mut self, id: u32) -> bool {
+        if !self
+            .objects
+            .get(&id)
+            .is_some_and(|o| o.mesh == MeshKind::Plane && o.render_options.reflectivity > 0.0)
+        {
+            return false;
+        }
+        self.mirror_object = Some(id);
+        self.changed(id);
+        true
+    }
+    pub fn mirror_plane(&self) -> Option<crate::render_math::MirrorPlane> {
+        let object = self.mirror_object.and_then(|id| self.objects.get(&id))?;
+        if object.render_options.reflectivity <= 0.0 {
+            return None;
+        }
+        let normal = object.render_data.plane_normal();
+        crate::render_math::MirrorPlane::new(normal, -normal.dot(object.transform.position))
+    }
+    pub fn mirror_visible(&self, matrix: Mat4, culling: bool) -> bool {
+        let Some(object) = self.mirror_object.and_then(|id| self.objects.get(&id)) else {
+            return false;
+        };
+        !culling
+            || object
+                .render_data
+                .intersects(&crate::visibility::Frustum::from_view_projection(matrix))
+    }
+    pub fn static_revision(&self) -> u64 {
+        self.static_revision
+    }
+    fn changed(&mut self, id: u32) {
+        self.render_revision = self.render_revision.wrapping_add(1);
+        if self
+            .objects
+            .get(&id)
+            .is_some_and(|o| o.render_options.is_static)
+        {
+            self.static_revision = self.static_revision.wrapping_add(1);
+        }
+    }
+    pub fn set_render_options(&mut self, id: u32, options: RenderOptions) -> bool {
+        if !options.reflectivity.is_finite() || !(0.0..=1.0).contains(&options.reflectivity) {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        if options.reflectivity > 0.0 && object.mesh != MeshKind::Plane {
+            return false;
+        }
+        let was_static = object.render_options.is_static;
+        object.render_options = options;
+        self.changed(id);
+        if was_static && !options.is_static {
+            self.static_revision = self.static_revision.wrapping_add(1);
+        }
+        true
+    }
+    pub fn set_object_spin(&mut self, id: u32, radians_per_second: Vec3) -> bool {
+        if !self.object_exists(id) || !radians_per_second.is_finite() {
+            return false;
+        }
+        if radians_per_second == Vec3::ZERO {
+            self.spins.remove(&id);
+        } else {
+            self.spins.insert(id, radians_per_second);
+        }
+        true
     }
     pub fn render_revision(&self) -> u64 {
         self.render_revision
@@ -166,6 +260,7 @@ impl SceneManager {
             SceneObject {
                 mesh,
                 transform,
+                render_options: RenderOptions::default(),
                 render_data: crate::visibility::ObjectRenderData::new(mesh, transform),
             },
         );
@@ -192,6 +287,9 @@ impl SceneManager {
     }
     pub fn clear_scene(&mut self) {
         self.objects.clear();
+        self.mirror_object = None;
+        self.spins.clear();
+        self.static_revision = self.static_revision.wrapping_add(1);
         self.render_revision = self.render_revision.wrapping_add(1);
         self.rotations.clear();
         self.removals
@@ -206,12 +304,24 @@ impl SceneManager {
     pub fn clear(&mut self) {
         self.clear_scene();
         self.clear_lights();
+        self.paused = false;
     }
     pub fn remove_object(&mut self, id: u32) -> bool {
+        let was_static = self
+            .objects
+            .get(&id)
+            .is_some_and(|o| o.render_options.is_static);
         if self.objects.remove(&id).is_none() {
             return false;
         }
         self.render_revision = self.render_revision.wrapping_add(1);
+        if was_static {
+            self.static_revision = self.static_revision.wrapping_add(1);
+        }
+        if self.mirror_object == Some(id) {
+            self.mirror_object = None;
+        }
+        self.spins.remove(&id);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -233,7 +343,7 @@ impl SceneManager {
         };
         object.transform = transform;
         object.refresh_render_data();
-        self.render_revision = self.render_revision.wrapping_add(1);
+        self.changed(id);
         true
     }
     pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
@@ -245,7 +355,7 @@ impl SceneManager {
         };
         object.transform.position = position;
         object.refresh_render_data();
-        self.render_revision = self.render_revision.wrapping_add(1);
+        self.changed(id);
         true
     }
     pub fn set_object_rotation(&mut self, id: u32, rotation: Vec3) -> bool {
@@ -257,7 +367,7 @@ impl SceneManager {
         };
         object.transform.rotation = rotation;
         object.refresh_render_data();
-        self.render_revision = self.render_revision.wrapping_add(1);
+        self.changed(id);
         true
     }
     pub fn set_object_scale(&mut self, id: u32, scale: Vec3) -> bool {
@@ -269,7 +379,7 @@ impl SceneManager {
         };
         object.transform.scale = scale;
         object.refresh_render_data();
-        self.render_revision = self.render_revision.wrapping_add(1);
+        self.changed(id);
         true
     }
     pub fn add_light(&mut self, position: Vec3, color: Vec3) -> Option<u32> {
@@ -387,7 +497,7 @@ impl SceneManager {
         true
     }
     pub fn update(&mut self, dt: f32) {
-        if !dt.is_finite() || dt < 0.0 {
+        if self.paused || !dt.is_finite() || dt <= 0.0 {
             return;
         }
         self.time += dt;
@@ -420,8 +530,21 @@ impl SceneManager {
             rotation.elapsed = elapsed;
             object.refresh_render_data();
             self.render_revision = self.render_revision.wrapping_add(1);
+            if object.render_options.is_static {
+                self.static_revision = self.static_revision.wrapping_add(1);
+            }
             elapsed < rotation.duration
         });
+        for (id, velocity) in &self.spins {
+            if let Some(object) = self.objects.get_mut(id) {
+                object.transform.rotation += *velocity * dt;
+                object.refresh_render_data();
+                self.render_revision = self.render_revision.wrapping_add(1);
+                if object.render_options.is_static {
+                    self.static_revision = self.static_revision.wrapping_add(1);
+                }
+            }
+        }
         for (id, orbit) in &self.light_orbits {
             if let Some(light) = self.lights.get_mut(id) {
                 let angle = now * orbit.speed + orbit.phase;
@@ -435,6 +558,86 @@ impl SceneManager {
                 light.color = orbit.color * pulse;
             }
         }
+    }
+    /// Static floor, mirror and blocks, with two continuously rotating objects.
+    pub fn load_effects_demo(&mut self) {
+        self.clear();
+        self.paused = false;
+        let static_options = RenderOptions {
+            is_static: true,
+            ..Default::default()
+        };
+        let floor = self.add_object(
+            MeshKind::Plane,
+            Transform::new(
+                Vec3::new(0.0, -1.0, 0.0),
+                Vec3::ZERO,
+                Vec3::new(12.0, 1.0, 12.0),
+            ),
+        );
+        self.set_render_options(
+            floor,
+            RenderOptions {
+                casts_shadow: false,
+                ..static_options
+            },
+        );
+        let mirror = self.add_object(
+            MeshKind::Plane,
+            Transform::new(
+                Vec3::new(0.0, 0.5, -3.0),
+                Vec3::new(std::f32::consts::FRAC_PI_2, 0.0, 0.0),
+                Vec3::new(5.5, 1.0, 3.0),
+            ),
+        );
+        self.mirror_object = Some(mirror);
+        self.set_render_options(
+            mirror,
+            RenderOptions {
+                casts_shadow: false,
+                receives_shadow: false,
+                reflectivity: 0.94,
+                ..static_options
+            },
+        );
+        for position in [
+            Vec3::new(-2.3, -0.3, 0.0),
+            Vec3::new(2.2, -0.5, 1.2),
+            Vec3::new(-1.5, -0.5, -1.8),
+        ] {
+            let id = self.add_cube(position);
+            self.set_render_options(id, static_options);
+        }
+        // Thin frame makes the finite mirror surface easy to identify.
+        for (position, scale) in [
+            (Vec3::new(0.0, 2.08, -3.0), Vec3::new(5.8, 0.16, 0.18)),
+            (Vec3::new(0.0, -1.08, -3.0), Vec3::new(5.8, 0.16, 0.18)),
+            (Vec3::new(-2.83, 0.5, -3.0), Vec3::new(0.16, 3.3, 0.18)),
+            (Vec3::new(2.83, 0.5, -3.0), Vec3::new(0.16, 3.3, 0.18)),
+        ] {
+            let id = self.add_object(MeshKind::Cube, Transform::new(position, Vec3::ZERO, scale));
+            self.set_render_options(id, static_options);
+        }
+        let cube = self.add_object(
+            MeshKind::Cube,
+            Transform::new(
+                Vec3::new(0.0, 0.1, 0.0),
+                Vec3::ZERO,
+                Vec3::new(1.2, 1.5, 1.0),
+            ),
+        );
+        self.set_object_spin(cube, Vec3::new(0.25, 0.8, 0.1));
+        let sphere = self.add_object(
+            MeshKind::Sphere,
+            Transform::new(
+                Vec3::new(1.8, 0.5, -1.2),
+                Vec3::ZERO,
+                Vec3::new(0.5, 1.0, 0.5),
+            ),
+        );
+        self.set_object_spin(sphere, Vec3::new(0.0, 0.0, 0.55));
+        self.add_light(Vec3::new(-3.0, 7.0, 4.0), Vec3::splat(0.85));
+        self.add_light(Vec3::new(4.0, 2.0, -1.0), Vec3::new(0.08, 0.12, 0.22));
     }
     pub fn load_example(&mut self) {
         self.clear();
@@ -458,6 +661,46 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn static_revision_invalidates_only_when_static_geometry_changes() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        scene.load_effects_demo();
+        let revision = scene.static_revision();
+        let geometry = scene.render_revision();
+        scene.update(0.5);
+        assert_eq!(scene.static_revision(), revision);
+        assert_ne!(scene.render_revision(), geometry);
+        let id = *scene
+            .objects()
+            .iter()
+            .find(|(_, o)| o.render_options.is_static && o.render_options.casts_shadow)
+            .unwrap()
+            .0;
+        scene.set_object_position(id, Vec3::new(-2.0, 0.0, 0.0));
+        assert_ne!(scene.static_revision(), revision);
+        let revision = scene.static_revision();
+        scene.remove_object(id);
+        assert_ne!(scene.static_revision(), revision);
+        let geometry = scene.render_revision();
+        scene.paused = true;
+        scene.update(1.0);
+        assert_eq!(scene.render_revision(), geometry);
+    }
+    #[test]
+    fn mirror_follows_its_transform_and_removal() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        scene.load_effects_demo();
+        let id = scene.mirror_object.unwrap();
+        scene.set_object_position(id, Vec3::new(0.0, 1.0, -5.0));
+        let plane = scene.mirror_plane().unwrap();
+        assert!((plane.normal.dot(Vec3::new(0.0, 1.0, -5.0)) + plane.distance).abs() < 1e-5);
+        assert!(plane.normal.dot(Vec3::Z).abs() > 0.99);
+        assert!(!scene.configure_mirror(super::INVALID_ID));
+        scene.remove_object(id);
+        assert!(scene.mirror_plane().is_none());
+    }
     #[test]
     fn normal_transform_preserves_perpendicularity_under_nonuniform_scale() {
         let transform = super::Transform::new(

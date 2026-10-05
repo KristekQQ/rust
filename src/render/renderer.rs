@@ -1,5 +1,7 @@
+use super::effects::Effects;
+use super::target::DepthRenderTarget;
 use crate::scene::{MeshKind, SceneManager};
-use crate::visibility::{InstanceData, RenderQueue};
+use crate::visibility::{InstanceData, RenderPassKind, RenderQueue};
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
@@ -102,6 +104,21 @@ fn build_uniform(
     }
 }
 
+struct PassCache {
+    queue: RenderQueue,
+    key: Option<(Mat4, u64, bool)>,
+    batches: [InstanceBatch; 3],
+}
+impl PassCache {
+    fn new(device: &wgpu::Device) -> Self {
+        Self {
+            queue: RenderQueue::default(),
+            key: None,
+            batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
+        }
+    }
+}
+
 pub struct SceneRenderer {
     grid_vertex_buffer: wgpu::Buffer,
     grid_vertex_count: u32,
@@ -111,7 +128,7 @@ pub struct SceneRenderer {
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
     pipelines: HashMap<
-        (wgpu::TextureFormat, wgpu::TextureFormat),
+        (wgpu::TextureFormat, wgpu::TextureFormat, bool),
         (wgpu::RenderPipeline, wgpu::RenderPipeline),
     >,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -121,9 +138,10 @@ pub struct SceneRenderer {
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
-    render_queue: RenderQueue,
-    extraction_key: Option<(Mat4, u64, bool)>,
-    batches: [InstanceBatch; 3],
+    passes: [PassCache; 4],
+    active_pass: RenderPassKind,
+    shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
+    effects: Option<Effects>,
     pub frustum_culling: bool,
     pub upload_bytes: usize,
     pub prepare_ms: f64,
@@ -187,7 +205,8 @@ impl SceneRenderer {
             }],
             label: Some("grid bind group"),
         });
-        let batches = std::array::from_fn(|_| InstanceBatch::new(&device, 1));
+        let passes = std::array::from_fn(|_| PassCache::new(&device));
+        let effects = Some(Effects::new(&device));
         Self {
             grid_vertex_buffer,
             grid_vertex_count,
@@ -204,9 +223,10 @@ impl SceneRenderer {
             grid_uniform_buffer,
             grid_bind_group,
             scene: SceneManager::default(),
-            render_queue: RenderQueue::default(),
-            extraction_key: None,
-            batches,
+            passes,
+            active_pass: RenderPassKind::Main,
+            shadow_pipelines: HashMap::new(),
+            effects,
             frustum_culling: true,
             upload_bytes: 0,
             prepare_ms: 0.0,
@@ -233,6 +253,11 @@ impl SceneRenderer {
     }
 
     pub fn prepare_view(&mut self, view: RenderView) {
+        self.prepare_pass(view, RenderPassKind::Main);
+    }
+    pub(super) fn prepare_pass(&mut self, view: RenderView, pass: RenderPassKind) {
+        self.active_pass = pass;
+        let cache = &mut self.passes[pass.index()];
         let camera_matrix = view.view_projection;
         let camera_pos = view.camera_position;
         let active_lights: Vec<Light> = self
@@ -249,17 +274,22 @@ impl SceneRenderer {
         let lights = lights_array(&active_lights);
         let key = (
             camera_matrix,
-            self.scene.render_revision(),
+            if pass == RenderPassKind::ShadowStatic {
+                self.scene.static_revision()
+            } else {
+                self.scene.render_revision()
+            },
             self.frustum_culling,
         );
-        self.upload_bytes = 0;
-        if self.extraction_key != Some(key) {
-            self.render_queue
-                .extract(&self.scene, camera_matrix, self.frustum_culling);
-            for (batch, instances) in self.batches.iter_mut().zip(&self.render_queue.batches) {
+
+        if cache.key != Some(key) {
+            cache
+                .queue
+                .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
+            for (batch, instances) in cache.batches.iter_mut().zip(&cache.queue.batches) {
                 self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
             }
-            self.extraction_key = Some(key);
+            cache.key = Some(key);
         }
         let grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
         self.queue.write_buffer(
@@ -283,12 +313,15 @@ impl SceneRenderer {
         }
     }
 
+    pub(super) fn pass_visible(&self, pass: RenderPassKind) -> usize {
+        self.passes[pass.index()].queue.visible
+    }
     pub fn render_stats(&self) -> [f64; 8] {
         [
-            self.render_queue.total as f64,
-            self.render_queue.visible as f64,
-            (self.render_queue.total - self.render_queue.visible) as f64,
-            self.render_queue.draw_calls() as f64,
+            self.passes[0].queue.total as f64,
+            self.passes[0].queue.visible as f64,
+            (self.passes[0].queue.total - self.passes[0].queue.visible) as f64,
+            self.passes[0].queue.draw_calls() as f64,
             self.upload_bytes as f64,
             self.prepare_ms,
             self.frame_metrics.fps,
@@ -296,29 +329,142 @@ impl SceneRenderer {
         ]
     }
 
-    /// Prepare and submit one view. Simulation advances separately, once per frame.
-    /// Submission before the next view keeps shared buffer writes ordered correctly.
+    pub fn set_effects(&mut self, shadows: bool, reflections: bool) {
+        let effects = self.effects.as_mut().unwrap();
+        if effects.shadows != shadows {
+            effects.reflection_key = None;
+        }
+        effects.shadows = shadows;
+        effects.reflections = reflections;
+    }
+    pub fn effects_stats(&self) -> [f64; 10] {
+        let e = self.effects.as_ref().unwrap();
+        let s = &e.stats;
+        [
+            s.static_updates as f64,
+            s.dynamic_updates as f64,
+            s.reflection_updates as f64,
+            s.static_visible as f64,
+            s.dynamic_visible as f64,
+            s.reflection_visible as f64,
+            s.passes as f64,
+            e.static_shadow.size as f64,
+            e.reflection.width as f64,
+            e.reflection.height as f64,
+        ]
+    }
+    /// Auxiliary views have independent culling/buffer caches; simulation advances separately.
+    /// Submit each pass before preparing another view, preserving shared uniform write ordering.
     pub fn render_view(
         &mut self,
         view: RenderView,
         target: &RenderTarget<'_>,
     ) -> Result<(), String> {
         target.validate()?;
-        self.prepare_view(view);
-        self.draw(target)
+        let mut effects = self.effects.take().unwrap();
+        let result = effects.render(self, view, target);
+        self.effects = Some(effects);
+        result
     }
-
-    pub fn draw(&mut self, target: &RenderTarget<'_>) -> Result<(), String> {
+    /// Submit a culled depth-only view without updating simulation or running color effects.
+    pub fn render_depth_view(
+        &mut self,
+        view: RenderView,
+        target: &DepthRenderTarget<'_>,
+        pass: RenderPassKind,
+    ) -> Result<(), String> {
         target.validate()?;
-        let key = (target.color_format, target.depth_format);
+        self.prepare_pass(view, pass);
+        self.draw_depth(target)
+    }
+    pub(super) fn draw_depth(&mut self, target: &DepthRenderTarget<'_>) -> Result<(), String> {
+        target.validate()?;
+        self.shadow_pipelines
+            .entry(target.format)
+            .or_insert_with(|| {
+                pipeline::build_shadow(&self.device, &self.bind_group_layout, target.format)
+            });
+        let pipeline = &self.shadow_pipelines[&target.format];
+        let cache = &self.passes[self.active_pass.index()];
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("shadow encoder"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("shadow casters"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: target.load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(pipeline);
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.0,
+                1.0,
+            );
+            pass.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            pass.set_bind_group(0, &self.grid_bind_group, &[]);
+            for (index, kind) in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere]
+                .into_iter()
+                .enumerate()
+            {
+                let count = cache.queue.batches[index].len() as u32;
+                if count == 0 {
+                    continue;
+                }
+                let mesh = self.mesh(kind);
+                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                pass.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
+                pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+            }
+        }
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+    pub(super) fn draw_color(
+        &mut self,
+        target: &RenderTarget<'_>,
+        effects: &Effects,
+        reflected: bool,
+    ) -> Result<(), String> {
+        target.validate()?;
+        let key = (target.color_format, target.depth_format, reflected);
         self.pipelines.entry(key).or_insert_with(|| {
             (
-                pipeline::build(&self.device, key.0, key.1, &self.bind_group_layout),
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    &effects.layout,
+                    reflected,
+                ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
             )
         });
         // Immutable lookup ends the map mutation before borrowing mesh resources.
         let pipelines = &self.pipelines[&key];
+        let cache = &self.passes[self.active_pass.index()];
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -363,22 +509,31 @@ impl SceneRenderer {
                 target.viewport.height,
             );
             rp.set_pipeline(&pipelines.0);
+            rp.set_bind_group(
+                1,
+                if reflected {
+                    &effects.reflection_group
+                } else {
+                    &effects.scene_group
+                },
+                &[],
+            );
             rp.set_bind_group(0, &self.grid_bind_group, &[]);
             for (index, kind) in [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere]
                 .into_iter()
                 .enumerate()
             {
-                let count = self.render_queue.batches[index].len() as u32;
+                let count = cache.queue.batches[index].len() as u32;
                 if count == 0 {
                     continue;
                 }
                 let mesh = self.mesh(kind);
                 rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                rp.set_vertex_buffer(1, self.batches[index].buffer.slice(..));
+                rp.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
                 rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
-            if self.draw_grid {
+            if self.draw_grid && !reflected {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));

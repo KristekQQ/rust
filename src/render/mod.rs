@@ -8,3 +8,6 @@ pub mod state;
 pub mod output;
 pub mod renderer;
 pub mod target;
+
+pub mod effects;
+pub mod textures;

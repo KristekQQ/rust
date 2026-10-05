@@ -99,3 +99,22 @@ mod tests {
         .is_err());
     }
 }
+
+/// A reusable depth-only pass target, e.g. a shadow map or depth prepass.
+pub struct DepthRenderTarget<'a> {
+    pub depth: &'a wgpu::TextureView,
+    pub format: wgpu::TextureFormat,
+    pub width: u32,
+    pub height: u32,
+    pub viewport: Viewport,
+    pub load: wgpu::LoadOp<f32>,
+}
+impl DepthRenderTarget<'_> {
+    pub fn validate(&self) -> Result<(), String> {
+        self.viewport.validate(self.width, self.height)?;
+        if !self.format.has_depth_aspect() {
+            return Err("Depth target requires a depth format".into());
+        }
+        Ok(())
+    }
+}

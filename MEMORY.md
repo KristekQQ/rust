@@ -1,3 +1,25 @@
+# Texturové průchody – aktualizace 2026-10-05
+
+Aktuální implementace má obecné RenderTarget/DepthRenderTarget v render/target.rs,
+ColorTarget/DepthTarget v render/textures.rs, vykreslení v renderer.rs a plán/cachování
+stínů a odrazu v effects.rs. Canvas je pouze output.rs + state.rs. SceneManager
+má RenderOptions, statickou revizi, Rust spin/pause a aktivní Plane zrcadlo, jehož
+rovina sleduje cached transformaci. InstanceData je nyní 144 B (material offset 128),
+SceneUniforms 208 B a EffectsUniforms 160 B. Historické údaje níže jsou starší.
+
+Každý z Main/Reflection/ShadowStatic/ShadowDynamic má vlastní frustum, CPU queue,
+klíč extrakce a GPU instance buffery. Statické stíny se při pohybu dynamických objektů
+neobnovují. Dvě Depth32Float mapy se kombinují před 3×3 PCF. Reflection vynechává
+aktivní zrcadlo, obrací triangle culling a používá fragmentový clip plane. Odraz mimo
+hlavní frustum se neobnovuje. Pomocné průchody v klidu neběží. Simulace jednou za
+snímek; submity průchodů zachovávají pořadí sdílených uniform write_buffer.
+
+Omezení: jeden planar mirror, první světlo se stínovou perspektivou s omezeným
+záběrem, neprůhledné objekty, single-sample; VR a 360° point shadows nejsou hotové.
+Detaily: docs/RENDER_PASSES.md. Testy: tests/render-effects.html (cache, pohyb,
+resize, offscreen) a tests/scene-sdk.html v obou backendech. prepareMs nyní zahrnuje
+CPU přípravu/encoding/submission všech průchodů, nikoliv skutečný GPU čas.
+
 # Projektová paměť
 
 Technická fakta o tomto repozitáři, ověřená z kódu a místního běhu 2026-10-05.

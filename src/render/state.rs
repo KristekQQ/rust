@@ -10,6 +10,7 @@ pub struct State {
     output: CanvasOutput,
     pub backend: String,
     pub aspect: f32,
+    view: RenderView,
 }
 impl Deref for State {
     type Target = SceneRenderer;
@@ -31,6 +32,10 @@ impl State {
             output,
             backend,
             aspect,
+            view: RenderView {
+                view_projection: Mat4::IDENTITY,
+                camera_position: Vec3::ZERO,
+            },
         })
     }
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -47,10 +52,10 @@ impl State {
     }
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
         self.renderer.advance_scene(dt);
-        self.renderer.prepare_view(RenderView {
+        self.view = RenderView {
             view_projection: camera_matrix,
             camera_position: camera_pos,
-        });
+        };
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
@@ -59,7 +64,7 @@ impl State {
         self.output.ensure_target(&self.renderer.device);
         let target = self.output.target(&frame);
         self.renderer
-            .draw(&target)
+            .render_view(self.view, &target)
             .map_err(|e| JsValue::from_str(&e))?;
         self.output
             .present(frame, &self.renderer.device, &self.renderer.queue);

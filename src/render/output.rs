@@ -2,6 +2,7 @@
 use super::{
     depth,
     target::{RenderTarget, Viewport},
+    textures::ColorTarget,
 };
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
@@ -13,10 +14,7 @@ pub struct CanvasFrame {
     reconfigure: bool,
 }
 struct TextureOutput {
-    _color: wgpu::Texture,
-    color: wgpu::TextureView,
-    _depth: wgpu::Texture,
-    depth: wgpu::TextureView,
+    target: ColorTarget,
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
 }
@@ -160,23 +158,13 @@ impl CanvasOutput {
             return;
         }
         let format = self.config.format.add_srgb_suffix();
-        let color_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("offscreen scene color"),
-            size: wgpu::Extent3d {
-                width: self.config.width,
-                height: self.config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
+        let target = ColorTarget::new(
+            device,
+            "offscreen scene color",
+            self.config.width,
+            self.config.height,
             format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        });
-        let color = color_texture.create_view(&Default::default());
-        let (depth_texture, depth) =
-            depth::create(device, self.config.width, self.config.height, DEPTH_FORMAT);
+        );
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("present texture layout"),
             entries: &[
@@ -210,7 +198,7 @@ impl CanvasOutput {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&color),
+                    resource: wgpu::BindingResource::TextureView(&target.color),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -250,10 +238,7 @@ impl CanvasOutput {
             cache: None,
         });
         self.texture_output = Some(TextureOutput {
-            _color: color_texture,
-            color,
-            _depth: depth_texture,
-            depth,
+            target,
             bind_group,
             pipeline,
         });
@@ -264,7 +249,7 @@ impl CanvasOutput {
                 .texture_output
                 .as_ref()
                 .expect("ensure_target before target");
-            (&output.color, &output.depth)
+            (&output.target.color, &output.target.depth)
         } else {
             (&frame.view, &self.depth_view)
         };

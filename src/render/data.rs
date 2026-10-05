@@ -395,6 +395,31 @@ mod tests {
     }
 
     #[test]
+    fn effects_uniform_layout_matches_wgsl() {
+        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 160);
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, reflection_matrix), 64);
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, clip_plane), 128);
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, params), 144);
+    }
+    #[test]
+    fn instance_material_layout_matches_shader() {
+        use crate::visibility::InstanceData;
+        assert_eq!(std::mem::size_of::<InstanceData>(), 144);
+        assert_eq!(std::mem::offset_of!(InstanceData, material), 128);
+        assert_eq!(
+            InstanceData::layout()
+                .attributes
+                .last()
+                .unwrap()
+                .shader_location,
+            11
+        );
+        assert_eq!(
+            InstanceData::layout().attributes.last().unwrap().offset,
+            128
+        );
+    }
+    #[test]
     fn uniform_offsets_match_wgsl_alignment() {
         assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 64);
         assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 80);
@@ -404,14 +429,33 @@ mod tests {
 
 impl crate::visibility::InstanceData {
     pub fn layout<'a>() -> VertexBufferLayout<'a> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 8] = wgpu::vertex_attr_array![
+        const ATTRIBUTES: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![
             3 => Float32x4, 4 => Float32x4, 5 => Float32x4, 6 => Float32x4,
-            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4
+            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4, 11 => Float32x4
         ];
         VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as u64,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: &ATTRIBUTES,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct EffectsUniforms {
+    pub shadow_matrix: [[f32; 4]; 4],
+    pub reflection_matrix: [[f32; 4]; 4],
+    pub clip_plane: [f32; 4],
+    pub params: [f32; 4],
+}
+impl Default for EffectsUniforms {
+    fn default() -> Self {
+        Self {
+            shadow_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            reflection_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            clip_plane: [0.0; 4],
+            params: [0.0, 0.0, 0.0, 0.00005],
         }
     }
 }

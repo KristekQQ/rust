@@ -15,6 +15,10 @@ export class SceneObject {
     rotate(degrees, { delay = 0, duration = 1 } = {}) {
         accepted(this.#wasm.schedule_rotate(this.id, ...degrees, delay, duration)); return this;
     }
+    setRenderOptions({isStatic=false, castsShadow=true, receivesShadow=true, reflectivity=0} = {}) {
+        accepted(this.#wasm.set_object_render_options(this.id,isStatic,castsShadow,receivesShadow,reflectivity)); return this;
+    }
+    spin(radiansPerSecond) { accepted(this.#wasm.set_object_spin(this.id,...radiansPerSecond)); return this; }
     removeAfter(seconds) { accepted(this.#wasm.schedule_remove_object(this.id, seconds)); return this; }
     remove() { accepted(this.#wasm.remove_object(this.id)); }
 }
@@ -52,6 +56,8 @@ export class Scene {
     }
     clear() { this.#wasm.clear_all(); }
     loadExample() { this.#wasm.load_example_scene(); }
+    setMirror(object) { accepted(this.#wasm.configure_planar_mirror(object.id)); }
+    loadEffectsDemo() { this.#wasm.load_effects_demo(); }
     loadCullingDemo() { this.#wasm.load_culling_demo(); }
 }
 
@@ -89,6 +95,12 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         set_camera_mode: wasm.set_camera_mode,
         set_grid_visible: wasm.set_grid_visible,
         set_output_mode: wasm.set_output_mode,
+        set_render_effects: wasm.set_render_effects,
+        set_simulation_paused: wasm.set_simulation_paused,
+        effects_stats() {
+            const [staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight] = wasm.effects_stats();
+            return {staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight};
+        },
         resize: wasm.resize,
         renderer_backend: wasm.renderer_backend,
         set_frustum_culling: wasm.set_frustum_culling,
