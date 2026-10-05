@@ -42,10 +42,18 @@ try {
     light.orbit({ radius: 2, height: 3, speed: 1 }).stopOrbit().set([0, 3, 0], [1, 1, 1]);
     assert(light.exists && scene.lightCount === 3, "Light SDK");
     light.remove();
+    engine.set_grid_visible(false);engine.set_light_helpers_visible(true);
+    engine.set_render_effects(true,false);
+    scene.createLight({ position: [-3, 4, 2], color: [0.3, 0.2, 0.1] });
+    scene.createLight({ position: [3, 4, 2], color: [0.1, 0.2, 0.3] });
+    for(let i=0;i<12;i++)await new Promise(requestAnimationFrame);
+    const shadows=engine.effects_stats();
+    assert(shadows.shadowLightCount===4 && shadows.staticUpdatesByLight.every(n=>n>0) && shadows.dynamicUpdatesByLight.every(n=>n>0), "Four independent shadow lights");
+    engine.set_render_effects(false,false);engine.set_grid_visible(true);engine.set_light_helpers_visible(true);
     scene.clear();
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Rust clear");
     scene.loadExample();
-    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, Rust sample, object commands, Rust animation/removal, stable IDs, lights, clear.";
+    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, Rust sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear.";
 } catch (error) {
     console.error(error);
     result.textContent = `FAIL: ${error.message}`;

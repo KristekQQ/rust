@@ -5,17 +5,19 @@ ColorTarget/DepthTarget v render/textures.rs, vykreslení v renderer.rs a plán/
 stínů a odrazu v effects.rs. Canvas je pouze output.rs + state.rs. SceneManager
 má RenderOptions, statickou revizi, Rust spin/pause a aktivní Plane zrcadlo, jehož
 rovina sleduje cached transformaci. InstanceData je nyní 144 B (material offset 128),
-SceneUniforms 208 B a EffectsUniforms 160 B. Historické údaje níže jsou starší.
+SceneUniforms 208 B a EffectsUniforms 352 B. Historické údaje níže jsou starší.
 
-Každý z Main/Reflection/ShadowStatic/ShadowDynamic má vlastní frustum, CPU queue,
+Main, Reflection a každé světlo s ShadowStatic/ShadowDynamic mají vlastní frustum, CPU queue,
 klíč extrakce a GPU instance buffery. Statické stíny se při pohybu dynamických objektů
-neobnovují. Dvě Depth32Float mapy se kombinují před 3×3 PCF. Reflection vynechává
+neobnovují. Dvě Depth32Float mapy každého světla se kombinují před 3×3 PCF. Reflection vynechává
 aktivní zrcadlo, obrací triangle culling a používá fragmentový clip plane. Odraz mimo
 hlavní frustum se neobnovuje. Pomocné průchody v klidu neběží. Simulace jednou za
 snímek; submity průchodů zachovávají pořadí sdílených uniform write_buffer.
 
-Omezení: jeden planar mirror, první světlo se stínovou perspektivou s omezeným
+Omezení: jeden planar mirror, až čtyři světla se samostatnou stínovou perspektivou s omezeným
 záběrem, neprůhledné objekty, single-sample; VR a 360° point shadows nejsou hotové.
+Pomocné značky světel a grid mají samostatné přepínače a kreslí se jen v Main,
+bez stínů a odrazu. Ukázka používá dvě barevná stínující světla.
 Detaily: docs/RENDER_PASSES.md. Testy: tests/render-effects.html (cache, pohyb,
 resize, offscreen) a tests/scene-sdk.html v obou backendech. prepareMs nyní zahrnuje
 CPU přípravu/encoding/submission všech průchodů, nikoliv skutečný GPU čas.

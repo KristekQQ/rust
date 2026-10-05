@@ -53,7 +53,7 @@ export type RawEngine = Pick<typeof wasm,
     "set_object_transform" | "set_cube_transform" | "add_light" | "remove_light" |
     "clear_lights" | "set_light" | "set_light_orbit" | "clear_light_orbit" |
     "schedule_rotate" | "schedule_remove_object" | "schedule_remove_light" |
-    "set_camera_mode" | "set_grid_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused">;
+    "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused">;
 export interface RenderStats {
     total: number; visible: number; culled: number;
     /** Object batches only, excludes optional debug lines. */
@@ -66,6 +66,7 @@ export interface RenderStats {
     frameMs: number;
 }
 export interface EffectStats {
+    shadowLightCount:number; staticUpdatesByLight:readonly number[]; dynamicUpdatesByLight:readonly number[];
     staticUpdates:number; dynamicUpdates:number; reflectionUpdates:number;
     staticVisible:number; dynamicVisible:number; reflectionVisible:number;
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;

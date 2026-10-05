@@ -22,6 +22,7 @@ pub fn load_effects_demo() {
             state.scene.load_effects_demo();
             state.set_effects(true, true);
             state.set_grid_visible(false);
+            state.set_light_helpers_visible(false);
         }
     });
 }
@@ -48,7 +49,7 @@ pub fn effects_stats() -> js_sys::Float64Array {
             .borrow()
             .as_ref()
             .map(|state| state.borrow().effects_stats())
-            .unwrap_or([0.0; 10])
+            .unwrap_or([0.0; 19])
     });
     js_sys::Float64Array::from(values.as_slice())
 }
@@ -243,6 +244,14 @@ pub fn set_object_scale(id: u32, x: f32, y: f32, z: f32) -> bool {
     })
 }
 
+#[wasm_bindgen]
+pub fn set_light_helpers_visible(show: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_light_helpers_visible(show);
+        }
+    });
+}
 #[wasm_bindgen]
 pub fn set_grid_visible(show: bool) {
     STATE.with(|s| {

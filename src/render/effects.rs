@@ -13,9 +13,14 @@ pub struct EffectStats {
     pub dynamic_updates: u32,
     pub reflection_updates: u32,
     pub static_visible: usize,
+    static_visible_by_light: [usize; MAX_LIGHTS],
+    dynamic_visible_by_light: [usize; MAX_LIGHTS],
     pub dynamic_visible: usize,
     pub reflection_visible: usize,
     pub passes: u32,
+    pub shadow_light_count: usize,
+    pub static_updates_by_light: [u32; MAX_LIGHTS],
+    pub dynamic_updates_by_light: [u32; MAX_LIGHTS],
 }
 pub struct Effects {
     pub layout: wgpu::BindGroupLayout,
@@ -23,14 +28,14 @@ pub struct Effects {
     last_uniform: EffectsUniforms,
     pub scene_group: wgpu::BindGroup,
     pub reflection_group: wgpu::BindGroup,
-    pub static_shadow: DepthTarget,
-    pub dynamic_shadow: DepthTarget,
+    pub static_shadow: [DepthTarget; MAX_LIGHTS],
+    pub dynamic_shadow: [DepthTarget; MAX_LIGHTS],
     pub reflection: ColorTarget,
     fallback: ColorTarget,
     comparison: wgpu::Sampler,
     sampler: wgpu::Sampler,
-    pub static_key: Option<(Mat4, u64, bool)>,
-    pub dynamic_key: Option<(Mat4, u64, bool)>,
+    pub static_key: [Option<(Mat4, u64, bool)>; MAX_LIGHTS],
+    pub dynamic_key: [Option<(Mat4, u64, bool)>; MAX_LIGHTS],
     pub reflection_key: Option<(Mat4, u64, [Light; MAX_LIGHTS], bool, bool)>,
     pub shadows: bool,
     pub reflections: bool,
@@ -38,70 +43,85 @@ pub struct Effects {
 }
 impl Effects {
     pub fn new(device: &wgpu::Device) -> Self {
+        let mut entries = vec![];
+        for binding in [6, 7, 8, 9, 10, 11] {
+            entries.push(wgpu::BindGroupLayoutEntry {
+                binding,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            });
+        }
+        entries.extend_from_slice(&[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 5,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ]);
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("scene effects layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
+            entries: &entries,
         });
         let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("effects uniforms"),
             contents: data::as_bytes(&[EffectsUniforms::default()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let static_shadow = DepthTarget::new(device, "static shadows", 1);
-        let dynamic_shadow = DepthTarget::new(device, "dynamic shadows", 1);
+        let static_shadow = std::array::from_fn(|_| DepthTarget::new(device, "static shadows", 1));
+        let dynamic_shadow =
+            std::array::from_fn(|_| DepthTarget::new(device, "dynamic shadows", 1));
         let reflection = ColorTarget::new(
             device,
             "planar reflection",
@@ -161,8 +181,8 @@ impl Effects {
             fallback,
             comparison,
             sampler,
-            static_key: None,
-            dynamic_key: None,
+            static_key: [None; MAX_LIGHTS],
+            dynamic_key: [None; MAX_LIGHTS],
             reflection_key: None,
             shadows: false,
             reflections: false,
@@ -173,41 +193,45 @@ impl Effects {
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         uniform: &wgpu::Buffer,
-        static_shadow: &DepthTarget,
-        dynamic_shadow: &DepthTarget,
+        static_shadow: &[DepthTarget; MAX_LIGHTS],
+        dynamic_shadow: &[DepthTarget; MAX_LIGHTS],
         comparison: &wgpu::Sampler,
         reflection: &ColorTarget,
         sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
+        let mut entries = vec![
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(comparison),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(&reflection.color),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ];
+        for i in 0..MAX_LIGHTS {
+            let binding = if i == 0 { 1 } else { 4 + i as u32 * 2 };
+            entries.push(wgpu::BindGroupEntry {
+                binding,
+                resource: wgpu::BindingResource::TextureView(&static_shadow[i].view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: binding + 1,
+                resource: wgpu::BindingResource::TextureView(&dynamic_shadow[i].view),
+            });
+        }
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("scene effects"),
             layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&static_shadow.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&dynamic_shadow.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(comparison),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::TextureView(&reflection.color),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
+            entries: &entries,
         })
     }
     fn write_uniform(&mut self, queue: &wgpu::Queue, value: EffectsUniforms) -> usize {
@@ -218,14 +242,16 @@ impl Effects {
         self.last_uniform = value;
         std::mem::size_of::<EffectsUniforms>()
     }
-    pub fn ensure(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+    pub fn ensure(&mut self, device: &wgpu::Device, width: u32, height: u32, light_count: usize) {
         let mut changed = false;
-        if self.shadows && self.static_shadow.size != 1024 {
-            self.static_shadow = DepthTarget::new(device, "static shadows", 1024);
-            self.dynamic_shadow = DepthTarget::new(device, "dynamic shadows", 1024);
-            self.static_key = None;
-            self.dynamic_key = None;
-            changed = true;
+        for i in 0..light_count {
+            if self.shadows && self.static_shadow[i].size != 1024 {
+                self.static_shadow[i] = DepthTarget::new(device, "static shadows", 1024);
+                self.dynamic_shadow[i] = DepthTarget::new(device, "dynamic shadows", 1024);
+                self.static_key[i] = None;
+                self.dynamic_key[i] = None;
+                changed = true;
+            }
         }
         // Half resolution, capped at 1024 on the longer axis, with camera aspect preserved.
         let scale = (0.5f32).min(1024.0 / width.max(height) as f32);
@@ -275,7 +301,8 @@ impl Effects {
         view: RenderView,
         target: &RenderTarget<'_>,
     ) -> Result<(), String> {
-        self.ensure(&renderer.device, target.width, target.height);
+        let light_count = renderer.scene.lights().len().min(MAX_LIGHTS);
+        self.ensure(&renderer.device, target.width, target.height, light_count);
         renderer.upload_bytes = 0;
         let mut lights = [super::data::EMPTY_LIGHT; MAX_LIGHTS];
         for (dst, light) in lights.iter_mut().zip(renderer.scene.lights().values()) {
@@ -286,16 +313,15 @@ impl Effects {
                 _pad_c: 0.0,
             };
         }
-        let has_light = !renderer.scene.lights().is_empty();
-        let shadow_matrix = if self.shadows && has_light {
-            crate::render_math::shadow_view_projection(Vec3::from_array(lights[0].position))
-        } else {
-            Mat4::IDENTITY
-        };
-        if self.shadows && has_light {
+        let shadow_count = if self.shadows { light_count } else { 0 };
+        self.stats.shadow_light_count = shadow_count;
+        let mut shadow_matrices = [Mat4::IDENTITY; MAX_LIGHTS];
+        for i in 0..shadow_count {
+            shadow_matrices[i] =
+                crate::render_math::shadow_view_projection(Vec3::from_array(lights[i].position));
             for pass in [RenderPassKind::ShadowStatic, RenderPassKind::ShadowDynamic] {
                 let key = (
-                    shadow_matrix,
+                    shadow_matrices[i],
                     if pass == RenderPassKind::ShadowStatic {
                         renderer.scene.static_revision()
                     } else {
@@ -304,44 +330,53 @@ impl Effects {
                     renderer.frustum_culling,
                 );
                 let previous = if pass == RenderPassKind::ShadowStatic {
-                    self.static_key
+                    self.static_key[i]
                 } else {
-                    self.dynamic_key
+                    self.dynamic_key[i]
                 };
                 if previous == Some(key) {
                     continue;
                 }
-                renderer.prepare_pass(
+                renderer.prepare_shadow_pass(
                     RenderView {
-                        view_projection: shadow_matrix,
-                        camera_position: Vec3::from_array(lights[0].position),
+                        view_projection: shadow_matrices[i],
+                        camera_position: Vec3::from_array(lights[i].position),
                     },
                     pass,
+                    i,
                 );
                 let map = if pass == RenderPassKind::ShadowStatic {
-                    &self.static_shadow
+                    &self.static_shadow[i]
                 } else {
-                    &self.dynamic_shadow
+                    &self.dynamic_shadow[i]
                 };
                 renderer.draw_depth(&map.target())?;
-                let visible = renderer.pass_visible(pass);
+                let visible = renderer.pass_visible();
                 if pass == RenderPassKind::ShadowStatic {
-                    self.static_key = Some(key);
+                    self.static_key[i] = Some(key);
                     self.stats.static_updates += 1;
-                    self.stats.static_visible = visible;
+                    self.stats.static_updates_by_light[i] += 1;
+                    self.stats.static_visible_by_light[i] = visible;
                 } else {
-                    self.dynamic_key = Some(key);
+                    self.dynamic_key[i] = Some(key);
                     self.stats.dynamic_updates += 1;
-                    self.stats.dynamic_visible = visible;
+                    self.stats.dynamic_updates_by_light[i] += 1;
+                    self.stats.dynamic_visible_by_light[i] = visible;
                 }
                 self.stats.passes += 1;
             }
         }
+        self.stats.static_visible = self.stats.static_visible_by_light[..shadow_count]
+            .iter()
+            .sum();
+        self.stats.dynamic_visible = self.stats.dynamic_visible_by_light[..shadow_count]
+            .iter()
+            .sum();
         let mut uniforms = EffectsUniforms {
-            shadow_matrix: shadow_matrix.to_cols_array_2d(),
+            shadow_matrices: shadow_matrices.map(|matrix| matrix.to_cols_array_2d()),
             ..Default::default()
         };
-        uniforms.params[0] = if self.shadows && has_light { 1.0 } else { 0.0 };
+        uniforms.params[0] = shadow_count as f32;
         if let Some(plane) = renderer.scene.mirror_plane().filter(|_| {
             self.reflections
                 && renderer
@@ -369,7 +404,7 @@ impl Effects {
                     RenderPassKind::Reflection,
                 );
                 renderer.draw_color(&self.reflection.target(), self, true)?;
-                self.stats.reflection_visible = renderer.pass_visible(RenderPassKind::Reflection);
+                self.stats.reflection_visible = renderer.pass_visible();
                 self.stats.reflection_updates += 1;
                 self.stats.passes += 1;
                 self.reflection_key = Some(key);

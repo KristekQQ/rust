@@ -13,11 +13,11 @@ případně `?backend=webgl`. Hlavní stránka nadále načítá původní malou
 | `visibility.rs` | konzervativní AABB/frustum test a filtry pro každý průchod |
 | `render/target.rs` | vypůjčené color/depth a samostatné depth cíle, viewport, Clear/Load |
 | `render/textures.rs` | vlastnictví a tvorba opakovaně použitelných barevných/hloubkových textur |
-| `render/renderer.rs` | GPU meshe, čtyři nezávislé cache dávek, barevné a hloubkové vykreslení |
+| `render/renderer.rs` | GPU meshe, nezávislé cache hlavní kamery, odrazu a dvojice stínů pro každé světlo, barevné a hloubkové vykreslení |
 | `render/effects.rs` | prostředky efektů, pořadí průchodů a invalidace texturových cache |
 | `render/output.rs` | browser surface, resize a prezentace; používá stejný ColorTarget jako odraz |
 
-Pořadí je statická stínová mapa → dynamická stínová mapa → odraz → hlavní
+Pořadí je statická + dynamická stínová mapa každého světla → odraz → hlavní
 kamera. Každý pomocný průchod se spouští pouze při invalidaci. Simulace se
 posouvá jednou před vykreslením, bez ohledu na počet kamer. Pomocné průchody
 mají vlastní RenderQueue a instance buffery; nesdílejí seznam viditelných
@@ -47,12 +47,12 @@ minimum porovnání v každém texelu, následované 3×3 PCF; tím se vrhajíc�
 kombinují před filtrováním. Depth bias při rasterizaci a malý bias podle
 normály omezují self-shadow acne.
 
-Současná implementace má **jedno stínující světlo (první světlo scény)**,
+Současná implementace má **až čtyři stínující světla**, každé má vlastní
 perspektivní mapu s omezeným záběrem kolem středu scény (FOV 1,5 rad,
 near 0,1, far 30), nikoliv úplný 360° point-light shadow. Mimo tento záběr je
 povrch osvětlen bez stínu tohoto světla. Každá mapa má 1024² texelů Depth32Float;
-dvě mapy využívají přibližně 8 MiB. Nejde o cascaded shadow maps ani cube mapy.
-Další světla mají běžné osvětlení. Toto omezení je vhodné pro ukázku a budoucí
+dvě mapy využívají přibližně 8 MiB na světlo (ukázka se dvěma světly 16 MiB). Nejde o cascaded shadow maps ani cube mapy.
+Toto omezení je vhodné pro ukázku a budoucí
 spot/directional rozšíření potřebuje vlastní nastavení projekce.
 
 ## Rovinné zrcadlo
@@ -91,8 +91,14 @@ hodnoty false/true/true/0. Odrazivost přijímají pouze Plane objekty, vizuáln
 používá aktivní zrcadlo. `spin([0,0,0])` zastaví průběžnou rotaci.
 `engine.scene.loadEffectsDemo()` vytvoří v Rustu 9 statických objektů a 2
 rotující objekty, oranžové hlavní a modré doplňkové světlo. Obě světla osvětlují
-scénu i její odraz; stín vrhá první světlo. `engine.effects_stats()` vrací počty aktualizací map, počty
+scénu i její odraz a obě vrhají vlastní stín. Pomocné značky světel a mřížka
+mají samostatné checkboxy a kreslí se výhradně v hlavním pohledu: nevrhají
+stíny a neobjevují se v odrazu. API: `set_light_helpers_visible(bool)` a
+`set_grid_visible(bool)`. `engine.effects_stats()` vrací počty aktualizací map, počty
 viditelných objektů v průchodech, počet provedených průchodů a rozlišení.
+`shadowLightCount` a `staticUpdatesByLight` / `dynamicUpdatesByLight` poskytují
+diagnostiku jednotlivých světel; počty casterů jsou součty přes aktivní světelné
+pohledy. EffectsUniforms má 352 B (čtyři stínové matice, odraz, clip plane a params).
 Počet průchodů nezahrnuje závěrečný prezentovací blit při output mode texture.
 `prepareMs` nyní zahrnuje CPU simulaci, přípravu/encoding/submission všech
 průchodů, nikoliv GPU execution. FPS je stále interval browser RAF.

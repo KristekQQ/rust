@@ -11,9 +11,11 @@ pre{white-space:pre-wrap;font-size:13px} :focus-visible{outline:3px solid #b8caf
 <canvas id="gpu-canvas"></canvas>
 <div class="panel">
 <h1>Stíny a rovinné zrcadlo · Rust</h1>
-<p>9 statických + 2 rotující objekty.<br>Oranžové hlavní + modré doplňkové světlo.<br>Táhni myší pro změnu pohledu.</p>
+<p>9 statických + 2 rotující objekty.<br>Oranžové + modré světlo, obě vrhají stín.<br>Táhni myší pro změnu pohledu.</p>
 <label><input id="shadows" type="checkbox" checked> Stíny</label>
 <label><input id="mirror" type="checkbox" checked> Zrcadlo</label>
+<label><input id="helpers" type="checkbox"> Pomocné značky světel</label>
+<label><input id="grid" type="checkbox"> Pomocná mřížka (bez odrazu)</label>
 <label><input id="pause" type="checkbox"> Pozastavit pohyb (test cache)</label>
 <label><input id="culling" type="checkbox" checked> Frustum culling každého průchodu</label>
 <button id="reset">Obnovit scénu</button>
@@ -30,21 +32,29 @@ try {
     engine.scene.loadEffectsDemo();
     let message='';
     const apply=()=>engine.set_render_effects(control('shadows').checked,control('mirror').checked);
+    const applyHelpers=()=>{engine.set_grid_visible(control('grid').checked);engine.set_light_helpers_visible(control('helpers').checked);};
+    control('grid').onchange=applyHelpers;control('helpers').onchange=applyHelpers;
     control('shadows').onchange=apply; control('mirror').onchange=apply;
     control('pause').onchange=()=>engine.set_simulation_paused(control('pause').checked);
     control('culling').onchange=()=>engine.set_frustum_culling(control('culling').checked);
-    control('reset').onclick=()=>{engine.scene.loadEffectsDemo();control('pause').checked=false;apply();};
+    control('reset').onclick=()=>{engine.scene.loadEffectsDemo();control('pause').checked=false;apply();applyHelpers();};
     window.addEventListener('resize',()=>engine.resize(innerWidth,innerHeight));
     const frames=async(n=12)=>{for(let i=0;i<n;i++)await new Promise(requestAnimationFrame);};
     control('verify').onclick=async()=>{
         const assert=(ok,message)=>{if(!ok)throw new Error(message);};
         try {
             engine.scene.loadEffectsDemo(); control('shadows').checked=true;control('mirror').checked=true;control('pause').checked=true;
-            engine.set_render_effects(true,true);engine.set_simulation_paused(true);await frames();
+            engine.set_render_effects(true,true);engine.set_simulation_paused(true);applyHelpers();await frames();
             const before=engine.effects_stats();await frames();const paused=engine.effects_stats();
             assert(paused.staticUpdates===before.staticUpdates && paused.dynamicUpdates===before.dynamicUpdates && paused.reflectionUpdates===before.reflectionUpdates,'Cache se v klidu obnovuje');
+            assert(paused.shadowLightCount===2 && paused.staticUpdatesByLight.slice(0,2).every(n=>n>0) && paused.dynamicUpdatesByLight.slice(0,2).every(n=>n>0),'Obě světla musí mít vlastní stínové mapy');
+            engine.set_grid_visible(true);engine.set_light_helpers_visible(true);await frames();
+            const helpers=engine.effects_stats();
+            assert(helpers.staticUpdates===paused.staticUpdates && helpers.dynamicUpdates===paused.dynamicUpdates && helpers.reflectionUpdates===paused.reflectionUpdates,'Pomůcky změnily stíny nebo odraz');
+            applyHelpers();
             assert(paused.passes===1,'Statický snímek musí vykreslit jen hlavní průchod');
             engine.set_simulation_paused(false);await frames();const moving=engine.effects_stats();
+            assert(moving.dynamicUpdatesByLight.slice(0,2).every((n,i)=>n>paused.dynamicUpdatesByLight[i]),'Pohyb neobnovil stín obou světel');
             assert(moving.staticUpdates===paused.staticUpdates,'Pohyb obnovil statickou mapu');
             assert(moving.dynamicUpdates>paused.dynamicUpdates && moving.reflectionUpdates>paused.reflectionUpdates,'Pohyb neobnovil dynamické výstupy');
             control('pause').checked=false;
@@ -54,12 +64,12 @@ try {
             const resized=engine.effects_stats();assert(resized.reflectionWidth===400 && resized.reflectionHeight===225,'Odraz nereaguje na resize');
             engine.set_output_mode('texture');await frames();engine.set_output_mode('canvas');
             engine.resize(innerWidth,innerHeight);await frames();
-            message='PASS: cache, pohyb, statické stíny, resize a výstup přes texturu';
+            message='PASS: stíny obou světel, cache, pomůcky bez odrazu, pohyb, resize, textura';
         }catch(error){message=`FAIL: ${error.message}`;console.error(error);}
     };
     setInterval(()=>{
         const r=engine.renderer_stats(),e=engine.effects_stats();
-        status.textContent=`${message}\n${engine.renderer_backend()} · ${r.fps.toFixed(0)} FPS\nHlavní kamera: ${r.visible}/${r.total}\nStatické castery: ${e.staticVisible} · map ${e.staticUpdates}\nDynamické castery: ${e.dynamicVisible} · map ${e.dynamicUpdates}\nOdraz: ${e.reflectionVisible} · obnov ${e.reflectionUpdates}\nPrůchody tohoto snímku: ${e.passes}\nStíny ${e.shadowResolution}² · odraz ${e.reflectionWidth}×${e.reflectionHeight}`;
+        status.textContent=`${message}\n${engine.renderer_backend()} · ${r.fps.toFixed(0)} FPS\nHlavní kamera: ${r.visible}/${r.total}\nStatické castery (součet pohledů): ${e.staticVisible} · map ${e.staticUpdates}\nDynamické castery (součet pohledů): ${e.dynamicVisible} · map ${e.dynamicUpdates}\nStínující světla: ${e.shadowLightCount}\nMapy oranžové: ${e.staticUpdatesByLight[0]} / ${e.dynamicUpdatesByLight[0]}\nMapy modré: ${e.staticUpdatesByLight[1]} / ${e.dynamicUpdatesByLight[1]}\nOdraz: ${e.reflectionVisible} · obnov ${e.reflectionUpdates}\nPrůchody tohoto snímku: ${e.passes}\nStíny ${e.shadowResolution}² · odraz ${e.reflectionWidth}×${e.reflectionHeight}`;
     },250);
 }catch(error){status.textContent=`FAIL: ${error.message}`;console.error(error);}
 </script>

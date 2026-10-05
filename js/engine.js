@@ -94,12 +94,13 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         schedule_remove_light: wasm.schedule_remove_light,
         set_camera_mode: wasm.set_camera_mode,
         set_grid_visible: wasm.set_grid_visible,
+        set_light_helpers_visible: wasm.set_light_helpers_visible,
         set_output_mode: wasm.set_output_mode,
         set_render_effects: wasm.set_render_effects,
         set_simulation_paused: wasm.set_simulation_paused,
         effects_stats() {
-            const [staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight] = wasm.effects_stats();
-            return {staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight};
+            const [staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight,shadowLightCount,...updates] = wasm.effects_stats();
+            return {staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight,shadowLightCount,staticUpdatesByLight:updates.slice(0,4),dynamicUpdatesByLight:updates.slice(4,8)};
         },
         resize: wasm.resize,
         renderer_backend: wasm.renderer_backend,

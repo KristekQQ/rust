@@ -191,7 +191,7 @@ pub struct Light {
 }
 
 pub use crate::scene::MAX_LIGHTS;
-pub const LIGHT_VERTICES_PER_LIGHT: usize = 8;
+pub const LIGHT_VERTICES_PER_LIGHT: usize = 8 + 3 * 16 * 2;
 pub const EMPTY_LIGHT: Light = Light {
     position: [0.0, 0.0, 0.0],
     _pad_p: 0.0,
@@ -244,7 +244,24 @@ pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
     let cross = 0.2_f32;
     for l in lights {
         let p = l.position;
-        let color = l.color;
+        let intensity = l.color.into_iter().fold(0.0_f32, f32::max).max(0.0001);
+        let color = l.color.map(|channel| channel / intensity);
+        // Three wire rings make the source position visible from every direction.
+        for axis in 0..3 {
+            for segment in 0..16 {
+                for endpoint in [segment, segment + 1] {
+                    let angle = endpoint as f32 * std::f32::consts::TAU / 16.0;
+                    let mut position = p;
+                    position[(axis + 1) % 3] += 0.16 * angle.cos();
+                    position[(axis + 2) % 3] += 0.16 * angle.sin();
+                    verts.push(Vertex {
+                        position,
+                        color,
+                        normal,
+                    });
+                }
+            }
+        }
         // small cross marking the light position
         verts.push(Vertex {
             position: [p[0] - cross, p[1], p[2]],
@@ -395,11 +412,34 @@ mod tests {
     }
 
     #[test]
+    fn light_helpers_fit_the_gpu_buffer_and_mark_each_source() {
+        let lights = [Light {
+            position: [2.0, 3.0, 4.0],
+            color: [0.2, 0.5, 1.0],
+            _pad_p: 0.0,
+            _pad_c: 0.0,
+        }; MAX_LIGHTS];
+        let vertices = light_rays(&lights);
+        assert_eq!(vertices.len(), MAX_LIGHTS * LIGHT_VERTICES_PER_LIGHT);
+        for helper in vertices.chunks_exact(LIGHT_VERTICES_PER_LIGHT) {
+            assert_eq!(
+                helper[LIGHT_VERTICES_PER_LIGHT - 2].position,
+                lights[0].position
+            );
+            assert!(helper
+                .iter()
+                .all(|vertex| vertex.position.iter().all(|value| value.is_finite())));
+        }
+    }
+    #[test]
     fn effects_uniform_layout_matches_wgsl() {
-        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 160);
-        assert_eq!(std::mem::offset_of!(EffectsUniforms, reflection_matrix), 64);
-        assert_eq!(std::mem::offset_of!(EffectsUniforms, clip_plane), 128);
-        assert_eq!(std::mem::offset_of!(EffectsUniforms, params), 144);
+        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 352);
+        assert_eq!(
+            std::mem::offset_of!(EffectsUniforms, reflection_matrix),
+            256
+        );
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, clip_plane), 320);
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, params), 336);
     }
     #[test]
     fn instance_material_layout_matches_shader() {
@@ -444,7 +484,7 @@ impl crate::visibility::InstanceData {
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct EffectsUniforms {
-    pub shadow_matrix: [[f32; 4]; 4],
+    pub shadow_matrices: [[[f32; 4]; 4]; MAX_LIGHTS],
     pub reflection_matrix: [[f32; 4]; 4],
     pub clip_plane: [f32; 4],
     pub params: [f32; 4],
@@ -452,7 +492,7 @@ pub struct EffectsUniforms {
 impl Default for EffectsUniforms {
     fn default() -> Self {
         Self {
-            shadow_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            shadow_matrices: [glam::Mat4::IDENTITY.to_cols_array_2d(); MAX_LIGHTS],
             reflection_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
             clip_plane: [0.0; 4],
             params: [0.0, 0.0, 0.0, 0.00005],

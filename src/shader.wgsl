@@ -68,7 +68,7 @@ fn vs_lines(input: VertexInput) -> VertexOutput {
 }
 
 struct EffectsUniforms {
-    shadow_matrix:mat4x4<f32>, reflection_matrix:mat4x4<f32>,
+    shadow_matrices:array<mat4x4<f32>,4>, reflection_matrix:mat4x4<f32>,
     clip_plane:vec4<f32>, params:vec4<f32>,
 };
 @group(1) @binding(0) var<uniform> effects:EffectsUniforms;
@@ -77,8 +77,23 @@ struct EffectsUniforms {
 @group(1) @binding(3) var shadow_sampler:sampler_comparison;
 @group(1) @binding(4) var reflection_texture:texture_2d<f32>;
 @group(1) @binding(5) var reflection_sampler:sampler;
-fn shadow_visibility(world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
-    let clip=effects.shadow_matrix*vec4(world,1.0);
+@group(1) @binding(6) var static_shadow_1:texture_depth_2d;
+@group(1) @binding(7) var dynamic_shadow_1:texture_depth_2d;
+@group(1) @binding(8) var static_shadow_2:texture_depth_2d;
+@group(1) @binding(9) var dynamic_shadow_2:texture_depth_2d;
+@group(1) @binding(10) var static_shadow_3:texture_depth_2d;
+@group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
+fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
+    switch index {
+        case 0u: { return min(textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
+        case 1u: { return min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
+        case 2u: { return min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
+        case 3u: { return min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
+        default: { return 1.0; }
+    }
+}
+fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
+    let clip=effects.shadow_matrices[index]*vec4(world,1.0);
     let ndc=clip.xyz/clip.w;
     if (clip.w<=0.0 || ndc.z<=0.0 || ndc.z>=1.0 || any(abs(ndc.xy)>vec2(1.0))) {return 1.0;}
     let uv=ndc.xy*vec2(0.5,-0.5)+vec2(0.5);
@@ -89,8 +104,7 @@ fn shadow_visibility(world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)
     // Combine static and dynamic visibility per texel, then apply 3x3 PCF.
     for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
         let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
-        visibility+=min(textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth),
-            textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        visibility+=compare_shadow(index,sample_uv,depth);
     }}
     return visibility/9.0;
 }
@@ -118,8 +132,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             spec = pow(max(dot(normal, halfway), 0.0), 32.0);
         }
         var visibility=1.0;
-        if(i==0u && effects.params.x>0.5 && input.material.y>0.5) {
-            visibility=shadow_visibility(input.world_pos,normal,l_dir);
+        if(i<u32(effects.params.x) && input.material.y>0.5) {
+            visibility=shadow_visibility(i,input.world_pos,normal,l_dir);
         }
         result += (diff * input.color + spec) * light.color * visibility;
     }

@@ -809,7 +809,7 @@ pub struct Light {
 }
 
 pub use crate::scene::MAX_LIGHTS;
-pub const LIGHT_VERTICES_PER_LIGHT: usize = 8;
+pub const LIGHT_VERTICES_PER_LIGHT: usize = 8 + 3 * 16 * 2;
 pub const EMPTY_LIGHT: Light = Light {
     position: [0.0, 0.0, 0.0],
     _pad_p: 0.0,
@@ -862,7 +862,24 @@ pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
     let cross = 0.2_f32;
     for l in lights {
         let p = l.position;
-        let color = l.color;
+        let intensity = l.color.into_iter().fold(0.0_f32, f32::max).max(0.0001);
+        let color = l.color.map(|channel| channel / intensity);
+        // Three wire rings make the source position visible from every direction.
+        for axis in 0..3 {
+            for segment in 0..16 {
+                for endpoint in [segment, segment + 1] {
+                    let angle = endpoint as f32 * std::f32::consts::TAU / 16.0;
+                    let mut position = p;
+                    position[(axis + 1) % 3] += 0.16 * angle.cos();
+                    position[(axis + 2) % 3] += 0.16 * angle.sin();
+                    verts.push(Vertex {
+                        position,
+                        color,
+                        normal,
+                    });
+                }
+            }
+        }
         // small cross marking the light position
         verts.push(Vertex {
             position: [p[0] - cross, p[1], p[2]],
@@ -1013,11 +1030,34 @@ mod tests {
     }
 
     #[test]
+    fn light_helpers_fit_the_gpu_buffer_and_mark_each_source() {
+        let lights = [Light {
+            position: [2.0, 3.0, 4.0],
+            color: [0.2, 0.5, 1.0],
+            _pad_p: 0.0,
+            _pad_c: 0.0,
+        }; MAX_LIGHTS];
+        let vertices = light_rays(&lights);
+        assert_eq!(vertices.len(), MAX_LIGHTS * LIGHT_VERTICES_PER_LIGHT);
+        for helper in vertices.chunks_exact(LIGHT_VERTICES_PER_LIGHT) {
+            assert_eq!(
+                helper[LIGHT_VERTICES_PER_LIGHT - 2].position,
+                lights[0].position
+            );
+            assert!(helper
+                .iter()
+                .all(|vertex| vertex.position.iter().all(|value| value.is_finite())));
+        }
+    }
+    #[test]
     fn effects_uniform_layout_matches_wgsl() {
-        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 160);
-        assert_eq!(std::mem::offset_of!(EffectsUniforms, reflection_matrix), 64);
-        assert_eq!(std::mem::offset_of!(EffectsUniforms, clip_plane), 128);
-        assert_eq!(std::mem::offset_of!(EffectsUniforms, params), 144);
+        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 352);
+        assert_eq!(
+            std::mem::offset_of!(EffectsUniforms, reflection_matrix),
+            256
+        );
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, clip_plane), 320);
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, params), 336);
     }
     #[test]
     fn instance_material_layout_matches_shader() {
@@ -1062,7 +1102,7 @@ impl crate::visibility::InstanceData {
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct EffectsUniforms {
-    pub shadow_matrix: [[f32; 4]; 4],
+    pub shadow_matrices: [[[f32; 4]; 4]; MAX_LIGHTS],
     pub reflection_matrix: [[f32; 4]; 4],
     pub clip_plane: [f32; 4],
     pub params: [f32; 4],
@@ -1070,7 +1110,7 @@ pub struct EffectsUniforms {
 impl Default for EffectsUniforms {
     fn default() -> Self {
         Self {
-            shadow_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            shadow_matrices: [glam::Mat4::IDENTITY.to_cols_array_2d(); MAX_LIGHTS],
             reflection_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
             clip_plane: [0.0; 4],
             params: [0.0, 0.0, 0.0, 0.00005],
@@ -1118,9 +1158,14 @@ pub struct EffectStats {
     pub dynamic_updates: u32,
     pub reflection_updates: u32,
     pub static_visible: usize,
+    static_visible_by_light: [usize; MAX_LIGHTS],
+    dynamic_visible_by_light: [usize; MAX_LIGHTS],
     pub dynamic_visible: usize,
     pub reflection_visible: usize,
     pub passes: u32,
+    pub shadow_light_count: usize,
+    pub static_updates_by_light: [u32; MAX_LIGHTS],
+    pub dynamic_updates_by_light: [u32; MAX_LIGHTS],
 }
 pub struct Effects {
     pub layout: wgpu::BindGroupLayout,
@@ -1128,14 +1173,14 @@ pub struct Effects {
     last_uniform: EffectsUniforms,
     pub scene_group: wgpu::BindGroup,
     pub reflection_group: wgpu::BindGroup,
-    pub static_shadow: DepthTarget,
-    pub dynamic_shadow: DepthTarget,
+    pub static_shadow: [DepthTarget; MAX_LIGHTS],
+    pub dynamic_shadow: [DepthTarget; MAX_LIGHTS],
     pub reflection: ColorTarget,
     fallback: ColorTarget,
     comparison: wgpu::Sampler,
     sampler: wgpu::Sampler,
-    pub static_key: Option<(Mat4, u64, bool)>,
-    pub dynamic_key: Option<(Mat4, u64, bool)>,
+    pub static_key: [Option<(Mat4, u64, bool)>; MAX_LIGHTS],
+    pub dynamic_key: [Option<(Mat4, u64, bool)>; MAX_LIGHTS],
     pub reflection_key: Option<(Mat4, u64, [Light; MAX_LIGHTS], bool, bool)>,
     pub shadows: bool,
     pub reflections: bool,
@@ -1143,70 +1188,85 @@ pub struct Effects {
 }
 impl Effects {
     pub fn new(device: &wgpu::Device) -> Self {
+        let mut entries = vec![];
+        for binding in [6, 7, 8, 9, 10, 11] {
+            entries.push(wgpu::BindGroupLayoutEntry {
+                binding,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            });
+        }
+        entries.extend_from_slice(&[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 5,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ]);
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("scene effects layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Depth,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
+            entries: &entries,
         });
         let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("effects uniforms"),
             contents: data::as_bytes(&[EffectsUniforms::default()]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-        let static_shadow = DepthTarget::new(device, "static shadows", 1);
-        let dynamic_shadow = DepthTarget::new(device, "dynamic shadows", 1);
+        let static_shadow = std::array::from_fn(|_| DepthTarget::new(device, "static shadows", 1));
+        let dynamic_shadow =
+            std::array::from_fn(|_| DepthTarget::new(device, "dynamic shadows", 1));
         let reflection = ColorTarget::new(
             device,
             "planar reflection",
@@ -1266,8 +1326,8 @@ impl Effects {
             fallback,
             comparison,
             sampler,
-            static_key: None,
-            dynamic_key: None,
+            static_key: [None; MAX_LIGHTS],
+            dynamic_key: [None; MAX_LIGHTS],
             reflection_key: None,
             shadows: false,
             reflections: false,
@@ -1278,41 +1338,45 @@ impl Effects {
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         uniform: &wgpu::Buffer,
-        static_shadow: &DepthTarget,
-        dynamic_shadow: &DepthTarget,
+        static_shadow: &[DepthTarget; MAX_LIGHTS],
+        dynamic_shadow: &[DepthTarget; MAX_LIGHTS],
         comparison: &wgpu::Sampler,
         reflection: &ColorTarget,
         sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
+        let mut entries = vec![
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(comparison),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(&reflection.color),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ];
+        for i in 0..MAX_LIGHTS {
+            let binding = if i == 0 { 1 } else { 4 + i as u32 * 2 };
+            entries.push(wgpu::BindGroupEntry {
+                binding,
+                resource: wgpu::BindingResource::TextureView(&static_shadow[i].view),
+            });
+            entries.push(wgpu::BindGroupEntry {
+                binding: binding + 1,
+                resource: wgpu::BindingResource::TextureView(&dynamic_shadow[i].view),
+            });
+        }
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("scene effects"),
             layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&static_shadow.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&dynamic_shadow.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(comparison),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::TextureView(&reflection.color),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
+            entries: &entries,
         })
     }
     fn write_uniform(&mut self, queue: &wgpu::Queue, value: EffectsUniforms) -> usize {
@@ -1323,14 +1387,16 @@ impl Effects {
         self.last_uniform = value;
         std::mem::size_of::<EffectsUniforms>()
     }
-    pub fn ensure(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+    pub fn ensure(&mut self, device: &wgpu::Device, width: u32, height: u32, light_count: usize) {
         let mut changed = false;
-        if self.shadows && self.static_shadow.size != 1024 {
-            self.static_shadow = DepthTarget::new(device, "static shadows", 1024);
-            self.dynamic_shadow = DepthTarget::new(device, "dynamic shadows", 1024);
-            self.static_key = None;
-            self.dynamic_key = None;
-            changed = true;
+        for i in 0..light_count {
+            if self.shadows && self.static_shadow[i].size != 1024 {
+                self.static_shadow[i] = DepthTarget::new(device, "static shadows", 1024);
+                self.dynamic_shadow[i] = DepthTarget::new(device, "dynamic shadows", 1024);
+                self.static_key[i] = None;
+                self.dynamic_key[i] = None;
+                changed = true;
+            }
         }
         // Half resolution, capped at 1024 on the longer axis, with camera aspect preserved.
         let scale = (0.5f32).min(1024.0 / width.max(height) as f32);
@@ -1380,7 +1446,8 @@ impl Effects {
         view: RenderView,
         target: &RenderTarget<'_>,
     ) -> Result<(), String> {
-        self.ensure(&renderer.device, target.width, target.height);
+        let light_count = renderer.scene.lights().len().min(MAX_LIGHTS);
+        self.ensure(&renderer.device, target.width, target.height, light_count);
         renderer.upload_bytes = 0;
         let mut lights = [super::data::EMPTY_LIGHT; MAX_LIGHTS];
         for (dst, light) in lights.iter_mut().zip(renderer.scene.lights().values()) {
@@ -1391,16 +1458,15 @@ impl Effects {
                 _pad_c: 0.0,
             };
         }
-        let has_light = !renderer.scene.lights().is_empty();
-        let shadow_matrix = if self.shadows && has_light {
-            crate::render_math::shadow_view_projection(Vec3::from_array(lights[0].position))
-        } else {
-            Mat4::IDENTITY
-        };
-        if self.shadows && has_light {
+        let shadow_count = if self.shadows { light_count } else { 0 };
+        self.stats.shadow_light_count = shadow_count;
+        let mut shadow_matrices = [Mat4::IDENTITY; MAX_LIGHTS];
+        for i in 0..shadow_count {
+            shadow_matrices[i] =
+                crate::render_math::shadow_view_projection(Vec3::from_array(lights[i].position));
             for pass in [RenderPassKind::ShadowStatic, RenderPassKind::ShadowDynamic] {
                 let key = (
-                    shadow_matrix,
+                    shadow_matrices[i],
                     if pass == RenderPassKind::ShadowStatic {
                         renderer.scene.static_revision()
                     } else {
@@ -1409,44 +1475,53 @@ impl Effects {
                     renderer.frustum_culling,
                 );
                 let previous = if pass == RenderPassKind::ShadowStatic {
-                    self.static_key
+                    self.static_key[i]
                 } else {
-                    self.dynamic_key
+                    self.dynamic_key[i]
                 };
                 if previous == Some(key) {
                     continue;
                 }
-                renderer.prepare_pass(
+                renderer.prepare_shadow_pass(
                     RenderView {
-                        view_projection: shadow_matrix,
-                        camera_position: Vec3::from_array(lights[0].position),
+                        view_projection: shadow_matrices[i],
+                        camera_position: Vec3::from_array(lights[i].position),
                     },
                     pass,
+                    i,
                 );
                 let map = if pass == RenderPassKind::ShadowStatic {
-                    &self.static_shadow
+                    &self.static_shadow[i]
                 } else {
-                    &self.dynamic_shadow
+                    &self.dynamic_shadow[i]
                 };
                 renderer.draw_depth(&map.target())?;
-                let visible = renderer.pass_visible(pass);
+                let visible = renderer.pass_visible();
                 if pass == RenderPassKind::ShadowStatic {
-                    self.static_key = Some(key);
+                    self.static_key[i] = Some(key);
                     self.stats.static_updates += 1;
-                    self.stats.static_visible = visible;
+                    self.stats.static_updates_by_light[i] += 1;
+                    self.stats.static_visible_by_light[i] = visible;
                 } else {
-                    self.dynamic_key = Some(key);
+                    self.dynamic_key[i] = Some(key);
                     self.stats.dynamic_updates += 1;
-                    self.stats.dynamic_visible = visible;
+                    self.stats.dynamic_updates_by_light[i] += 1;
+                    self.stats.dynamic_visible_by_light[i] = visible;
                 }
                 self.stats.passes += 1;
             }
         }
+        self.stats.static_visible = self.stats.static_visible_by_light[..shadow_count]
+            .iter()
+            .sum();
+        self.stats.dynamic_visible = self.stats.dynamic_visible_by_light[..shadow_count]
+            .iter()
+            .sum();
         let mut uniforms = EffectsUniforms {
-            shadow_matrix: shadow_matrix.to_cols_array_2d(),
+            shadow_matrices: shadow_matrices.map(|matrix| matrix.to_cols_array_2d()),
             ..Default::default()
         };
-        uniforms.params[0] = if self.shadows && has_light { 1.0 } else { 0.0 };
+        uniforms.params[0] = shadow_count as f32;
         if let Some(plane) = renderer.scene.mirror_plane().filter(|_| {
             self.reflections
                 && renderer
@@ -1474,7 +1549,7 @@ impl Effects {
                     RenderPassKind::Reflection,
                 );
                 renderer.draw_color(&self.reflection.target(), self, true)?;
-                self.stats.reflection_visible = renderer.pass_visible(RenderPassKind::Reflection);
+                self.stats.reflection_visible = renderer.pass_visible();
                 self.stats.reflection_updates += 1;
                 self.stats.passes += 1;
                 self.reflection_key = Some(key);
@@ -2124,6 +2199,7 @@ pub struct SceneRenderer {
     light_vertex_buffer: wgpu::Buffer,
     light_vertex_count: u32,
     pub draw_grid: bool,
+    pub draw_light_helpers: bool,
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
     pipelines: HashMap<
@@ -2137,8 +2213,8 @@ pub struct SceneRenderer {
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
-    passes: [PassCache; 4],
-    active_pass: RenderPassKind,
+    passes: [PassCache; 2 + MAX_LIGHTS * 2],
+    active_cache: usize,
     shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     effects: Option<Effects>,
     pub frustum_culling: bool,
@@ -2212,6 +2288,7 @@ impl SceneRenderer {
             light_vertex_buffer,
             light_vertex_count,
             draw_grid: true,
+            draw_light_helpers: true,
             device,
             queue,
             pipelines: HashMap::new(),
@@ -2223,7 +2300,7 @@ impl SceneRenderer {
             grid_bind_group,
             scene: SceneManager::default(),
             passes,
-            active_pass: RenderPassKind::Main,
+            active_cache: 0,
             shadow_pipelines: HashMap::new(),
             effects,
             frustum_culling: true,
@@ -2235,6 +2312,10 @@ impl SceneRenderer {
     }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
+    }
+
+    pub fn set_light_helpers_visible(&mut self, show: bool) {
+        self.draw_light_helpers = show;
     }
 
     fn mesh(&self, kind: MeshKind) -> &Mesh {
@@ -2255,8 +2336,23 @@ impl SceneRenderer {
         self.prepare_pass(view, RenderPassKind::Main);
     }
     pub(super) fn prepare_pass(&mut self, view: RenderView, pass: RenderPassKind) {
-        self.active_pass = pass;
-        let cache = &mut self.passes[pass.index()];
+        self.prepare_pass_cache(view, pass, pass.index());
+    }
+    pub(super) fn prepare_shadow_pass(
+        &mut self,
+        view: RenderView,
+        pass: RenderPassKind,
+        light: usize,
+    ) {
+        self.prepare_pass_cache(
+            view,
+            pass,
+            2 + light * 2 + usize::from(pass == RenderPassKind::ShadowDynamic),
+        );
+    }
+    fn prepare_pass_cache(&mut self, view: RenderView, pass: RenderPassKind, index: usize) {
+        self.active_cache = index;
+        let cache = &mut self.passes[index];
         let camera_matrix = view.view_projection;
         let camera_pos = view.camera_position;
         let active_lights: Vec<Light> = self
@@ -2312,8 +2408,8 @@ impl SceneRenderer {
         }
     }
 
-    pub(super) fn pass_visible(&self, pass: RenderPassKind) -> usize {
-        self.passes[pass.index()].queue.visible
+    pub(super) fn pass_visible(&self) -> usize {
+        self.passes[self.active_cache].queue.visible
     }
     pub fn render_stats(&self) -> [f64; 8] {
         [
@@ -2336,7 +2432,7 @@ impl SceneRenderer {
         effects.shadows = shadows;
         effects.reflections = reflections;
     }
-    pub fn effects_stats(&self) -> [f64; 10] {
+    pub fn effects_stats(&self) -> [f64; 19] {
         let e = self.effects.as_ref().unwrap();
         let s = &e.stats;
         [
@@ -2347,9 +2443,18 @@ impl SceneRenderer {
             s.dynamic_visible as f64,
             s.reflection_visible as f64,
             s.passes as f64,
-            e.static_shadow.size as f64,
+            e.static_shadow[0].size as f64,
             e.reflection.width as f64,
             e.reflection.height as f64,
+            s.shadow_light_count as f64,
+            s.static_updates_by_light[0] as f64,
+            s.static_updates_by_light[1] as f64,
+            s.static_updates_by_light[2] as f64,
+            s.static_updates_by_light[3] as f64,
+            s.dynamic_updates_by_light[0] as f64,
+            s.dynamic_updates_by_light[1] as f64,
+            s.dynamic_updates_by_light[2] as f64,
+            s.dynamic_updates_by_light[3] as f64,
         ]
     }
     /// Auxiliary views have independent culling/buffer caches; simulation advances separately.
@@ -2384,7 +2489,7 @@ impl SceneRenderer {
                 pipeline::build_shadow(&self.device, &self.bind_group_layout, target.format)
             });
         let pipeline = &self.shadow_pipelines[&target.format];
-        let cache = &self.passes[self.active_pass.index()];
+        let cache = &self.passes[self.active_cache];
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -2463,7 +2568,7 @@ impl SceneRenderer {
         });
         // Immutable lookup ends the map mutation before borrowing mesh resources.
         let pipelines = &self.pipelines[&key];
-        let cache = &self.passes[self.active_pass.index()];
+        let cache = &self.passes[self.active_cache];
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -2532,13 +2637,17 @@ impl SceneRenderer {
                 rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
-            if self.draw_grid && !reflected {
+            if !reflected && (self.draw_grid || self.draw_light_helpers) {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
-                rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
-                rp.draw(0..self.grid_vertex_count, 0..1);
-                rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
-                rp.draw(0..self.light_vertex_count, 0..1);
+                if self.draw_grid {
+                    rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+                    rp.draw(0..self.grid_vertex_count, 0..1);
+                }
+                if self.draw_light_helpers {
+                    rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                    rp.draw(0..self.light_vertex_count, 0..1);
+                }
             }
         }
         self.queue.submit(Some(encoder.finish()));
@@ -3586,8 +3695,8 @@ impl SceneManager {
         );
         self.set_object_spin(sphere, Vec3::new(0.0, 0.0, 0.55));
         // Warm key light and blue fill; both illuminate the scene and its reflection.
-        self.add_light(Vec3::new(-3.0, 7.0, 4.0), Vec3::new(0.8, 0.224, 0.056));
-        self.add_light(Vec3::new(4.0, 3.0, 2.0), Vec3::new(0.052, 0.234, 0.65));
+        self.add_light(Vec3::new(-2.5, 3.0, -1.5), Vec3::new(0.8, 0.224, 0.056));
+        self.add_light(Vec3::new(2.5, 2.0, 2.0), Vec3::new(0.052, 0.234, 0.65));
     }
     pub fn load_example(&mut self) {
         self.clear();
@@ -3820,7 +3929,7 @@ fn vs_lines(input: VertexInput) -> VertexOutput {
 }
 
 struct EffectsUniforms {
-    shadow_matrix:mat4x4<f32>, reflection_matrix:mat4x4<f32>,
+    shadow_matrices:array<mat4x4<f32>,4>, reflection_matrix:mat4x4<f32>,
     clip_plane:vec4<f32>, params:vec4<f32>,
 };
 @group(1) @binding(0) var<uniform> effects:EffectsUniforms;
@@ -3829,8 +3938,23 @@ struct EffectsUniforms {
 @group(1) @binding(3) var shadow_sampler:sampler_comparison;
 @group(1) @binding(4) var reflection_texture:texture_2d<f32>;
 @group(1) @binding(5) var reflection_sampler:sampler;
-fn shadow_visibility(world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
-    let clip=effects.shadow_matrix*vec4(world,1.0);
+@group(1) @binding(6) var static_shadow_1:texture_depth_2d;
+@group(1) @binding(7) var dynamic_shadow_1:texture_depth_2d;
+@group(1) @binding(8) var static_shadow_2:texture_depth_2d;
+@group(1) @binding(9) var dynamic_shadow_2:texture_depth_2d;
+@group(1) @binding(10) var static_shadow_3:texture_depth_2d;
+@group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
+fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
+    switch index {
+        case 0u: { return min(textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
+        case 1u: { return min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
+        case 2u: { return min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
+        case 3u: { return min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
+        default: { return 1.0; }
+    }
+}
+fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
+    let clip=effects.shadow_matrices[index]*vec4(world,1.0);
     let ndc=clip.xyz/clip.w;
     if (clip.w<=0.0 || ndc.z<=0.0 || ndc.z>=1.0 || any(abs(ndc.xy)>vec2(1.0))) {return 1.0;}
     let uv=ndc.xy*vec2(0.5,-0.5)+vec2(0.5);
@@ -3841,8 +3965,7 @@ fn shadow_visibility(world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)
     // Combine static and dynamic visibility per texel, then apply 3x3 PCF.
     for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
         let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
-        visibility+=min(textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth),
-            textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        visibility+=compare_shadow(index,sample_uv,depth);
     }}
     return visibility/9.0;
 }
@@ -3870,8 +3993,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             spec = pow(max(dot(normal, halfway), 0.0), 32.0);
         }
         var visibility=1.0;
-        if(i==0u && effects.params.x>0.5 && input.material.y>0.5) {
-            visibility=shadow_visibility(input.world_pos,normal,l_dir);
+        if(i<u32(effects.params.x) && input.material.y>0.5) {
+            visibility=shadow_visibility(i,input.world_pos,normal,l_dir);
         }
         result += (diff * input.color + spec) * light.color * visibility;
     }
@@ -4247,6 +4370,7 @@ pub fn load_effects_demo() {
             state.scene.load_effects_demo();
             state.set_effects(true, true);
             state.set_grid_visible(false);
+            state.set_light_helpers_visible(false);
         }
     });
 }
@@ -4273,7 +4397,7 @@ pub fn effects_stats() -> js_sys::Float64Array {
             .borrow()
             .as_ref()
             .map(|state| state.borrow().effects_stats())
-            .unwrap_or([0.0; 10])
+            .unwrap_or([0.0; 19])
     });
     js_sys::Float64Array::from(values.as_slice())
 }
@@ -4468,6 +4592,14 @@ pub fn set_object_scale(id: u32, x: f32, y: f32, z: f32) -> bool {
     })
 }
 
+#[wasm_bindgen]
+pub fn set_light_helpers_visible(show: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_light_helpers_visible(show);
+        }
+    });
+}
 #[wasm_bindgen]
 pub fn set_grid_visible(show: bool) {
     STATE.with(|s| {

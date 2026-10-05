@@ -125,6 +125,7 @@ pub struct SceneRenderer {
     light_vertex_buffer: wgpu::Buffer,
     light_vertex_count: u32,
     pub draw_grid: bool,
+    pub draw_light_helpers: bool,
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
     pipelines: HashMap<
@@ -138,8 +139,8 @@ pub struct SceneRenderer {
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
-    passes: [PassCache; 4],
-    active_pass: RenderPassKind,
+    passes: [PassCache; 2 + MAX_LIGHTS * 2],
+    active_cache: usize,
     shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     effects: Option<Effects>,
     pub frustum_culling: bool,
@@ -213,6 +214,7 @@ impl SceneRenderer {
             light_vertex_buffer,
             light_vertex_count,
             draw_grid: true,
+            draw_light_helpers: true,
             device,
             queue,
             pipelines: HashMap::new(),
@@ -224,7 +226,7 @@ impl SceneRenderer {
             grid_bind_group,
             scene: SceneManager::default(),
             passes,
-            active_pass: RenderPassKind::Main,
+            active_cache: 0,
             shadow_pipelines: HashMap::new(),
             effects,
             frustum_culling: true,
@@ -236,6 +238,10 @@ impl SceneRenderer {
     }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
+    }
+
+    pub fn set_light_helpers_visible(&mut self, show: bool) {
+        self.draw_light_helpers = show;
     }
 
     fn mesh(&self, kind: MeshKind) -> &Mesh {
@@ -256,8 +262,23 @@ impl SceneRenderer {
         self.prepare_pass(view, RenderPassKind::Main);
     }
     pub(super) fn prepare_pass(&mut self, view: RenderView, pass: RenderPassKind) {
-        self.active_pass = pass;
-        let cache = &mut self.passes[pass.index()];
+        self.prepare_pass_cache(view, pass, pass.index());
+    }
+    pub(super) fn prepare_shadow_pass(
+        &mut self,
+        view: RenderView,
+        pass: RenderPassKind,
+        light: usize,
+    ) {
+        self.prepare_pass_cache(
+            view,
+            pass,
+            2 + light * 2 + usize::from(pass == RenderPassKind::ShadowDynamic),
+        );
+    }
+    fn prepare_pass_cache(&mut self, view: RenderView, pass: RenderPassKind, index: usize) {
+        self.active_cache = index;
+        let cache = &mut self.passes[index];
         let camera_matrix = view.view_projection;
         let camera_pos = view.camera_position;
         let active_lights: Vec<Light> = self
@@ -313,8 +334,8 @@ impl SceneRenderer {
         }
     }
 
-    pub(super) fn pass_visible(&self, pass: RenderPassKind) -> usize {
-        self.passes[pass.index()].queue.visible
+    pub(super) fn pass_visible(&self) -> usize {
+        self.passes[self.active_cache].queue.visible
     }
     pub fn render_stats(&self) -> [f64; 8] {
         [
@@ -337,7 +358,7 @@ impl SceneRenderer {
         effects.shadows = shadows;
         effects.reflections = reflections;
     }
-    pub fn effects_stats(&self) -> [f64; 10] {
+    pub fn effects_stats(&self) -> [f64; 19] {
         let e = self.effects.as_ref().unwrap();
         let s = &e.stats;
         [
@@ -348,9 +369,18 @@ impl SceneRenderer {
             s.dynamic_visible as f64,
             s.reflection_visible as f64,
             s.passes as f64,
-            e.static_shadow.size as f64,
+            e.static_shadow[0].size as f64,
             e.reflection.width as f64,
             e.reflection.height as f64,
+            s.shadow_light_count as f64,
+            s.static_updates_by_light[0] as f64,
+            s.static_updates_by_light[1] as f64,
+            s.static_updates_by_light[2] as f64,
+            s.static_updates_by_light[3] as f64,
+            s.dynamic_updates_by_light[0] as f64,
+            s.dynamic_updates_by_light[1] as f64,
+            s.dynamic_updates_by_light[2] as f64,
+            s.dynamic_updates_by_light[3] as f64,
         ]
     }
     /// Auxiliary views have independent culling/buffer caches; simulation advances separately.
@@ -385,7 +415,7 @@ impl SceneRenderer {
                 pipeline::build_shadow(&self.device, &self.bind_group_layout, target.format)
             });
         let pipeline = &self.shadow_pipelines[&target.format];
-        let cache = &self.passes[self.active_pass.index()];
+        let cache = &self.passes[self.active_cache];
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -464,7 +494,7 @@ impl SceneRenderer {
         });
         // Immutable lookup ends the map mutation before borrowing mesh resources.
         let pipelines = &self.pipelines[&key];
-        let cache = &self.passes[self.active_pass.index()];
+        let cache = &self.passes[self.active_cache];
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -533,13 +563,17 @@ impl SceneRenderer {
                 rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
-            if self.draw_grid && !reflected {
+            if !reflected && (self.draw_grid || self.draw_light_helpers) {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
-                rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
-                rp.draw(0..self.grid_vertex_count, 0..1);
-                rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
-                rp.draw(0..self.light_vertex_count, 0..1);
+                if self.draw_grid {
+                    rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+                    rp.draw(0..self.grid_vertex_count, 0..1);
+                }
+                if self.draw_light_helpers {
+                    rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                    rp.draw(0..self.light_vertex_count, 0..1);
+                }
             }
         }
         self.queue.submit(Some(encoder.finish()));
