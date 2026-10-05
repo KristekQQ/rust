@@ -30,9 +30,18 @@ pub fn renderer_stats() -> js_sys::Float64Array {
             .borrow()
             .as_ref()
             .map(|state| state.borrow().render_stats())
-            .unwrap_or([0.0; 6])
+            .unwrap_or([0.0; 8])
     });
     js_sys::Float64Array::from(values.as_slice())
+}
+
+#[wasm_bindgen]
+pub fn load_culling_demo() {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().scene.load_culling_demo();
+        }
+    });
 }
 
 #[wasm_bindgen]

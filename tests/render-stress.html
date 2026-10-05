@@ -1,30 +1,58 @@
 <!doctype html>
 <html lang="cs">
 <meta charset="utf-8">
-<title>Rust – culling a instancing</title>
-<style>body{margin:0;font:14px system-ui;color:white}canvas{width:100vw;height:100vh;display:block}aside{position:fixed;left:12px;top:12px;background:#171727ed;padding:16px;border-radius:8px}pre{white-space:pre-wrap}button{padding:6px}</style>
-<canvas id="gpu-canvas" aria-label="Test instancování"></canvas>
-<aside><strong>10 000 krychlí · Rust renderer</strong><p>100 před kamerou, 9 900 mimo záběr.</p>
-<label><input id="culling" type="checkbox" checked> Frustum culling</label>
-<button id="sample">Ukázková scéna</button><pre id="status" role="status">Načítám…</pre></aside>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rust – prostorový test cullingu</title>
+<style>
+body{margin:0;font:14px system-ui;color:#eef0ff;background:#111526}canvas{width:100vw;height:100vh;display:block;outline:none}
+aside{position:fixed;left:12px;top:12px;background:#14182aeb;padding:16px;border:1px solid #ffffff26;border-radius:12px;width:min(290px,calc(100vw - 60px));box-shadow:0 12px 36px #0005}
+h1{font-size:17px;margin:0 0 8px}p{line-height:1.5;margin:8px 0}.meters{display:flex;gap:24px;margin:14px 0}.meters strong{display:block;font-size:30px;font-variant-numeric:tabular-nums}.meters small{color:#adb8ce}
+pre{line-height:1.6;font-size:13px;white-space:pre-wrap;font-variant-numeric:tabular-nums;margin:12px 0}button{padding:7px 10px;margin:4px 2px 4px 0;color:inherit;background:#333c64;border:1px solid #ffffff30;border-radius:6px;cursor:pointer}button[aria-pressed=true]{background:#505fa1}button:focus-visible,a:focus-visible{outline:2px solid #a4cbff;outline-offset:3px}a{color:#b8d7ff}small{color:#abb5c9}.muted{font-size:12px;color:#abb5c9}
+</style>
+<canvas id="gpu-canvas" tabindex="0" aria-label="Prostorová scéna s krychlemi"></canvas>
+<aside>
+<h1 id="title">10 000 krychlí v prostoru</h1>
+<p id="description">Prolétněte mezi krychlemi. Viditelnost se mění podle polohy a směru kamery.</p>
+<div class="meters"><div><strong id="fps">—</strong><small>FPS</small></div><div><strong id="frame-ms">—</strong><small>ms / snímek</small></div></div>
+<label><input id="culling" type="checkbox" checked> Frustum culling</label><br>
+<button id="free" aria-pressed="true">Free</button><button id="orbit" aria-pressed="false">Orbit</button><br>
+<button id="space">Prostorové krychle</button><button id="sample">Ukázková scéna</button>
+<pre id="status" role="status">Načítám…</pre>
+<p class="muted">Tažení myší: pohled · WASD: pohyb<br>Q / E: dolů / nahoru · Shift: rychleji<br>Orbit: + / − vzdálenost</p>
+<small>FPS a interval snímků počítá Rust z browser smyčky. CPU příprava není GPU čas.</small>
+<p class="muted"><a href="http://127.0.0.1:8000/tests/render-stress.html">Spustit přes místní HTTP server</a> · <a href="?backend=auto">WebGPU / auto</a> · <a href="?backend=webgl">WebGL</a></p>
+</aside>
 <script type="module">
+const status=document.getElementById("status");
 try {
-    const {initEngine} = await import(`../js/engine.js?v=${Date.now()}`);
-    const engine = await initEngine(document.getElementById("gpu-canvas"),{backend:new URLSearchParams(location.search).get("backend") || "auto"});
-    engine.set_grid_visible(false);
-    for(let i=0;i<10000;i++) {
-        const position = i<100 ? [(i%10-4.5)*0.4,(Math.floor(i/10)-4.5)*0.4,0] : [1000+i,0,0];
-        engine.scene.createCube(position).setScale([0.25,0.25,0.25]);
+    if(location.protocol === "file:") throw new Error("WASM potřebuje HTTP server. Klikněte na Spustit přes místní HTTP server.");
+    const {initEngine}=await import(`../js/engine.js?v=${Date.now()}`);
+    const canvas=document.getElementById("gpu-canvas");
+    const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get("backend") || "auto"});
+    function mode(value) {
+        engine.set_camera_mode(value);
+        for(const id of ["free","orbit"]) document.getElementById(id).setAttribute("aria-pressed",String(id===value));
+        canvas.focus();
     }
-    engine.scene.createLight({position:[3,4,5]});
-    document.getElementById("culling").onchange = event => engine.set_frustum_culling(event.target.checked);
-    document.getElementById("sample").onclick = () => engine.scene.loadExample();
-    const samples=[];
-    setInterval(() => {
-        const stats = engine.renderer_stats();
-        samples.push(stats.prepareMs); if(samples.length>30) samples.shift();
-        document.getElementById("status").textContent = `${engine.renderer_backend()}\nObjekty: ${stats.total}\nViditelné: ${stats.visible}\nVyřazené: ${stats.culled}\nDraw calls objektů: ${stats.drawCalls}\nUpload posledního snímku: ${stats.uploadBytes} B\nCPU příprava průměr: ${(samples.reduce((a,b)=>a+b,0)/samples.length).toFixed(3)} ms\nČas nezahrnuje GPU ani prezentaci.`;
+    function setup(spatial) {
+        if(spatial) engine.scene.loadCullingDemo(); else engine.scene.loadExample();
+        engine.set_grid_visible(!spatial);
+        document.getElementById("title").textContent=spatial ? "10 000 krychlí v prostoru" : "Ukázková scéna";
+        document.getElementById("description").textContent=spatial ? "Prolétněte mezi krychlemi. Viditelnost se mění podle polohy a směru kamery." : "Krychle, koule a rovina. Otočte kameru mimo scénu a sledujte počty.";
+        mode(spatial ? "free" : "orbit");
+    }
+    document.getElementById("culling").onchange=event=>engine.set_frustum_culling(event.target.checked);
+    for(const id of ["free","orbit"]) document.getElementById(id).onclick=()=>mode(id);
+    document.getElementById("space").onclick=()=>setup(true);
+    document.getElementById("sample").onclick=()=>setup(false);
+    addEventListener("resize",()=>engine.resize(canvas.width=innerWidth,canvas.height=innerHeight));
+    setup(true);
+    setInterval(()=>{
+        const s=engine.renderer_stats();
+        document.getElementById("fps").textContent=s.fps>0 ? s.fps.toFixed(0) : "—";
+        document.getElementById("frame-ms").textContent=s.frameMs>0 ? s.frameMs.toFixed(1) : "—";
+        status.textContent=`${engine.renderer_backend() === "BrowserWebGpu" ? "WebGPU" : "WebGL"}\nVe scéně: ${s.total.toLocaleString("cs")}\nOdeslané k vykreslení: ${s.visible.toLocaleString("cs")}\nVyřazené: ${s.culled.toLocaleString("cs")}\nDraw calls: ${s.drawCalls}\nUpload: ${s.uploadBytes.toLocaleString("cs")} B\nCPU příprava: ${s.prepareMs > 0 ? s.prepareMs.toFixed(3)+" ms" : "pod rozlišením časovače"}`;
     },200);
-} catch(error) {document.getElementById("status").textContent=`FAIL: ${error.message}`;console.error(error);}
+} catch(error) {status.textContent=`${error.message}`;console.error(error);}
 </script>
 </html>

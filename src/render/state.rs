@@ -133,6 +133,7 @@ pub struct State {
     pub frustum_culling: bool,
     pub upload_bytes: usize,
     pub prepare_ms: f64,
+    frame_metrics: crate::frame_metrics::FrameMetrics,
     last_lights: [Light; MAX_LIGHTS],
 }
 
@@ -280,6 +281,7 @@ impl State {
             frustum_culling: true,
             upload_bytes: 0,
             prepare_ms: 0.0,
+            frame_metrics: crate::frame_metrics::FrameMetrics::default(),
             last_lights: lights_array,
         })
     }
@@ -310,6 +312,7 @@ impl State {
     }
 
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        self.frame_metrics.record(dt);
         self.scene.update(dt);
         let active_lights: Vec<Light> = self
             .scene
@@ -359,7 +362,7 @@ impl State {
         }
     }
 
-    pub fn render_stats(&self) -> [f64; 6] {
+    pub fn render_stats(&self) -> [f64; 8] {
         [
             self.render_queue.total as f64,
             self.render_queue.visible as f64,
@@ -367,6 +370,8 @@ impl State {
             self.render_queue.draw_calls() as f64,
             self.upload_bytes as f64,
             self.prepare_ms,
+            self.frame_metrics.fps,
+            self.frame_metrics.frame_ms,
         ]
     }
 

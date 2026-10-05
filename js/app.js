@@ -1,4 +1,8 @@
 const status = document.getElementById("status");
+// Older cached HTML may load the current module during local development.
+const frameStats = document.getElementById("frame-stats") ??
+    Object.assign(document.createElement("div"), { id: "frame-stats", className: "help" });
+status.after(frameStats);
 try {
     const version = Date.now();
     const { initEngine } = await import(`./engine.js?v=${version}`);
@@ -38,6 +42,11 @@ try {
     });
     status.textContent = `Scéna běží · ${engine.renderer_backend() === "BrowserWebGpu" ? "WebGPU" : "WebGL"}`;
     for (const button of document.querySelectorAll("button")) button.disabled = false;
+    setInterval(() => {
+        const stats = engine.renderer_stats();
+        frameStats.textContent =
+            `${stats.fps > 0 ? stats.fps.toFixed(0) : "—"} FPS · ${stats.frameMs.toFixed(1)} ms/snímek · viditelné ${stats.visible}/${stats.total} · vyřazené ${stats.culled}`;
+    }, 200);
 } catch (error) {
     console.error(error);
     status.textContent = `Scénu se nepodařilo spustit: ${error instanceof Error ? error.message : String(error)}. Použijte prohlížeč s WebGPU nebo WebGL2 a ověřte sestavení pkg/.`;

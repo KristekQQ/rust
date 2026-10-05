@@ -137,6 +137,13 @@ ověřil WebGPU i WebGL bez chyb, tmavou přivrácenou stranu při zadním svět
 elipsoid a horní/dolní stranu roviny.
 # Výkon rendereru – aktuální změna 2026-10-05
 
+Prostorový test nyní načítá Rustem definovaných 20 × 25 × 20 krychlí kolem
+kamery místo původních 9 900 vzdálených objektů. Scene.loadCullingDemo je pouze
+JS příkaz. FrameMetrics v Rustu měří FPS/interval RAF v okně 0,5 s a resetuje
+pauzy nad 0,25 s; statistiky přidávají fps/frameMs. Volná kamera: Q/E vertikálně,
+Shift 4× rychlost. FPS a viditelné počty jsou i v hlavní stránce. test HTML musí
+běžet přes HTTP; file:// zobrazuje odkaz na loopback server.
+
 Renderer již nepoužívá objektové uniformy/bind groups. `visibility.rs` drží
 CPU extrakci frusta a RenderQueue; SceneObject cachuje model, normal matrix a
 world AABB při změnách transformací. Instance buffery se sdílejí podle meshe,

@@ -101,6 +101,34 @@ pub struct SceneManager {
 }
 
 impl SceneManager {
+    /// Fixed spatial demo for flying through and inspecting visibility.
+    /// Creation and all transforms remain in Rust, not the JS test page.
+    pub fn load_culling_demo(&mut self) {
+        self.clear();
+        for x in 0..20 {
+            for y in 0..25 {
+                for z in 0..20 {
+                    let position = Vec3::new(
+                        (x as f32 - 9.5) * 3.0,
+                        (y as f32 - 12.0) * 1.8,
+                        (z as f32 - 9.5) * 3.0,
+                    );
+                    self.add_object(
+                        MeshKind::Cube,
+                        Transform::new(position, Vec3::ZERO, Vec3::splat(0.65)),
+                    );
+                }
+            }
+        }
+        for position in [
+            Vec3::new(-20.0, 20.0, -20.0),
+            Vec3::new(20.0, 20.0, 20.0),
+            Vec3::new(-20.0, -20.0, 20.0),
+            Vec3::new(20.0, -20.0, -20.0),
+        ] {
+            self.add_light(position, Vec3::splat(0.35));
+        }
+    }
     pub fn render_revision(&self) -> u64 {
         self.render_revision
     }

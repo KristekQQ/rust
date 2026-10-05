@@ -52,6 +52,7 @@ export class Scene {
     }
     clear() { this.#wasm.clear_all(); }
     loadExample() { this.#wasm.load_example_scene(); }
+    loadCullingDemo() { this.#wasm.load_culling_demo(); }
 }
 
 export async function initEngine(canvas, { backend = "auto" } = {}) {
@@ -91,8 +92,8 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         renderer_backend: wasm.renderer_backend,
         set_frustum_culling: wasm.set_frustum_culling,
         renderer_stats() {
-            const [total, visible, culled, drawCalls, uploadBytes, prepareMs] = wasm.renderer_stats();
-            return {total, visible, culled, drawCalls, uploadBytes, prepareMs};
+            const [total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs] = wasm.renderer_stats();
+            return {total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs};
         },
     });
 }

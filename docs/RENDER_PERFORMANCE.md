@@ -29,11 +29,39 @@ JS/TS pouze posílá příkazy a čte diagnostiku. GPU vykonává WGSL shadery.
 
 ## Ověření a meze měření
 
-`tests/render-stress.html` vytvoří 10 000 krychlí, z nichž 100 leží v záběru.
+Původní verze `tests/render-stress.html` vytvořila 10 000 krychlí, z nichž 100 leželo v záběru.
 Na WebGPU i WebGL bylo ověřeno 100 viditelných, 9 900 vyřazených a jeden
 objektový draw call. Ve stabilním snímku bez změn se přenáší pouze 208 B.
 Po vypnutí cullingu se odešle všech 10 000 instancí; stále jde o jeden draw
 call a v dalších stabilních snímcích se instance znovu nepřenášejí.
+
+Aktuální stránka volá Rust `SceneManager::load_culling_demo`: 20 × 25 × 20
+krychlí rozmístěných kolem kamery v prostoru přibližně 57 × 43 × 57 jednotek.
+Je určena pro létání a vizuální kontrolu; počet vyřazených krychlí není fixní.
+Volná kamera má Q/E pro vertikální pohyb a Shift pro čtyřnásobnou rychlost.
+Stránka nabízí i pevnou ukázku a přepínání Free/Orbit. Spouštět přes HTTP,
+např. `http://127.0.0.1:8000/tests/render-stress.html`, nikoli file://.
+
+FPS a průměrný interval snímku jsou počítány `FrameMetrics` v Rustu z intervalů
+RAF v půlsekundových oknech. Pauza delší než 250 ms resetuje okno, aby přepnutí
+do pozadí neznečišťovalo průměr. Jde o frekvenci browser smyčky, nikoli měření
+času GPU nebo důkaz fyzické prezentace každého snímku. Statistiku zobrazuje
+zátěžový test i hlavní ukázka; JS pouze formátuje hodnoty.
+
+## BVH, octree, kd-tree
+
+BVH není univerzálně nejlepší. Pro pravidelně rozmístěné podobně velké objekty,
+voxelový svět nebo statické chunky je přirozenou volbou uniform grid nebo octree.
+Pro různě velké a nepravidelně rozložené objekty je obvykle praktičtější BVH.
+Kd-tree je relevantní pro statické ray-intersection úlohy, ale není automaticky
+rychlejší při výběru celých objektů podle šesti rovin frusta. Náklady údržby,
+duplikace přes hranice buněk a rozložení dat v paměti jsou stejně důležité jako
+název stromu. Současný engine má zatím flat AABB scan s cache statického pohledu,
+nikoli BVH ani octree. Další strukturu vybrat porovnáním pohybující se kamery
+ve stejné scéně, včetně nákladů aktualizací a tvorby dávek.
+
+Srovnání: [PBRT BVH](https://www.pbr-book.org/4ed/Primitives_and_Intersection_Acceleration/Bounding_Volume_Hierarchies),
+[Babylon.js selection octree](https://github.com/BabylonJS/Documentation/blob/master/content/features/featuresDeepDive/scene/optimizeOctrees.md).
 
 Předchozí renderer měl N objektových draw callů a N zápisů uniformů,
 přičemž každý snímek posílal 336 B na každý objekt, i mimo záběr. Pro 10 000

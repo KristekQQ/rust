@@ -107,6 +107,25 @@ mod tests {
         glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
     }
     #[test]
+    fn spatial_demo_spans_the_world_and_camera_can_leave_it() {
+        let mut scene = SceneManager::default();
+        scene.load_culling_demo();
+        assert_eq!(scene.objects().len(), 10000);
+        assert_eq!(scene.lights().len(), 4);
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, camera(), true);
+        assert!(queue.visible > 0 && queue.visible < queue.total);
+        let outside = glam::camera::lh::view::look_at_mat4(
+            Vec3::new(100.0, 0.0, 0.0),
+            Vec3::new(200.0, 0.0, 0.0),
+            Vec3::Y,
+        );
+        queue.extract(&scene, camera() * outside, true);
+        assert_eq!(queue.visible, 0);
+        queue.extract(&scene, camera() * outside, false);
+        assert_eq!((queue.visible, queue.draw_calls()), (10000, 1));
+    }
+    #[test]
     fn moving_camera_and_intersecting_bounds_do_not_lose_visible_objects() {
         let projection = camera();
         let view = glam::camera::lh::view::look_at_mat4(

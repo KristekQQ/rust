@@ -53,19 +53,31 @@ impl Camera {
     }
 
     pub fn update(&mut self, dt: f32) {
+        let speed = self.speed
+            * if self.pressed.contains("ShiftLeft") || self.pressed.contains("ShiftRight") {
+                4.0
+            } else {
+                1.0
+            };
         let forward = self.forward();
         let right = Vec3::Y.cross(forward).normalize();
         if self.pressed.contains("KeyW") {
-            self.position += forward * self.speed * dt;
+            self.position += forward * speed * dt;
         }
         if self.pressed.contains("KeyS") {
-            self.position -= forward * self.speed * dt;
+            self.position -= forward * speed * dt;
         }
         if self.pressed.contains("KeyA") {
-            self.position -= right * self.speed * dt;
+            self.position -= right * speed * dt;
         }
         if self.pressed.contains("KeyD") {
-            self.position += right * self.speed * dt;
+            self.position += right * speed * dt;
+        }
+        if self.pressed.contains("KeyE") {
+            self.position.y += speed * dt;
+        }
+        if self.pressed.contains("KeyQ") {
+            self.position.y -= speed * dt;
         }
     }
 

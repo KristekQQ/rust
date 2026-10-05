@@ -42,6 +42,7 @@ export class Scene {
     createLight(options?: LightOptions): SceneLight;
     clear(): void;
     loadExample(): void;
+    loadCullingDemo(): void;
 }
 export type RawEngine = Pick<typeof wasm,
     "add_cube" | "add_plane" | "add_sphere" | "remove_object" | "clear_scene" |
@@ -56,6 +57,9 @@ export interface RenderStats {
     uploadBytes: number;
     /** Rust simulation, extraction and upload submission; excludes GPU execution. */
     prepareMs: number;
+    /** Averaged browser RAF rate, calculated in Rust; not GPU timestamp timing. */
+    fps: number;
+    frameMs: number;
 }
 export type Engine = Readonly<RawEngine & { readonly scene: Scene; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
