@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::{Window, HtmlCanvasElement, PointerEvent};
+use web_sys::{HtmlCanvasElement, PointerEvent, Window};
 
 use crate::input::camera::CameraController;
 
@@ -19,10 +19,11 @@ where
         let on_down = Closure::wrap(Box::new(move |e: PointerEvent| {
             if e.buttons() & 1 == 1 {
                 if let Some(target) = e.target() {
-                    if target == canvas_clone
-                        .clone()
-                        .dyn_into::<web_sys::EventTarget>()
-                        .unwrap()
+                    if target
+                        == canvas_clone
+                            .clone()
+                            .dyn_into::<web_sys::EventTarget>()
+                            .unwrap()
                     {
                         *dragging.borrow_mut() = true;
                     }

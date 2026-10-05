@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Rust scene SDK – integration test</title>
+<body>
+<h1>Rust scene SDK</h1>
+<pre id="result" role="status">Probíhá test…</pre>
+<canvas id="gpu-canvas" width="640" height="360"></canvas>
+<script type="module">
+const result = document.getElementById("result");
+const assert = (ok, message) => { if (!ok) throw new Error(message); };
+try {
+    const { initEngine } = await import(`../js/engine.js?v=${Date.now()}`);
+    const engine = await initEngine(document.getElementById("gpu-canvas"), {
+        backend: new URLSearchParams(location.search).get("backend") || "auto",
+    });
+    const scene = engine.scene;
+    assert(scene.objectCount === 0 && scene.lightCount === 0, "Engine must start empty");
+    scene.loadExample();
+    assert(scene.objectCount === 3 && scene.lightCount === 2, "Rust sample setup");
+    const cube = scene.createCube([-2, 0, 0]);
+    cube.setPosition([-1.5, 0, 0]).setScale([0.7, 0.7, 0.7]).setRotation([0, 0, 0]);
+    cube.rotate([0, 180, 0], { duration: 0.05 }).removeAfter(0.1);
+    assert(cube.exists && scene.objectCount === 4, "Create object through SDK");
+    // Only the Rust frame loop advances scene simulation. JS waits for its result.
+    const deadline = performance.now() + 5000;
+    while (cube.exists && performance.now() < deadline) {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+    assert(!cube.exists && scene.objectCount === 3, "Rust scheduled removal");
+    const replacement = scene.createCube([-2, 0, 0]);
+    assert(replacement.id !== cube.id, "Stable IDs");
+    let rejected = false;
+    try { cube.setPosition([0, 0, 0]); } catch { rejected = true; }
+    assert(rejected && replacement.exists, "Stale handles are rejected by Rust");
+    replacement.remove();
+    const light = scene.createLight({ position: [0, 3, 0], color: [1, 0, 0] });
+    light.orbit({ radius: 2, height: 3, speed: 1 }).stopOrbit().set([0, 3, 0], [1, 1, 1]);
+    assert(light.exists && scene.lightCount === 3, "Light SDK");
+    light.remove();
+    scene.clear();
+    assert(scene.objectCount === 0 && scene.lightCount === 0, "Rust clear");
+    scene.loadExample();
+    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, Rust sample, object commands, Rust animation/removal, stable IDs, lights, clear.";
+} catch (error) {
+    console.error(error);
+    result.textContent = `FAIL: ${error.message}`;
+}
+</script>
+</body>
+</html>

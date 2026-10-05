@@ -15,12 +15,16 @@ pub struct OrbitCamera {
 
 impl OrbitCamera {
     pub fn new(aspect: f32) -> Self {
-        let radius: f32 = 3.0;
-        let yaw: f32 = 0.0;
-        let pitch: f32 = 0.0;
+        let radius: f32 = 8.0;
+        let yaw: f32 = std::f32::consts::FRAC_PI_4;
+        let pitch: f32 = 0.35;
         let target = Vec3::ZERO;
         let position = target
-            + Vec3::new(radius * yaw.cos() * pitch.cos(), radius * pitch.sin(), radius * yaw.sin() * pitch.cos());
+            + Vec3::new(
+                radius * yaw.cos() * pitch.cos(),
+                radius * pitch.sin(),
+                radius * yaw.sin() * pitch.cos(),
+            );
         Self {
             position,
             target,
@@ -83,9 +87,14 @@ impl OrbitCamera {
             );
     }
 
-pub fn matrix(&self) -> Mat4 {
-        let view = Mat4::look_at_lh(self.position, self.target, Vec3::Y);
-        let proj = Mat4::perspective_lh(std::f32::consts::FRAC_PI_4, self.aspect, 0.1, 100.0);
+    pub fn matrix(&self) -> Mat4 {
+        let view = glam::camera::lh::view::look_at_mat4(self.position, self.target, Vec3::Y);
+        let proj = glam::camera::lh::proj::directx::perspective(
+            std::f32::consts::FRAC_PI_4,
+            self.aspect,
+            0.1,
+            100.0,
+        );
         proj * view
     }
 }
@@ -93,6 +102,10 @@ pub fn matrix(&self) -> Mat4 {
 use crate::input::camera::CameraController;
 
 impl CameraController for OrbitCamera {
+    fn clear_input(&mut self) {
+        self.pressed.clear();
+    }
+
     fn key_down(&mut self, code: String) {
         OrbitCamera::key_down(self, code);
     }
@@ -117,4 +130,3 @@ impl CameraController for OrbitCamera {
         self.position
     }
 }
-

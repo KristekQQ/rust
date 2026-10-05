@@ -10,8 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-# Aktualizováno na wgpu 25.0.2
-wgpu = { version = "25.0.2", features = ["webgpu", "webgl", "wgsl"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "webgpu", "webgl", "wgsl"] }
 console_error_panic_hook = "0.1"
 web-sys = { version = "0.3", features = [
     "HtmlCanvasElement",
@@ -24,9 +23,8 @@ web-sys = { version = "0.3", features = [
     "MouseEvent",
     "PointerEvent"
 ] }
-glam    = { version = "0.30.3", default-features = false, features = ["libm","serde"] }
+glam    = { version = "0.34.0", default-features = false, features = ["libm","serde"] }
 js-sys = "0.3"
-
 \n# File: src/input/active_camera.rs
 use crate::input::camera::{Camera, CameraController};
 use crate::input::orbit_camera::OrbitCamera;
@@ -54,6 +52,7 @@ impl ActiveCamera {
     }
 
     pub fn set_type(&mut self, ty: CameraType) {
+        self.clear_input();
         self.active = ty;
     }
 
@@ -78,6 +77,11 @@ impl ActiveCamera {
 }
 
 impl CameraController for ActiveCamera {
+    fn clear_input(&mut self) {
+        self.free.clear_input();
+        self.orbit.clear_input();
+    }
+
     fn key_down(&mut self, code: String) {
         self.active_mut().key_down(code);
     }
@@ -103,6 +107,50 @@ impl CameraController for ActiveCamera {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn switching_camera_releases_held_keys() {
+        let mut camera = ActiveCamera::new(16.0 / 9.0);
+        camera.set_type(CameraType::Free);
+        camera.key_down("KeyW".into());
+        camera.update(0.5);
+        let position = camera.position();
+        camera.set_type(CameraType::Orbit);
+        camera.key_up("KeyW".into());
+        camera.set_type(CameraType::Free);
+        camera.update(0.5);
+        assert_eq!(camera.position(), position);
+    }
+
+    #[test]
+    fn clearing_input_stops_movement_in_both_modes() {
+        for mode in [CameraType::Free, CameraType::Orbit] {
+            let mut camera = ActiveCamera::new(16.0 / 9.0);
+            camera.set_type(mode);
+            camera.key_down("KeyW".into());
+            let before = camera.position();
+            camera.update(0.25);
+            assert_ne!(camera.position(), before);
+            camera.clear_input();
+            let stopped = camera.position();
+            camera.update(1.0);
+            assert_eq!(camera.position(), stopped);
+            assert!(camera.matrix().is_finite());
+        }
+    }
+
+    #[test]
+    fn camera_projects_target_in_webgpu_depth_range() {
+        let camera = ActiveCamera::new(16.0 / 9.0);
+        let target = camera.matrix().project_point3(Vec3::ZERO);
+        assert!(target.x.abs() < 1e-5 && target.y.abs() < 1e-5);
+        assert!((0.0..1.0).contains(&target.z));
+    }
+}
+
 \n# File: src/input/camera.rs
 use glam::{Mat4, Vec3};
 use std::collections::HashSet;
@@ -111,6 +159,7 @@ pub trait CameraController {
     fn key_down(&mut self, code: String);
     fn key_up(&mut self, code: String);
     fn mouse_move(&mut self, dx: f32, dy: f32);
+    fn clear_input(&mut self);
 
     fn update(&mut self, dt: f32);
     fn matrix(&self) -> Mat4;
@@ -130,9 +179,9 @@ pub struct Camera {
 impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
-            position: Vec3::new(0.0, 0.0, 2.0),
-            yaw: -std::f32::consts::FRAC_PI_2,
-            pitch: 0.0,
+            position: Vec3::new(5.0, 3.0, 5.0),
+            yaw: -3.0 * std::f32::consts::FRAC_PI_4,
+            pitch: -0.4,
             speed: 2.0,
             sensitivity: 0.002,
             pressed: HashSet::new(),
@@ -175,12 +224,21 @@ impl Camera {
     }
 
     pub fn matrix(&self) -> Mat4 {
-        let view = Mat4::look_at_lh(self.position, self.position + self.forward(), Vec3::Y);
-        let proj = Mat4::perspective_lh(std::f32::consts::FRAC_PI_4, self.aspect, 0.1, 100.0);
+        let view = glam::camera::lh::view::look_at_mat4(
+            self.position,
+            self.position + self.forward(),
+            Vec3::Y,
+        );
+        let proj = glam::camera::lh::proj::directx::perspective(
+            std::f32::consts::FRAC_PI_4,
+            self.aspect,
+            0.1,
+            100.0,
+        );
         proj * view
     }
 
-fn forward(&self) -> Vec3 {
+    fn forward(&self) -> Vec3 {
         Vec3::new(
             self.yaw.cos() * self.pitch.cos(),
             self.pitch.sin(),
@@ -191,6 +249,10 @@ fn forward(&self) -> Vec3 {
 }
 
 impl CameraController for Camera {
+    fn clear_input(&mut self) {
+        self.pressed.clear();
+    }
+
     fn key_down(&mut self, code: String) {
         Camera::key_down(self, code);
     }
@@ -246,23 +308,31 @@ where
         .add_event_listener_with_callback("keyup", key_up.as_ref().unchecked_ref())
         .unwrap();
     key_up.forget();
+
+    let on_blur = Closure::wrap(Box::new(move || {
+        cam.borrow_mut().clear_input();
+    }) as Box<dyn FnMut()>);
+    window
+        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
+        .unwrap();
+    on_blur.forget();
 }
 
 \n# File: src/input/mod.rs
-#![cfg(target_arch = "wasm32")]
-
-pub mod camera;
-pub mod orbit_camera;
 pub mod active_camera;
+pub mod camera;
+#[cfg(target_arch = "wasm32")]
 pub mod keyboard;
+#[cfg(target_arch = "wasm32")]
 pub mod mouse;
+pub mod orbit_camera;
 
 \n# File: src/input/mouse.rs
 #![cfg(target_arch = "wasm32")]
 
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::{Window, HtmlCanvasElement, PointerEvent};
+use web_sys::{HtmlCanvasElement, PointerEvent, Window};
 
 use crate::input::camera::CameraController;
 
@@ -279,10 +349,11 @@ where
         let on_down = Closure::wrap(Box::new(move |e: PointerEvent| {
             if e.buttons() & 1 == 1 {
                 if let Some(target) = e.target() {
-                    if target == canvas_clone
-                        .clone()
-                        .dyn_into::<web_sys::EventTarget>()
-                        .unwrap()
+                    if target
+                        == canvas_clone
+                            .clone()
+                            .dyn_into::<web_sys::EventTarget>()
+                            .unwrap()
                     {
                         *dragging.borrow_mut() = true;
                     }
@@ -343,12 +414,16 @@ pub struct OrbitCamera {
 
 impl OrbitCamera {
     pub fn new(aspect: f32) -> Self {
-        let radius: f32 = 3.0;
-        let yaw: f32 = 0.0;
-        let pitch: f32 = 0.0;
+        let radius: f32 = 8.0;
+        let yaw: f32 = std::f32::consts::FRAC_PI_4;
+        let pitch: f32 = 0.35;
         let target = Vec3::ZERO;
         let position = target
-            + Vec3::new(radius * yaw.cos() * pitch.cos(), radius * pitch.sin(), radius * yaw.sin() * pitch.cos());
+            + Vec3::new(
+                radius * yaw.cos() * pitch.cos(),
+                radius * pitch.sin(),
+                radius * yaw.sin() * pitch.cos(),
+            );
         Self {
             position,
             target,
@@ -411,9 +486,14 @@ impl OrbitCamera {
             );
     }
 
-pub fn matrix(&self) -> Mat4 {
-        let view = Mat4::look_at_lh(self.position, self.target, Vec3::Y);
-        let proj = Mat4::perspective_lh(std::f32::consts::FRAC_PI_4, self.aspect, 0.1, 100.0);
+    pub fn matrix(&self) -> Mat4 {
+        let view = glam::camera::lh::view::look_at_mat4(self.position, self.target, Vec3::Y);
+        let proj = glam::camera::lh::proj::directx::perspective(
+            std::f32::consts::FRAC_PI_4,
+            self.aspect,
+            0.1,
+            100.0,
+        );
         proj * view
     }
 }
@@ -421,6 +501,10 @@ pub fn matrix(&self) -> Mat4 {
 use crate::input::camera::CameraController;
 
 impl CameraController for OrbitCamera {
+    fn clear_input(&mut self) {
+        self.pressed.clear();
+    }
+
     fn key_down(&mut self, code: String) {
         OrbitCamera::key_down(self, code);
     }
@@ -446,12 +530,11 @@ impl CameraController for OrbitCamera {
     }
 }
 
-
 \n# File: src/lib.rs
-#[cfg(target_arch = "wasm32")]
 pub mod input;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
+pub mod scene;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
 
@@ -650,6 +733,15 @@ pub struct Light {
     pub _pad_c: f32,
 }
 
+pub use crate::scene::MAX_LIGHTS;
+pub const LIGHT_VERTICES_PER_LIGHT: usize = 8;
+pub const EMPTY_LIGHT: Light = Light {
+    position: [0.0, 0.0, 0.0],
+    _pad_p: 0.0,
+    color: [0.0, 0.0, 0.0],
+    _pad_c: 0.0,
+};
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct SceneUniforms {
@@ -657,7 +749,7 @@ pub struct SceneUniforms {
     pub model: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
-    pub lights: [Light; 2],
+    pub lights: [Light; MAX_LIGHTS],
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {
@@ -666,10 +758,26 @@ pub fn grid_vertices(size: i32) -> Vec<Vertex> {
     let normal = [0.0, 1.0, 0.0];
     for i in -size..=size {
         let f = i as f32;
-        verts.push(Vertex { position: [-size as f32, 0.0, f], color, normal });
-        verts.push(Vertex { position: [size as f32, 0.0, f], color, normal });
-        verts.push(Vertex { position: [f, 0.0, -size as f32], color, normal });
-        verts.push(Vertex { position: [f, 0.0, size as f32], color, normal });
+        verts.push(Vertex {
+            position: [-size as f32, 0.0, f],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [size as f32, 0.0, f],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [f, 0.0, -size as f32],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [f, 0.0, size as f32],
+            color,
+            normal,
+        });
     }
     verts
 }
@@ -682,19 +790,117 @@ pub fn light_rays(lights: &[Light]) -> Vec<Vertex> {
         let p = l.position;
         let color = l.color;
         // small cross marking the light position
-        verts.push(Vertex { position: [p[0] - cross, p[1], p[2]], color, normal });
-        verts.push(Vertex { position: [p[0] + cross, p[1], p[2]], color, normal });
-        verts.push(Vertex { position: [p[0], p[1] - cross, p[2]], color, normal });
-        verts.push(Vertex { position: [p[0], p[1] + cross, p[2]], color, normal });
-        verts.push(Vertex { position: [p[0], p[1], p[2] - cross], color, normal });
-        verts.push(Vertex { position: [p[0], p[1], p[2] + cross], color, normal });
+        verts.push(Vertex {
+            position: [p[0] - cross, p[1], p[2]],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [p[0] + cross, p[1], p[2]],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [p[0], p[1] - cross, p[2]],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [p[0], p[1] + cross, p[2]],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [p[0], p[1], p[2] - cross],
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [p[0], p[1], p[2] + cross],
+            color,
+            normal,
+        });
         // line from light to origin
-        verts.push(Vertex { position: p, color, normal });
-        verts.push(Vertex { position: [0.0, 0.0, 0.0], color, normal });
+        verts.push(Vertex {
+            position: p,
+            color,
+            normal,
+        });
+        verts.push(Vertex {
+            position: [0.0, 0.0, 0.0],
+            color,
+            normal,
+        });
     }
     verts
 }
 
+pub fn plane_mesh() -> (Vec<Vertex>, Vec<u16>) {
+    let color = [0.25, 0.25, 0.28];
+    let normal_up = [0.0, 1.0, 0.0];
+    let normal_down = [0.0, -1.0, 0.0];
+    let s = 0.5;
+    let positions = [[-s, 0.0, -s], [s, 0.0, -s], [s, 0.0, s], [-s, 0.0, s]];
+    let mut vertices = Vec::with_capacity(8);
+    for p in positions {
+        vertices.push(Vertex {
+            position: p,
+            color,
+            normal: normal_up,
+        });
+    }
+    for p in positions {
+        vertices.push(Vertex {
+            position: p,
+            color,
+            normal: normal_down,
+        });
+    }
+    let indices: Vec<u16> = vec![
+        0, 1, 2, 0, 2, 3, // top
+        4, 6, 5, 4, 7, 6, // bottom
+    ];
+    (vertices, indices)
+}
+
+pub fn sphere_mesh(segments_u: u32, segments_v: u32) -> (Vec<Vertex>, Vec<u16>) {
+    let color = [0.7, 0.7, 0.8];
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+    let u_steps = segments_u.max(3);
+    let v_steps = segments_v.max(2);
+    for v in 0..=v_steps {
+        let v_frac = v as f32 / v_steps as f32;
+        let phi = v_frac * std::f32::consts::PI;
+        let sin_phi = phi.sin();
+        let cos_phi = phi.cos();
+        for u in 0..=u_steps {
+            let u_frac = u as f32 / u_steps as f32;
+            let theta = u_frac * std::f32::consts::TAU;
+            let sin_theta = theta.sin();
+            let cos_theta = theta.cos();
+            let x = sin_phi * cos_theta;
+            let y = cos_phi;
+            let z = sin_phi * sin_theta;
+            vertices.push(Vertex {
+                position: [x, y, z],
+                color,
+                normal: [x, y, z],
+            });
+        }
+    }
+    let ring = u_steps + 1;
+    for v in 0..v_steps {
+        for u in 0..u_steps {
+            let i0 = (v * ring + u) as u16;
+            let i1 = (v * ring + u + 1) as u16;
+            let i2 = ((v + 1) * ring + u) as u16;
+            let i3 = ((v + 1) * ring + u + 1) as u16;
+            indices.extend_from_slice(&[i0, i2, i1, i1, i2, i3]);
+        }
+    }
+    (vertices, indices)
+}
 
 \n# File: src/render/depth.rs
 #![cfg(target_arch = "wasm32")]
@@ -738,8 +944,8 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
-        bind_group_layouts: &[layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(layout)],
+        immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("pipeline"),
@@ -748,7 +954,7 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Vertex::layout()],
+            buffers: &[Some(Vertex::layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -768,23 +974,27 @@ pub fn build(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
             bias: Default::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }
 
-pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLayout) -> RenderPipeline {
+pub fn build_lines(
+    device: &Device,
+    format: TextureFormat,
+    layout: &BindGroupLayout,
+) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("grid pipeline layout"),
-        bind_group_layouts: &[layout],
-        push_constant_ranges: &[],
+        bind_group_layouts: &[Some(layout)],
+        immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("grid pipeline"),
@@ -793,7 +1003,7 @@ pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLay
             module: &shader,
             entry_point: Some("vs_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[Vertex::layout()],
+            buffers: &[Some(Vertex::layout())],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -813,28 +1023,109 @@ pub fn build_lines(device: &Device, format: TextureFormat, layout: &BindGroupLay
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: false,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(false),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
             bias: Default::default(),
         }),
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }
 
-
 \n# File: src/render/state.rs
 #![cfg(target_arch = "wasm32")]
 
-use glam::Mat4;
+use crate::scene::{MeshKind, SceneManager};
+use glam::{Mat4, Vec3};
+use std::collections::BTreeMap;
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 use wgpu::util::DeviceExt;
 
-use crate::render::data::{self, SceneUniforms, Light};
+use crate::render::data::{
+    self, Light, SceneUniforms, Vertex, EMPTY_LIGHT, LIGHT_VERTICES_PER_LIGHT, MAX_LIGHTS,
+};
 use crate::render::{depth, pipeline};
+
+struct ObjectResources {
+    uniform_buffer: wgpu::Buffer,
+    bind_group: wgpu::BindGroup,
+}
+
+impl ObjectResources {
+    fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, uniform: SceneUniforms) -> Self {
+        let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("object uniform buffer"),
+            contents: data::as_bytes(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buffer.as_entire_binding(),
+            }],
+            label: Some("object bind group"),
+        });
+        Self {
+            uniform_buffer,
+            bind_group,
+        }
+    }
+}
+
+struct Mesh {
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    index_count: u32,
+}
+
+impl Mesh {
+    fn new(device: &wgpu::Device, label: &str, vertices: &[Vertex], indices: &[u16]) -> Self {
+        let vertex_label = format!("{label} vertex buffer");
+        let index_label = format!("{label} index buffer");
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(vertex_label.as_str()),
+            contents: data::as_bytes(vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(index_label.as_str()),
+            contents: data::as_bytes(indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        Self {
+            vertex_buffer,
+            index_buffer,
+            index_count: indices.len() as u32,
+        }
+    }
+}
+
+fn lights_array(lights: &[Light]) -> [Light; MAX_LIGHTS] {
+    let mut out = [EMPTY_LIGHT; MAX_LIGHTS];
+    for (dst, src) in out.iter_mut().zip(lights.iter()) {
+        *dst = *src;
+    }
+    out
+}
+
+fn build_uniform(
+    camera_matrix: Mat4,
+    model: Mat4,
+    camera_pos: Vec3,
+    lights: [Light; MAX_LIGHTS],
+) -> SceneUniforms {
+    SceneUniforms {
+        mvp: (camera_matrix * model).to_cols_array_2d(),
+        model: model.to_cols_array_2d(),
+        camera_pos: camera_pos.into(),
+        _pad0: 0.0,
+        lights,
+    }
+}
 
 pub struct State {
     grid_pipeline: wgpu::RenderPipeline,
@@ -844,62 +1135,75 @@ pub struct State {
     light_vertex_count: u32,
     pub draw_grid: bool,
     surface: wgpu::Surface<'static>,
+    instance: wgpu::Instance,
+    canvas: HtmlCanvasElement,
+    pub backend: String,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    cube_uniform_buffer: wgpu::Buffer,
+    bind_group_layout: wgpu::BindGroupLayout,
+    cube_mesh: Mesh,
+    plane_mesh: Mesh,
+    sphere_mesh: Mesh,
     grid_uniform_buffer: wgpu::Buffer,
-    cube_bind_group: wgpu::BindGroup,
     grid_bind_group: wgpu::BindGroup,
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
     depth_format: wgpu::TextureFormat,
     pub aspect: f32,
+    pub scene: SceneManager,
+    gpu_objects: BTreeMap<u32, ObjectResources>,
 }
 
 impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let instance_desc = wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
+            backends: if canvas.get_attribute("data-backend").as_deref() == Some("webgl") {
+                wgpu::Backends::GL
+            } else {
+                wgpu::Backends::all()
+            },
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
         };
-        let instance = wgpu::util::new_instance_with_webgpu_detection(&instance_desc).await;
+        let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-        let surface =
-            unsafe { std::mem::transmute::<wgpu::Surface<'_>, wgpu::Surface<'static>>(surface) };
-        let adapter = wgpu::util::initialize_adapter_from_env_or_default(
-            &instance,
-            Some(&surface),
-        )
-        .await
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let backend = format!("{:?}", adapter.get_info().backend);
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: adapter.limits(),
-                    memory_hints: wgpu::MemoryHints::default(),
-                    trace: wgpu::Trace::default(),
-                },
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(adapter.limits()),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: wgpu::Trace::default(),
+                ..Default::default()
+            })
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         let caps = surface.get_capabilities(&adapter);
+        let format = caps
+            .formats
+            .iter()
+            .copied()
+            .find(wgpu::TextureFormat::is_srgb)
+            .unwrap_or(caps.formats[0]);
+        let view_format = format.add_srgb_suffix();
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: caps.formats[0],
+            format,
             width: canvas.width(),
             height: canvas.height(),
             present_mode: caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
-            view_formats: vec![],
+            view_formats: vec![view_format],
+            color_space: wgpu::SurfaceColorSpace::Auto,
         };
         surface.configure(&device, &config);
         let aspect = config.width as f32 / config.height as f32;
@@ -908,16 +1212,11 @@ impl State {
         let (depth_texture, depth_view) =
             depth::create(&device, config.width, config.height, depth_format);
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("vertex buffer"),
-            contents: data::as_bytes(data::VERTICES),
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("index buffer"),
-            contents: data::as_bytes(data::INDICES),
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        });
+        let cube_mesh = Mesh::new(&device, "cube", data::VERTICES, data::INDICES);
+        let (plane_vertices, plane_indices) = data::plane_mesh();
+        let plane_mesh = Mesh::new(&device, "plane", &plane_vertices, &plane_indices);
+        let (sphere_vertices, sphere_indices) = data::sphere_mesh(24, 16);
+        let sphere_mesh = Mesh::new(&device, "sphere", &sphere_vertices, &sphere_indices);
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("bind group layout"),
@@ -933,8 +1232,8 @@ impl State {
             }],
         });
 
-        let pipeline = pipeline::build(&device, config.format, &bind_group_layout);
-        let grid_pipeline = pipeline::build_lines(&device, config.format, &bind_group_layout);
+        let pipeline = pipeline::build(&device, view_format, &bind_group_layout);
+        let grid_pipeline = pipeline::build_lines(&device, view_format, &bind_group_layout);
         let grid_vertices = data::grid_vertices(10);
         let grid_vertex_count = grid_vertices.len() as u32;
         let grid_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -943,60 +1242,22 @@ impl State {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let uniform = SceneUniforms {
-            mvp: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            model: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            camera_pos: [0.0, 0.0, 0.0],
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
+        let active_lights = Vec::new();
+        let lights_array = lights_array(&active_lights);
+        let grid_uniform = build_uniform(Mat4::IDENTITY, Mat4::IDENTITY, Vec3::ZERO, lights_array);
 
-        let light_vertices = data::light_rays(&uniform.lights);
+        let light_vertices = data::light_rays(&active_lights);
         let light_vertex_count = light_vertices.len() as u32;
-        let light_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        let max_light_vertices = (MAX_LIGHTS * LIGHT_VERTICES_PER_LIGHT) as u64;
+        let light_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("light vertex buffer"),
-            contents: data::as_bytes(&light_vertices),
+            size: max_light_vertices * std::mem::size_of::<data::Vertex>() as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        });
-        let cube_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("cube uniform buffer"),
-            contents: data::as_bytes(&[uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let cube_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: cube_uniform_buffer.as_entire_binding(),
-            }],
-            label: Some("bind group"),
+            mapped_at_creation: false,
         });
         let grid_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("grid uniform buffer"),
-            contents: data::as_bytes(&[uniform]),
+            contents: data::as_bytes(&[grid_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
         let grid_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -1007,7 +1268,6 @@ impl State {
             }],
             label: Some("grid bind group"),
         });
-
         Ok(Self {
             grid_pipeline,
             grid_vertex_buffer,
@@ -1016,20 +1276,25 @@ impl State {
             light_vertex_count,
             draw_grid: true,
             surface,
+            instance,
+            canvas: canvas.clone(),
+            backend,
             device,
             queue,
             config,
             pipeline,
-            vertex_buffer,
-            index_buffer,
-            cube_uniform_buffer,
+            bind_group_layout,
+            cube_mesh,
+            plane_mesh,
+            sphere_mesh,
             grid_uniform_buffer,
-            cube_bind_group,
             grid_bind_group,
             depth_texture,
             depth_view,
             depth_format,
             aspect,
+            scene: SceneManager::default(),
+            gpu_objects: BTreeMap::new(),
         })
     }
     pub fn set_grid_visible(&mut self, show: bool) {
@@ -1050,69 +1315,83 @@ impl State {
         self.depth_view = depth_view;
     }
 
-
-
-    pub fn update(&self, camera_matrix: Mat4, model: Mat4, camera_pos: glam::Vec3) {
-        let cube_mvp = camera_matrix * model;
-        let cube_uniform = SceneUniforms {
-            mvp: cube_mvp.to_cols_array_2d(),
-            model: model.to_cols_array_2d(),
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
-        let grid_uniform = SceneUniforms {
-            mvp: camera_matrix.to_cols_array_2d(),
-            model: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ],
-            camera_pos: camera_pos.into(),
-            _pad0: 0.0,
-            lights: [
-                Light {
-                    position: [1.5, 1.0, 2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    _pad_c: 0.0,
-                },
-                Light {
-                    position: [-1.5, 1.0, -2.0],
-                    _pad_p: 0.0,
-                    color: [1.0, 0.0, 0.0],
-                    _pad_c: 0.0,
-                },
-            ],
-        };
-        self.queue
-            .write_buffer(&self.cube_uniform_buffer, 0, data::as_bytes(&[cube_uniform]));
-        self.queue
-            .write_buffer(&self.grid_uniform_buffer, 0, data::as_bytes(&[grid_uniform]));
-        let light_vertices = data::light_rays(&cube_uniform.lights);
-        self.queue
-            .write_buffer(&self.light_vertex_buffer, 0, data::as_bytes(&light_vertices));
+    fn mesh(&self, kind: MeshKind) -> &Mesh {
+        match kind {
+            MeshKind::Cube => &self.cube_mesh,
+            MeshKind::Plane => &self.plane_mesh,
+            MeshKind::Sphere => &self.sphere_mesh,
+        }
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let frame = self.surface.get_current_texture()?;
-        let view = frame
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+    pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        self.scene.update(dt);
+        let active_lights: Vec<Light> = self
+            .scene
+            .lights()
+            .values()
+            .map(|light| Light {
+                position: light.position.to_array(),
+                _pad_p: 0.0,
+                color: light.color.to_array(),
+                _pad_c: 0.0,
+            })
+            .collect();
+        let lights = lights_array(&active_lights);
+        self.gpu_objects
+            .retain(|id, _| self.scene.object_exists(*id));
+        for (id, object) in self.scene.objects() {
+            let uniform =
+                build_uniform(camera_matrix, object.transform.model(), camera_pos, lights);
+            let resources = self.gpu_objects.entry(*id).or_insert_with(|| {
+                ObjectResources::new(&self.device, &self.bind_group_layout, uniform)
+            });
+            self.queue
+                .write_buffer(&resources.uniform_buffer, 0, data::as_bytes(&[uniform]));
+        }
+        let grid_uniform = build_uniform(camera_matrix, Mat4::IDENTITY, camera_pos, lights);
+        self.queue.write_buffer(
+            &self.grid_uniform_buffer,
+            0,
+            data::as_bytes(&[grid_uniform]),
+        );
+        let light_vertices = data::light_rays(&active_lights);
+        self.light_vertex_count = light_vertices.len() as u32;
+        if !light_vertices.is_empty() {
+            self.queue.write_buffer(
+                &self.light_vertex_buffer,
+                0,
+                data::as_bytes(&light_vertices),
+            );
+        }
+    }
+
+    pub fn render(&mut self) -> Result<(), JsValue> {
+        let (frame, reconfigure) = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame) => (frame, false),
+            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => (frame, true),
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Outdated => {
+                self.surface.configure(&self.device, &self.config);
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface = self
+                    .instance
+                    .create_surface(wgpu::SurfaceTarget::Canvas(self.canvas.clone()))
+                    .map_err(|error| JsValue::from_str(&error.to_string()))?;
+                self.surface.configure(&self.device, &self.config);
+                return Ok(());
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                return Err(JsValue::from_str("GPU surface validation failed"));
+            }
+        };
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.config.format.add_srgb_suffix()),
+            ..Default::default()
+        });
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -1124,6 +1403,7 @@ impl State {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.1,
@@ -1144,12 +1424,18 @@ impl State {
                 }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
             rp.set_pipeline(&self.pipeline);
-            rp.set_bind_group(0, &self.cube_bind_group, &[]);
-            rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            rp.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            rp.draw_indexed(0..data::INDICES.len() as u32, 0, 0..1);
+            for (id, object) in self.scene.objects() {
+                if let Some(resources) = self.gpu_objects.get(id) {
+                    let mesh = self.mesh(object.mesh);
+                    rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                    rp.set_bind_group(0, &resources.bind_group, &[]);
+                    rp.draw_indexed(0..mesh.index_count, 0, 0..1);
+                }
+            }
             if self.draw_grid {
                 rp.set_pipeline(&self.grid_pipeline);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
@@ -1160,8 +1446,481 @@ impl State {
             }
         }
         self.queue.submit(Some(encoder.finish()));
-        frame.present();
+        self.queue.present(frame);
+        if reconfigure {
+            self.surface.configure(&self.device, &self.config);
+        }
         Ok(())
+    }
+}
+
+\n# File: src/scene.rs
+//! CPU scene state and simulation. No browser, JavaScript or GPU dependencies.
+use glam::{Mat4, Vec3};
+use std::collections::BTreeMap;
+
+pub const MAX_LIGHTS: usize = 4;
+pub const INVALID_ID: u32 = u32::MAX;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MeshKind {
+    Cube,
+    Plane,
+    Sphere,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Transform {
+    pub position: Vec3,
+    pub rotation: Vec3,
+    pub scale: Vec3,
+}
+
+impl Transform {
+    pub fn new(position: Vec3, rotation: Vec3, scale: Vec3) -> Self {
+        Self {
+            position,
+            rotation,
+            scale,
+        }
+    }
+    pub fn model(&self) -> Mat4 {
+        Mat4::from_translation(self.position)
+            * Mat4::from_rotation_y(self.rotation.y)
+            * Mat4::from_rotation_x(self.rotation.x)
+            * Mat4::from_rotation_z(self.rotation.z)
+            * Mat4::from_scale(self.scale)
+    }
+    fn is_valid(&self) -> bool {
+        self.position.is_finite()
+            && self.rotation.is_finite()
+            && self.scale.is_finite()
+            && self.scale.abs().min_element() > 0.0
+    }
+}
+
+pub struct SceneObject {
+    pub transform: Transform,
+    pub mesh: MeshKind,
+}
+#[derive(Clone, Copy)]
+pub struct Light {
+    pub position: Vec3,
+    pub color: Vec3,
+}
+struct RotationAction {
+    id: u32,
+    start: f32,
+    duration: f32,
+    delta: Vec3,
+    elapsed: f32,
+}
+#[derive(Clone, Copy)]
+enum RemovalKind {
+    Object,
+    Light,
+}
+struct ScheduledRemoval {
+    id: u32,
+    at: f32,
+    kind: RemovalKind,
+}
+struct LightOrbit {
+    radius: f32,
+    height: f32,
+    speed: f32,
+    phase: f32,
+    pulse: f32,
+    color: Vec3,
+}
+
+#[derive(Default)]
+pub struct SceneManager {
+    objects: BTreeMap<u32, SceneObject>,
+    lights: BTreeMap<u32, Light>,
+    light_orbits: BTreeMap<u32, LightOrbit>,
+    next_id: u32,
+    time: f32,
+    rotations: Vec<RotationAction>,
+    removals: Vec<ScheduledRemoval>,
+}
+
+impl SceneManager {
+    // IDs are never reused, including after clear/reset. Old handles stay invalid.
+    fn allocate_id(&mut self) -> Option<u32> {
+        if self.next_id >= i32::MAX as u32 {
+            return None;
+        }
+        let id = self.next_id;
+        self.next_id += 1;
+        Some(id)
+    }
+    pub fn objects(&self) -> &BTreeMap<u32, SceneObject> {
+        &self.objects
+    }
+    pub fn lights(&self) -> &BTreeMap<u32, Light> {
+        &self.lights
+    }
+    pub fn object_exists(&self, id: u32) -> bool {
+        self.objects.contains_key(&id)
+    }
+    pub fn light_exists(&self, id: u32) -> bool {
+        self.lights.contains_key(&id)
+    }
+    pub fn add_object(&mut self, mesh: MeshKind, transform: Transform) -> u32 {
+        if !transform.is_valid() {
+            return INVALID_ID;
+        }
+        let Some(id) = self.allocate_id() else {
+            return INVALID_ID;
+        };
+        self.objects.insert(id, SceneObject { mesh, transform });
+        id
+    }
+    pub fn add_cube(&mut self, position: Vec3) -> u32 {
+        self.add_object(
+            MeshKind::Cube,
+            Transform::new(position, Vec3::ZERO, Vec3::ONE),
+        )
+    }
+    pub fn add_plane(&mut self, position: Vec3) -> u32 {
+        self.add_object(
+            MeshKind::Plane,
+            Transform::new(position, Vec3::ZERO, Vec3::ONE),
+        )
+    }
+    pub fn add_sphere(&mut self, position: Vec3) -> u32 {
+        self.add_object(
+            MeshKind::Sphere,
+            Transform::new(position, Vec3::ZERO, Vec3::ONE),
+        )
+    }
+    pub fn clear_scene(&mut self) {
+        self.objects.clear();
+        self.rotations.clear();
+        self.removals
+            .retain(|r| matches!(r.kind, RemovalKind::Light));
+    }
+    pub fn clear_lights(&mut self) {
+        self.lights.clear();
+        self.light_orbits.clear();
+        self.removals
+            .retain(|r| matches!(r.kind, RemovalKind::Object));
+    }
+    pub fn clear(&mut self) {
+        self.clear_scene();
+        self.clear_lights();
+    }
+    pub fn remove_object(&mut self, id: u32) -> bool {
+        if self.objects.remove(&id).is_none() {
+            return false;
+        }
+        self.rotations.retain(|r| r.id != id);
+        self.removals
+            .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
+        true
+    }
+    pub fn set_object_transform(
+        &mut self,
+        id: u32,
+        position: Vec3,
+        rotation: Vec3,
+        scale: Vec3,
+    ) -> bool {
+        let transform = Transform::new(position, rotation, scale);
+        if !transform.is_valid() {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.transform = transform;
+        true
+    }
+    pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
+        if !position.is_finite() {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.transform.position = position;
+        true
+    }
+    pub fn set_object_rotation(&mut self, id: u32, rotation: Vec3) -> bool {
+        if !rotation.is_finite() {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.transform.rotation = rotation;
+        true
+    }
+    pub fn set_object_scale(&mut self, id: u32, scale: Vec3) -> bool {
+        if !scale.is_finite() || scale.abs().min_element() <= 0.0 {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.transform.scale = scale;
+        true
+    }
+    pub fn add_light(&mut self, position: Vec3, color: Vec3) -> Option<u32> {
+        if self.lights.len() >= MAX_LIGHTS || !position.is_finite() || !color.is_finite() {
+            return None;
+        }
+        let id = self.allocate_id()?;
+        self.lights.insert(id, Light { position, color });
+        Some(id)
+    }
+    pub fn remove_light(&mut self, id: u32) -> bool {
+        if self.lights.remove(&id).is_none() {
+            return false;
+        }
+        self.light_orbits.remove(&id);
+        self.removals
+            .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Light));
+        true
+    }
+    pub fn set_light(&mut self, id: u32, position: Vec3, color: Vec3) -> bool {
+        if !position.is_finite() || !color.is_finite() {
+            return false;
+        }
+        let Some(light) = self.lights.get_mut(&id) else {
+            return false;
+        };
+        *light = Light { position, color };
+        true
+    }
+    pub fn set_light_orbit(
+        &mut self,
+        id: u32,
+        radius: f32,
+        height: f32,
+        speed: f32,
+        phase: f32,
+        pulse: f32,
+        color: Vec3,
+    ) -> bool {
+        if !self.light_exists(id)
+            || ![radius, height, speed, phase, pulse]
+                .iter()
+                .all(|v| v.is_finite())
+            || !color.is_finite()
+        {
+            return false;
+        }
+        self.light_orbits.insert(
+            id,
+            LightOrbit {
+                radius: radius.max(0.01),
+                height,
+                speed,
+                phase,
+                pulse: pulse.clamp(0.0, 1.0),
+                color,
+            },
+        );
+        true
+    }
+    pub fn clear_light_orbit(&mut self, id: u32) -> bool {
+        if !self.light_exists(id) {
+            return false;
+        }
+        self.light_orbits.remove(&id);
+        true
+    }
+    pub fn schedule_rotate(
+        &mut self,
+        id: u32,
+        rx_deg: f32,
+        ry_deg: f32,
+        rz_deg: f32,
+        delay: f32,
+        duration: f32,
+    ) -> bool {
+        let degrees = Vec3::new(rx_deg, ry_deg, rz_deg);
+        if !self.object_exists(id)
+            || !degrees.is_finite()
+            || !delay.is_finite()
+            || !duration.is_finite()
+            || duration <= 0.0
+        {
+            return false;
+        }
+        self.rotations.push(RotationAction {
+            id,
+            start: self.time + delay.max(0.0),
+            duration,
+            delta: degrees * std::f32::consts::PI / 180.0,
+            elapsed: 0.0,
+        });
+        true
+    }
+    pub fn schedule_remove_object(&mut self, id: u32, delay: f32) -> bool {
+        if !self.object_exists(id) || !delay.is_finite() {
+            return false;
+        }
+        self.removals.push(ScheduledRemoval {
+            id,
+            at: self.time + delay.max(0.0),
+            kind: RemovalKind::Object,
+        });
+        true
+    }
+    pub fn schedule_remove_light(&mut self, id: u32, delay: f32) -> bool {
+        if !self.light_exists(id) || !delay.is_finite() {
+            return false;
+        }
+        self.removals.push(ScheduledRemoval {
+            id,
+            at: self.time + delay.max(0.0),
+            kind: RemovalKind::Light,
+        });
+        true
+    }
+    pub fn update(&mut self, dt: f32) {
+        if !dt.is_finite() || dt < 0.0 {
+            return;
+        }
+        self.time += dt;
+        let now = self.time;
+        let pending = std::mem::take(&mut self.removals);
+        for removal in pending {
+            if now < removal.at {
+                self.removals.push(removal);
+                continue;
+            }
+            match removal.kind {
+                RemovalKind::Object => {
+                    self.remove_object(removal.id);
+                }
+                RemovalKind::Light => {
+                    self.remove_light(removal.id);
+                }
+            }
+        }
+        self.rotations.retain_mut(|rotation| {
+            let Some(object) = self.objects.get_mut(&rotation.id) else {
+                return false;
+            };
+            if now < rotation.start {
+                return true;
+            }
+            let elapsed = (now - rotation.start).min(rotation.duration);
+            object.transform.rotation +=
+                rotation.delta * ((elapsed - rotation.elapsed) / rotation.duration);
+            rotation.elapsed = elapsed;
+            elapsed < rotation.duration
+        });
+        for (id, orbit) in &self.light_orbits {
+            if let Some(light) = self.lights.get_mut(id) {
+                let angle = now * orbit.speed + orbit.phase;
+                light.position = Vec3::new(
+                    angle.cos() * orbit.radius,
+                    orbit.height + (angle * 1.3).sin() * 0.3,
+                    angle.sin() * orbit.radius,
+                );
+                let pulse =
+                    1.0 - orbit.pulse * 0.5 + (now * 2.0 + orbit.phase).sin() * orbit.pulse * 0.5;
+                light.color = orbit.color * pulse;
+            }
+        }
+    }
+    pub fn load_example(&mut self) {
+        self.clear();
+        self.add_object(
+            MeshKind::Plane,
+            Transform::new(
+                Vec3::new(0.0, -0.6, 0.0),
+                Vec3::ZERO,
+                Vec3::new(8.0, 1.0, 8.0),
+            ),
+        );
+        self.add_cube(Vec3::ZERO);
+        self.add_object(
+            MeshKind::Sphere,
+            Transform::new(Vec3::new(1.8, 0.4, 0.2), Vec3::ZERO, Vec3::splat(0.6)),
+        );
+        self.add_light(Vec3::new(2.5, 3.0, 2.5), Vec3::ONE);
+        self.add_light(Vec3::new(-2.0, 1.5, -1.5), Vec3::new(0.2, 0.6, 1.0));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn animation_is_computed_by_rust_and_finishes_exactly() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        assert!(scene.schedule_rotate(id, 0.0, 180.0, 0.0, 1.0, 2.0));
+        scene.update(1.0);
+        assert_eq!(scene.objects()[&id].transform.rotation, Vec3::ZERO);
+        scene.update(1.0);
+        assert!(
+            (scene.objects()[&id].transform.rotation.y - std::f32::consts::FRAC_PI_2).abs() < 1e-5
+        );
+        scene.update(3.0);
+        assert!((scene.objects()[&id].transform.rotation.y - std::f32::consts::PI).abs() < 1e-5);
+        scene.update(3.0);
+        assert!((scene.objects()[&id].transform.rotation.y - std::f32::consts::PI).abs() < 1e-5);
+    }
+    #[test]
+    fn removed_and_reset_handles_never_target_new_objects() {
+        let mut scene = SceneManager::default();
+        let old = scene.add_cube(Vec3::ZERO);
+        scene.schedule_remove_object(old, 2.0);
+        scene.remove_object(old);
+        let new = scene.add_cube(Vec3::ONE);
+        assert_ne!(old, new);
+        assert!(!scene.set_object_position(old, Vec3::ZERO));
+        scene.update(3.0);
+        assert!(scene.object_exists(new));
+        scene.clear();
+        assert_ne!(new, scene.add_cube(Vec3::ZERO));
+    }
+    #[test]
+    fn lights_enforce_capacity_and_removal_does_not_resurrect_them() {
+        let mut scene = SceneManager::default();
+        let first = scene.add_light(Vec3::ZERO, Vec3::ONE).unwrap();
+        for _ in 1..MAX_LIGHTS {
+            assert!(scene.add_light(Vec3::ZERO, Vec3::ONE).is_some());
+        }
+        assert!(scene.add_light(Vec3::ZERO, Vec3::ONE).is_none());
+        scene.remove_light(first);
+        assert!(!scene.set_light_orbit(first, 1.0, 1.0, 1.0, 0.0, 0.0, Vec3::ONE));
+        assert!(scene.add_light(Vec3::ZERO, Vec3::ONE).is_some());
+    }
+    #[test]
+    fn sample_is_stable_and_invalid_values_do_not_corrupt_simulation() {
+        let mut scene = SceneManager::default();
+        scene.load_example();
+        assert_eq!(scene.objects().len(), 3);
+        assert_eq!(scene.lights().len(), 2);
+        scene.update(100.0);
+        assert_eq!(scene.objects().len(), 3);
+        assert_eq!(scene.add_cube(Vec3::splat(f32::NAN)), INVALID_ID);
+        let id = *scene.objects().keys().next().unwrap();
+        assert!(!scene.set_object_scale(id, Vec3::ZERO));
+        scene.update(f32::NAN);
+        assert!(scene.objects()[&id].transform.model().is_finite());
+    }
+    #[test]
+    fn scheduled_removals_and_light_orbits_run_without_javascript() {
+        let mut scene = SceneManager::default();
+        let cube = scene.add_cube(Vec3::ZERO);
+        let light = scene.add_light(Vec3::ZERO, Vec3::ONE).unwrap();
+        scene.set_light_orbit(light, 2.0, 1.0, 1.0, 0.0, 0.0, Vec3::ONE);
+        scene.schedule_remove_object(cube, 1.0);
+        scene.schedule_remove_light(light, 2.0);
+        scene.update(1.0);
+        assert!(!scene.object_exists(cube));
+        assert!((scene.lights()[&light].position.x - 2.0_f32 * 1.0_f32.cos()).abs() < 1e-5);
+        scene.update(1.0);
+        assert!(!scene.light_exists(light));
     }
 }
 
@@ -1173,12 +1932,14 @@ struct Light {
     _pad_c: f32,
 };
 
+const LIGHT_COUNT: u32 = 4u;
+
 struct SceneUniforms {
     mvp: mat4x4<f32>,
     model: mat4x4<f32>,
     camera_pos: vec3<f32>,
     _pad0: f32,
-    lights: array<Light, 2>,
+    lights: array<Light, LIGHT_COUNT>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -1214,17 +1975,16 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let view_dir = normalize(scene.camera_pos - input.world_pos);
     var result = input.color * 0.1; // ambient
 
-    // light 0
-    let l0_dir = normalize(scene.lights[0].position - input.world_pos);
-    let diff0 = max(dot(normal, l0_dir), 0.0);
-    let spec0 = pow(max(dot(normal, normalize(l0_dir + view_dir)), 0.0), 32.0);
-    result += (diff0 * input.color + spec0) * scene.lights[0].color;
-
-    // light 1
-    let l1_dir = normalize(scene.lights[1].position - input.world_pos);
-    let diff1 = max(dot(normal, l1_dir), 0.0);
-    let spec1 = pow(max(dot(normal, normalize(l1_dir + view_dir)), 0.0), 32.0);
-    result += (diff1 * input.color + spec1) * scene.lights[1].color;
+    for (var i: u32 = 0u; i < LIGHT_COUNT; i = i + 1u) {
+        let light = scene.lights[i];
+        if (all(light.color == vec3<f32>(0.0))) {
+            continue;
+        }
+        let l_dir = normalize(light.position - input.world_pos);
+        let diff = max(dot(normal, l_dir), 0.0);
+        let spec = pow(max(dot(normal, normalize(l_dir + view_dir)), 0.0), 32.0);
+        result += (diff * input.color + spec) * light.color;
+    }
 
     return vec4<f32>(result, 1.0);
 }
@@ -1241,8 +2001,6 @@ use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::{closure::Closure, JsCast};
 
-use glam::Mat4;
-
 use crate::input::active_camera::{ActiveCamera, CameraType};
 use crate::input::camera::CameraController;
 use crate::input::{keyboard, mouse};
@@ -1251,6 +2009,113 @@ use crate::render::state::State;
 thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+}
+
+#[wasm_bindgen]
+pub fn renderer_backend() -> String {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().backend.clone())
+            .unwrap_or_default()
+    })
+}
+
+#[wasm_bindgen]
+pub fn load_example_scene() {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().scene.load_example();
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn clear_all() {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().scene.clear();
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn scene_object_count() -> u32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().scene.objects().len() as u32)
+            .unwrap_or(0)
+    })
+}
+
+#[wasm_bindgen]
+pub fn scene_light_count() -> u32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().scene.lights().len() as u32)
+            .unwrap_or(0)
+    })
+}
+
+#[wasm_bindgen]
+pub fn object_exists(id: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow().scene.object_exists(id))
+    })
+}
+
+#[wasm_bindgen]
+pub fn light_exists(id: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow().scene.light_exists(id))
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_object_position(id: u32, x: f32, y: f32, z: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state
+                .borrow_mut()
+                .scene
+                .set_object_position(id, glam::Vec3::new(x, y, z))
+        })
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_object_rotation(id: u32, x: f32, y: f32, z: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state
+                .borrow_mut()
+                .scene
+                .set_object_rotation(id, glam::Vec3::new(x, y, z))
+        })
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_object_scale(id: u32, x: f32, y: f32, z: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state
+                .borrow_mut()
+                .scene
+                .set_object_scale(id, glam::Vec3::new(x, y, z))
+        })
+    })
 }
 
 #[wasm_bindgen]
@@ -1278,6 +2143,9 @@ pub fn set_camera_mode(mode: &str) {
 
 #[wasm_bindgen]
 pub fn resize(width: u32, height: u32) {
+    if width == 0 || height == 0 {
+        return;
+    }
     STATE.with(|s| {
         if let Some(st) = &*s.borrow() {
             st.borrow_mut().resize(width, height);
@@ -1290,8 +2158,242 @@ pub fn resize(width: u32, height: u32) {
     });
 }
 
-#[wasm_bindgen(start)]
+#[wasm_bindgen]
+pub fn clear_scene() {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().scene.clear_scene();
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_cube(x: f32, y: f32, z: f32) -> u32 {
+    let mut id = crate::scene::INVALID_ID;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            id = st.borrow_mut().scene.add_cube(glam::Vec3::new(x, y, z));
+        }
+    });
+    id
+}
+
+#[wasm_bindgen]
+pub fn add_plane(x: f32, y: f32, z: f32) -> u32 {
+    let mut id = crate::scene::INVALID_ID;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            id = st.borrow_mut().scene.add_plane(glam::Vec3::new(x, y, z));
+        }
+    });
+    id
+}
+
+#[wasm_bindgen]
+pub fn add_sphere(x: f32, y: f32, z: f32) -> u32 {
+    let mut id = crate::scene::INVALID_ID;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            id = st.borrow_mut().scene.add_sphere(glam::Vec3::new(x, y, z));
+        }
+    });
+    id
+}
+
+#[wasm_bindgen]
+pub fn remove_object(id: u32) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.remove_object(id);
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn set_object_transform(
+    id: u32,
+    x: f32,
+    y: f32,
+    z: f32,
+    rx: f32,
+    ry: f32,
+    rz: f32,
+    sx: f32,
+    sy: f32,
+    sz: f32,
+) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.set_object_transform(
+                id,
+                glam::Vec3::new(x, y, z),
+                glam::Vec3::new(rx, ry, rz),
+                glam::Vec3::new(sx, sy, sz),
+            );
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn set_cube_transform(
+    id: u32,
+    x: f32,
+    y: f32,
+    z: f32,
+    rx: f32,
+    ry: f32,
+    rz: f32,
+    sx: f32,
+    sy: f32,
+    sz: f32,
+) -> bool {
+    set_object_transform(id, x, y, z, rx, ry, rz, sx, sy, sz)
+}
+
+#[wasm_bindgen]
+pub fn clear_lights() {
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            st.borrow_mut().scene.clear_lights();
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn add_light(x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> i32 {
+    let mut id = -1;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            if let Some(light_id) = st
+                .borrow_mut()
+                .scene
+                .add_light(glam::Vec3::new(x, y, z), glam::Vec3::new(r, g, b))
+            {
+                id = light_id as i32;
+            }
+        }
+    });
+    id
+}
+
+#[wasm_bindgen]
+pub fn remove_light(id: u32) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.remove_light(id);
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn schedule_rotate(
+    id: u32,
+    rx_deg: f32,
+    ry_deg: f32,
+    rz_deg: f32,
+    delay: f32,
+    duration: f32,
+) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st
+                .borrow_mut()
+                .scene
+                .schedule_rotate(id, rx_deg, ry_deg, rz_deg, delay, duration);
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn schedule_remove_object(id: u32, delay: f32) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.schedule_remove_object(id, delay);
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn schedule_remove_light(id: u32, delay: f32) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.schedule_remove_light(id, delay);
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn set_light_orbit(
+    id: u32,
+    radius: f32,
+    height: f32,
+    speed: f32,
+    phase: f32,
+    pulse: f32,
+    r: f32,
+    g: f32,
+    b: f32,
+) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.set_light_orbit(
+                id,
+                radius,
+                height,
+                speed,
+                phase,
+                pulse,
+                glam::Vec3::new(r, g, b),
+            );
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn clear_light_orbit(id: u32) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.clear_light_orbit(id);
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
+pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> bool {
+    let mut ok = false;
+    STATE.with(|s| {
+        if let Some(st) = &*s.borrow() {
+            ok = st.borrow_mut().scene.set_light(
+                id,
+                glam::Vec3::new(x, y, z),
+                glam::Vec3::new(r, g, b),
+            );
+        }
+    });
+    ok
+}
+
+#[wasm_bindgen]
 pub async fn start() -> Result<(), JsValue> {
+    if STATE.with(|state| state.borrow().is_some()) {
+        return Ok(());
+    }
     console_error_panic_hook::set_once();
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
@@ -1310,8 +2412,7 @@ pub async fn start() -> Result<(), JsValue> {
     keyboard::attach(&window, camera.clone());
     mouse::attach(&window, &canvas, camera.clone());
 
-    let start_time = performance.now();
-    let prev_time = Rc::new(RefCell::new(start_time));
+    let prev_time = Rc::new(RefCell::new(performance.now()));
     let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
@@ -1324,17 +2425,21 @@ pub async fn start() -> Result<(), JsValue> {
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
-        let _elapsed = (now - start_time) as f32 / 1000.0;
-        let rot = std::f32::consts::FRAC_PI_4;
         {
             let mut cam = camera_c.borrow_mut();
             cam.update(dt);
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
-            let model = Mat4::from_rotation_y(rot) * Mat4::from_rotation_x(rot);
             let mut st = state_c.borrow_mut();
-            st.update(cam_matrix, model, cam_pos);
-            if st.render().is_err() {
+            st.update(dt, cam_matrix, cam_pos);
+            if let Err(error) = st.render() {
+                web_sys::console::error_1(&error);
+                if let Some(status) = web_sys::window()
+                    .and_then(|window| window.document())
+                    .and_then(|document| document.get_element_by_id("status"))
+                {
+                    status.set_text_content(Some("Vykreslování se zastavilo. Obnovte stránku."));
+                }
                 return;
             }
         }

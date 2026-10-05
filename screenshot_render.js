@@ -12,7 +12,7 @@ const fs = require('fs');
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: [
       '--enable-unsafe-webgpu',
       '--enable-features=Vulkan,Metal,WebGPU',
@@ -38,7 +38,7 @@ const fs = require('fs');
     const png = PNG.sync.read(buffer);
     const nonZero = png.data.some((v, idx) => (idx % 4 !== 3) && v !== 0);
     if (nonZero) break;
-    await page.waitForTimeout(500);
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
   fs.writeFileSync('render.png', buffer);
 

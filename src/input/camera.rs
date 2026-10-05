@@ -5,6 +5,7 @@ pub trait CameraController {
     fn key_down(&mut self, code: String);
     fn key_up(&mut self, code: String);
     fn mouse_move(&mut self, dx: f32, dy: f32);
+    fn clear_input(&mut self);
 
     fn update(&mut self, dt: f32);
     fn matrix(&self) -> Mat4;
@@ -24,9 +25,9 @@ pub struct Camera {
 impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
-            position: Vec3::new(0.0, 0.0, 2.0),
-            yaw: -std::f32::consts::FRAC_PI_2,
-            pitch: 0.0,
+            position: Vec3::new(5.0, 3.0, 5.0),
+            yaw: -3.0 * std::f32::consts::FRAC_PI_4,
+            pitch: -0.4,
             speed: 2.0,
             sensitivity: 0.002,
             pressed: HashSet::new(),
@@ -69,12 +70,21 @@ impl Camera {
     }
 
     pub fn matrix(&self) -> Mat4 {
-        let view = Mat4::look_at_lh(self.position, self.position + self.forward(), Vec3::Y);
-        let proj = Mat4::perspective_lh(std::f32::consts::FRAC_PI_4, self.aspect, 0.1, 100.0);
+        let view = glam::camera::lh::view::look_at_mat4(
+            self.position,
+            self.position + self.forward(),
+            Vec3::Y,
+        );
+        let proj = glam::camera::lh::proj::directx::perspective(
+            std::f32::consts::FRAC_PI_4,
+            self.aspect,
+            0.1,
+            100.0,
+        );
         proj * view
     }
 
-fn forward(&self) -> Vec3 {
+    fn forward(&self) -> Vec3 {
         Vec3::new(
             self.yaw.cos() * self.pitch.cos(),
             self.pitch.sin(),
@@ -85,6 +95,10 @@ fn forward(&self) -> Vec3 {
 }
 
 impl CameraController for Camera {
+    fn clear_input(&mut self) {
+        self.pressed.clear();
+    }
+
     fn key_down(&mut self, code: String) {
         Camera::key_down(self, code);
     }

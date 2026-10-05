@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 
 (async () => {
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: [
       '--enable-unsafe-webgpu',
       '--enable-features=Vulkan,Metal,WebGPU',

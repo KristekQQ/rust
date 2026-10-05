@@ -1,53 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cs">
 <head>
     <meta charset="UTF-8" />
-    <title>WebGPU with Rust/WASM</title>
+    <title>Rust · 3D scéna</title>
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; font: 14px system-ui, sans-serif; background: #19194d; color: white; }
         #gpu-canvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; }
+        .toolbar { position: absolute; top: 16px; left: 16px; z-index: 1; padding: 14px; border-radius: 12px; background: #131328e8; max-width: calc(100vw - 60px); }
+        .controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+        button { border: 1px solid #737399; border-radius: 6px; background: #33334e; color: white; padding: 7px 10px; cursor: pointer; }
+        button[aria-pressed="true"] { background: #5555a1; }
+        button:focus-visible { outline: 2px solid #96dcff; outline-offset: 2px; }
+        button:disabled { opacity: 0.5; cursor: default; }
+        #status, .help { font-size: 12px; color: #cfcfe6; }
+        #status { max-width: 420px; overflow-wrap: anywhere; }
+        a { color: #a9dfff; }
     </style>
 </head>
 <body>
-    <button id="orbit-btn" style="position:absolute;top:10px;left:10px;z-index:1;">Orbit</button>
-    <button id="free-btn" style="position:absolute;top:40px;left:10px;z-index:1;">Free</button>
-    <button id="grid-btn" style="position:absolute;top:70px;left:10px;z-index:1;">Hide Grid</button>
-    <canvas id="gpu-canvas"></canvas>
+    <div class="toolbar">
+        <strong>Rust · 3D scéna</strong>
+        <div class="controls">
+            <button id="orbit-btn" aria-pressed="true" disabled>Orbit</button>
+            <button id="free-btn" aria-pressed="false" disabled>Free</button>
+            <button id="grid-btn" aria-pressed="true" disabled>Skrýt mřížku</button>
+            <button id="reset-btn" disabled>Obnovit scénu</button>
+        </div>
+        <div id="status" role="status">Načítám scénu…</div>
+        <div class="help">Tažení myší: pohled · WASD: pohyb · +/−: vzdálenost v Orbit</div>
+        <div class="help">Grafika: <a href="?backend=auto">Automaticky</a> · <a href="?backend=webgl">WebGL</a></div>
+    </div>
+    <canvas id="gpu-canvas" aria-label="Interaktivní 3D scéna" tabindex="0"></canvas>
     <script type="module">
-        // Patch outdated WebGPU limit name for newer Chrome versions.
-        const origRequestDevice = GPUAdapter.prototype.requestDevice;
-        GPUAdapter.prototype.requestDevice = function(desc) {
-            if (desc?.requiredLimits?.maxInterStageShaderComponents !== undefined &&
-                desc.requiredLimits.maxInterStageShaderVariables === undefined) {
-                desc.requiredLimits.maxInterStageShaderVariables =
-                    desc.requiredLimits.maxInterStageShaderComponents;
-                delete desc.requiredLimits.maxInterStageShaderComponents;
-            }
-            return origRequestDevice.call(this, desc);
-        };
-
-        const canvas = document.getElementById("gpu-canvas");
-        canvas.width  = window.innerWidth;
-        canvas.height = window.innerHeight;
-        let grid = true;
-
-        import init, { set_camera_mode, set_grid_visible, resize } from './pkg/webgpu_wasm.js';
-        await init();
-        resize(canvas.width, canvas.height);
-        set_grid_visible(true);
-        document.getElementById("grid-btn").onclick = () => {
-            grid = !grid;
-            set_grid_visible(grid);
-            document.getElementById("grid-btn").textContent = grid ? "Hide Grid" : "Show Grid";
-        };
-
-        document.getElementById('orbit-btn').onclick = () => set_camera_mode('orbit');
-        document.getElementById('free-btn').onclick = () => set_camera_mode('free');
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            resize(canvas.width, canvas.height);
+        import(`./js/app.js?v=${Date.now()}`).catch(error => {
+            console.error(error);
+            document.getElementById("status").textContent = `Scénu se nepodařilo spustit: ${error.message}`;
         });
     </script>
 </body>
