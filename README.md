@@ -83,7 +83,8 @@ cube.removeAfter(8);                     // Rust schedules removal
 ```
 
 `engine.scene.clear()` clears objects, lights and their pending actions.
-`engine.scene.loadExample()` runs the JavaScript recipe from `examples/scenes.js`.
+Import a `createScene` function from an example and call it with `engine.scene`;
+the SDK does not contain sample loaders.
 `engine.scene.objectCount` / `lightCount` read Rust state. Handles expose
 `exists`; invalid commands throw when Rust rejects them. IDs are never reused,
 including after scene reset, so old handles cannot target new objects.
@@ -266,12 +267,13 @@ server. Podrobnosti a omezení jsou v [plánu rendereru](docs/RENDER_PERFORMANCE
 
 [Ukázka statických/dynamických stínů a odrazu](tests/render-effects.html) má
 samostatné frustum culling a cache pro jednotlivé průchody; vše počítá Rust.
-SDK přidává `setRenderOptions`, `spin`, `scene.setMirror`, `loadEffectsDemo`,
+SDK přidává `setRenderOptions`, `spin`, `scene.setMirror`,
 `set_render_effects`, `set_simulation_paused` a `effects_stats`.
 [Architektura, použití a současná omezení](docs/RENDER_PASSES.md).
 
 ## JavaScript examples
 
-[Galerie pěti ukázek](examples/index.html) používá [JS definice scén](examples/scenes.js)
+[Rozcestník pěti samostatných ukázek](examples/index.html) odkazuje na aplikace
+s vlastními main.js a scene.js; začni [základním příkladem](examples/basic/main.js)
 přes Rust/WASM SDK. Spuštění: `scripts/run-local.sh`, potom
 http://127.0.0.1:8000/examples/. Viz [návod](examples/README.md).

@@ -19,13 +19,15 @@ pre { white-space: pre-wrap; } a { color: #c7d8ff; }
 <a href="../index.html">Hlavní scéna</a>
 </div>
 <script type="module">
+import { createScene } from "../examples/basic/scene.js";
+
 const result = document.getElementById('result');
 try {
     const { initEngine } = await import(`../js/engine.js?v=${Date.now()}`);
     const engine = await initEngine(document.getElementById('gpu-canvas'), {
         backend: new URLSearchParams(location.search).get('backend') || 'auto',
     });
-    engine.scene.loadExample();
+    createScene(engine.scene);
     let mode = 'canvas', small = false, message = '';
     const frames = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
     const setMode = value => {

@@ -1,4 +1,4 @@
-//! Native test fixtures only. Browser examples live in examples/scenes.js.
+//! Native test fixtures only. Browser examples live in examples/<name>/scene.js.
 use crate::scene::{MeshKind, RenderOptions, SceneManager, Transform};
 use glam::Vec3;
 impl SceneManager {

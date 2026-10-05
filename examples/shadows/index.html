@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · Dva barevné stíny · Rust engine</title>
+<link rel="stylesheet" href="../shared/example.css">
+<main>
+    <!-- Výstup rendereru. UI není součást canvasu ani renderovací scény. -->
+    <canvas id="gpu-canvas" tabindex="0" aria-label="3D scéna"></canvas>
+    <!-- Tento kontejner vyplňuje volitelný modul shared/tools.js. -->
+    <aside id="tools" aria-label="Vývojové nástroje"><p>Načítám ukázku…</p></aside>
+</main>
+<!-- Jediný vstup aplikace: obsahuje všechny importy a pořadí inicializace. -->
+<script type="module" src="main.js"></script>
+</html>

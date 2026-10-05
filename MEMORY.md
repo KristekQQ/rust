@@ -1,3 +1,13 @@
+# Samostatné aplikace a nástroje – aktuální rozhodnutí 2026-10-05
+
+examples/index.html je statický rozcestník bez canvasu/WASM. Každý z basic,
+shadows, mirror, lights, culling má vlastní index.html, main.js s úplnými
+importy a scene.js. Volitelné DOM nástroje jsou shared/tools.js. SDK engine.js
+neimportuje ukázky ani UI a už nemá loadExample/loadEffectsDemo/loadCullingDemo.
+Příklady se importují přímo v aplikacích/testech. Starý společný scenes.js a
+gallery.js byly odstraněny. Ukončení renderu naviguje na statický rozcestník.
+Níže uvedené údaje o společné galerii a load metodách jsou historické.
+
 # JavaScript examples – aktuální rozhodnutí 2026-10-05
 
 Uživatel požaduje definice ukázkových scén v JavaScriptu. Runtime recepty jsou

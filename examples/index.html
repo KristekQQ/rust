@@ -2,29 +2,22 @@
 <html lang="cs">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rust engine · JavaScript examples</title>
+<title>Rust engine · Rozcestník ukázek</title>
 <style>
-*{box-sizing:border-box}body{margin:0;color:#e7ecf5;background:#101524;font:15px system-ui}main{display:grid;grid-template-columns:minmax(0,1fr) 330px;height:100vh}canvas{width:100%;height:100%;display:block;outline:none}.panel{padding:24px;background:#171e30;overflow:auto}h1{font-size:23px;line-height:1.2;margin:0 0 16px}p{line-height:1.5;color:#adbcd2}select,button{font:inherit;padding:10px;color:inherit;background:#293650;border:1px solid #52617c;border-radius:7px}select{width:100%}button{cursor:pointer;margin:8px 4px 8px 0}label{display:block;margin:12px 0}input{accent-color:#92b9ff}pre{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap}a{color:#a5c7ff}:focus-visible{outline:3px solid #b8caff}#idle{position:absolute;left:30px;top:30px;pointer-events:none;color:#adbcd2}@media(max-width:700px){main{grid-template-columns:1fr;grid-template-rows:55vh auto;height:auto}.panel{padding:18px}#idle{font-size:13px;max-width:200px}}
+body{margin:0;background:#101524;color:#e7ecf5;font:16px/1.6 system-ui}main{max-width:1000px;margin:auto;padding:48px 24px}h1{line-height:1.2;font-size:34px}p{color:#adbcd2}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}article{padding:22px;background:#171e30;border:1px solid #33445e;border-radius:12px}h2{font-size:20px;margin:0 0 8px}a{color:#a5c7ff}article a:first-of-type{display:inline-block;background:#293650;padding:8px 14px;border-radius:7px;text-decoration:none}code{color:#cbd8f4}:focus-visible{outline:3px solid #b8caff}
 </style>
 <main>
-<div style="position:relative;min-height:0"><canvas id="gpu-canvas" tabindex="0" aria-label="Ukázka Rust rendereru"></canvas><p id="idle">Render je vypnutý.<br>Vyber ukázku a klikni na Spustit.</p></div>
-<aside class="panel">
-<h1>Rust engine<br>JavaScript examples</h1>
-<label for="example">Ukázka</label><select id="example"></select>
-<p id="description"></p>
-<button id="start">Spustit ukázku</button><button id="stop" disabled>Ukončit render</button>
-<label><input id="shadows" type="checkbox" disabled> Stíny světel</label>
-<label><input id="mirror" type="checkbox" disabled> Rovinné zrcadlo</label>
-<label><input id="texture" type="checkbox" disabled> Hlavní výstup přes texturu</label>
-<label><input id="helpers" type="checkbox" disabled> Pomocné značky světel</label>
-<label><input id="grid" type="checkbox" disabled> Pomocná mřížka</label>
-<label><input id="pause" type="checkbox" disabled> Pozastavit simulaci</label>
-<label><input id="culling" type="checkbox" checked disabled> Frustum culling</label>
-<button id="verify" disabled>Ověřit všech 5 ukázek</button>
-<pre id="status" role="status">Žádná scéna neběží.</pre>
-<p>Táhni myší pro pohled. WASD pro pohyb, +/− vzdálenost. Ve volné kameře Q/E nahoru a dolů.</p>
-<p>Scény: <a href="scenes.js">scenes.js</a><br>Rust: stav, simulace, culling a WebGPU.</p>
-<a href="../index.html">Hlavní scéna</a> · <a id="backend" href="?backend=webgl">WebGL</a>
-</aside></main>
-<script type="module" src="gallery.js"></script>
+<h1>Rust engine · samostatné ukázky</h1>
+<p>Každá ukázka má vlastní HTML, <code>main.js</code> s importy a <code>scene.js</code>.
+Vývojové ovládání je volitelný modul <code>shared/tools.js</code>. Tento rozcestník nespouští žádný render.</p>
+<div class="cards">
+<article><h2>01 · Základní scéna</h2><p>Začni tady: inicializace enginu, objekty, světla a rozměry výstupu.</p><a href="basic/">Spustit</a> · <a href="basic/main.js">main.js</a> · <a href="basic/scene.js">scene.js</a></article>
+<article><h2>02 · Dva barevné stíny</h2><p>Statické bloky, rotující objekty a dvě stínující světla.</p><a href="shadows/">Spustit</a> · <a href="shadows/main.js">main.js</a> · <a href="shadows/scene.js">scene.js</a></article>
+<article><h2>03 · Zrcadlo</h2><p>Rozšíření předchozí ukázky: rovinný odraz do textury.</p><a href="mirror/">Spustit</a> · <a href="mirror/main.js">main.js</a> · <a href="mirror/scene.js">scene.js</a></article>
+<article><h2>04 · Pohyblivá světla</h2><p>JS nastaví orbitu; Rust počítá pohyb a obnovuje stínové mapy.</p><a href="lights/">Spustit</a> · <a href="lights/main.js">main.js</a> · <a href="lights/scene.js">scene.js</a></article>
+<article><h2>05 · Prostorový culling</h2><p>10 000 krychlí a volná kamera. Viditelnost i dávkování řeší Rust.</p><a href="culling/">Spustit</a> · <a href="culling/main.js">main.js</a> · <a href="culling/scene.js">scene.js</a></article>
+</div>
+<p><a href="README.md">Návod pro vlastní aplikaci</a> · <a href="shared/tools.js">Zdroj vývojového UI</a> · <a href="../index.html">Hlavní stránka</a></p>
+</main>
+<!-- Rozcestník záměrně nemá skripty, canvas ani načítání WASM. -->
 </html>

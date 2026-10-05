@@ -43,13 +43,7 @@ export class Scene {
     createSphere(position?: Vector3): SceneObject;
     createLight(options?: LightOptions): SceneLight;
     clear(): void;
-    /** Run the basic JavaScript recipe through Rust scene commands. */
-    loadExample(): void;
     setMirror(object: SceneObject): void;
-    /** Run the JavaScript mirror/shadows recipe and enable its effects. */
-    loadEffectsDemo(): void;
-    /** Run the JavaScript spatial recipe; Rust computes visibility. */
-    loadCullingDemo(): void;
 }
 export type RawEngine = Pick<typeof wasm,
     "add_cube" | "add_plane" | "add_sphere" | "remove_object" | "clear_scene" |

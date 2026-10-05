@@ -12,8 +12,10 @@ before relying on those findings.
 The user wants scene management, logic, calculations and simulation in Rust.
 `src/scene.rs` is the CPU SceneManager; the renderer consumes its state. JS/TS
 is a thin command SDK holding IDs, not a second scene manager. Runtime example
-scenes are defined in `examples/scenes.js` using SDK commands, as requested by
-the user. Do not hardcode sample scenes into production Rust. `src/test_scenes.rs`
+scenes are defined in separate `examples/<name>/scene.js` modules using SDK commands, as requested by
+the user. Each example has its own main.js with explicit imports. The optional
+DOM tools live in examples/shared/tools.js; the SDK must not import examples or UI.
+Do not hardcode sample scenes into production Rust. `src/test_scenes.rs`
 is native test fixtures only. Keep automatic spawning out unless requested.
 
 - `index.html` is the main Rust/WASM scene. `cube.html` and `render_webgpu.js`

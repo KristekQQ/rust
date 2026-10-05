@@ -35,7 +35,7 @@ objektový draw call. Ve stabilním snímku bez změn se přenáší pouze 208 B
 Po vypnutí cullingu se odešle všech 10 000 instancí; stále jde o jeden draw
 call a v dalších stabilních snímcích se instance znovu nepřenášejí.
 
-Aktuální stránka volá JS recept `culling` přes SDK v `examples/scenes.js`: 20 × 25 × 20
+Aktuální stránka volá JS `createScene` přes SDK v `examples/culling/scene.js`: 20 × 25 × 20
 krychlí rozmístěných kolem kamery v prostoru přibližně 57 × 43 × 57 jednotek.
 Je určena pro létání a vizuální kontrolu; počet vyřazených krychlí není fixní.
 Volná kamera má Q/E pro vertikální pohyb a Shift pro čtyřnásobnou rychlost.

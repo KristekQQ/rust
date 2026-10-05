@@ -24,12 +24,15 @@ pre{white-space:pre-wrap;font-size:13px} :focus-visible{outline:3px solid #b8caf
 <a href="../index.html">Hlavní scéna</a> · <a href="?backend=webgl">WebGL</a>
 </div>
 <script type="module">
+import { createScene } from "../examples/mirror/scene.js";
+
 const status=document.getElementById('status');
 const control=id=>document.getElementById(id);
 try {
     const {initEngine}=await import(`../js/engine.js?v=${Date.now()}`);
     const engine=await initEngine(control('gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')||'auto'});
-    engine.scene.loadEffectsDemo();
+    createScene(engine.scene);
+    engine.set_render_effects(true,true);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
     let message='';
     const apply=()=>engine.set_render_effects(control('shadows').checked,control('mirror').checked);
     const applyHelpers=()=>{engine.set_grid_visible(control('grid').checked);engine.set_light_helpers_visible(control('helpers').checked);};
@@ -37,13 +40,13 @@ try {
     control('shadows').onchange=apply; control('mirror').onchange=apply;
     control('pause').onchange=()=>engine.set_simulation_paused(control('pause').checked);
     control('culling').onchange=()=>engine.set_frustum_culling(control('culling').checked);
-    control('reset').onclick=()=>{engine.scene.loadEffectsDemo();control('pause').checked=false;apply();applyHelpers();};
+    control('reset').onclick=()=>{createScene(engine.scene);engine.set_simulation_paused(false);control('pause').checked=false;apply();applyHelpers();};
     window.addEventListener('resize',()=>engine.resize(innerWidth,innerHeight));
     const frames=async(n=12)=>{for(let i=0;i<n;i++)await new Promise(requestAnimationFrame);};
     control('verify').onclick=async()=>{
         const assert=(ok,message)=>{if(!ok)throw new Error(message);};
         try {
-            engine.scene.loadEffectsDemo(); control('shadows').checked=true;control('mirror').checked=true;control('pause').checked=true;
+            createScene(engine.scene); control('shadows').checked=true;control('mirror').checked=true;control('pause').checked=true;
             engine.set_render_effects(true,true);engine.set_simulation_paused(true);applyHelpers();await frames();
             const before=engine.effects_stats();await frames();const paused=engine.effects_stats();
             assert(paused.staticUpdates===before.staticUpdates && paused.dynamicUpdates===before.dynamicUpdates && paused.reflectionUpdates===before.reflectionUpdates,'Cache se v klidu obnovuje');

@@ -15,6 +15,8 @@
   "include": [
     "js/*.d.ts",
     "examples/*.ts",
-    "examples/scenes.js"
+    "examples/*/scene.js",
+    "examples/shared/scene-helpers.js",
+    "examples/*/main.js"
   ]
 }
