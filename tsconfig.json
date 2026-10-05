@@ -3,9 +3,18 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true
   },
-  "include": ["js/*.d.ts", "examples/*.ts"]
+  "include": [
+    "js/*.d.ts",
+    "examples/*.ts",
+    "examples/scenes.js"
+  ]
 }

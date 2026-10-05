@@ -89,8 +89,9 @@ engine.set_simulation_paused(true); // kamera se může dál pohybovat
 `setRenderOptions` nastaví celý balík voleb; vynechané hodnoty mají výchozí
 hodnoty false/true/true/0. Odrazivost přijímají pouze Plane objekty, vizuálně ji
 používá aktivní zrcadlo. `spin([0,0,0])` zastaví průběžnou rotaci.
-`engine.scene.loadEffectsDemo()` vytvoří v Rustu 9 statických objektů a 2
-rotující objekty, oranžové hlavní a modré doplňkové světlo. Obě světla osvětlují
+`engine.scene.loadEffectsDemo()` vytvoří 9 statických objektů a 2
+rotující objekty, oranžové hlavní a modré doplňkové světlo pomocí JS receptu
+v `examples/scenes.js` (výpočty a rendering nadále v Rustu). Obě světla osvětlují
 scénu i její odraz a obě vrhají vlastní stín. Pomocné značky světel a mřížka
 mají samostatné checkboxy a kreslí se výhradně v hlavním pohledu: nevrhají
 stíny a neobjevují se v odrazu. API: `set_light_helpers_visible(bool)` a

@@ -18,3 +18,6 @@ mod render_data_tests;
 #[allow(dead_code)]
 #[path = "render/target.rs"]
 mod render_target_tests;
+
+#[cfg(test)]
+mod test_scenes;

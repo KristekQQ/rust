@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rust engine · JavaScript examples</title>
+<style>
+*{box-sizing:border-box}body{margin:0;color:#e7ecf5;background:#101524;font:15px system-ui}main{display:grid;grid-template-columns:minmax(0,1fr) 330px;height:100vh}canvas{width:100%;height:100%;display:block;outline:none}.panel{padding:24px;background:#171e30;overflow:auto}h1{font-size:23px;line-height:1.2;margin:0 0 16px}p{line-height:1.5;color:#adbcd2}select,button{font:inherit;padding:10px;color:inherit;background:#293650;border:1px solid #52617c;border-radius:7px}select{width:100%}button{cursor:pointer;margin:8px 4px 8px 0}label{display:block;margin:12px 0}input{accent-color:#92b9ff}pre{font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap}a{color:#a5c7ff}:focus-visible{outline:3px solid #b8caff}#idle{position:absolute;left:30px;top:30px;pointer-events:none;color:#adbcd2}@media(max-width:700px){main{grid-template-columns:1fr;grid-template-rows:55vh auto;height:auto}.panel{padding:18px}#idle{font-size:13px;max-width:200px}}
+</style>
+<main>
+<div style="position:relative;min-height:0"><canvas id="gpu-canvas" tabindex="0" aria-label="Ukázka Rust rendereru"></canvas><p id="idle">Render je vypnutý.<br>Vyber ukázku a klikni na Spustit.</p></div>
+<aside class="panel">
+<h1>Rust engine<br>JavaScript examples</h1>
+<label for="example">Ukázka</label><select id="example"></select>
+<p id="description"></p>
+<button id="start">Spustit ukázku</button><button id="stop" disabled>Ukončit render</button>
+<label><input id="shadows" type="checkbox" disabled> Stíny světel</label>
+<label><input id="mirror" type="checkbox" disabled> Rovinné zrcadlo</label>
+<label><input id="texture" type="checkbox" disabled> Hlavní výstup přes texturu</label>
+<label><input id="helpers" type="checkbox" disabled> Pomocné značky světel</label>
+<label><input id="grid" type="checkbox" disabled> Pomocná mřížka</label>
+<label><input id="pause" type="checkbox" disabled> Pozastavit simulaci</label>
+<label><input id="culling" type="checkbox" checked disabled> Frustum culling</label>
+<button id="verify" disabled>Ověřit všech 5 ukázek</button>
+<pre id="status" role="status">Žádná scéna neběží.</pre>
+<p>Táhni myší pro pohled. WASD pro pohyb, +/− vzdálenost. Ve volné kameře Q/E nahoru a dolů.</p>
+<p>Scény: <a href="scenes.js">scenes.js</a><br>Rust: stav, simulace, culling a WebGPU.</p>
+<a href="../index.html">Hlavní scéna</a> · <a id="backend" href="?backend=webgl">WebGL</a>
+</aside></main>
+<script type="module" src="gallery.js"></script>
+</html>

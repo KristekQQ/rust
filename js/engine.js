@@ -1,3 +1,4 @@
+import { basic, mirror, culling } from "../examples/scenes.js";
 // JavaScript bridge to the Rust engine. GPU state and the frame loop live in Rust.
 // The current Rust API supports one canvas with the id "gpu-canvas" per page.
 function accepted(ok) {
@@ -55,10 +56,10 @@ export class Scene {
         return new SceneLight(this.#wasm, id);
     }
     clear() { this.#wasm.clear_all(); }
-    loadExample() { this.#wasm.load_example_scene(); }
+    loadExample() { basic(this); }
     setMirror(object) { accepted(this.#wasm.configure_planar_mirror(object.id)); }
-    loadEffectsDemo() { this.#wasm.load_effects_demo(); }
-    loadCullingDemo() { this.#wasm.load_culling_demo(); }
+    loadEffectsDemo() { mirror(this); this.#wasm.set_render_effects(true,true); this.#wasm.set_simulation_paused(false); this.#wasm.set_grid_visible(false); this.#wasm.set_light_helpers_visible(false); }
+    loadCullingDemo() { culling(this); }
 }
 
 export async function initEngine(canvas, { backend = "auto" } = {}) {

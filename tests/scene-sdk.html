@@ -17,7 +17,7 @@ try {
     const scene = engine.scene;
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Engine must start empty");
     scene.loadExample();
-    assert(scene.objectCount === 3 && scene.lightCount === 2, "Rust sample setup");
+    assert(scene.objectCount === 3 && scene.lightCount === 2, "JavaScript sample recipe creates Rust scene state");
     const cube = scene.createCube([-2, 0, 0]);
     cube.setPosition([-1.5, 0, 0]).setScale([0.7, 0.7, 0.7]).setRotation([0, 0, 0]);
     cube.rotate([0, 180, 0], { duration: 0.05 }).removeAfter(0.1);
@@ -53,7 +53,7 @@ try {
     scene.clear();
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Rust clear");
     scene.loadExample();
-    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, Rust sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear.";
+    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear.";
 } catch (error) {
     console.error(error);
     result.textContent = `FAIL: ${error.message}`;

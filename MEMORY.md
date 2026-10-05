@@ -1,3 +1,13 @@
+# JavaScript examples – aktuální rozhodnutí 2026-10-05
+
+Uživatel požaduje definice ukázkových scén v JavaScriptu. Runtime recepty jsou
+v examples/scenes.js; examples/index.html + gallery.js nabízí 5 scén a jeden
+canvas, přepnutí scén a úplné ukončení renderu (reload bez inicializace engine).
+Scene.loadExample/loadEffectsDemo/loadCullingDemo volají JS recepty, nikoliv
+WASM load exporty. Ty byly odstraněny. SceneManager, výpočty, simulace a rendering
+zůstávají v Rustu; test_scenes.rs jsou cfg(test) fixtures pro nativní testy.
+Historické poznámky o definicích příkladů v Rustu níže už neplatí.
+
 # Texturové průchody – aktualizace 2026-10-05
 
 Aktuální implementace má obecné RenderTarget/DepthRenderTarget v render/target.rs,

@@ -15,18 +15,6 @@ thread_local! {
 }
 
 #[wasm_bindgen]
-pub fn load_effects_demo() {
-    STATE.with(|state| {
-        if let Some(state) = state.borrow().as_ref() {
-            let mut state = state.borrow_mut();
-            state.scene.load_effects_demo();
-            state.set_effects(true, true);
-            state.set_grid_visible(false);
-            state.set_light_helpers_visible(false);
-        }
-    });
-}
-#[wasm_bindgen]
 pub fn set_render_effects(shadows: bool, reflections: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {
@@ -129,15 +117,6 @@ pub fn renderer_stats() -> js_sys::Float64Array {
 }
 
 #[wasm_bindgen]
-pub fn load_culling_demo() {
-    STATE.with(|state| {
-        if let Some(state) = state.borrow().as_ref() {
-            state.borrow_mut().scene.load_culling_demo();
-        }
-    });
-}
-
-#[wasm_bindgen]
 pub fn renderer_backend() -> String {
     STATE.with(|state| {
         state
@@ -146,15 +125,6 @@ pub fn renderer_backend() -> String {
             .map(|state| state.borrow().backend.clone())
             .unwrap_or_default()
     })
-}
-
-#[wasm_bindgen]
-pub fn load_example_scene() {
-    STATE.with(|state| {
-        if let Some(state) = state.borrow().as_ref() {
-            state.borrow_mut().scene.load_example();
-        }
-    });
 }
 
 #[wasm_bindgen]

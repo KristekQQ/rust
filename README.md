@@ -70,7 +70,7 @@ interpolation, matrix calculations, or light movement calculations.
 
 - `js/engine.js`: `initEngine(canvas)` awaits Rust and returns `engine.scene` plus the compatible low-level API.
 - `js/engine.d.ts`: types for the scene API and object/light handles.
-- `js/scene.js`: one command requesting Rust's fixed example scene.
+- `js/scene.js`: loads a JavaScript scene recipe through the command SDK.
 - `examples/control-scene.ts`: a separate TypeScript usage example, not loaded by the main page.
 
 Use the browser console or your own JS/TS code:
@@ -83,7 +83,7 @@ cube.removeAfter(8);                     // Rust schedules removal
 ```
 
 `engine.scene.clear()` clears objects, lights and their pending actions.
-`engine.scene.loadExample()` loads the Rust-defined sample.
+`engine.scene.loadExample()` runs the JavaScript recipe from `examples/scenes.js`.
 `engine.scene.objectCount` / `lightCount` read Rust state. Handles expose
 `exists`; invalid commands throw when Rust rejects them. IDs are never reused,
 including after scene reset, so old handles cannot target new objects.
@@ -269,3 +269,9 @@ samostatné frustum culling a cache pro jednotlivé průchody; vše počítá Ru
 SDK přidává `setRenderOptions`, `spin`, `scene.setMirror`, `loadEffectsDemo`,
 `set_render_effects`, `set_simulation_paused` a `effects_stats`.
 [Architektura, použití a současná omezení](docs/RENDER_PASSES.md).
+
+## JavaScript examples
+
+[Galerie pěti ukázek](examples/index.html) používá [JS definice scén](examples/scenes.js)
+přes Rust/WASM SDK. Spuštění: `scripts/run-local.sh`, potom
+http://127.0.0.1:8000/examples/. Viz [návod](examples/README.md).
