@@ -636,8 +636,9 @@ impl SceneManager {
             ),
         );
         self.set_object_spin(sphere, Vec3::new(0.0, 0.0, 0.55));
-        self.add_light(Vec3::new(-3.0, 7.0, 4.0), Vec3::splat(0.85));
-        self.add_light(Vec3::new(4.0, 2.0, -1.0), Vec3::new(0.08, 0.12, 0.22));
+        // Warm key light and blue fill; both illuminate the scene and its reflection.
+        self.add_light(Vec3::new(-3.0, 7.0, 4.0), Vec3::new(0.8, 0.224, 0.056));
+        self.add_light(Vec3::new(4.0, 3.0, 2.0), Vec3::new(0.052, 0.234, 0.65));
     }
     pub fn load_example(&mut self) {
         self.clear();

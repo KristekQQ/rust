@@ -90,7 +90,8 @@ engine.set_simulation_paused(true); // kamera se může dál pohybovat
 hodnoty false/true/true/0. Odrazivost přijímají pouze Plane objekty, vizuálně ji
 používá aktivní zrcadlo. `spin([0,0,0])` zastaví průběžnou rotaci.
 `engine.scene.loadEffectsDemo()` vytvoří v Rustu 9 statických objektů a 2
-rotující objekty. `engine.effects_stats()` vrací počty aktualizací map, počty
+rotující objekty, oranžové hlavní a modré doplňkové světlo. Obě světla osvětlují
+scénu i její odraz; stín vrhá první světlo. `engine.effects_stats()` vrací počty aktualizací map, počty
 viditelných objektů v průchodech, počet provedených průchodů a rozlišení.
 Počet průchodů nezahrnuje závěrečný prezentovací blit při output mode texture.
 `prepareMs` nyní zahrnuje CPU simulaci, přípravu/encoding/submission všech
