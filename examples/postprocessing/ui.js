@@ -1,5 +1,5 @@
 // Optional application UI. No GPU resources, camera math or animation loop here.
-export function createUI(container, engine) {
+export function createUI(container, engine, { resetView = () => {} } = {}) {
     if (!container) throw new Error('Chybí UI');
     container.innerHTML = `
         <a href="../">← Rozcestník / ukončit render</a>
@@ -7,19 +7,22 @@ export function createUI(container, engine) {
         <label><input type="checkbox" name="ssr" checked> Screen-space reflections</label>
         <label>Síla SSR <input type="range" name="ssrStrength" min="0" max="1" step="0.05" value="0.85"></label>
         <label><input type="checkbox" name="godRays" checked> Volumetrické paprsky</label>
-        <label>Síla paprsků <input type="range" name="godRaysStrength" min="0" max="1" step="0.05" value="0.65"></label>
+        <label>Síla paprsků <input type="range" name="godRaysStrength" min="0" max="1" step="0.05" value="0.8"></label>
+        <label>Jas paprsků <input type="range" name="exposure" min="0" max="80" step="1" value="40"></label>
         <label><input type="checkbox" name="pause"> Pozastavit pohyb</label>
         <label><input type="checkbox" name="texture"> Výstup přes texturu</label>
         <label><input type="checkbox" name="grid"> Pomocná mřížka</label>
         <label><input type="checkbox" name="helpers"> Značky světel</label>
+        <button id="view">Pohled na paprsky</button>
         <button data-camera="free">Free kamera</button><button data-camera="orbit">Orbit kamera</button>
         <button id="verify">Ověřit řetězec</button>
         <pre role="status"></pre>
-        <p>Táhni myší pro změnu pohledu. WASD: pohyb · Q/E: výška · Shift: rychleji. Odrazy obsahují pouze objekty viditelné kamerou. Paprsky se počítají v prostoru ze stínových map prvního světla.</p>
+        <p>Táhni myší pro změnu pohledu. WASD: pohyb · Q/E: výška · Shift: rychleji. Odrazy obsahují pouze objekty viditelné kamerou. Světlo vstupuje velkým kruhovým oknem. Jeho kamenné příčky rozdělují paprsky; vypnutím volumetrických paprsků uvidíš rozdíl.</p>
         <p>Model: Marko Dabrovic, opravy Kenzie Lamar. <a href="https://casual-effects.com/data/">McGuire Computer Graphics Archive</a> · CC BY-NC (nekomerční demo). <a href="../../docs/GLTF.md">Import glTF</a>.</p>
         <p><a href="main.js">main.js</a> · <a href="scene.js">scene.js</a> · <a href="ui.js">ui.js</a></p>`;
     const field = name => container.querySelector(`[name="${name}"]`);
     const apply = () => {
+        engine.postprocessing.configureGodRays({ density: 0.055, exposure: Number(field('exposure').value) });
         for (const name of ['ssr', 'godRays']) {
             if (field(name).checked) engine.postprocessing.enable(name, { strength: Number(field(`${name}Strength`).value) });
             else engine.postprocessing.disable(name);
@@ -37,6 +40,7 @@ export function createUI(container, engine) {
     container.addEventListener('click', cameraClick);
     let message = '';
     const frames = async () => { for (let i = 0; i < 6; i++) await new Promise(requestAnimationFrame); };
+    container.querySelector('#view').onclick = resetView;
     container.querySelector('#verify').onclick = async () => {
         try {
             let rejected = false;

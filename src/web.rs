@@ -57,6 +57,16 @@ pub fn load_gltf(bytes: &[u8], buffers: js_sys::Array) -> Result<u32, JsValue> {
 }
 
 #[wasm_bindgen]
+pub fn configure_god_rays(density: f32, exposure: f32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().configure_god_rays(density, exposure))
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_postprocess(name: &str, enabled: bool, strength: f32) -> bool {
     STATE.with(|state| {
         state

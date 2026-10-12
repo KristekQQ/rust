@@ -1,3 +1,15 @@
+# Viditelné god rays z rozety – 2026-10-12
+
+Neprůhledný převod původně zastínil všechna okna. Converter nyní vynechává
+2 760 `staklo*` faces a ponechává kamenné rámy; GLB má 72 513 triangles/145 857 vertices.
+Native regression ray test ověřuje průchod bočním oknem i rozetou a blokování kamenem.
+Ukázka světlo [-19,12,0.2] venku před rozetou, kamera [6,2.5,2] -> [-12,8,0].
+Volumetrické params jsou SDK configureGodRays({density,exposure}) -> Rust, limity 0–1/0–100.
+Defaults .035/2.5 zachovány; ukázka .055/40, strength .8. Původní model/test počty níže historické.
+Server serve-local.py má no-store a nevrací 304 na moduly; run-local.sh ho používá.
+Postprocessing main má SDK/UI revision URL pro staré klientské cache; typy zachovány JSDoc.
+Světlo stále bodové/perspektivní, nejde o obecné směrové slunce. API PBR/animace beze změn.
+
 # Komplexní konstrukce Šibenik – 2026-10-12
 
 Postprocessing příklad nyní načítá skutečnou katedrálu z McGuire Graphics Archive.

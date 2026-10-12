@@ -618,8 +618,8 @@ mod tests {
     fn real_sibenik_architecture_has_complete_large_triangle_mesh() {
         let bytes = include_bytes!("../assets/models/sibenik-cathedral/sibenik-geometry.glb");
         let model = parse(bytes, &[]).unwrap();
-        assert_eq!(model.vertices.len(), 148_866);
-        assert_eq!(model.indices.len(), 75_273 * 3);
+        assert_eq!(model.vertices.len(), 145_857);
+        assert_eq!(model.indices.len(), 72_513 * 3);
         assert!(model.indices.iter().any(|&i| i > u16::MAX as u32));
         assert!(model.vertices.iter().all(|v| {
             Vec3::from_array(v.position).is_finite()
@@ -627,6 +627,55 @@ mod tests {
         }));
         assert!(model.bounds_min[0] < -20.0 && model.bounds_max[1] >= 15.3);
     }
+    #[test]
+    fn cathedral_window_transmits_light_while_nearby_stone_blocks_it() {
+        let model = parse(
+            include_bytes!("../assets/models/sibenik-cathedral/sibenik-geometry.glb"),
+            &[],
+        )
+        .unwrap();
+        let to_local = |p: Vec3| (p - Vec3::new(0.0, 11.2498456, 0.0)) / 0.8;
+        let blocked = |light: Vec3, end: Vec3| {
+            let start = to_local(light);
+            let direction = to_local(end) - start;
+            model.indices.chunks_exact(3).any(|ids| {
+                let a = Vec3::from_array(model.vertices[ids[0] as usize].position);
+                let edge1 = Vec3::from_array(model.vertices[ids[1] as usize].position) - a;
+                let edge2 = Vec3::from_array(model.vertices[ids[2] as usize].position) - a;
+                let p = direction.cross(edge2);
+                let determinant = edge1.dot(p);
+                if determinant.abs() < 1e-8 {
+                    return false;
+                }
+                let delta = start - a;
+                let u = delta.dot(p) / determinant;
+                if !(0.0..=1.0).contains(&u) {
+                    return false;
+                }
+                let q = delta.cross(edge1);
+                let v = direction.dot(q) / determinant;
+                let t = edge2.dot(q) / determinant;
+                v >= 0.0 && u + v <= 1.0 && t > 1e-5 && t < 0.9999
+            })
+        };
+        assert!(
+            !blocked(Vec3::new(-5.3, 15.6, -5.0), Vec3::new(-5.3, 0.0, 0.0)),
+            "The demonstration light must enter through a real opening"
+        );
+        assert!(
+            blocked(Vec3::new(-5.3, 15.6, -5.0), Vec3::new(-4.3, 0.0, 0.0)),
+            "Window frames and surrounding stone must remain occluders"
+        );
+        assert!(
+            !blocked(Vec3::new(-19.0, 12.0, 0.2), Vec3::new(0.0, -0.5, 0.2)),
+            "Rose window apertures must transmit the scene light"
+        );
+        assert!(
+            blocked(Vec3::new(-19.0, 11.1, 0.0), Vec3::new(0.0, -0.5, 0.0)),
+            "Rose window stone center must cast a shadow"
+        );
+    }
+
     #[test]
     fn real_kenney_bridge_glb_has_finite_geometry() {
         let bytes = include_bytes!(

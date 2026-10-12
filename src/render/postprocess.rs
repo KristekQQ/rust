@@ -151,6 +151,8 @@ pub struct PostProcessor {
     targets: Option<Targets>,
     submitted_frames: u64,
     last_pass_count: usize,
+    volume_density: f32,
+    volume_exposure: f32,
 }
 impl PostProcessor {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
@@ -337,6 +339,8 @@ impl PostProcessor {
             targets: None,
             submitted_frames: 0,
             last_pass_count: 0,
+            volume_density: 0.035,
+            volume_exposure: 2.5,
         }
     }
     fn shadow_group(
@@ -427,6 +431,19 @@ impl PostProcessor {
         self.last_pass_count = 0;
         true
     }
+    pub fn configure_volume(&mut self, density: f32, exposure: f32) -> bool {
+        if !density.is_finite()
+            || !(0.0..=1.0).contains(&density)
+            || !exposure.is_finite()
+            || !(0.0..=100.0).contains(&exposure)
+        {
+            return false;
+        }
+        self.volume_density = density;
+        self.volume_exposure = exposure;
+        true
+    }
+
     pub fn set_effect(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
         if !strength.is_finite() || !(0.0..=1.0).contains(&strength) {
             return false;
@@ -592,7 +609,12 @@ impl PostProcessor {
                 ],
                 mask_params: self.reflection_mask.params,
                 shadow_view_projection: shadow_matrix.to_cols_array_2d(),
-                volume_params: [if shadows_enabled { 1.0 } else { 0.0 }, 0.035, 24.0, 2.5],
+                volume_params: [
+                    if shadows_enabled { 1.0 } else { 0.0 },
+                    self.volume_density,
+                    24.0,
+                    self.volume_exposure,
+                ],
             };
             queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
             let destination = if index + 1 == active.len() {

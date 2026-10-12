@@ -50,6 +50,9 @@ impl State {
         self.output.resize(&self.renderer.device, width, height);
         self.aspect = self.output.aspect();
     }
+    pub fn configure_god_rays(&mut self, density: f32, exposure: f32) -> bool {
+        self.postprocess.configure_volume(density, exposure)
+    }
     pub fn set_postprocess(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
         self.postprocess.set_effect(name, enabled, strength)
     }

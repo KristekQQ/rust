@@ -128,6 +128,9 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
             enable(name, { strength = 0.6 } = {}) {
                 accepted(wasm.set_postprocess(name, true, strength));
             },
+            configureGodRays({ density = 0.035, exposure = 2.5 } = {}) {
+                accepted(wasm.configure_god_rays(density, exposure));
+            },
             disable(name) { accepted(wasm.set_postprocess(name, false, 0)); },
             setReflectionMask({ width, height, pixels, center = [0, 0], size = [1, 1] }) {
                 accepted(wasm.set_reflection_mask(width, height, pixels, ...center, ...size));

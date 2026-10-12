@@ -52,7 +52,7 @@ i dynamickou stínovou mapu prvního světla, směrovou HG fázi a exponenciáln
 Stabilní prostorový jitter omezuje pravidelné pásy; temporal accumulation není
 implementována. Zdroj už nemusí být vidět na obrazovce.
 
-Ukázka používá skutečný interiér katedrály Šibenik (75 273 trojúhelníků),
+Ukázka používá skutečný interiér katedrály Šibenik (72 513 trojúhelníků),
 bez textur a animací. Geometry-only GLB vzniká offline převodem staženého OBJ;
 provenance a nekomerční licence CC BY-NC jsou v assets/models/sibenik-cathedral.
 Stínové mapy se sdílejí s rendererem; další stínové průchody ani kopie nejsou
@@ -87,3 +87,20 @@ a [GPU Gems: light scattering postprocess](https://developer.nvidia.com/gpugems/
 
 Pomocný grid a značky světel se vykreslí až po řetězci jako depth-tested overlay.
 Neovlivňují SSR, god rays ani packed-depth vstup.
+
+## Viditelné paprsky z otevřeného okna
+
+Geometry-only převod vynechává `staklo*` výplně oken, které by jinak vrhaly
+neprůhledný stín. Kamenné rámy a rozeta jsou běžné statické castery.
+První světlo ukázky je venku před velkou rozetou; výchozí kamera hledí do svazků.
+Jde zatím o bodové světlo a jeho perspektivní stínový kužel, ne o implementaci
+směrového slunce. Žádná malovaná textura paprsků se nepoužívá.
+
+`engine.postprocessing.configureGodRays({ density: 0.055, exposure: 40 })`
+nastaví hustotu média (0–1) a jas objemového světla (0–100), nezávisle na osvětlení
+povrchů. Rust validuje a zapisuje hodnoty do existujících uniformů; změna těchto
+voleb nevytváří další renderovací cíle. Výchozí hodnoty enginu zůstávají 0.035/2.5.
+Ukázkové UI nabízí checkbox efektu, jas a tlačítko návratu k pohledu na paprsky.
+
+Vývojový server `scripts/serve-local.py` nepoužívá cache modulů; `run-local.sh`
+ho spustí po WASM buildu. Staré otevřené stránky je při změně SDK třeba obnovit.

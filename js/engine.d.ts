@@ -74,6 +74,8 @@ export type PostEffectName = "ssr" | "godRays";
 export interface PostProcessing {
     /** Strength 0..1. Unknown effects and invalid values throw. Computed in Rust/WGSL. */
     enable(name: PostEffectName, options?: { strength?: number }): void;
+    /** Volume density 0..1 and exposure 0..100; independent of surface lighting. */
+    configureGodRays(options?: { density?: number; exposure?: number }): void;
     disable(name: PostEffectName): void;
     /** Grayscale mask on world XZ: 0 dry, 255 reflective. Uploaded once. */
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;

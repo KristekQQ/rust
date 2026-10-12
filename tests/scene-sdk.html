@@ -60,6 +60,10 @@ try {
     scene.clear();
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Rust clear");
     createScene(scene);
+    engine.postprocessing.configureGodRays({ density: 0.055, exposure: 40 });
+    let volumeRejected = false;
+    try { engine.postprocessing.configureGodRays({ density: NaN, exposure: 200 }); } catch { volumeRejected = true; }
+    assert(volumeRejected, 'Invalid volumetric settings rejected');
     engine.postprocessing.enable('ssr', { strength: 0.7 });
     engine.postprocessing.enable('godRays', { strength: 0.4 });
     for (let i = 0; i < 8; i++) await new Promise(requestAnimationFrame);

@@ -16,13 +16,21 @@ def convert(archive, destination):
     with zipfile.ZipFile(archive) as package:
         source = package.read('sibenik.obj').decode('utf-8')
     positions, vertices, normals, indices, lookup = [], [], [], [], {}
+    material = ""
+    omitted_glass_faces = 0
     for line in source.splitlines():
         fields = line.split()
         if not fields:
             continue
         if fields[0] == 'v':
             positions.append(tuple(map(float, fields[1:4])))
+        elif fields[0] == 'usemtl':
+            material = fields[1]
         elif fields[0] == 'f':
+            # The opaque-only preview must keep clear/stained window openings open.
+            if material.startswith('staklo'):
+                omitted_glass_faces += 1
+                continue
             corners = []
             for token in fields[1:]:
                 raw = int(token.split('/')[0])
@@ -88,7 +96,7 @@ def convert(archive, destination):
     glb += struct.pack('<II', len(header), 0x4e4f534a) + header
     glb += struct.pack('<II', len(binary), 0x004e4942) + binary
     Path(destination).write_bytes(glb)
-    print(json.dumps({'vertices': len(vertices), 'triangles': len(indices)//3, 'bounds': [minimum, maximum], 'bytes': len(glb), 'sha256': hashlib.sha256(glb).hexdigest()}, indent=2))
+    print(json.dumps({'omitted_glass_faces': omitted_glass_faces, 'vertices': len(vertices), 'triangles': len(indices)//3, 'bounds': [minimum, maximum], 'bytes': len(glb), 'sha256': hashlib.sha256(glb).hexdigest()}, indent=2))
 
 
 if __name__ == '__main__':

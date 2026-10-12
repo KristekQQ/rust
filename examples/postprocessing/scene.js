@@ -11,8 +11,8 @@ export async function createScene(scene) {
     // Optional wet-floor surface lies just above the model's existing floor.
     const floor = scene.createPlane([0, -0.98, 0]).setScale([25, 1, 12]);
     floor.setRenderOptions({ isStatic: true, castsShadow: false, reflectivity: 0.85 });
-    // A light outside the side wall lets real windows shape the volumetric pass.
-    scene.createLight({ position: [-5, 10, -9], color: [1, 0.8, 0.58] });
-    scene.createLight({ position: [4, 6, 2], color: [0.25, 0.32, 0.45] });
+    // A light outside the rose window lets its real stone tracery split the light.
+    scene.createLight({ position: [-19, 12, 0.2], color: [1.4, 1.12, 0.812] });
+    scene.createLight({ position: [7, 4, 1], color: [0.055, 0.075, 0.11] });
     return { floor, architecture };
 }
