@@ -3,10 +3,10 @@ export function createUI(container, engine) {
     if (!container) throw new Error('Chybí UI');
     container.innerHTML = `
         <a href="../">← Rozcestník / ukončit render</a>
-        <h1>SSR + god rays</h1>
+        <h1>Kaluž a světlo v mlze</h1>
         <label><input type="checkbox" name="ssr" checked> Screen-space reflections</label>
         <label>Síla SSR <input type="range" name="ssrStrength" min="0" max="1" step="0.05" value="0.85"></label>
-        <label><input type="checkbox" name="godRays" checked> God rays</label>
+        <label><input type="checkbox" name="godRays" checked> Volumetrické paprsky</label>
         <label>Síla paprsků <input type="range" name="godRaysStrength" min="0" max="1" step="0.05" value="0.65"></label>
         <label><input type="checkbox" name="pause"> Pozastavit pohyb</label>
         <label><input type="checkbox" name="texture"> Výstup přes texturu</label>
@@ -14,7 +14,7 @@ export function createUI(container, engine) {
         <label><input type="checkbox" name="helpers"> Značky světel</label>
         <button id="verify">Ověřit řetězec</button>
         <pre role="status"></pre>
-        <p>Táhni myší pro změnu pohledu. Odrazy obsahují pouze objekty viditelné kamerou. Paprsky pocházejí z prvního světla a jsou screen-space aproximací.</p>
+        <p>Táhni myší pro změnu pohledu. Odrazy obsahují pouze objekty viditelné kamerou. Paprsky se počítají v prostoru ze stínových map prvního světla.</p>
         <p><a href="main.js">main.js</a> · <a href="scene.js">scene.js</a> · <a href="ui.js">ui.js</a></p>`;
     const field = name => container.querySelector(`[name="${name}"]`);
     const apply = () => {

@@ -43,12 +43,24 @@ vypne také. Maximální maska je 1024×1024. Depth je v druhém MRT attachmentu
 nikoli z normal mapy. Objekty mimo obraz nebo za viditelným povrchem v odrazu
 chybí; zatím bez temporal accumulation, roughness a environment fallback.
 
-## God rays
+## God rays / volumetrické světlo
 
-První světlo ve scéně poskytuje pozici a barvu zdroje. Shader projektuje zdroj,
-vytvoří konečný světelný disk a akumuluje 48 radiálních vzorků zakrytých depth.
-Zdroj za kamerou / mimo obraz se neuplatní. Jde o screen-space light shafts,
-ne plnou volumetrickou mlhu. U okrajů obrazu a geometrie jsou možné artefakty.
+Od 2026-10-12 shader místo radiálního rozmazání integruje rozptýlené světlo
+podél kamerového paprsku ve 32 vzorcích. První viditelný povrch z packed depth
+omezuje délku integrace (maximum 24 jednotek). Každý vzorek používá statickou
+i dynamickou stínovou mapu prvního světla, směrovou HG fázi a exponenciální útlum.
+Stabilní prostorový jitter omezuje pravidelné pásy; temporal accumulation není
+implementována. Zdroj už nemusí být vidět na obrazovce.
+
+Ukázka používá kamenný průchod a nepravidelné skály místo barevných lamel.
+Stínové mapy se sdílejí s rendererem; další stínové průchody ani kopie nejsou
+potřeba. `enable('godRays', { strength })` a pořadí řetězce zůstávají stejné.
+
+Jde o omezený objemový single-scattering efekt, ne úplný atmosférický model:
+jedno světlo, homogenní médium, stávající perspektivní stínový kužel místo 360°
+point shadows; bez vícečetného rozptylu a bez zeslabení původní povrchové barvy
+mlhou. Při vypnutých stínech se rozptyl počítá jako nezakryté světlo v kuželu.
+Ve vysoce kontrastních hranách jsou možné šum / aliasing; není to záruka VR výkonu.
 
 ## Přidání dalšího efektu
 
@@ -68,6 +80,7 @@ Ukázka a integrační kontroly: `/examples/postprocessing/`, `?backend=webgl`,
 `tests/scene-sdk.html`, `tests/render-target.html`, `tests/render-effects.html`.
 
 Podklady: [GPUOpen SSR](https://gpuopen.com/manuals/fidelityfx_sdk/techniques/stochastic-screen-space-reflections/)
+, [GPU Gems: objemové světlo](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-39-volume-rendering-techniques)
 a [GPU Gems: light scattering postprocess](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-13-volumetric-light-scattering-post-process).
 
 Pomocný grid a značky světel se vykreslí až po řetězci jako depth-tested overlay.

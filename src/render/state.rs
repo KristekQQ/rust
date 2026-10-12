@@ -30,9 +30,12 @@ impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
         let aspect = output.aspect();
-        let postprocess = PostProcessor::new(&device, output.color_format());
+        let renderer = SceneRenderer::new(device, queue);
+        let mut postprocess = PostProcessor::new(&renderer.device, output.color_format());
+        let (static_map, dynamic_map) = renderer.shadow_maps();
+        postprocess.set_shadow_maps(&renderer.device, static_map, dynamic_map);
         Ok(Self {
-            renderer: SceneRenderer::new(device, queue),
+            renderer,
             output,
             postprocess,
             backend,
@@ -98,6 +101,11 @@ impl State {
             self.renderer
                 .render_view(self.view, &self.postprocess.target())
                 .map_err(|e| JsValue::from_str(&e))?;
+            // Effects lazily replaces fallback maps when shadows are first enabled.
+            // Rebind by resource identity; unchanged maps do not allocate a new bind group.
+            let (static_map, dynamic_map) = self.renderer.shadow_maps();
+            self.postprocess
+                .set_shadow_maps(&self.renderer.device, static_map, dynamic_map);
             let light = self.renderer.scene.lights().values().next();
             let (position, color) = light
                 .map(|l| (l.position, l.color))
@@ -109,6 +117,7 @@ impl State {
                 position,
                 color,
                 target.color,
+                self.renderer.shadows_enabled(),
             );
             let overlays = super::target::RenderTarget {
                 depth: self.postprocess.target().depth,

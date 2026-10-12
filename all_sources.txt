@@ -2092,14 +2092,16 @@ struct Uniforms {
     inverse_view_projection: [[f32; 4]; 4],
     view_projection: [[f32; 4]; 4],
     camera: [f32; 4],
-    light_clip: [f32; 4],
+    light_position: [f32; 4],
     light_color: [f32; 4],
     // strength, final output flag, width, height; all fields are 16-byte aligned.
     params: [f32; 4],
     mask_params: [f32; 4],
+    shadow_view_projection: [[f32; 4]; 4],
+    volume_params: [f32; 4],
 }
-// Rust offsets match WGSL matrices and vec4 fields (208 bytes total).
-const _: () = assert!(std::mem::size_of::<Uniforms>() == 208);
+// Rust offsets match WGSL matrices and vec4 fields (288 bytes total).
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 288);
 const _: () = assert!(std::mem::offset_of!(Uniforms, params) == 176);
 
 // Add a WGSL fragment entry point and a descriptor to extend the chain.
@@ -2220,6 +2222,10 @@ pub struct PostProcessor {
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     depth_sampler: wgpu::Sampler,
+    shadow_layout: wgpu::BindGroupLayout,
+    shadow_sampler: wgpu::Sampler,
+    shadow_bind_group: wgpu::BindGroup,
+    shadow_views: Option<(wgpu::TextureView, wgpu::TextureView)>,
     effects: Vec<Effect>,
     reflection_mask: ReflectionMask,
     targets: Option<Targets>,
@@ -2297,6 +2303,54 @@ impl PostProcessor {
             label: Some("postprocess nearest depth"),
             ..Default::default()
         });
+        let shadow_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("volume shadow layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                    count: None,
+                },
+            ],
+        });
+        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("volume comparison sampler"),
+            compare: Some(wgpu::CompareFunction::LessEqual),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        // Valid fallback resources until the renderer supplies its persistent maps.
+        // Their contents are not sampled when shadows_enabled is false.
+        let fallback = super::textures::DepthTarget::new(device, "volume shadow fallback", 1);
+        let shadow_bind_group = Self::shadow_group(
+            device,
+            &shadow_layout,
+            &shadow_sampler,
+            &fallback.view,
+            &fallback.view,
+        );
         let effects = EFFECTS
             .iter()
             .map(|descriptor| {
@@ -2307,7 +2361,7 @@ impl PostProcessor {
                 let pipeline_layout =
                     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                         label: Some("postprocess pipeline layout"),
-                        bind_group_layouts: &[Some(&layout)],
+                        bind_group_layouts: &[Some(&layout), Some(&shadow_layout)],
                         immediate_size: 0,
                     });
                 let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -2354,12 +2408,67 @@ impl PostProcessor {
             layout,
             sampler,
             depth_sampler,
+            shadow_layout,
+            shadow_sampler,
+            shadow_bind_group,
+            shadow_views: None,
             effects,
             reflection_mask: ReflectionMask::new(device, 1, 1),
             targets: None,
             submitted_frames: 0,
             last_pass_count: 0,
         }
+    }
+    fn shadow_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler,
+        static_map: &wgpu::TextureView,
+        dynamic_map: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("volume first-light shadows"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(static_map),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(dynamic_map),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(sampler),
+                },
+            ],
+        })
+    }
+    /// Rebind only when the renderer replaces its first-light shadow textures.
+    pub fn set_shadow_maps(
+        &mut self,
+        device: &wgpu::Device,
+        static_map: &wgpu::TextureView,
+        dynamic_map: &wgpu::TextureView,
+    ) {
+        if self
+            .shadow_views
+            .as_ref()
+            .is_some_and(|(cached_static, cached_dynamic)| {
+                cached_static == static_map && cached_dynamic == dynamic_map
+            })
+        {
+            return;
+        }
+        self.shadow_bind_group = Self::shadow_group(
+            device,
+            &self.shadow_layout,
+            &self.shadow_sampler,
+            static_map,
+            dynamic_map,
+        );
+        self.shadow_views = Some((static_map.clone(), dynamic_map.clone()));
     }
     /// R8 bytes map world XZ to UV: (position - center) / size + 0.5.
     /// Wet/dry base-color shading is applied by the SSR pass only.
@@ -2518,6 +2627,7 @@ impl PostProcessor {
         light_position: Vec3,
         light_color: Vec3,
         output: &wgpu::TextureView,
+        shadows_enabled: bool,
     ) {
         // new() has no queue; initialize its white fallback once, before sampling.
         if self.reflection_mask.needs_white_upload {
@@ -2536,7 +2646,7 @@ impl PostProcessor {
         if active.is_empty() {
             return;
         }
-        let light_clip = view.view_projection * light_position.extend(1.0);
+        let shadow_matrix = crate::render_math::shadow_view_projection(light_position);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("postprocess chain"),
         });
@@ -2552,7 +2662,7 @@ impl PostProcessor {
                         0.0
                     })
                     .to_array(),
-                light_clip: light_clip.to_array(),
+                light_position: light_position.extend(1.0).to_array(),
                 light_color: light_color.extend(1.0).to_array(),
                 params: [
                     effect.strength,
@@ -2561,6 +2671,8 @@ impl PostProcessor {
                     targets.scene.height as f32,
                 ],
                 mask_params: self.reflection_mask.params,
+                shadow_view_projection: shadow_matrix.to_cols_array_2d(),
+                volume_params: [if shadows_enabled { 1.0 } else { 0.0 }, 0.035, 24.0, 2.5],
             };
             queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
             let destination = if index + 1 == active.len() {
@@ -2588,6 +2700,7 @@ impl PostProcessor {
             });
             pass.set_pipeline(&effect.pipeline);
             pass.set_bind_group(0, bind_group, &[]);
+            pass.set_bind_group(1, &self.shadow_bind_group, &[]);
             pass.draw(0..3, 0..1);
         }
         queue.submit(Some(encoder.finish()));
@@ -2601,10 +2714,13 @@ struct Uniforms {
     inverse_view_projection: mat4x4<f32>,
     view_projection: mat4x4<f32>,
     camera: vec4<f32>,
-    light_clip: vec4<f32>,
+    light_position: vec4<f32>,
     light_color: vec4<f32>,
     params: vec4<f32>,
     mask_params: vec4<f32>,
+    shadow_view_projection: mat4x4<f32>,
+    // shadow-enabled, extinction density, max ray range, scattering exposure
+    volume_params: vec4<f32>,
 };
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 @group(0) @binding(1) var scene_sampler: sampler;
@@ -2612,6 +2728,9 @@ struct Uniforms {
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
 @group(0) @binding(4) var depth_sampler: sampler;
 @group(0) @binding(6) var reflection_mask: texture_2d<f32>;
+@group(1) @binding(0) var volume_static_shadow: texture_depth_2d;
+@group(1) @binding(1) var volume_dynamic_shadow: texture_depth_2d;
+@group(1) @binding(2) var volume_shadow_sampler: sampler_comparison;
 struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
 @vertex fn vs_main(@builtin(vertex_index) index: u32) -> Output {
     let positions = array<vec2<f32>, 3>(vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -2710,31 +2829,62 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     }
     return source.rgb;
 }
-fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
-    let clip = uniforms.light_clip;
-    if clip.w <= 0.0 { return source; }
+// Single-scattering eye-ray integration with shadow-map visibility, inspired by
+// Toth/Umenhoffer (Eurographics 2009). No radial screen emitter or screen-light gating.
+fn volume_visibility(position: vec3<f32>) -> f32 {
+    let clip = uniforms.shadow_view_projection * vec4(position, 1.0);
+    if clip.w <= 0.0 { return 0.0; }
     let ndc = clip.xyz / clip.w;
-    let light_uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
-    if !inside(light_uv) || ndc.z <= 0.0 || ndc.z >= 1.0 { return source; }
-    // Sample a finite emitter disk so a partially covered light casts radial shafts.
-    // Each sample is blocked by geometry in front of the projected light depth.
-    let source_radius = 0.065;
-    let aspect = uniforms.params.z / uniforms.params.w;
-    let radial_step = (light_uv - uv) / 48.0;
-    var sample_uv = uv;
-    var illumination = 0.0;
-    var decay = 1.0;
-    for (var sample = 0u; sample < 48u; sample += 1u) {
-        sample_uv += radial_step;
-        let offset = (sample_uv - light_uv) * vec2(aspect, 1.0);
-        let emitter = 1.0 - smoothstep(source_radius * 0.25, source_radius, length(offset));
-        let visible = select(0.0, 1.0, depth_at(sample_uv) + 0.0005 >= ndc.z);
-        illumination += emitter * visible * decay;
-        decay *= 0.975;
+    let uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    // Existing point-light shadow maps cover a perspective cone, not all 360 degrees.
+    if !inside(uv) || ndc.z <= 0.0 || ndc.z >= 1.0 { return 0.0; }
+    let edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    let cone_fade = smoothstep(0.0, 0.04, edge);
+    // With shadows disabled, retain explicitly unshadowed scattering in this cone.
+    if uniforms.volume_params.x < 0.5 { return cone_fade; }
+    // A small depth bias avoids self-shadowing without leaking light through stones.
+    let reference_depth = ndc.z - 0.00008;
+    let static_visibility = textureSampleCompareLevel(volume_static_shadow, volume_shadow_sampler, uv, reference_depth);
+    let dynamic_visibility = textureSampleCompareLevel(volume_dynamic_shadow, volume_shadow_sampler, uv, reference_depth);
+    return min(static_visibility, dynamic_visibility) * cone_fade;
+}
+fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
+    if max(max(uniforms.light_color.r, uniforms.light_color.g), uniforms.light_color.b) <= 0.0 { return source; }
+    let depth = depth_at(uv);
+    let endpoint = world_at(uv, min(depth, 0.999999));
+    let camera_to_surface = endpoint - uniforms.camera.xyz;
+    let surface_distance = length(camera_to_surface);
+    if surface_distance < 0.0001 { return source; }
+    let direction = camera_to_surface / surface_distance;
+    var ray_length = min(surface_distance, uniforms.volume_params.z);
+    if depth >= 0.999999 { ray_length = uniforms.volume_params.z; }
+    let step_length = ray_length / 32.0;
+    let density = uniforms.volume_params.y * uniforms.params.x;
+    let step_transmission = exp(-density * step_length);
+    // Deterministic per-pixel jitter removes aligned bands without temporal flicker.
+    let pixel = floor(uv * uniforms.params.zw);
+    let jitter = fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+    var transmission = 1.0;
+    var radiance = vec3(0.0);
+    let g = 0.45;
+    for (var step = 0u; step < 32u; step += 1u) {
+        let t = (f32(step) + jitter) * step_length;
+        let position = uniforms.camera.xyz + direction * t;
+        let to_light = uniforms.light_position.xyz - position;
+        let distance_squared = max(dot(to_light, to_light), 0.01);
+        let light_direction = to_light * inverseSqrt(distance_squared);
+        let cosine = clamp(dot(direction, light_direction), -1.0, 1.0);
+        // Henyey-Greenstein phase with moderate forward scattering.
+        let phase = (1.0 - g * g) / (12.5663706 * pow(max(1.0 + g * g - 2.0 * g * cosine, 0.001), 1.5));
+        let attenuation = 5.0 / (1.0 + 0.2 * distance_squared);
+        let visibility = volume_visibility(position);
+        radiance += max(uniforms.light_color.rgb, vec3(0.0)) * (transmission * (1.0 - step_transmission) * phase * attenuation * visibility);
+        transmission *= step_transmission;
     }
-    let border = min(min(light_uv.x, 1.0 - light_uv.x), min(light_uv.y, 1.0 - light_uv.y));
-    let edge_fade = smoothstep(0.0, 0.06, border);
-    return source + max(uniforms.light_color.rgb, vec3(0.0)) * illumination * (uniforms.params.x * edge_fade / 12.0);
+    // Keep original surface lighting; the integrated medium adds bounded light.
+    // This additive approximation omits surface fog extinction and multiple scattering.
+    let scattering = radiance * uniforms.volume_params.w;
+    return source + scattering / (vec3(1.0) + scattering);
 }
 // Intermediate alpha remains material metadata; final output alpha is opaque. Keep SSR before color-only effects in EFFECTS by default.
 @fragment fn fs_ssr(input: Output) -> @location(0) vec4<f32> {
@@ -3008,6 +3158,20 @@ impl SceneRenderer {
             frame_metrics: crate::frame_metrics::FrameMetrics::default(),
             last_lights: lights_array,
         }
+    }
+    /// Stable first-light maps; postprocessing shares these resources instead of re-rendering shadows.
+    pub fn shadow_maps(&self) -> (&wgpu::TextureView, &wgpu::TextureView) {
+        let effects = self
+            .effects
+            .as_ref()
+            .expect("effects available outside render_view");
+        (
+            &effects.static_shadow[0].view,
+            &effects.dynamic_shadow[0].view,
+        )
+    }
+    pub fn shadows_enabled(&self) -> bool {
+        self.effects.as_ref().is_some_and(|effects| effects.shadows)
     }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
@@ -3483,9 +3647,12 @@ impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
         let aspect = output.aspect();
-        let postprocess = PostProcessor::new(&device, output.color_format());
+        let renderer = SceneRenderer::new(device, queue);
+        let mut postprocess = PostProcessor::new(&renderer.device, output.color_format());
+        let (static_map, dynamic_map) = renderer.shadow_maps();
+        postprocess.set_shadow_maps(&renderer.device, static_map, dynamic_map);
         Ok(Self {
-            renderer: SceneRenderer::new(device, queue),
+            renderer,
             output,
             postprocess,
             backend,
@@ -3551,6 +3718,11 @@ impl State {
             self.renderer
                 .render_view(self.view, &self.postprocess.target())
                 .map_err(|e| JsValue::from_str(&e))?;
+            // Effects lazily replaces fallback maps when shadows are first enabled.
+            // Rebind by resource identity; unchanged maps do not allocate a new bind group.
+            let (static_map, dynamic_map) = self.renderer.shadow_maps();
+            self.postprocess
+                .set_shadow_maps(&self.renderer.device, static_map, dynamic_map);
             let light = self.renderer.scene.lights().values().next();
             let (position, color) = light
                 .map(|l| (l.position, l.color))
@@ -3562,6 +3734,7 @@ impl State {
                 position,
                 color,
                 target.color,
+                self.renderer.shadows_enabled(),
             );
             let overlays = super::target::RenderTarget {
                 depth: self.postprocess.target().depth,

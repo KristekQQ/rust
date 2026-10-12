@@ -238,6 +238,20 @@ impl SceneRenderer {
             last_lights: lights_array,
         }
     }
+    /// Stable first-light maps; postprocessing shares these resources instead of re-rendering shadows.
+    pub fn shadow_maps(&self) -> (&wgpu::TextureView, &wgpu::TextureView) {
+        let effects = self
+            .effects
+            .as_ref()
+            .expect("effects available outside render_view");
+        (
+            &effects.static_shadow[0].view,
+            &effects.dynamic_shadow[0].view,
+        )
+    }
+    pub fn shadows_enabled(&self) -> bool {
+        self.effects.as_ref().is_some_and(|effects| effects.shadows)
+    }
     pub fn set_grid_visible(&mut self, show: bool) {
         self.draw_grid = show;
     }

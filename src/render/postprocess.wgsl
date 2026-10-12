@@ -2,10 +2,13 @@ struct Uniforms {
     inverse_view_projection: mat4x4<f32>,
     view_projection: mat4x4<f32>,
     camera: vec4<f32>,
-    light_clip: vec4<f32>,
+    light_position: vec4<f32>,
     light_color: vec4<f32>,
     params: vec4<f32>,
     mask_params: vec4<f32>,
+    shadow_view_projection: mat4x4<f32>,
+    // shadow-enabled, extinction density, max ray range, scattering exposure
+    volume_params: vec4<f32>,
 };
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 @group(0) @binding(1) var scene_sampler: sampler;
@@ -13,6 +16,9 @@ struct Uniforms {
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
 @group(0) @binding(4) var depth_sampler: sampler;
 @group(0) @binding(6) var reflection_mask: texture_2d<f32>;
+@group(1) @binding(0) var volume_static_shadow: texture_depth_2d;
+@group(1) @binding(1) var volume_dynamic_shadow: texture_depth_2d;
+@group(1) @binding(2) var volume_shadow_sampler: sampler_comparison;
 struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
 @vertex fn vs_main(@builtin(vertex_index) index: u32) -> Output {
     let positions = array<vec2<f32>, 3>(vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -111,31 +117,62 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     }
     return source.rgb;
 }
-fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
-    let clip = uniforms.light_clip;
-    if clip.w <= 0.0 { return source; }
+// Single-scattering eye-ray integration with shadow-map visibility, inspired by
+// Toth/Umenhoffer (Eurographics 2009). No radial screen emitter or screen-light gating.
+fn volume_visibility(position: vec3<f32>) -> f32 {
+    let clip = uniforms.shadow_view_projection * vec4(position, 1.0);
+    if clip.w <= 0.0 { return 0.0; }
     let ndc = clip.xyz / clip.w;
-    let light_uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
-    if !inside(light_uv) || ndc.z <= 0.0 || ndc.z >= 1.0 { return source; }
-    // Sample a finite emitter disk so a partially covered light casts radial shafts.
-    // Each sample is blocked by geometry in front of the projected light depth.
-    let source_radius = 0.065;
-    let aspect = uniforms.params.z / uniforms.params.w;
-    let radial_step = (light_uv - uv) / 48.0;
-    var sample_uv = uv;
-    var illumination = 0.0;
-    var decay = 1.0;
-    for (var sample = 0u; sample < 48u; sample += 1u) {
-        sample_uv += radial_step;
-        let offset = (sample_uv - light_uv) * vec2(aspect, 1.0);
-        let emitter = 1.0 - smoothstep(source_radius * 0.25, source_radius, length(offset));
-        let visible = select(0.0, 1.0, depth_at(sample_uv) + 0.0005 >= ndc.z);
-        illumination += emitter * visible * decay;
-        decay *= 0.975;
+    let uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    // Existing point-light shadow maps cover a perspective cone, not all 360 degrees.
+    if !inside(uv) || ndc.z <= 0.0 || ndc.z >= 1.0 { return 0.0; }
+    let edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    let cone_fade = smoothstep(0.0, 0.04, edge);
+    // With shadows disabled, retain explicitly unshadowed scattering in this cone.
+    if uniforms.volume_params.x < 0.5 { return cone_fade; }
+    // A small depth bias avoids self-shadowing without leaking light through stones.
+    let reference_depth = ndc.z - 0.00008;
+    let static_visibility = textureSampleCompareLevel(volume_static_shadow, volume_shadow_sampler, uv, reference_depth);
+    let dynamic_visibility = textureSampleCompareLevel(volume_dynamic_shadow, volume_shadow_sampler, uv, reference_depth);
+    return min(static_visibility, dynamic_visibility) * cone_fade;
+}
+fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
+    if max(max(uniforms.light_color.r, uniforms.light_color.g), uniforms.light_color.b) <= 0.0 { return source; }
+    let depth = depth_at(uv);
+    let endpoint = world_at(uv, min(depth, 0.999999));
+    let camera_to_surface = endpoint - uniforms.camera.xyz;
+    let surface_distance = length(camera_to_surface);
+    if surface_distance < 0.0001 { return source; }
+    let direction = camera_to_surface / surface_distance;
+    var ray_length = min(surface_distance, uniforms.volume_params.z);
+    if depth >= 0.999999 { ray_length = uniforms.volume_params.z; }
+    let step_length = ray_length / 32.0;
+    let density = uniforms.volume_params.y * uniforms.params.x;
+    let step_transmission = exp(-density * step_length);
+    // Deterministic per-pixel jitter removes aligned bands without temporal flicker.
+    let pixel = floor(uv * uniforms.params.zw);
+    let jitter = fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+    var transmission = 1.0;
+    var radiance = vec3(0.0);
+    let g = 0.45;
+    for (var step = 0u; step < 32u; step += 1u) {
+        let t = (f32(step) + jitter) * step_length;
+        let position = uniforms.camera.xyz + direction * t;
+        let to_light = uniforms.light_position.xyz - position;
+        let distance_squared = max(dot(to_light, to_light), 0.01);
+        let light_direction = to_light * inverseSqrt(distance_squared);
+        let cosine = clamp(dot(direction, light_direction), -1.0, 1.0);
+        // Henyey-Greenstein phase with moderate forward scattering.
+        let phase = (1.0 - g * g) / (12.5663706 * pow(max(1.0 + g * g - 2.0 * g * cosine, 0.001), 1.5));
+        let attenuation = 5.0 / (1.0 + 0.2 * distance_squared);
+        let visibility = volume_visibility(position);
+        radiance += max(uniforms.light_color.rgb, vec3(0.0)) * (transmission * (1.0 - step_transmission) * phase * attenuation * visibility);
+        transmission *= step_transmission;
     }
-    let border = min(min(light_uv.x, 1.0 - light_uv.x), min(light_uv.y, 1.0 - light_uv.y));
-    let edge_fade = smoothstep(0.0, 0.06, border);
-    return source + max(uniforms.light_color.rgb, vec3(0.0)) * illumination * (uniforms.params.x * edge_fade / 12.0);
+    // Keep original surface lighting; the integrated medium adds bounded light.
+    // This additive approximation omits surface fog extinction and multiple scattering.
+    let scattering = radiance * uniforms.volume_params.w;
+    return source + scattering / (vec3(1.0) + scattering);
 }
 // Intermediate alpha remains material metadata; final output alpha is opaque. Keep SSR before color-only effects in EFFECTS by default.
 @fragment fn fs_ssr(input: Output) -> @location(0) vec4<f32> {

@@ -1,6 +1,14 @@
+# Kvalita god rays – 2026-10-12
+
+Radiální emitter-disk nahrazen 32krokovým kamerovým raymarchingem do prvního
+povrchu, se sdílenými stínovými mapami prvního světla, HG fází a Beerovým útlumem.
+Objemové světlo omezeno existujícím stínovým kuželem a 24 jednotkami; additive
+single-scattering, bez vícečetného rozptylu nebo surface fog extinction.
+Ukázka JS používá neutrální kameny/průchod místo lamel. SSR/maska API beze změn.
+
 # Postprocessing – 2026-10-12
 
-Rust render/postprocess.rs + WGSL: SSR a screen-space god rays, registry EFFECTS,
+Rust render/postprocess.rs + WGSL: SSR a volumetrické god rays, registry EFFECTS,
 ping-pong targets, offscreen reflectivity alpha metadata, opaque final output.
 SDK engine.postprocessing enable/disable/setReflectionMask/stats. Scéna
 examples/postprocessing obsahuje SVG masku kaluže načtenou JS pouze při startu;

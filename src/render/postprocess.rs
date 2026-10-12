@@ -12,14 +12,16 @@ struct Uniforms {
     inverse_view_projection: [[f32; 4]; 4],
     view_projection: [[f32; 4]; 4],
     camera: [f32; 4],
-    light_clip: [f32; 4],
+    light_position: [f32; 4],
     light_color: [f32; 4],
     // strength, final output flag, width, height; all fields are 16-byte aligned.
     params: [f32; 4],
     mask_params: [f32; 4],
+    shadow_view_projection: [[f32; 4]; 4],
+    volume_params: [f32; 4],
 }
-// Rust offsets match WGSL matrices and vec4 fields (208 bytes total).
-const _: () = assert!(std::mem::size_of::<Uniforms>() == 208);
+// Rust offsets match WGSL matrices and vec4 fields (288 bytes total).
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 288);
 const _: () = assert!(std::mem::offset_of!(Uniforms, params) == 176);
 
 // Add a WGSL fragment entry point and a descriptor to extend the chain.
@@ -140,6 +142,10 @@ pub struct PostProcessor {
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     depth_sampler: wgpu::Sampler,
+    shadow_layout: wgpu::BindGroupLayout,
+    shadow_sampler: wgpu::Sampler,
+    shadow_bind_group: wgpu::BindGroup,
+    shadow_views: Option<(wgpu::TextureView, wgpu::TextureView)>,
     effects: Vec<Effect>,
     reflection_mask: ReflectionMask,
     targets: Option<Targets>,
@@ -217,6 +223,54 @@ impl PostProcessor {
             label: Some("postprocess nearest depth"),
             ..Default::default()
         });
+        let shadow_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("volume shadow layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                    count: None,
+                },
+            ],
+        });
+        let shadow_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("volume comparison sampler"),
+            compare: Some(wgpu::CompareFunction::LessEqual),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        // Valid fallback resources until the renderer supplies its persistent maps.
+        // Their contents are not sampled when shadows_enabled is false.
+        let fallback = super::textures::DepthTarget::new(device, "volume shadow fallback", 1);
+        let shadow_bind_group = Self::shadow_group(
+            device,
+            &shadow_layout,
+            &shadow_sampler,
+            &fallback.view,
+            &fallback.view,
+        );
         let effects = EFFECTS
             .iter()
             .map(|descriptor| {
@@ -227,7 +281,7 @@ impl PostProcessor {
                 let pipeline_layout =
                     device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                         label: Some("postprocess pipeline layout"),
-                        bind_group_layouts: &[Some(&layout)],
+                        bind_group_layouts: &[Some(&layout), Some(&shadow_layout)],
                         immediate_size: 0,
                     });
                 let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -274,12 +328,67 @@ impl PostProcessor {
             layout,
             sampler,
             depth_sampler,
+            shadow_layout,
+            shadow_sampler,
+            shadow_bind_group,
+            shadow_views: None,
             effects,
             reflection_mask: ReflectionMask::new(device, 1, 1),
             targets: None,
             submitted_frames: 0,
             last_pass_count: 0,
         }
+    }
+    fn shadow_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        sampler: &wgpu::Sampler,
+        static_map: &wgpu::TextureView,
+        dynamic_map: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("volume first-light shadows"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(static_map),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(dynamic_map),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(sampler),
+                },
+            ],
+        })
+    }
+    /// Rebind only when the renderer replaces its first-light shadow textures.
+    pub fn set_shadow_maps(
+        &mut self,
+        device: &wgpu::Device,
+        static_map: &wgpu::TextureView,
+        dynamic_map: &wgpu::TextureView,
+    ) {
+        if self
+            .shadow_views
+            .as_ref()
+            .is_some_and(|(cached_static, cached_dynamic)| {
+                cached_static == static_map && cached_dynamic == dynamic_map
+            })
+        {
+            return;
+        }
+        self.shadow_bind_group = Self::shadow_group(
+            device,
+            &self.shadow_layout,
+            &self.shadow_sampler,
+            static_map,
+            dynamic_map,
+        );
+        self.shadow_views = Some((static_map.clone(), dynamic_map.clone()));
     }
     /// R8 bytes map world XZ to UV: (position - center) / size + 0.5.
     /// Wet/dry base-color shading is applied by the SSR pass only.
@@ -438,6 +547,7 @@ impl PostProcessor {
         light_position: Vec3,
         light_color: Vec3,
         output: &wgpu::TextureView,
+        shadows_enabled: bool,
     ) {
         // new() has no queue; initialize its white fallback once, before sampling.
         if self.reflection_mask.needs_white_upload {
@@ -456,7 +566,7 @@ impl PostProcessor {
         if active.is_empty() {
             return;
         }
-        let light_clip = view.view_projection * light_position.extend(1.0);
+        let shadow_matrix = crate::render_math::shadow_view_projection(light_position);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("postprocess chain"),
         });
@@ -472,7 +582,7 @@ impl PostProcessor {
                         0.0
                     })
                     .to_array(),
-                light_clip: light_clip.to_array(),
+                light_position: light_position.extend(1.0).to_array(),
                 light_color: light_color.extend(1.0).to_array(),
                 params: [
                     effect.strength,
@@ -481,6 +591,8 @@ impl PostProcessor {
                     targets.scene.height as f32,
                 ],
                 mask_params: self.reflection_mask.params,
+                shadow_view_projection: shadow_matrix.to_cols_array_2d(),
+                volume_params: [if shadows_enabled { 1.0 } else { 0.0 }, 0.035, 24.0, 2.5],
             };
             queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
             let destination = if index + 1 == active.len() {
@@ -508,6 +620,7 @@ impl PostProcessor {
             });
             pass.set_pipeline(&effect.pipeline);
             pass.set_bind_group(0, bind_group, &[]);
+            pass.set_bind_group(1, &self.shadow_bind_group, &[]);
             pass.draw(0..3, 0..1);
         }
         queue.submit(Some(encoder.finish()));
