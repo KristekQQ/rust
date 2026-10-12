@@ -303,7 +303,6 @@ impl Effects {
     ) -> Result<(), String> {
         let light_count = renderer.scene.lights().len().min(MAX_LIGHTS);
         self.ensure(&renderer.device, target.width, target.height, light_count);
-        renderer.upload_bytes = 0;
         let mut lights = [super::data::EMPTY_LIGHT; MAX_LIGHTS];
         for (dst, light) in lights.iter_mut().zip(renderer.scene.lights().values()) {
             *dst = Light {

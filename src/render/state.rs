@@ -14,6 +14,7 @@ pub struct State {
     pub backend: String,
     pub aspect: f32,
     view: RenderView,
+    model_camera: Option<(u32, usize)>,
 }
 impl Deref for State {
     type Target = SceneRenderer;
@@ -40,6 +41,7 @@ impl State {
             postprocess,
             backend,
             aspect,
+            model_camera: None,
             view: RenderView {
                 view_projection: Mat4::IDENTITY,
                 camera_position: Vec3::ZERO,
@@ -91,6 +93,69 @@ impl State {
             view_projection: camera_matrix,
             camera_position: camera_pos,
         };
+        if let Some((id, node)) = self.model_camera {
+            if let Some(view) = self.imported_camera_view(id, node) {
+                self.view = view;
+            } else {
+                self.model_camera = None;
+            }
+        }
+    }
+    pub fn clear_model_camera(&mut self) {
+        self.model_camera = None;
+    }
+    pub fn use_model_camera(&mut self, id: u32, node: usize) -> bool {
+        if self.imported_camera_view(id, node).is_none() {
+            return false;
+        }
+        self.model_camera = Some((id, node));
+        true
+    }
+    fn imported_camera_view(&self, id: u32, node: usize) -> Option<RenderView> {
+        let model = self.scene.model(id)?;
+        if !model.pose.active_nodes.contains(&node) {
+            return None;
+        }
+        let camera = model.asset.nodes.get(node)?.camera?;
+        let root = self.scene.objects().get(&id)?.transform.model();
+        let world = root * model.pose.world_matrices[node];
+        if world.determinant().abs() < 1e-10 {
+            return None;
+        }
+        let projection = match &model.asset.cameras[camera] {
+            crate::gltf_model::ModelCamera::Perspective {
+                yfov,
+                aspect_ratio,
+                znear,
+                zfar,
+                ..
+            } => match zfar {
+                Some(far) => glam::camera::rh::proj::directx::perspective(
+                    *yfov,
+                    aspect_ratio.unwrap_or(self.aspect),
+                    *znear,
+                    *far,
+                ),
+                None => glam::camera::rh::proj::directx::perspective_infinite(
+                    *yfov,
+                    aspect_ratio.unwrap_or(self.aspect),
+                    *znear,
+                ),
+            },
+            crate::gltf_model::ModelCamera::Orthographic {
+                xmag,
+                ymag,
+                znear,
+                zfar,
+                ..
+            } => glam::camera::rh::proj::directx::orthographic(
+                -*xmag, *xmag, -*ymag, *ymag, *znear, *zfar,
+            ),
+        };
+        Some(RenderView {
+            view_projection: projection * world.inverse(),
+            camera_position: world.transform_point3(Vec3::ZERO),
+        })
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
@@ -127,6 +192,9 @@ impl State {
                 auxiliary: None,
                 ..target
             };
+            self.renderer
+                .draw_transparent(&overlays)
+                .map_err(|e| JsValue::from_str(&e))?;
             self.renderer.draw_helpers(&overlays);
         } else {
             self.renderer

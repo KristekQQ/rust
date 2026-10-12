@@ -12,8 +12,8 @@ Original model by **Marko Dabrovic**; holes corrected by **Kenzie Lamar** at Vic
 
 `python3 scripts/convert-sibenik.py /tmp/sibenik.zip assets/models/sibenik-cathedral/sibenik-geometry.glb`
 
-The original OBJ positions and face winding are retained. Quads are split into two triangles along their internal 0–2 diagonal (checked during conversion); 11 zero-area triangles are omitted. Face normals are computed and vertices split at normal discontinuities. All UVs, texture references, original materials and image data are discarded. The 2,760 faces assigned to `staklo*` (clear/stained glass) are omitted so the opaque-only preview preserves light-transmitting window apertures; stone frames and tracery remain. A uniform neutral color previews the construction under the engine's existing lighting. No PBR shading or animation is added.
+The original OBJ positions and face winding are retained. Quads are split into two triangles along their internal 0–2 diagonal (checked during conversion); 11 zero-area triangles are omitted. Face normals are computed and vertices split at normal discontinuities. All UVs, texture references, original materials and image data are discarded. The 2,760 faces assigned to `staklo*` (clear/stained glass) are omitted so the opaque-only preview preserves light-transmitting window apertures; stone frames and tracery remain. A uniform neutral color previews the construction under the engine's existing lighting. The neutral stone material uses metallic=0 and roughness=0.95 for the PBR renderer; no original texture maps or animation are added.
 
-Result: **72,513 triangles, 145,857 vertices**, 4,371,752 bytes. Source coordinates and scale are retained; the JavaScript example applies the placement and uniform scale through the SDK.
+Result: **72,513 triangles, 145,857 vertices**, 4,371,796 bytes. Source coordinates and scale are retained; the JavaScript example applies the placement and uniform scale through the SDK.
 
-GLB SHA-256: `7a2127a886d2754d5217911aa35752eed3fbc29d0747337fb5f63c7fa54e005b`.
+GLB SHA-256: `099d80d2ef252316297313be8664c81c0277f35516acae588bb285ba057257c4`.

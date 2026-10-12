@@ -57,6 +57,144 @@ pub fn load_gltf(bytes: &[u8], buffers: js_sys::Array) -> Result<u32, JsValue> {
 }
 
 #[wasm_bindgen]
+pub fn gltf_resource_uris(bytes: &[u8]) -> Result<String, JsValue> {
+    let resources = crate::gltf_loader::resource_uris(bytes).map_err(|e| JsValue::from_str(&e))?;
+    Ok(serde_json::json!({"buffers":resources.buffers,"images":resources.images}).to_string())
+}
+
+fn model_resources(
+    bytes: &[u8],
+    buffers: js_sys::Array,
+    images: js_sys::Array,
+) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), JsValue> {
+    let mut total = bytes.len();
+    if total > 128 * 1024 * 1024 || buffers.length() + images.length() > 1024 {
+        return Err(JsValue::from_str("glTF překračuje limity zdrojů"));
+    }
+    let mut convert = |array: js_sys::Array| -> Result<Vec<Vec<u8>>, JsValue> {
+        array
+            .iter()
+            .map(|value| {
+                if !value.is_instance_of::<js_sys::Uint8Array>() {
+                    return Err(JsValue::from_str("glTF zdroje musí být Uint8Array"));
+                }
+                let value = value.unchecked_into::<js_sys::Uint8Array>();
+                total = total.saturating_add(value.length() as usize);
+                if total > 128 * 1024 * 1024 {
+                    return Err(JsValue::from_str("glTF překračuje 128 MiB"));
+                }
+                Ok(value.to_vec())
+            })
+            .collect()
+    };
+    Ok((convert(buffers)?, convert(images)?))
+}
+#[wasm_bindgen]
+pub fn load_gltf_model(
+    bytes: &[u8],
+    buffers: js_sys::Array,
+    images: js_sys::Array,
+) -> Result<u32, JsValue> {
+    let (buffers, images) = model_resources(bytes, buffers, images)?;
+    let asset = crate::gltf_loader::parse_model(bytes, &buffers, &images)
+        .map_err(|e| JsValue::from_str(&e))?;
+    for warning in &asset.warnings {
+        web_sys::console::warn_1(&JsValue::from_str(warning));
+    }
+    STATE.with(|s| {
+        let s = s.borrow();
+        let engine = s
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let result = engine
+            .borrow_mut()
+            .import_gltf_model(std::sync::Arc::new(asset))
+            .map_err(|e| JsValue::from_str(&e));
+        result
+    })
+}
+#[wasm_bindgen]
+pub fn model_info(id: u32) -> Result<String, JsValue> {
+    STATE.with(|s| {
+        let state=s.borrow();
+        let engine=state.as_ref().ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let engine=engine.borrow();
+        let model=engine.scene.model(id).ok_or_else(|| JsValue::from_str("Model neexistuje"))?;
+        let asset=&model.asset;
+        let animations:Vec<_>=asset.animations.iter().enumerate().map(|(i,a)| serde_json::json!({"name":a.name.clone().unwrap_or_else(||format!("Animation {i}")),"duration":a.duration})).collect();
+        let nodes:Vec<_>=asset.nodes.iter().enumerate().map(|(i,n)| serde_json::json!({"name":n.name.clone().unwrap_or_else(||format!("Node {i}")),"mesh":n.mesh,"camera":n.camera,"morphTargets":n.mesh.and_then(|m|asset.meshes[m].primitives.first()).map(|p|asset.primitives[*p].morph_targets.len()).unwrap_or(0)})).collect();
+        let scenes:Vec<_>=asset.scenes.iter().enumerate().map(|(i,s)|serde_json::json!({"name":s.name.clone().unwrap_or_else(||format!("Scene {i}"))})).collect();
+        let playback=model.playback.as_ref().map(|p|serde_json::json!({"clip":p.clip,"time":p.time,"speed":p.speed,"looping":p.looping,"playing":p.playing}));
+        Ok(serde_json::json!({"animations":animations,"nodes":nodes,"scenes":scenes,"scene":model.scene,"playback":playback,"primitives":asset.primitives.len(),"materials":asset.materials.len(),"textures":asset.textures.len(),"skins":asset.skins.len(),"lastError":model.last_error}).to_string())
+    })
+}
+#[wasm_bindgen]
+pub fn play_model_animation(id: u32, clip: usize, looping: bool, speed: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .play_model_animation(id, clip, looping, speed)
+                .is_ok()
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn pause_model_animation(id: u32, paused: bool) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .pause_model_animation(id, paused)
+                .is_ok()
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn seek_model_animation(id: u32, time: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.seek_model_animation(id, time).is_ok())
+    })
+}
+#[wasm_bindgen]
+pub fn stop_model_animation(id: u32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.stop_model_animation(id).is_ok())
+    })
+}
+#[wasm_bindgen]
+pub fn select_model_scene(id: u32, scene: usize) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.select_model_scene(id, scene).is_ok())
+    })
+}
+#[wasm_bindgen]
+pub fn set_model_morph_weights(id: u32, node: usize, weights: &[f32]) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .set_model_morph_weights(id, node, weights)
+                .is_ok()
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn use_model_camera(id: u32, node: usize) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().use_model_camera(id, node))
+    })
+}
+
+#[wasm_bindgen]
 pub fn configure_god_rays(density: f32, exposure: f32) -> bool {
     STATE.with(|state| {
         state
@@ -327,16 +465,31 @@ pub fn set_grid_visible(show: bool) {
 
 #[wasm_bindgen]
 pub fn set_camera_view(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> bool {
-    CAMERA.with(|camera| {
+    let accepted = CAMERA.with(|camera| {
         camera.borrow().as_ref().is_some_and(|c| {
             c.borrow_mut()
                 .set_view(glam::Vec3::new(px, py, pz), glam::Vec3::new(tx, ty, tz))
         })
-    })
+    });
+    if accepted {
+        STATE.with(|s| {
+            if let Some(s) = s.borrow().as_ref() {
+                s.borrow_mut().clear_model_camera();
+            }
+        });
+    }
+    accepted
 }
 
 #[wasm_bindgen]
 pub fn set_camera_mode(mode: &str) {
+    if mode == "free" || mode == "orbit" {
+        STATE.with(|s| {
+            if let Some(s) = s.borrow().as_ref() {
+                s.borrow_mut().clear_model_camera();
+            }
+        });
+    }
     CAMERA.with(|c| {
         if let Some(cam) = &*c.borrow() {
             let mut cam = cam.borrow_mut();

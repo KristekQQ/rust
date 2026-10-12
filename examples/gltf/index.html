@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>glTF PBR a animace · Rust engine</title><link rel="stylesheet" href="../shared/example.css">
+<main><canvas id="gpu-canvas" aria-label="glTF model"></canvas><aside id="tools">
+<h1>glTF · PBR a animace</h1><p><a href="../">Ukázky</a> · <a href="scene.js">scene.js</a></p>
+<label>Model <select id="model"><option value="fox">Animovaná liška</option><option value="helmet">PBR helma</option></select></label>
+<label>Animace <select id="clip"></select></label><label><input id="playing" type="checkbox" checked>Přehrávat</label>
+<label>Rychlost <input id="speed" type="range" min="0" max="2" step="0.1" value="1"></label>
+<button id="pose-start">Začátek klipu</button><button id="pose-mid">Polovina klipu</button>
+<button id="reset">Znovu načíst</button><pre id="status" role="status">Načítám…</pre>
+<p>Řízení animace, interpolace, kostra i materiály jsou v Rustu. JS sestaví scénu a předává příkazy.</p>
+<p>Fox: PixelMannen (CC0), tomkranis a AsoboStudio/scurest (CC BY 4.0). Helma: theblueturtle_ (CC BY-NC 4.0), ctxwing (CC BY 4.0), nekomerční demo.</p>
+</aside></main><script type="module" src="main.js"></script></html>

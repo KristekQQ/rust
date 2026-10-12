@@ -1,5 +1,7 @@
 pub mod frame_metrics;
+pub mod gltf_animation;
 pub mod gltf_loader;
+pub mod gltf_model;
 pub mod input;
 #[cfg(target_arch = "wasm32")]
 pub mod render;

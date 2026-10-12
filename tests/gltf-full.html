@@ -1,0 +1,36 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>glTF core runtime test</title>
+<h1>glTF · PBR, animace a runtime</h1><pre id="result" role="status">Probíhá test…</pre>
+<canvas id="gpu-canvas" width="640" height="360" style="width:640px;height:360px"></canvas>
+<button id="morph-zero">Morph 0</button><button id="morph-one">Morph 1</button>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+const status=document.getElementById('result');
+const assert=(x,m)=>{if(!x)throw new Error(m)};
+const frames=async(n=8)=>{while(n--)await new Promise(requestAnimationFrame)};
+try {
+ const engine=await initEngine(document.getElementById('gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ engine.set_camera_mode('free');engine.setCameraView([0,3,12],[0,1,0]);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+ engine.scene.createLight({position:[0,5,5],color:[20,20,20]});
+ const fixture=await engine.scene.loadModel(new URL('fixtures/gltf/full/full.gltf',location.href));
+ assert(fixture.info.textures===1 && fixture.info.primitives===3,'External PNG and three material modes');
+ assert(fixture.info.animations.length===1 && fixture.info.scenes.length===2,'Morph clip and multiple scenes');
+ fixture.playAnimation('Morph',{loop:false}).pauseAnimation().seekAnimation(1);
+ assert(fixture.info.playback.time===1 && !fixture.info.playback.playing,'Seek and pause');
+ fixture.selectScene(1);await frames();assert(fixture.info.scene===1,'Scene selection');
+ fixture.selectScene(0);fixture.stopAnimation().setMorphWeights(1,[0.75]);
+ let rejected=false;try{fixture.setMorphWeights(1,[NaN])}catch{rejected=true}assert(rejected,'Invalid morph weights rejected');
+ fixture.useCamera(3);await frames();engine.setCameraView([0,3,12],[0,1,0]);
+ const fox=await engine.scene.loadModel(new URL('../assets/models/fox/Fox.glb',location.href));
+ assert(fox.info.skins===1 && fox.info.animations.length===3,'Real skinned Fox model');
+ fox.setScale([.025,.025,.025]).setPosition([0,0,-3]).playAnimation('Walk');await frames(24);
+ assert(fox.info.playback.time>0,'Rust advances animation');
+ fox.pauseAnimation();const time=fox.info.playback.time;await frames();assert(fox.info.playback.time===time,'Pause freezes playback');
+ fox.seekAnimation(.3).pauseAnimation(false);await frames();fox.stopAnimation();assert(fox.info.playback===null,'Stop restores asset pose');
+ fox.remove();await frames();assert(!fox.exists,'Animated model removal');
+ const helmet=await engine.scene.loadModel(new URL('../assets/models/damaged-helmet/DamagedHelmet.glb',location.href));
+ assert(helmet.info.textures===5 && helmet.info.materials===1,'Five PBR maps with JPEG/PNG decoding');helmet.remove();
+ document.getElementById('morph-zero').onclick=()=>{fixture.stopAnimation();for(let i=0;i<3;i++)fixture.setMorphWeights(i,[0]);};
+ document.getElementById('morph-one').onclick=()=>{fixture.stopAnimation();for(let i=0;i<3;i++)fixture.setMorphWeights(i,[1]);};
+ await frames();status.textContent=`PASS: ${engine.renderer_backend()} · external PNG, PBR maps, MASK/BLEND, UV1, scenes, cameras, morph weights, Fox skin/animations, pause/seek/stop/remove.`;
+} catch(error){status.textContent=`FAIL: ${error.message??error}`;console.error(error);}
+</script></html>

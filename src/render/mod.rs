@@ -5,6 +5,7 @@ pub mod depth;
 pub mod pipeline;
 pub mod state;
 
+pub mod gltf_gpu;
 pub mod output;
 pub mod renderer;
 pub mod target;

@@ -261,3 +261,14 @@ Revize geometrického stavu + camera matrix + nastavení cullingu slouží jako
 klíč cache extrakce; statické snímky neopakují scan objektů a tvorbu dávek.
 `engine.renderer_stats()` / `set_frustum_culling(bool)` poskytují diagnostiku.
 Plán a omezení: `docs/RENDER_PERFORMANCE.md`; ověření: `tests/render-stress.html`.
+
+## 2026-10-13 · glTF core runtime and PBR
+
+- `src/gltf_model.rs` owns CPU asset/pose types; `src/gltf_animation.rs` samples STEP/LINEAR/CUBICSPLINE TRS/weights, morphs and skins. `src/gltf_loader.rs::parse_model` imports retained hierarchy, materials, PNG/JPEG, sparse accessors, all primitive modes, scenes and cameras. Legacy `parse` remains for geometry fixtures/API compatibility.
+- `SceneManager.models` owns model runtime by root ID, animation update and pose bounds. Commands validate candidate pose/bounds before commit. The root uses existing imported bounds/culling and static/dynamic revisions.
+- `src/render/gltf_gpu.rs` / `gltf_pbr.wgsl` are dedicated portable PBR draws. CPU deform on changed pose, GPU buffers reused for color/reflection/shadow; cache by model revision/root/options. Material maps use sRGB base/emissive and linear ORM/normal, UV per texture role, mip/sampler reuse. Missing normals use derivative flat faces after deformation.
+- Transparent primitives sort across model roots after all opaque geometry; postprocessed main adds BLEND using opaque depth after effects. They do not contribute to opaque SSR/godray depth or shadow maps. No triangle sorting/IBL/HDR/animation blending yet; required unknown glTF extensions are rejected, optional extensions warn/fallback.
+- JS `ModelObject` extends root handle with info/play/pause/seek/stop/morph/scene/camera commands. Import does not activate embedded cameras. `setCameraView` restores standard camera. `examples/gltf/` is a separate app; `tests/gltf-full.html` tests metadata/runtime and needs visual checks in addition to PASS.
+- Approved cathedral camera `[6,2.5,2]` looking at `[-12,8,0]` and first light `[-19,12,0.2]` remain. Neutral stone now explicitly metallic=0/roughness=.95; geometry/placement/window apertures unchanged.
+
+- Verification: 55 native tests PASS; wasm32 check, wasm-pack build and npm typecheck PASS. Real gltf-full/glTF-sdk/scene-sdk plus render-target/render-effects/postprocessing chain PASS in WebGPU and WebGL. Visual checks: Fox start/mid skeleton poses with changing shadows, actual morph height and MASK/BLEND checker, five-map helmet, cathedral rose-window beams in both backends. This is observed feature coverage, not Khronos conformance certification.

@@ -283,8 +283,9 @@ http://127.0.0.1:8000/examples/. Viz [návod](examples/README.md).
 [SSR, kaluž a god rays](examples/postprocessing/index.html) používají rozšiřitelný
 Rust/WGSL řetězec. [API a přidání efektu](docs/POSTPROCESSING.md).
 
-## Statické glTF modely
+## glTF modely, PBR a animace
 
 `await engine.scene.loadModel(url)` načte `.gltf` nebo `.glb` do Rust scény.
-Podporu geometrie, materiálů a limity popisuje [docs/GLTF.md](docs/GLTF.md).
+Ukázka [glTF](examples/gltf/) předvádí PBR textury a kosterní animace.
+Podporu geometrie, materiálů, animací a limity popisuje [docs/GLTF.md](docs/GLTF.md).
 Ukázka [postprocessing](examples/postprocessing/) používá komplexní interiér katedrály Šibenik (CC BY-NC, pouze nekomerční demonstrační asset).

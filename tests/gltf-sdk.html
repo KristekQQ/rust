@@ -27,7 +27,7 @@ try {
     await frames();
     assert(scene.objectCount===3 && bridge.exists && triangle.exists,'GLB + relative .bin import');
     const stats=engine.renderer_stats(), effects=engine.effects_stats();
-    assert(stats.visible===3 && stats.drawCalls===3,'Imported and built-in geometry draw batches');
+    assert(stats.visible===3 && stats.drawCalls===bridge.info.primitives+triangle.info.primitives+1,'Imported and built-in geometry draw batches');
     assert(effects.staticVisible>0 && effects.dynamicVisible>0 && effects.reflectionVisible===2,'Custom meshes in shadow and reflection passes');
     const before=scene.objectCount;
     let rejected=false;

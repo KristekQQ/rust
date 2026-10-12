@@ -36,6 +36,23 @@ export class SceneLight {
     remove() { accepted(this.#wasm.remove_light(this.id)); }
 }
 
+/** glTF root handle. Pose, playback and imported hierarchy remain in Rust. */
+export class ModelObject extends SceneObject {
+    #wasm;
+    constructor(wasm, id) { super(wasm, id); this.#wasm = wasm; }
+    get info() { return JSON.parse(this.#wasm.model_info(this.id)); }
+    playAnimation(clip = 0, { loop = true, speed = 1 } = {}) {
+        const index = typeof clip === 'string' ? this.info.animations.findIndex(a => a.name === clip) : clip;
+        accepted(this.#wasm.play_model_animation(this.id, index, loop, speed)); return this;
+    }
+    pauseAnimation(paused = true) { accepted(this.#wasm.pause_model_animation(this.id, paused)); return this; }
+    seekAnimation(seconds) { accepted(this.#wasm.seek_model_animation(this.id, seconds)); return this; }
+    stopAnimation() { accepted(this.#wasm.stop_model_animation(this.id)); return this; }
+    selectScene(index) { accepted(this.#wasm.select_model_scene(this.id, index)); return this; }
+    setMorphWeights(node, weights) { accepted(this.#wasm.set_model_morph_weights(this.id, node, weights)); return this; }
+    useCamera(node) { accepted(this.#wasm.use_model_camera(this.id, node)); return this; }
+}
+
 // Thin command facade for the Rust SceneManager, not a second manager in JS.
 export class Scene {
     #wasm;
@@ -91,13 +108,17 @@ export class Scene {
             return bytes;
         };
         const bytes = await fetchBytes(source, true);
-        const uris = this.#wasm.gltf_buffer_uris(bytes);
-        if (uris.length > 1024) throw new Error('Model má příliš mnoho bufferů');
+        const { buffers: uris, images: imageUris } = JSON.parse(this.#wasm.gltf_resource_uris(bytes));
+        if (uris.length + imageUris.length > 1024) throw new Error('Model má příliš mnoho zdrojů');
         const buffers = [];
         // Bound total download memory; do not fetch all external buffers concurrently.
         for (const uri of uris) buffers.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
+        const images = [];
+        for (const uri of imageUris) images.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
         checkCurrent();
-        return this.#create(this.#wasm.load_gltf(bytes, buffers));
+        const id = this.#wasm.load_gltf_model(bytes, buffers, images);
+        accepted(id !== 0xffffffff);
+        return new ModelObject(this.#wasm, id);
     }
     createLight({ position = [0, 0, 0], color = [1, 1, 1] } = {}) {
         const id = this.#wasm.add_light(...position, ...color);

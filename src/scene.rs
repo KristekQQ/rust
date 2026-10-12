@@ -116,6 +116,7 @@ struct LightOrbit {
 #[derive(Default)]
 pub struct SceneManager {
     objects: BTreeMap<u32, SceneObject>,
+    models: BTreeMap<u32, crate::gltf_model::ModelInstance>,
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
     next_id: u32,
@@ -217,6 +218,100 @@ impl SceneManager {
     pub fn lights(&self) -> &BTreeMap<u32, Light> {
         &self.lights
     }
+    pub fn models(&self) -> &BTreeMap<u32, crate::gltf_model::ModelInstance> {
+        &self.models
+    }
+    pub fn model(&self, id: u32) -> Option<&crate::gltf_model::ModelInstance> {
+        self.models.get(&id)
+    }
+    pub fn add_model(
+        &mut self,
+        asset: std::sync::Arc<crate::gltf_model::ModelAsset>,
+    ) -> Result<u32, String> {
+        let model = crate::gltf_model::ModelInstance::new(asset, None)?;
+        let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose)?;
+        let id = self.add_imported(min, max);
+        if id == INVALID_ID {
+            return Err("Cannot allocate model root".into());
+        }
+        self.models.insert(id, model);
+        Ok(id)
+    }
+    fn commit_model(
+        &mut self,
+        id: u32,
+        model: crate::gltf_model::ModelInstance,
+    ) -> Result<(), String> {
+        let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose)?;
+        let object = self
+            .objects
+            .get_mut(&id)
+            .ok_or("Model root does not exist")?;
+        object.local_bounds = Some((min, max));
+        object.refresh_render_data();
+        self.models.insert(id, model);
+        self.changed(id);
+        Ok(())
+    }
+    fn mutate_model(
+        &mut self,
+        id: u32,
+        operation: impl FnOnce(&mut crate::gltf_model::ModelInstance) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let mut candidate = self
+            .models
+            .get(&id)
+            .ok_or("Model root does not exist")?
+            .clone();
+        operation(&mut candidate)?;
+        candidate.last_error = None;
+        self.commit_model(id, candidate)
+    }
+    pub fn play_model_animation(
+        &mut self,
+        id: u32,
+        clip: usize,
+        looping: bool,
+        speed: f32,
+    ) -> Result<(), String> {
+        if !speed.is_finite() {
+            return Err("Animation speed must be finite".into());
+        }
+        self.mutate_model(id, |model| {
+            model.play(clip, looping)?;
+            model.playback.as_mut().unwrap().speed = speed;
+            Ok(())
+        })
+    }
+    pub fn pause_model_animation(&mut self, id: u32, paused: bool) -> Result<(), String> {
+        let model = self
+            .models
+            .get_mut(&id)
+            .ok_or("Model root does not exist")?;
+        model
+            .playback
+            .as_mut()
+            .ok_or("Model has no active animation")?
+            .playing = !paused;
+        Ok(())
+    }
+    pub fn seek_model_animation(&mut self, id: u32, time: f32) -> Result<(), String> {
+        self.mutate_model(id, |model| model.seek(time))
+    }
+    pub fn stop_model_animation(&mut self, id: u32) -> Result<(), String> {
+        self.mutate_model(id, |model| model.stop())
+    }
+    pub fn select_model_scene(&mut self, id: u32, scene: usize) -> Result<(), String> {
+        self.mutate_model(id, |model| model.select_scene(scene))
+    }
+    pub fn set_model_morph_weights(
+        &mut self,
+        id: u32,
+        node: usize,
+        weights: &[f32],
+    ) -> Result<(), String> {
+        self.mutate_model(id, |model| model.set_morph_weights(node, weights))
+    }
     pub fn object_exists(&self, id: u32) -> bool {
         self.objects.contains_key(&id)
     }
@@ -278,6 +373,7 @@ impl SceneManager {
     }
     pub fn clear_scene(&mut self) {
         self.objects.clear();
+        self.models.clear();
         self.mirror_object = None;
         self.spins.clear();
         self.static_revision = self.static_revision.wrapping_add(1);
@@ -305,6 +401,7 @@ impl SceneManager {
         if self.objects.remove(&id).is_none() {
             return false;
         }
+        self.models.remove(&id);
         self.render_revision = self.render_revision.wrapping_add(1);
         if was_static {
             self.static_revision = self.static_revision.wrapping_add(1);
@@ -490,6 +587,33 @@ impl SceneManager {
     pub fn update(&mut self, dt: f32) {
         if self.paused || !dt.is_finite() || dt <= 0.0 {
             return;
+        }
+        let active: Vec<_> = self
+            .models
+            .iter()
+            .filter(|(_, model)| {
+                model
+                    .playback
+                    .as_ref()
+                    .is_some_and(|p| p.playing && p.speed != 0.)
+            })
+            .map(|(&id, _)| id)
+            .collect();
+        for id in active {
+            let mut candidate = self.models[&id].clone();
+            let result = match candidate.update(dt) {
+                Ok(true) => self.commit_model(id, candidate),
+                Ok(false) => Ok(()),
+                Err(error) => Err(error),
+            };
+            if let Err(error) = result {
+                if let Some(model) = self.models.get_mut(&id) {
+                    model.last_error = Some(error);
+                    if let Some(playback) = &mut model.playback {
+                        playback.playing = false;
+                    }
+                }
+            }
         }
         self.time += dt;
         let now = self.time;

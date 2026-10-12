@@ -1,43 +1,58 @@
-# Import statických glTF modelů
+# glTF modely, PBR a animace
 
-`scene.loadModel()` načte glTF 2.0 (`.gltf`) nebo binární GLB (`.glb`) přes SDK a vrátí běžný handle scény. Fetch zajišťuje JavaScript; parsování, převod geometrie, bounds a její vykreslení řídí Rust.
+Model načti přes `await scene.loadModel(url)`. JavaScript zajišťuje přenos souborů a drží pouze ID; Rust parsuje glTF/GLB, vlastní hierarchii uzlů, materiály, pózu, animace, bounds i vykreslování. Import nikdy automaticky nezmění kameru.
 
 ```js
-const arch = await scene.loadModel(new URL(
-    '../../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb',
-    import.meta.url,
-));
-
-arch.setPosition([0, -0.6, 0])
-    .setRotation([0, Math.PI / 4, 0]) // radiány
-    .setScale([6, 8, 4])
-    .setRenderOptions({
-        isStatic: true,
-        castsShadow: true,
-        receivesShadow: true,
-    });
+import { initEngine } from '../js/engine.js';
+const engine = await initEngine(document.querySelector('#gpu-canvas'));
+const model = await engine.scene.loadModel(new URL('../assets/models/fox/Fox.glb', import.meta.url));
+model.setScale([0.035, 0.035, 0.035]);
+model.playAnimation('Walk', { loop: true, speed: 1 });
+// Všechny následující příkazy mění Rust runtime:
+model.pauseAnimation();
+model.seekAnimation(0.5); // sekundy
+model.pauseAnimation(false);
+model.stopAnimation(); // výchozí póza souboru
+console.log(model.info); // snímek metadat a přehrávání z Rustu
 ```
 
-V `.gltf` lze použít externí buffery, například vedlejší `.bin`; SDK načte všechny URI bufferů relativně k URL modelu. V GLB se použije vložený BIN blok. Celkový přenos modelu a bufferů je omezen na 128 MiB. Načítání je asynchronní, proto ho `await` před použitím handle. `scene.clear()` zruší čekající importy; soubory po HTTP přesměrování používají finální URL. `new URL(..., import.meta.url)` naváže cestu k modulu příkladu, nikoli k aktuální stránce.
+## Import a materiály
 
-## Podporovaná geometrie a materiály
+`.gltf` a `.glb` mohou obsahovat externí buffery, relativní PNG/JPEG, data URI i vložené bufferView obrázky. URI se řeší vůči finální URL modelu po přesměrování. SDK načítá zdroje postupně; celkový přenos je omezen na 128 MiB. `scene.clear()` zneplatní čekající importy. Chyba importu nepřidá částečný model do scény.
 
-Loader prochází výchozí glTF scénu a sloučí její mesh primitiva do jediné statické geometrie. Node transformace se započítají do vrcholů při importu; pozdější `setPosition`, `setRotation` a `setScale` mění transformaci celého výsledného objektu. Osa a směry scén se nemění. Bounds se počítají z importovaných vrcholů a Rust je aktualizuje při transformaci objektu.
+PBR používá glTF metallic–roughness: base color, metallic/roughness, normal map, occlusion a emissive včetně faktorů. Base color/emissive jsou sRGB; ostatní mapy jsou lineární. Renderer respektuje UV sady, barvy vrcholů, tangenty, wrap/filter samplery a mipmapy. Podporuje OPAQUE, MASK s alphaCutoff, BLEND a doubleSided. Materiály jednotlivých primitiv zůstávají oddělené. Geometrie zachovává uzly a sdílené mesh reference.
 
-Podporovány jsou pouze neprůhledné primitiva `TRIANGLES`. Pozice musí být `float VEC3`; normály jsou volitelné (při absenci je Rust dopočítá). Barvy vrcholů `COLOR_0` mohou být `float` nebo normalizované `uint8/uint16` VEC3/VEC4. Barva vrcholu se násobí materiálovým `baseColorFactor`. Bez těchto barevných vstupů se použije bílá.
+Indexovaná i neindexovaná geometrie podporuje body, čáry, smyčky, stripy, trojúhelníky a fan. Loader čte sparse accessors. Při absenci normál počítá ploché normály z deformované geometrie; normal mapa bez tangentů používá odvození báze ve fragment shaderu. Body a čáry mají neosvětlený materiál dle glTF.
 
-Jde o barvu pro stávající osvětlení enginu, ne o glTF PBR renderer. Metallic/roughness se nepřenáší. Model nesmí odkazovat textury ani obrázky; materiály s `BLEND`, `MASK` nebo `doubleSided` jsou odmítnuty. Požadovaná glTF rozšíření nejsou podporována; Draco, meshopt a quantized geometry jsou odmítnuty.
+Osvětlení je přímé GGX/Smith/Schlick ze světel enginu a jednoduchá ambientní složka. Zatím není environment IBL ani HDR tonemapping; kovový model proto nemá stejné okolní odrazy jako prohlížeč s HDR panoramatem. `reflectivity` enginu je samostatná možnost pro stávající SSR/rovinný odraz.
 
-## Statické vykreslení a efekty
+## Hierarchie a animace
 
-Importovaná geometrie sama o sobě nemá animovaný runtime. Skelety (`skins`) a morph targets jsou odmítnuty. Pokud dokument obsahuje animace, loader je nepřehrává a použije výchozí statickou pózu uzlů. Pro pohyblivé objekty použij transformace scény nebo její Rustem řízenou animaci.
+Každý model má jedno ID scény a uvnitř Rustu vlastní strom uzlů, mesh primitiva, skiny a morph targety. Transformace handle mění kořen celého modelu. Klipy podporují translaci, quaternion rotaci, scale a morph weights; interpolace STEP, LINEAR (rotace SLERP) a CUBICSPLINE. Skinnování používá inverse bind matrices a všechny sady joint/weight vlivů. Nejprve se aplikuje morph, potom skin a transformace uzlu.
 
-`isStatic: true` označuje objekt pro statické cache stínů a odrazů; nezamyká transformaci. Změna transformace statického objektu invaliduje příslušnou cache. `castsShadow` určuje účast v průchodu casterů; `receivesShadow` řídí vzorkování stínů při osvětlení povrchu. Bounds modelu používá Rust pro frustum culling a vykreslovací průchody včetně stínů a odrazů. Pro god rays model vrhá stín do mapy prvního světla, kterou efekt vzorkuje. Reflektivita patří na povrchy scény přes `reflectivity`; samotný model není obrazovkový SSR ani obecný texturovaný materiál.
+`playAnimation(indexOrName, {loop, speed})`, `pauseAnimation(bool)`, `seekAnimation(seconds)` a `stopAnimation()` řídí jeden aktivní klip modelu. Smíchávání více klipů není součástí současného API. Rust aktualizuje animace jednou za frame, bez JS animační smyčky. Změněná póza obnoví bounds i statickou stínovou cache; označení `isStatic` animaci nezamyká.
 
-Limity parseru jsou 128 MiB vstupu/bufferů, 1 000 000 vrcholů a 3 000 000 indexů. Překročení limitu nebo nepodporovaná data skončí chybou při načtení.
+První portable implementace deformuje vrcholy v Rustu na CPU a uploaduje je jen při změně pózy či kořenové transformace. Stejné buffery pak používá hlavní pohled, odraz i stíny. Statický model se každý frame znovu nedeformuje. Mnoho animovaných postav bude vyžadovat další optimalizaci GPU skinningu; tato verze neslibuje maximální výkon davových scén.
 
-## Příklad a asset
+`model.setMorphWeights(nodeIndex, weights)` nastaví váhy bez spuštění klipu. `model.selectScene(index)` přepne glTF scénu. `model.useCamera(nodeIndex)` explicitně zapne perspektivní nebo ortografickou kameru modelu (včetně perspektivy bez zfar). `engine.setCameraView()` nebo `set_camera_mode()` vrátí ovládání běžné kameře. Dostupné uzly, scény a klipy jsou v `model.info`.
 
-Kompletní scéna s komplexním interiérem katedrály, kaluží, SSR a god rays je v [`examples/postprocessing/`](../examples/postprocessing/); viz zejména [`scene.js`](../examples/postprocessing/scene.js) a [`main.js`](../examples/postprocessing/main.js). Původní malý testovací model je kamenný oblouk [Kenney Nature Kit](../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb). Balík je vydán pod CC0; původ a přesná přiložená licence jsou v [README modelu](../assets/models/kenney-nature-bridge-stone-round/README.md) a [LICENSE.txt](../assets/models/kenney-nature-bridge-stone-round/LICENSE.txt). Kenneyho [stránka Nature Kit](https://kenney.nl/assets/nature-kit) uvádí licenci CC0.
+## Stíny, odrazy a průhlednost
 
-Aktuální postprocessing příklad používá [geometrii katedrály Šibenik](../assets/models/sibenik-cathedral/README.md): 72 513 trojúhelníků bez textur či animací. Tento asset je CC BY-NC, pro nekomerční demonstraci. `engine.setCameraView(position, target)` nastaví volnou kameru pomocí Rust výpočtů; SDK očekává dva Vector3 a odmítá shodný bod nebo svislý směr.
+OPAQUE a MASK se vykreslují do hlavního obrazu, pomocné hloubky, odrazové textury a stínových map. MASK používá stejnou texturu a cutoff i ve stínu. BLEND se řadí od vzdálenějších primitiv, nezapisuje hloubku a nevrhá neprůhledné stíny. V hlavním pohledu se přidává po screen-space efektech; SSR a god rays tedy používají hloubku neprůhledné geometrie. Řazení průhledných trojúhelníků uvnitř jednoho primitiva není řešeno.
+
+## Rozsah kompatibility
+
+Cílem je glTF 2.0 core, nikoli všechna existující rozšíření. Nepodporované `extensionsRequired` skončí s konkrétní chybou; volitelná rozšíření používají základní glTF fallback s upozorněním. Draco, meshopt, KTX2/BasisU, transmission, clearcoat a další rozšířené materiály nejsou v této verzi implementované. Podpora PBR není tvrzení o Khronos certifikaci celého importeru.
+
+Velikosti obrázků a bufferů se kontrolují proti limitům zařízení. Soubor, který překročí parserové/GPU limity, se odmítne s chybou. Přesné ochranné limity jsou v Rust loaderu a GPU uploadu.
+
+## Ukázky a ověření
+
+- [Samostatná glTF ukázka](../examples/gltf/): animovaná liška a PBR helma; každá scéna je sestavená v JS.
+- [Runtime integrační test](../tests/gltf-full.html): externí PNG, UV, MASK/BLEND, morph, kamery, více scén a skin/klipy skutečného modelu.
+- [Původní integrační test](../tests/gltf-sdk.html): import, transformace, stíny, odraz a životní cyklus.
+- [Postprocessing](../examples/postprocessing/): katedrála Šibenik, zachovaná kamera a světlo u růžicového okna.
+
+Licenční údaje stažených modelů jsou v jejich asset README. Fox má části CC0 a CC BY 4.0. DamagedHelmet a Šibenik jsou nekomerční demonstrační assety; licence enginu se tím nemění.
+
+Specifikace: [Khronos glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html).

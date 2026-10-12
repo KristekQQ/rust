@@ -134,6 +134,7 @@ fn build_uniform(
 }
 
 struct PassCache {
+    camera_position: Vec3,
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
@@ -143,6 +144,7 @@ impl PassCache {
     fn new(device: &wgpu::Device) -> Self {
         Self {
             queue: RenderQueue::default(),
+            camera_position: Vec3::ZERO,
             key: None,
             batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
             imported: HashMap::new(),
@@ -168,6 +170,8 @@ pub struct SceneRenderer {
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
     imported_meshes: HashMap<u32, Mesh>,
+    gltf_gpu: super::gltf_gpu::GltfGpu,
+    gltf_models: HashMap<u32, super::gltf_gpu::GpuModel>,
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
@@ -241,6 +245,11 @@ impl SceneRenderer {
         });
         let passes = std::array::from_fn(|_| PassCache::new(&device));
         let effects = Some(Effects::new(&device));
+        let gltf_gpu = super::gltf_gpu::GltfGpu::new(
+            &device,
+            &bind_group_layout,
+            &effects.as_ref().unwrap().layout,
+        );
         Self {
             grid_vertex_buffer,
             grid_vertex_count,
@@ -256,6 +265,8 @@ impl SceneRenderer {
             plane_mesh,
             sphere_mesh,
             imported_meshes: HashMap::new(),
+            gltf_gpu,
+            gltf_models: HashMap::new(),
             grid_uniform_buffer,
             grid_bind_group,
             scene: SceneManager::default(),
@@ -323,13 +334,62 @@ impl SceneRenderer {
         Ok(id)
     }
     pub fn advance_scene(&mut self, dt: f32) {
+        self.upload_bytes = 0;
         self.frame_metrics.record(dt);
         self.scene.update(dt);
+        self.gltf_models
+            .retain(|id, _| self.scene.object_exists(*id));
+        for (id, gpu) in &mut self.gltf_models {
+            if let (Some(model), Some(object)) =
+                (self.scene.model(*id), self.scene.objects().get(id))
+            {
+                let options = object.render_options;
+                match self.gltf_gpu.update(
+                    &self.queue,
+                    gpu,
+                    &model.asset,
+                    &model.pose,
+                    model.revision,
+                    object.transform.model(),
+                    [
+                        options.reflectivity,
+                        if options.receives_shadow { 1.0 } else { 0.0 },
+                        0.0,
+                        0.0,
+                    ],
+                ) {
+                    Ok(bytes) => self.upload_bytes += bytes,
+                    Err(error) => {
+                        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&error))
+                    }
+                }
+            }
+        }
         self.imported_meshes
             .retain(|id, _| self.scene.object_exists(*id));
         for cache in &mut self.passes {
             cache.imported.retain(|id, _| self.scene.object_exists(*id));
         }
+    }
+    pub fn import_gltf_model(
+        &mut self,
+        asset: std::sync::Arc<crate::gltf_model::ModelAsset>,
+    ) -> Result<u32, String> {
+        // Validate CPU pose before allocating GPU resources or exposing a root ID.
+        let instance = crate::gltf_model::ModelInstance::new(asset.clone(), None)?;
+        let mut gpu = self.gltf_gpu.upload(&self.device, &self.queue, &asset)?;
+        self.gltf_gpu.update(
+            &self.queue,
+            &mut gpu,
+            &asset,
+            &instance.pose,
+            instance.revision,
+            Mat4::IDENTITY,
+            [0.0, 1.0, 0.0, 0.0],
+        )?;
+        let id = self.scene.add_model(asset)?;
+        self.gltf_models.insert(id, gpu);
+        Ok(id)
     }
 
     pub fn prepare_view(&mut self, view: RenderView) {
@@ -353,6 +413,7 @@ impl SceneRenderer {
     fn prepare_pass_cache(&mut self, view: RenderView, pass: RenderPassKind, index: usize) {
         self.active_cache = index;
         let cache = &mut self.passes[index];
+        cache.camera_position = view.camera_position;
         let camera_matrix = view.view_projection;
         let camera_pos = view.camera_position;
         let active_lights: Vec<Light> = self
@@ -424,7 +485,22 @@ impl SceneRenderer {
             self.passes[0].queue.total as f64,
             self.passes[0].queue.visible as f64,
             (self.passes[0].queue.total - self.passes[0].queue.visible) as f64,
-            self.passes[0].queue.draw_calls() as f64,
+            (self.passes[0].queue.draw_calls()
+                + self.passes[0]
+                    .queue
+                    .imported
+                    .keys()
+                    .filter_map(|id| self.gltf_models.get(id))
+                    .map(|m| {
+                        super::gltf_gpu::draw_count(m, false) + super::gltf_gpu::draw_count(m, true)
+                    })
+                    .sum::<usize>()
+                - self.passes[0]
+                    .queue
+                    .imported
+                    .keys()
+                    .filter(|id| self.gltf_models.contains_key(id))
+                    .count()) as f64,
             self.upload_bytes as f64,
             self.prepare_ms,
             self.frame_metrics.fps,
@@ -496,6 +572,19 @@ impl SceneRenderer {
             .or_insert_with(|| {
                 pipeline::build_shadow(&self.device, &self.bind_group_layout, target.format)
             });
+        let gltf_key = super::gltf_gpu::PipelineKey {
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            depth_format: target.format,
+            reflected: false,
+            material_mask: false,
+            shadow: true,
+        };
+        for id in self.passes[self.active_cache].queue.imported.keys() {
+            if let Some(model) = self.gltf_models.get(id) {
+                self.gltf_gpu
+                    .prepare_pipeline(&self.device, gltf_key, model);
+            }
+        }
         let pipeline = &self.shadow_pipelines[&target.format];
         let cache = &self.passes[self.active_cache];
         let mut encoder = self
@@ -553,11 +642,19 @@ impl SceneRenderer {
                 if instances.is_empty() {
                     continue;
                 }
-                let mesh = &self.imported_meshes[id];
+                let Some(mesh) = self.imported_meshes.get(id) else {
+                    continue;
+                };
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 pass.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 pass.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
+            }
+            for id in cache.queue.imported.keys() {
+                if let Some(model) = self.gltf_models.get(id) {
+                    self.gltf_gpu
+                        .draw(&mut pass, model, gltf_key, false, cache.camera_position);
+                }
             }
         }
         self.queue.submit(Some(encoder.finish()));
@@ -632,7 +729,9 @@ impl SceneRenderer {
         let key = (
             target.color_format,
             target.depth_format,
-            reflected,
+            self.passes[self.active_cache]
+                .key
+                .is_some_and(|k| k.0.determinant() < 0.0),
             target.auxiliary.is_some(),
         );
         self.pipelines.entry(key).or_insert_with(|| {
@@ -643,12 +742,27 @@ impl SceneRenderer {
                     key.1,
                     &self.bind_group_layout,
                     &effects.layout,
-                    reflected,
+                    key.2,
                     key.3,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
             )
         });
+        let gltf_key = super::gltf_gpu::PipelineKey {
+            format: target.color_format,
+            depth_format: target.depth_format,
+            reflected: self.passes[self.active_cache]
+                .key
+                .is_some_and(|k| k.0.determinant() < 0.0),
+            material_mask: target.auxiliary.is_some(),
+            shadow: false,
+        };
+        for id in self.passes[self.active_cache].queue.imported.keys() {
+            if let Some(model) = self.gltf_models.get(id) {
+                self.gltf_gpu
+                    .prepare_pipeline(&self.device, gltf_key, model);
+            }
+        }
         // Immutable lookup ends the map mutation before borrowing mesh resources.
         let pipelines = &self.pipelines[&key];
         let cache = &self.passes[self.active_cache];
@@ -740,11 +854,32 @@ impl SceneRenderer {
                 if instances.is_empty() {
                     continue;
                 }
-                let mesh = &self.imported_meshes[id];
+                let Some(mesh) = self.imported_meshes.get(id) else {
+                    continue;
+                };
                 rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 rp.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
+            }
+            for id in cache.queue.imported.keys() {
+                if let Some(model) = self.gltf_models.get(id) {
+                    self.gltf_gpu
+                        .draw(&mut rp, model, gltf_key, false, cache.camera_position);
+                }
+            }
+            if reflected || target.auxiliary.is_none() {
+                self.gltf_gpu.draw_many(
+                    &mut rp,
+                    cache
+                        .queue
+                        .imported
+                        .keys()
+                        .filter_map(|id| self.gltf_models.get(id)),
+                    gltf_key,
+                    true,
+                    cache.camera_position,
+                );
             }
             if !reflected
                 && target.auxiliary.is_none()
@@ -761,6 +896,91 @@ impl SceneRenderer {
                     rp.draw(0..self.light_vertex_count, 0..1);
                 }
             }
+        }
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+    /// Transparent materials use opaque depth after screen-space effects.
+    pub fn draw_transparent(&mut self, target: &RenderTarget<'_>) -> Result<(), String> {
+        let cache = &self.passes[0];
+        if !cache
+            .queue
+            .imported
+            .keys()
+            .filter_map(|id| self.gltf_models.get(id))
+            .any(|m| super::gltf_gpu::draw_count(m, true) > 0)
+        {
+            return Ok(());
+        }
+        let key = super::gltf_gpu::PipelineKey {
+            format: target.color_format,
+            depth_format: target.depth_format,
+            reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
+            material_mask: false,
+            shadow: false,
+        };
+        for id in cache.queue.imported.keys() {
+            if let Some(model) = self.gltf_models.get(id) {
+                self.gltf_gpu.prepare_pipeline(&self.device, key, model);
+            }
+        }
+        let effects = self.effects.as_ref().unwrap();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("glTF transparent overlay"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("glTF transparent overlay"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.0,
+                1.0,
+            );
+            pass.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            pass.set_bind_group(0, &self.grid_bind_group, &[]);
+            pass.set_bind_group(1, &effects.scene_group, &[]);
+            self.gltf_gpu.draw_many(
+                &mut pass,
+                cache
+                    .queue
+                    .imported
+                    .keys()
+                    .filter_map(|id| self.gltf_models.get(id)),
+                key,
+                true,
+                cache.camera_position,
+            );
         }
         self.queue.submit(Some(encoder.finish()));
         Ok(())

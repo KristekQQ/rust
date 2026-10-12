@@ -9,7 +9,7 @@ export interface OrbitOptions {
 }
 /** Handle to Rust state. Throws when Rust rejects an invalid command. */
 export class SceneObject {
-    private constructor();
+    protected constructor();
     readonly id: number;
     readonly exists: boolean;
     setPosition(position: Vector3): this;
@@ -22,6 +22,27 @@ export class SceneObject {
     spin(radiansPerSecond: Vector3): this;
     removeAfter(seconds: number): this;
     remove(): void;
+}
+export interface ModelInfo {
+    animations: {name: string; duration: number}[];
+    nodes: {name: string; mesh: number | null; camera: number | null; morphTargets: number}[];
+    scenes: {name: string}[];
+    scene: number;
+    playback: {clip: number; time: number; speed: number; looping: boolean; playing: boolean} | null;
+    primitives: number; materials: number; textures: number; skins: number;
+    lastError: string | null;
+}
+export class ModelObject extends SceneObject {
+    private constructor();
+    readonly info: ModelInfo;
+    playAnimation(clip?: number | string, options?: {loop?: boolean; speed?: number}): this;
+    pauseAnimation(paused?: boolean): this;
+    seekAnimation(seconds: number): this;
+    stopAnimation(): this;
+    selectScene(index: number): this;
+    setMorphWeights(node: number, weights: readonly number[]): this;
+    /** Explicitly activates a glTF camera node; importing never changes the view. */
+    useCamera(node: number): this;
 }
 export class SceneLight {
     private constructor();
@@ -41,8 +62,8 @@ export class Scene {
     createCube(position?: Vector3): SceneObject;
     createPlane(position?: Vector3): SceneObject;
     createSphere(position?: Vector3): SceneObject;
-    /** Load static glTF2/GLB geometry. Rust parses it; returned handle uses normal scene commands. */
-    loadModel(url: string | URL): Promise<SceneObject>;
+    /** glTF2/GLB asset; decoding, PBR, hierarchy and animation are owned by Rust. */
+    loadModel(url: string | URL): Promise<ModelObject>;
     createLight(options?: LightOptions): SceneLight;
     clear(): void;
     setMirror(object: SceneObject): void;

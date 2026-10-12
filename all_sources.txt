@@ -25,7 +25,9 @@ web-sys = { version = "0.3", features = [
 ] }
 glam    = { version = "0.34.0", default-features = false, features = ["libm","serde"] }
 js-sys = "0.3"
-gltf = { version = "1.4", default-features = false, features = ["utils", "names"] }
+gltf = { version = "1.4", default-features = false, features = ["utils", "names", "extras"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+serde_json = "1.0"
 \n# File: src/frame_metrics.rs
 //! Browser frame-loop timing, not GPU execution timing.
 #[derive(Default)]
@@ -74,6 +76,532 @@ mod tests {
             metrics.record(1.0 / 30.0);
         }
         assert!((metrics.fps - 30.0).abs() < 0.001);
+    }
+}
+
+\n# File: src/gltf_animation.rs
+//! Animation sampling and CPU morph/skin deformation; no browser or GPU state.
+use crate::gltf_model::*;
+use glam::{Mat3, Mat4, Quat, Vec3};
+use std::sync::Arc;
+
+pub fn sample_channel(channel: &AnimationChannel, time: f32) -> Result<Vec<f32>, String> {
+    if !time.is_finite() || channel.times.is_empty() || channel.components == 0 {
+        return Err("Invalid animation sample".into());
+    }
+    let n = channel.components;
+    let cubic = channel.interpolation == Interpolation::CubicSpline;
+    let width = n
+        .checked_mul(if cubic { 3 } else { 1 })
+        .ok_or("Animation width overflow")?;
+    if channel.values.len()
+        != channel
+            .times
+            .len()
+            .checked_mul(width)
+            .ok_or("Animation size overflow")?
+    {
+        return Err("Invalid animation values length".into());
+    }
+    let value = |key: usize| {
+        &channel.values
+            [key * width + if cubic { n } else { 0 }..key * width + if cubic { 2 * n } else { n }]
+    };
+    let upper = channel.times.partition_point(|&t| t <= time);
+    let lower = upper.saturating_sub(1);
+    if upper == 0 {
+        return Ok(value(0).to_vec());
+    }
+    if upper >= channel.times.len() || channel.interpolation == Interpolation::Step {
+        return Ok(value(lower).to_vec());
+    }
+    let dt = channel.times[upper] - channel.times[lower];
+    if !dt.is_finite() || dt <= 0.0 {
+        return Err("Animation timestamps must increase".into());
+    }
+    let t = (time - channel.times[lower]) / dt;
+    let a = value(lower);
+    let b = value(upper);
+    if channel.property == AnimationProperty::Rotation && !cubic {
+        if n != 4 {
+            return Err("Rotation channel must have four components".into());
+        }
+        let qa = Quat::from_array([a[0], a[1], a[2], a[3]]).normalize();
+        let qb = Quat::from_array([b[0], b[1], b[2], b[3]]).normalize();
+        return Ok(qa.slerp(qb, t).normalize().to_array().to_vec());
+    }
+    let mut sampled = vec![0.; n];
+    for i in 0..n {
+        sampled[i] = if cubic {
+            let out = channel.values[lower * width + 2 * n + i];
+            let input = channel.values[upper * width + i];
+            let t2 = t * t;
+            let t3 = t2 * t;
+            (2. * t3 - 3. * t2 + 1.) * a[i]
+                + (t3 - 2. * t2 + t) * dt * out
+                + (-2. * t3 + 3. * t2) * b[i]
+                + (t3 - t2) * dt * input
+        } else {
+            a[i] * (1. - t) + b[i] * t
+        };
+    }
+    if sampled.iter().any(|v| !v.is_finite()) {
+        return Err("Animation interpolation overflow".into());
+    }
+    if channel.property == AnimationProperty::Rotation {
+        if n != 4 {
+            return Err("Rotation channel must have four components".into());
+        }
+        let q = Quat::from_array([sampled[0], sampled[1], sampled[2], sampled[3]]);
+        if q.length_squared() <= 0.0 {
+            return Err("Animation produced a zero quaternion".into());
+        }
+        sampled = q.normalize().to_array().to_vec();
+    }
+    Ok(sampled)
+}
+
+pub fn default_pose(asset: &ModelAsset, scene: usize) -> Result<ModelPose, String> {
+    if scene >= asset.scenes.len() {
+        return Err("Model scene index is out of range".into());
+    }
+    let mut pose = rest_pose(asset)?;
+    let mut pending = asset.scenes[scene].nodes.clone();
+    let mut seen = vec![false; asset.nodes.len()];
+    while let Some(node) = pending.pop() {
+        if node >= asset.nodes.len() || seen[node] {
+            return Err("Invalid/cyclic scene graph".into());
+        }
+        seen[node] = true;
+        pose.active_nodes.push(node);
+        pending.extend_from_slice(&asset.nodes[node].children);
+    }
+    Ok(pose)
+}
+
+/// Default transforms for every node, including assets with no scenes.
+pub fn rest_pose(asset: &ModelAsset) -> Result<ModelPose, String> {
+    let mut pose = ModelPose {
+        local_trs: asset.nodes.iter().map(|n| n.trs).collect(),
+        world_matrices: vec![Mat4::IDENTITY; asset.nodes.len()],
+        node_weights: asset
+            .nodes
+            .iter()
+            .map(|node| {
+                node.weights.clone().unwrap_or_else(|| {
+                    node.mesh
+                        .map(|m| asset.meshes[m].weights.clone())
+                        .unwrap_or_default()
+                })
+            })
+            .collect(),
+        skin_matrices: vec![vec![]; asset.nodes.len()],
+        skin_world_space: vec![false; asset.nodes.len()],
+        active_nodes: vec![],
+    };
+    recompute_world(asset, &mut pose)?;
+    Ok(pose)
+}
+
+pub fn recompute_world(asset: &ModelAsset, pose: &mut ModelPose) -> Result<(), String> {
+    let mut parents = vec![None; asset.nodes.len()];
+    for (i, node) in asset.nodes.iter().enumerate() {
+        for &child in &node.children {
+            if child >= parents.len() || parents[child].replace(i).is_some() {
+                return Err("Model graph has multiple parents or invalid child".into());
+            }
+        }
+    }
+    let mut stack: Vec<_> = parents
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.is_none())
+        .map(|(i, _)| (i, Mat4::IDENTITY))
+        .collect();
+    let mut visited = 0;
+    while let Some((i, parent)) = stack.pop() {
+        let node = &asset.nodes[i];
+        let local = node.matrix.unwrap_or_else(|| pose.local_trs[i].matrix());
+        let world = parent * local;
+        if !world.is_finite() {
+            return Err("Non-finite animated model matrix".into());
+        }
+        pose.world_matrices[i] = world;
+        visited += 1;
+        stack.extend(node.children.iter().map(|&j| (j, world)));
+    }
+    if visited != asset.nodes.len() {
+        return Err("Model node graph contains a cycle".into());
+    }
+    for (i, node) in asset.nodes.iter().enumerate() {
+        pose.skin_matrices[i].clear();
+        if let Some(skin_index) = node.skin {
+            let skin = asset.skins.get(skin_index).ok_or("Invalid skin index")?;
+            let inverse = pose.world_matrices[i].inverse();
+            pose.skin_world_space[i] = !inverse.is_finite();
+            let inverse = if pose.skin_world_space[i] {
+                Mat4::IDENTITY
+            } else {
+                inverse
+            };
+            for (&joint, ibm) in skin.joints.iter().zip(&skin.inverse_bind_matrices) {
+                let world = pose.world_matrices.get(joint).ok_or("Invalid skin joint")?;
+                let matrix = inverse * *world * *ibm;
+                if !matrix.is_finite() {
+                    return Err("Non-finite skin matrix".into());
+                }
+                pose.skin_matrices[i].push(matrix);
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn apply_clip(
+    asset: &ModelAsset,
+    pose: &mut ModelPose,
+    clip: usize,
+    time: f32,
+) -> Result<(), String> {
+    let clip = asset
+        .animations
+        .get(clip)
+        .ok_or("Animation clip index out of range")?;
+    let original = pose;
+    let mut candidate = original.clone();
+    let pose = &mut candidate;
+    // Unanimated properties preserve the asset's default pose.
+    for (i, node) in asset.nodes.iter().enumerate() {
+        pose.local_trs[i] = node.trs;
+        pose.node_weights[i] = node.weights.clone().unwrap_or_else(|| {
+            node.mesh
+                .map(|m| asset.meshes[m].weights.clone())
+                .unwrap_or_default()
+        });
+    }
+    for channel in &clip.channels {
+        let sampled = sample_channel(channel, time)?;
+        let trs = pose
+            .local_trs
+            .get_mut(channel.node)
+            .ok_or("Animation node index out of range")?;
+        match channel.property {
+            AnimationProperty::Translation => trs.translation = Vec3::from_slice(&sampled),
+            AnimationProperty::Scale => trs.scale = Vec3::from_slice(&sampled),
+            AnimationProperty::Rotation => {
+                trs.rotation =
+                    Quat::from_array([sampled[0], sampled[1], sampled[2], sampled[3]]).normalize()
+            }
+            AnimationProperty::Weights => pose.node_weights[channel.node] = sampled,
+        }
+    }
+    recompute_world(asset, pose)?;
+    *original = candidate;
+    Ok(())
+}
+
+impl ModelInstance {
+    pub fn new(asset: Arc<ModelAsset>, scene: Option<usize>) -> Result<Self, String> {
+        let scene = scene.or(asset.default_scene).unwrap_or(0);
+        let pose = default_pose(&asset, scene)?;
+        Ok(Self {
+            asset,
+            pose,
+            playback: None,
+            scene,
+            revision: 1,
+            last_error: None,
+            morph_overrides: Default::default(),
+        })
+    }
+    pub fn play(&mut self, clip: usize, looping: bool) -> Result<(), String> {
+        if clip >= self.asset.animations.len() {
+            return Err("Animation clip index out of range".into());
+        }
+        apply_clip(&self.asset, &mut self.pose, clip, 0.)?;
+        self.apply_morph_overrides(clip);
+        self.playback = Some(AnimationPlayback {
+            clip,
+            time: 0.,
+            speed: 1.,
+            looping,
+            playing: true,
+        });
+        self.revision = self.revision.wrapping_add(1);
+        Ok(())
+    }
+    pub fn stop(&mut self) -> Result<(), String> {
+        let pose = default_pose(&self.asset, self.scene)?;
+        self.playback = None;
+        self.pose = pose;
+        self.morph_overrides.clear();
+        self.revision = self.revision.wrapping_add(1);
+        Ok(())
+    }
+    pub fn seek(&mut self, time: f32) -> Result<(), String> {
+        if !time.is_finite() || time < 0. {
+            return Err("Animation time must be finite and nonnegative".into());
+        }
+        let playback = self
+            .playback
+            .as_mut()
+            .ok_or("Model has no active animation")?;
+        let duration = self.asset.animations[playback.clip].duration;
+        let target = time.min(duration);
+        let clip = playback.clip;
+        apply_clip(&self.asset, &mut self.pose, playback.clip, target)?;
+        playback.time = target;
+        self.apply_morph_overrides(clip);
+        self.revision = self.revision.wrapping_add(1);
+        Ok(())
+    }
+    pub fn update(&mut self, delta: f32) -> Result<bool, String> {
+        if !delta.is_finite() || delta < 0. {
+            return Err("Invalid animation delta".into());
+        }
+        let Some(mut playback) = self.playback.clone() else {
+            return Ok(false);
+        };
+        if !playback.playing || delta == 0. || playback.speed == 0. {
+            return Ok(false);
+        }
+        let duration = self.asset.animations[playback.clip].duration;
+        let advanced = playback.time + delta * playback.speed;
+        if !advanced.is_finite() {
+            return Err("Animation time overflow".into());
+        }
+        playback.time = if duration <= 0. {
+            0.
+        } else if playback.looping {
+            advanced.rem_euclid(duration)
+        } else {
+            advanced.clamp(0., duration)
+        };
+        if !playback.looping && (advanced >= duration || advanced < 0.) {
+            playback.playing = false;
+        }
+        apply_clip(&self.asset, &mut self.pose, playback.clip, playback.time)?;
+        self.apply_morph_overrides(playback.clip);
+        self.playback = Some(playback);
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
+    pub fn select_scene(&mut self, scene: usize) -> Result<(), String> {
+        self.pose = default_pose(&self.asset, scene)?;
+        self.scene = scene;
+        self.playback = None;
+        self.morph_overrides.clear();
+        self.revision = self.revision.wrapping_add(1);
+        Ok(())
+    }
+    pub fn set_morph_weights(&mut self, node: usize, weights: &[f32]) -> Result<(), String> {
+        let model_node = self
+            .asset
+            .nodes
+            .get(node)
+            .ok_or("Morph node out of range")?;
+        let mesh = model_node.mesh.ok_or("Morph node has no mesh")?;
+        if weights.len() != self.asset.meshes[mesh].weights.len()
+            || weights.iter().any(|v| !v.is_finite())
+        {
+            return Err("Invalid morph weights".into());
+        }
+        self.pose.node_weights[node] = weights.to_vec();
+        self.morph_overrides.insert(node, weights.to_vec());
+        self.revision = self.revision.wrapping_add(1);
+        Ok(())
+    }
+    fn apply_morph_overrides(&mut self, clip: usize) {
+        let animated: std::collections::HashSet<_> = self.asset.animations[clip]
+            .channels
+            .iter()
+            .filter(|channel| channel.property == AnimationProperty::Weights)
+            .map(|channel| channel.node)
+            .collect();
+        for (&node, weights) in &self.morph_overrides {
+            if !animated.contains(&node) {
+                self.pose.node_weights[node] = weights.clone();
+            }
+        }
+    }
+}
+
+/// CPU local-space deformation: morph targets first, then every joint influence.
+pub fn deformed_vertices(
+    asset: &ModelAsset,
+    pose: &ModelPose,
+    node: usize,
+    primitive: usize,
+) -> Result<Vec<ModelVertex>, String> {
+    let p = asset
+        .primitives
+        .get(primitive)
+        .ok_or("Primitive index out of range")?;
+    let model_node = asset.nodes.get(node).ok_or("Model node out of range")?;
+    let weights = pose
+        .node_weights
+        .get(node)
+        .ok_or("Pose node out of range")?;
+    let mut vertices = asset
+        .vertices
+        .get(p.vertices.clone())
+        .ok_or("Invalid primitive vertex range")?
+        .to_vec();
+    for (i, vertex) in vertices.iter_mut().enumerate() {
+        let mut position = Vec3::from_array(vertex.position);
+        let mut normal = Vec3::from_array(vertex.normal);
+        let mut tangent = Vec3::from_slice(&vertex.tangent);
+        for (j, target) in p.morph_targets.iter().enumerate() {
+            let weight = weights.get(j).copied().unwrap_or(0.);
+            if weight == 0. {
+                continue;
+            }
+            if let Some(delta) = target.positions.get(i) {
+                position += Vec3::from_array(*delta) * weight;
+            }
+            if let Some(delta) = target.normals.get(i) {
+                normal += Vec3::from_array(*delta) * weight;
+            }
+            if let Some(delta) = target.tangents.get(i) {
+                tangent += Vec3::from_array(*delta) * weight;
+            }
+        }
+        if model_node.skin.is_some() && !vertex.influences.is_empty() {
+            let matrices = &pose.skin_matrices[node];
+            let mut skin = Mat4::ZERO;
+            for &(joint, weight) in &vertex.influences {
+                if weight == 0. {
+                    continue;
+                }
+                skin += *matrices
+                    .get(joint as usize)
+                    .ok_or("Vertex joint index out of skin range")?
+                    * weight;
+            }
+            position = skin.transform_point3(position);
+            let linear = Mat3::from_mat4(skin);
+            let inverse = linear.inverse().transpose();
+            normal = if inverse.is_finite() {
+                inverse * normal
+            } else {
+                linear * normal
+            };
+            tangent = linear * tangent;
+            if linear.determinant() < 0. {
+                vertex.tangent[3] = -vertex.tangent[3];
+            }
+        }
+        if !position.is_finite() || !normal.is_finite() || !tangent.is_finite() {
+            return Err("Model deformation overflow".into());
+        }
+        normal = normal.try_normalize().unwrap_or(Vec3::Y);
+        tangent = (tangent - normal * normal.dot(tangent))
+            .try_normalize()
+            .unwrap_or(Vec3::ZERO);
+        vertex.position = position.to_array();
+        vertex.normal = normal.to_array();
+        vertex.tangent = [tangent.x, tangent.y, tangent.z, vertex.tangent[3]];
+    }
+    Ok(vertices)
+}
+
+pub fn model_bounds(asset: &ModelAsset, pose: &ModelPose) -> Result<(Vec3, Vec3), String> {
+    let mut min = Vec3::splat(f32::INFINITY);
+    let mut max = Vec3::splat(f32::NEG_INFINITY);
+    for &node in &pose.active_nodes {
+        if let Some(mesh) = asset.nodes[node].mesh {
+            for &primitive in &asset.meshes[mesh].primitives {
+                for vertex in deformed_vertices(asset, pose, node, primitive)? {
+                    let point = node_render_matrix(pose, node)
+                        .transform_point3(Vec3::from_array(vertex.position));
+                    if !point.is_finite() {
+                        return Err("Model bounds overflow".into());
+                    }
+                    min = min.min(point);
+                    max = max.max(point);
+                }
+            }
+        }
+    }
+    if !min.is_finite() {
+        return Ok((Vec3::ZERO, Vec3::ZERO));
+    }
+    Ok((min, max))
+}
+
+/// Matrix to apply AFTER CPU deformation (before the scene model root transform).
+pub fn node_render_matrix(pose: &ModelPose, node: usize) -> Mat4 {
+    if pose.skin_world_space[node] {
+        Mat4::IDENTITY
+    } else {
+        pose.world_matrices[node]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn channel(
+        property: AnimationProperty,
+        interpolation: Interpolation,
+        values: Vec<f32>,
+        components: usize,
+    ) -> AnimationChannel {
+        AnimationChannel {
+            node: 0,
+            property,
+            interpolation,
+            times: vec![0., 2.],
+            values,
+            components,
+        }
+    }
+    #[test]
+    fn step_linear_and_cubic_tangents_scale_by_key_duration() {
+        let linear = channel(
+            AnimationProperty::Weights,
+            Interpolation::Linear,
+            vec![0., 4.],
+            1,
+        );
+        assert_eq!(sample_channel(&linear, 1.).unwrap(), [2.]);
+        assert_eq!(sample_channel(&linear, -1.).unwrap(), [0.]);
+        assert_eq!(sample_channel(&linear, 3.).unwrap(), [4.]);
+        let step = AnimationChannel {
+            interpolation: Interpolation::Step,
+            ..linear
+        };
+        assert_eq!(sample_channel(&step, 1.9).unwrap(), [0.]);
+        assert_eq!(sample_channel(&step, 2.).unwrap(), [4.]);
+        let cubic = channel(
+            AnimationProperty::Weights,
+            Interpolation::CubicSpline,
+            vec![0., 0., 2., 0., 0., 0.],
+            1,
+        );
+        assert_eq!(sample_channel(&cubic, 1.).unwrap(), [0.5]);
+    }
+    #[test]
+    fn rotations_take_short_path_and_cubic_rotation_normalizes() {
+        let linear = channel(
+            AnimationProperty::Rotation,
+            Interpolation::Linear,
+            vec![0., 0., 0., 1., 0., 0., 0., -1.],
+            4,
+        );
+        let q = sample_channel(&linear, 1.).unwrap();
+        assert!((q[3].abs() - 1.).abs() < 1e-6);
+        let cubic = channel(
+            AnimationProperty::Rotation,
+            Interpolation::CubicSpline,
+            vec![
+                0., 0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0.,
+                0., 0., 0.,
+            ],
+            4,
+        );
+        let q = sample_channel(&cubic, 1.).unwrap();
+        assert!((q.iter().map(|v| v * v).sum::<f32>() - 1.).abs() < 1e-6);
     }
 }
 
@@ -814,6 +1342,1669 @@ mod tests {
     }
 }
 
+/// Index-preserving URI lists. Empty entries refer to embedded buffer/image views.
+#[derive(Clone, Debug)]
+pub struct ModelResources {
+    pub buffers: Vec<String>,
+    pub images: Vec<String>,
+}
+pub fn resource_uris(bytes: &[u8]) -> Result<ModelResources, String> {
+    let gltf = core_document(bytes)?;
+    Ok(ModelResources {
+        buffers: gltf
+            .buffers()
+            .map(|b| match b.source() {
+                gltf::buffer::Source::Bin => String::new(),
+                gltf::buffer::Source::Uri(s) => s.into(),
+            })
+            .collect(),
+        images: gltf
+            .images()
+            .map(|i| match i.source() {
+                gltf::image::Source::View { .. } => String::new(),
+                gltf::image::Source::Uri { uri, .. } => uri.into(),
+            })
+            .collect(),
+    })
+}
+fn core_document(bytes: &[u8]) -> Result<gltf::Gltf, String> {
+    if bytes.len() > MAX_BYTES {
+        return Err("glTF exceeds the 128 MiB input limit".into());
+    }
+    let doc = gltf::Gltf::from_slice(bytes).map_err(|e| format!("Invalid glTF: {e}"))?;
+    if let Some(extension) = doc.extensions_required().next() {
+        return Err(format!("Required glTF extension unsupported: {extension}"));
+    }
+    if doc.nodes().count() > MAX_NODES
+        || doc.accessors().count() > MAX_NODES
+        || doc.meshes().count() > MAX_NODES
+        || doc.views().count() > MAX_NODES
+        || doc.materials().count() > MAX_NODES
+        || doc.images().count() > MAX_NODES
+        || doc.textures().count() > MAX_NODES
+        || doc.samplers().count() > MAX_NODES
+        || doc.skins().count() > MAX_NODES
+        || doc.animations().count() > MAX_NODES
+        || doc.scenes().count() > MAX_NODES
+        || doc.cameras().count() > MAX_NODES
+    {
+        return Err("glTF metadata exceeds the object limit".into());
+    }
+    Ok(doc)
+}
+fn core_buffers<'a>(
+    gltf: &'a gltf::Gltf,
+    external: &'a [Vec<u8>],
+) -> Result<Vec<&'a [u8]>, String> {
+    let mut buffers = vec![];
+    let mut bytes = 0usize;
+    let mut scalars = 0usize;
+    for buffer in gltf.buffers() {
+        let data = match buffer.source() {
+            gltf::buffer::Source::Bin => gltf.blob.as_deref().ok_or("Missing GLB BIN")?,
+            gltf::buffer::Source::Uri(_) => external
+                .get(buffer.index())
+                .map(Vec::as_slice)
+                .ok_or("Missing external buffer")?,
+        };
+        bytes = bytes
+            .checked_add(data.len())
+            .ok_or("Buffer length overflow")?;
+        if bytes > MAX_BYTES || data.len() < buffer.length() {
+            return Err("Oversize or truncated glTF buffers".into());
+        }
+        buffers.push(&data[..buffer.length()]);
+    }
+    for view in gltf.views() {
+        if view
+            .offset()
+            .checked_add(view.length())
+            .filter(|&end| end <= buffers[view.buffer().index()].len())
+            .is_none()
+        {
+            return Err("Buffer view exceeds buffer".into());
+        }
+    }
+    for accessor in gltf.accessors() {
+        scalars = scalars
+            .checked_add(
+                accessor
+                    .count()
+                    .checked_mul(accessor.dimensions().multiplicity())
+                    .ok_or("Accessor size overflow")?,
+            )
+            .ok_or("Accessor size overflow")?;
+        if accessor.count() > MAX_INDICES || scalars > 32_000_000 {
+            return Err("glTF accessor element limit exceeded".into());
+        }
+        let size = accessor_element_size(&accessor);
+        if let Some(view) = accessor.view() {
+            let stride = view.stride().unwrap_or(size);
+            if stride < size {
+                return Err("Invalid accessor stride".into());
+            }
+            let end = accessor
+                .count()
+                .saturating_sub(1)
+                .checked_mul(stride)
+                .and_then(|n| n.checked_add(size))
+                .and_then(|n| n.checked_add(accessor.offset()))
+                .ok_or("Accessor range overflow")?;
+            if end > view.length() {
+                return Err("Accessor exceeds buffer view".into());
+            }
+        } else if accessor.sparse().is_none() {
+            return Err("Accessor needs a buffer view or sparse data".into());
+        }
+        if let Some(sparse) = accessor.sparse() {
+            if sparse.count() > accessor.count() {
+                return Err("Sparse count exceeds accessor".into());
+            }
+            let indices = sparse.indices();
+            let iv = indices.view();
+            let is = indices.index_type().size();
+            let ie = indices
+                .offset()
+                .checked_add(sparse.count().checked_mul(is).ok_or("Sparse overflow")?)
+                .ok_or("Sparse overflow")?;
+            let values = sparse.values();
+            let vv = values.view();
+            let ve = values
+                .offset()
+                .checked_add(sparse.count().checked_mul(size).ok_or("Sparse overflow")?)
+                .ok_or("Sparse overflow")?;
+            if iv.stride().is_some()
+                || vv.stride().is_some()
+                || ie > iv.length()
+                || ve > vv.length()
+            {
+                return Err("Invalid sparse buffer range".into());
+            }
+            let bytes =
+                &buffers[iv.buffer().index()][iv.offset() + indices.offset()..iv.offset() + ie];
+            let mut previous = None;
+            for b in bytes.chunks_exact(is) {
+                let index = match is {
+                    1 => b[0] as usize,
+                    2 => u16::from_le_bytes([b[0], b[1]]) as usize,
+                    _ => u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize,
+                };
+                if index >= accessor.count() || previous.is_some_and(|prev| index <= prev) {
+                    return Err("Sparse indices must increase and remain in range".into());
+                }
+                previous = Some(index);
+            }
+        }
+    }
+    Ok(buffers)
+}
+fn accessor_element_size(accessor: &gltf::Accessor<'_>) -> usize {
+    let component = accessor.data_type().size();
+    let columns = match accessor.dimensions() {
+        gltf::accessor::Dimensions::Mat2 => 2,
+        gltf::accessor::Dimensions::Mat3 => 3,
+        gltf::accessor::Dimensions::Mat4 => 4,
+        _ => return accessor.size(),
+    };
+    (columns * component).div_ceil(4) * 4 * columns
+}
+fn checked_attribute(
+    accessor: &gltf::Accessor<'_>,
+    count: usize,
+    dimensions: gltf::accessor::Dimensions,
+    types: &[gltf::accessor::DataType],
+    normalized: bool,
+) -> Result<(), String> {
+    if accessor.count() != count
+        || accessor.dimensions() != dimensions
+        || !types.contains(&accessor.data_type())
+        || (normalized
+            && accessor.data_type() != gltf::accessor::DataType::F32
+            && !accessor.normalized())
+    {
+        return Err(format!("Invalid attribute accessor {}", accessor.index()));
+    }
+    Ok(())
+}
+
+/// Full glTF 2.0 core CPU import. External resources are supplied by document index.
+pub fn parse_model(
+    bytes: &[u8],
+    external_buffers: &[Vec<u8>],
+    external_images: &[Vec<u8>],
+) -> Result<crate::gltf_model::ModelAsset, String> {
+    use crate::gltf_model::*;
+    use gltf::accessor::{DataType as D, Dimensions as A};
+    let gltf = core_document(bytes)?;
+    let buffers = core_buffers(&gltf, external_buffers)?;
+    let mut asset = ModelAsset {
+        vertices: vec![],
+        primitives: vec![],
+        meshes: vec![],
+        materials: vec![],
+        images: vec![],
+        textures: vec![],
+        samplers: vec![],
+        nodes: vec![],
+        skins: vec![],
+        animations: vec![],
+        scenes: vec![],
+        default_scene: gltf.default_scene().map(|s| s.index()),
+        cameras: vec![],
+        warnings: vec![],
+    };
+    for extension in gltf.extensions_used() {
+        asset.warnings.push(format!(
+            "Optional extension {extension} ignored; using glTF core fallback"
+        ));
+    }
+    let texture_slot = |info: gltf::texture::Info<'_>| TextureSlot {
+        texture: info.texture().index(),
+        tex_coord: info.tex_coord(),
+    };
+    for material in gltf.materials() {
+        let pbr = material.pbr_metallic_roughness();
+        let m = ModelMaterial {
+            name: material.name().map(str::to_owned),
+            base_color_factor: pbr.base_color_factor(),
+            metallic_factor: pbr.metallic_factor(),
+            roughness_factor: pbr.roughness_factor(),
+            emissive_factor: material.emissive_factor(),
+            base_color_texture: pbr.base_color_texture().map(texture_slot),
+            metallic_roughness_texture: pbr.metallic_roughness_texture().map(texture_slot),
+            normal_texture: material.normal_texture().map(|i| TextureSlot {
+                texture: i.texture().index(),
+                tex_coord: i.tex_coord(),
+            }),
+            normal_scale: material.normal_texture().map_or(1., |i| i.scale()),
+            occlusion_texture: material.occlusion_texture().map(|i| TextureSlot {
+                texture: i.texture().index(),
+                tex_coord: i.tex_coord(),
+            }),
+            occlusion_strength: material.occlusion_texture().map_or(1., |i| i.strength()),
+            emissive_texture: material.emissive_texture().map(texture_slot),
+            alpha_mode: match material.alpha_mode() {
+                gltf::material::AlphaMode::Opaque => AlphaMode::Opaque,
+                gltf::material::AlphaMode::Mask => AlphaMode::Mask,
+                gltf::material::AlphaMode::Blend => AlphaMode::Blend,
+            },
+            alpha_cutoff: material.alpha_cutoff().unwrap_or(0.5),
+            double_sided: material.double_sided(),
+        };
+        let factors = m
+            .base_color_factor
+            .iter()
+            .chain(&m.emissive_factor)
+            .copied()
+            .chain([m.metallic_factor, m.roughness_factor, m.occlusion_strength]);
+        if factors
+            .clone()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(&v))
+            || !m.normal_scale.is_finite()
+            || !m.alpha_cutoff.is_finite()
+        {
+            return Err("Invalid material factors".into());
+        }
+        asset.materials.push(m);
+    }
+    let mut decoded_bytes = 0usize;
+    let mut encoded_bytes = buffers.iter().map(|b| b.len()).sum::<usize>();
+    for image in gltf.images() {
+        let (encoded, mime) = match image.source() {
+            gltf::image::Source::View { view, mime_type } => (
+                &buffers[view.buffer().index()][view.offset()..view.offset() + view.length()],
+                Some(mime_type),
+            ),
+            gltf::image::Source::Uri { mime_type, .. } => (
+                external_images
+                    .get(image.index())
+                    .map(Vec::as_slice)
+                    .ok_or("Missing external glTF image")?,
+                mime_type,
+            ),
+        };
+        if matches!(image.source(), gltf::image::Source::Uri { .. }) {
+            encoded_bytes = encoded_bytes
+                .checked_add(encoded.len())
+                .ok_or("Image size overflow")?;
+        }
+        if encoded_bytes > MAX_BYTES {
+            return Err("Encoded glTF resources exceed 128 MiB".into());
+        }
+        let decoded = decode_core_image(encoded, mime)?;
+        decoded_bytes = decoded_bytes
+            .checked_add(decoded.2.len())
+            .ok_or("Image size overflow")?;
+        if decoded_bytes > 256 * 1024 * 1024 {
+            return Err("Decoded glTF images exceed 256 MiB".into());
+        }
+        asset.images.push(ModelImage {
+            name: image.name().map(str::to_owned),
+            width: decoded.0,
+            height: decoded.1,
+            rgba: decoded.2,
+        });
+    }
+    for sampler in gltf.samplers() {
+        asset.samplers.push(ModelSampler {
+            wrap_s: wrap_mode(sampler.wrap_s()),
+            wrap_t: wrap_mode(sampler.wrap_t()),
+            mag_filter: sampler.mag_filter().map(|f| match f {
+                gltf::texture::MagFilter::Nearest => FilterMode::Nearest,
+                gltf::texture::MagFilter::Linear => FilterMode::Linear,
+            }),
+            min_filter: sampler.min_filter().map(|f| match f {
+                gltf::texture::MinFilter::Nearest => FilterMode::Nearest,
+                gltf::texture::MinFilter::Linear => FilterMode::Linear,
+                gltf::texture::MinFilter::NearestMipmapNearest => FilterMode::NearestMipmapNearest,
+                gltf::texture::MinFilter::LinearMipmapNearest => FilterMode::LinearMipmapNearest,
+                gltf::texture::MinFilter::NearestMipmapLinear => FilterMode::NearestMipmapLinear,
+                gltf::texture::MinFilter::LinearMipmapLinear => FilterMode::LinearMipmapLinear,
+            }),
+        });
+    }
+    for texture in gltf.textures() {
+        asset.textures.push(ModelTexture {
+            image: texture.source().index(),
+            sampler: texture.sampler().index(),
+        });
+    }
+    let mut total_indices = 0usize;
+    let mut morph_elements = 0usize;
+    let mut influence_elements = 0usize;
+    for mesh in gltf.meshes() {
+        let mut imported = ModelMesh {
+            name: mesh.name().map(str::to_owned),
+            primitives: vec![],
+            weights: vec![],
+        };
+        let mut mesh_targets = None;
+        for primitive in mesh.primitives() {
+            let position = primitive.get(&gltf::Semantic::Positions).ok_or(
+                "Primitive missing POSITION; extension-only geometry has no core fallback",
+            )?;
+            let count = position.count();
+            checked_attribute(&position, count, A::Vec3, &[D::F32], false)?;
+            if count == 0
+                || asset
+                    .vertices
+                    .len()
+                    .checked_add(count)
+                    .filter(|&n| n <= MAX_VERTICES)
+                    .is_none()
+            {
+                return Err("glTF vertex limit exceeded".into());
+            }
+            // Validate typed reader shapes before they reinterpret components.
+            for (semantic, accessor) in primitive.attributes() {
+                match semantic {
+                    gltf::Semantic::Extras(_) => {
+                        if !asset
+                            .warnings
+                            .iter()
+                            .any(|w| w.contains("Custom vertex attributes"))
+                        {
+                            asset.warnings.push("Custom vertex attributes are application-specific and are not rendered".into());
+                        }
+                    }
+                    gltf::Semantic::Positions | gltf::Semantic::Normals => {
+                        checked_attribute(&accessor, count, A::Vec3, &[D::F32], false)?
+                    }
+                    gltf::Semantic::Tangents => {
+                        checked_attribute(&accessor, count, A::Vec4, &[D::F32], false)?
+                    }
+                    gltf::Semantic::TexCoords(_) => checked_attribute(
+                        &accessor,
+                        count,
+                        A::Vec2,
+                        &[D::F32, D::U8, D::U16],
+                        true,
+                    )?,
+                    gltf::Semantic::Colors(_) => {
+                        if !matches!(accessor.dimensions(), A::Vec3 | A::Vec4) {
+                            return Err("COLOR must be VEC3/VEC4".into());
+                        }
+                        checked_attribute(
+                            &accessor,
+                            count,
+                            accessor.dimensions(),
+                            &[D::F32, D::U8, D::U16],
+                            true,
+                        )?;
+                    }
+                    gltf::Semantic::Joints(_) => {
+                        checked_attribute(&accessor, count, A::Vec4, &[D::U8, D::U16], false)?;
+                        if accessor.normalized() {
+                            return Err("JOINTS must not be normalized".into());
+                        }
+                    }
+                    gltf::Semantic::Weights(_) => checked_attribute(
+                        &accessor,
+                        count,
+                        A::Vec4,
+                        &[D::F32, D::U8, D::U16],
+                        true,
+                    )?,
+                }
+            }
+            if let Some(indices) = primitive.indices() {
+                checked_attribute(
+                    &indices,
+                    indices.count(),
+                    A::Scalar,
+                    &[D::U8, D::U16, D::U32],
+                    false,
+                )?;
+                if indices.normalized() {
+                    return Err("Indices cannot be normalized".into());
+                }
+            }
+            let reader = primitive.reader(|b| buffers.get(b.index()).copied());
+            let positions: Vec<_> = reader
+                .read_positions()
+                .ok_or("Cannot read positions")?
+                .collect();
+            let indices: Vec<u32> = if primitive.indices().is_some() {
+                reader
+                    .read_indices()
+                    .ok_or("Cannot read indices")?
+                    .into_u32()
+                    .collect()
+            } else {
+                (0..count as u32).collect()
+            };
+            total_indices = total_indices
+                .checked_add(indices.len())
+                .ok_or("Index size overflow")?;
+            if total_indices > MAX_INDICES || indices.iter().any(|&i| i as usize >= count) {
+                return Err("Invalid or oversize glTF indices".into());
+            }
+            let mode = match primitive.mode() {
+                gltf::mesh::Mode::Points => PrimitiveMode::Points,
+                gltf::mesh::Mode::Lines => PrimitiveMode::Lines,
+                gltf::mesh::Mode::LineLoop => PrimitiveMode::LineLoop,
+                gltf::mesh::Mode::LineStrip => PrimitiveMode::LineStrip,
+                gltf::mesh::Mode::Triangles => PrimitiveMode::Triangles,
+                gltf::mesh::Mode::TriangleStrip => PrimitiveMode::TriangleStrip,
+                gltf::mesh::Mode::TriangleFan => PrimitiveMode::TriangleFan,
+            };
+            validate_core_mode(mode, indices.len())?;
+            let normals: Vec<_> = reader
+                .read_normals()
+                .map(|v| v.collect())
+                .unwrap_or_else(|| derive_core_normals(&positions, &indices, mode));
+            let flat_normals = primitive.get(&gltf::Semantic::Normals).is_none();
+            let tangents: Vec<_> = if flat_normals {
+                vec![[0., 0., 0., 1.]; count]
+            } else {
+                reader
+                    .read_tangents()
+                    .map(|v| v.collect())
+                    .unwrap_or_else(|| vec![[0., 0., 0., 1.]; count])
+            };
+            let colors: Vec<_> = reader
+                .read_colors(0)
+                .map(|v| v.into_rgba_f32().collect())
+                .unwrap_or_else(|| vec![[1.; 4]; count]);
+            let tex_sets: Vec<_> = primitive
+                .attributes()
+                .filter_map(|(s, _)| {
+                    if let gltf::Semantic::TexCoords(i) = s {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if let Some(index) = primitive.material().index() {
+                let material = &asset.materials[index];
+                for slot in [
+                    material.base_color_texture,
+                    material.metallic_roughness_texture,
+                    material.normal_texture,
+                    material.occlusion_texture,
+                    material.emissive_texture,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    if !tex_sets.contains(&slot.tex_coord) {
+                        return Err("Textured primitive lacks its referenced TEXCOORD set".into());
+                    }
+                }
+            }
+            let max_tex = tex_sets.iter().max().copied().map_or(0, |n| n as usize + 1);
+            if max_tex > 32 {
+                return Err("Texture coordinate set limit exceeded".into());
+            }
+            let mut tex_coords = vec![vec![[0.; 2]; count]; max_tex];
+            for set in tex_sets {
+                tex_coords[set as usize] = reader
+                    .read_tex_coords(set)
+                    .ok_or("Cannot read texture coordinates")?
+                    .into_f32()
+                    .collect();
+            }
+            let sets: Vec<_> = primitive
+                .attributes()
+                .filter_map(|(s, _)| {
+                    if let gltf::Semantic::Joints(i) = s {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let weight_sets = primitive
+                .attributes()
+                .filter(|(s, _)| matches!(s, gltf::Semantic::Weights(_)))
+                .count();
+            if sets.len() != weight_sets {
+                return Err("JOINTS/WEIGHTS sets must match".into());
+            }
+            let mut influences = vec![vec![]; count];
+            let mut joints0 = vec![[0u16; 4]; count];
+            let mut weights0 = vec![[0.; 4]; count];
+            for set in sets {
+                if primitive.get(&gltf::Semantic::Weights(set)).is_none() {
+                    return Err("JOINTS/WEIGHTS sets must match".into());
+                }
+                influence_elements = influence_elements
+                    .checked_add(count.checked_mul(4).ok_or("Influence size overflow")?)
+                    .ok_or("Influence size overflow")?;
+                if influence_elements > 8_000_000 {
+                    return Err("glTF influence limit exceeded".into());
+                }
+                let joints: Vec<_> = reader
+                    .read_joints(set)
+                    .ok_or("Cannot read JOINTS")?
+                    .into_u16()
+                    .collect();
+                let weights: Vec<_> = reader
+                    .read_weights(set)
+                    .ok_or("Cannot read WEIGHTS")?
+                    .into_f32()
+                    .collect();
+                if joints.len() != count || weights.len() != count {
+                    return Err("Invalid joint/weight count".into());
+                }
+                for i in 0..count {
+                    for j in 0..4 {
+                        if !weights[i][j].is_finite() || weights[i][j] < 0. {
+                            return Err("Invalid joint weight".into());
+                        }
+                        influences[i].push((joints[i][j], weights[i][j]));
+                    }
+                }
+                if set == 0 {
+                    joints0 = joints;
+                    weights0 = weights;
+                }
+            }
+            for weights in &mut influences {
+                if !weights.is_empty() {
+                    let sum = weights.iter().map(|(_, w)| w).sum::<f32>();
+                    if !sum.is_finite() || sum <= 0. {
+                        return Err("Joint weights must have positive finite sum".into());
+                    }
+                    for (_, w) in weights {
+                        *w /= sum;
+                    }
+                }
+            }
+            let start = asset.vertices.len();
+            for i in 0..count {
+                let v = ModelVertex {
+                    position: positions[i],
+                    normal: normals[i],
+                    tangent: tangents[i],
+                    uv0: tex_coords.first().map_or([0.; 2], |v| v[i]),
+                    uv1: tex_coords.get(1).map_or([0.; 2], |v| v[i]),
+                    color: colors[i],
+                    joints: joints0[i],
+                    weights: weights0[i],
+                    influences: std::mem::take(&mut influences[i]),
+                    tex_coords: tex_coords.iter().map(|v| v[i]).collect(),
+                };
+                if v.position
+                    .iter()
+                    .chain(&v.normal)
+                    .chain(&v.tangent)
+                    .chain(&v.uv0)
+                    .chain(&v.uv1)
+                    .chain(&v.color)
+                    .any(|v| !v.is_finite())
+                    || v.tex_coords.iter().flatten().any(|v| !v.is_finite())
+                    || v.color.iter().any(|v| !(0.0..=1.0).contains(v))
+                {
+                    return Err("Non-finite or invalid vertex attribute".into());
+                }
+                asset.vertices.push(v);
+            }
+            let mut targets = vec![];
+            for target in primitive.morph_targets() {
+                for a in [target.positions(), target.normals(), target.tangents()]
+                    .into_iter()
+                    .flatten()
+                {
+                    checked_attribute(&a, count, A::Vec3, &[D::F32], false)?;
+                }
+            }
+            for (p, n, t) in reader.read_morph_targets() {
+                morph_elements = morph_elements
+                    .checked_add(count * 3)
+                    .ok_or("Morph size overflow")?;
+                if morph_elements > 8_000_000 {
+                    return Err("glTF morph limit exceeded".into());
+                }
+                let target = MorphTarget {
+                    positions: p.map(|v| v.collect()).unwrap_or_default(),
+                    normals: n.map(|v| v.collect()).unwrap_or_default(),
+                    tangents: t.map(|v| v.collect()).unwrap_or_default(),
+                };
+                if target
+                    .positions
+                    .iter()
+                    .chain(&target.normals)
+                    .chain(&target.tangents)
+                    .flatten()
+                    .any(|v| !v.is_finite())
+                {
+                    return Err("Invalid morph target".into());
+                }
+                targets.push(target);
+            }
+            if mesh_targets
+                .replace(targets.len())
+                .is_some_and(|n| n != targets.len())
+            {
+                return Err("Mesh primitives must have matching morph target counts".into());
+            }
+            imported.primitives.push(asset.primitives.len());
+            asset.primitives.push(ModelPrimitive {
+                flat_normals,
+                vertices: start..asset.vertices.len(),
+                indices,
+                mode,
+                material: primitive.material().index(),
+                morph_targets: targets,
+            });
+        }
+        imported.weights = mesh
+            .weights()
+            .map(|w| w.to_vec())
+            .unwrap_or_else(|| vec![0.; mesh_targets.unwrap_or(0)]);
+        if imported.weights.len() != mesh_targets.unwrap_or(0)
+            || imported.weights.iter().any(|v| !v.is_finite())
+        {
+            return Err("Invalid mesh morph weights".into());
+        }
+        asset.meshes.push(imported);
+    }
+    for node in gltf.nodes() {
+        let (trs, matrix) = match node.transform() {
+            gltf::scene::Transform::Decomposed {
+                translation,
+                rotation,
+                scale,
+            } => (
+                NodeTrs {
+                    translation: Vec3::from_array(translation),
+                    rotation: glam::Quat::from_array(rotation),
+                    scale: Vec3::from_array(scale),
+                },
+                None,
+            ),
+            gltf::scene::Transform::Matrix { matrix } => (
+                NodeTrs {
+                    translation: Vec3::ZERO,
+                    rotation: glam::Quat::IDENTITY,
+                    scale: Vec3::ONE,
+                },
+                Some(Mat4::from_cols_array_2d(&matrix)),
+            ),
+        };
+        if !trs.translation.is_finite()
+            || !trs.rotation.is_finite()
+            || !trs.scale.is_finite()
+            || (trs.rotation.length_squared() - 1.).abs() > 0.001
+            || matrix.is_some_and(|m| {
+                !m.is_finite()
+                    || m.x_axis.w != 0.
+                    || m.y_axis.w != 0.
+                    || m.z_axis.w != 0.
+                    || m.w_axis.w != 1.
+            })
+        {
+            return Err("Invalid node transform".into());
+        }
+        let weights = node.weights().map(|w| w.to_vec());
+        if let Some(w) = &weights {
+            if node
+                .mesh()
+                .is_none_or(|m| w.len() != asset.meshes[m.index()].weights.len())
+                || w.iter().any(|v| !v.is_finite())
+            {
+                return Err("Invalid node morph weights".into());
+            }
+        }
+        asset.nodes.push(ModelNode {
+            name: node.name().map(str::to_owned),
+            children: node.children().map(|n| n.index()).collect(),
+            mesh: node.mesh().map(|m| m.index()),
+            skin: node.skin().map(|s| s.index()),
+            camera: node.camera().map(|c| c.index()),
+            trs,
+            matrix,
+            weights,
+        });
+    }
+    for skin in gltf.skins() {
+        let joints: Vec<_> = skin.joints().map(|j| j.index()).collect();
+        if joints.is_empty() || joints.len() > 65536 {
+            return Err("Invalid skin joint count".into());
+        }
+        if let Some(ibm) = skin.inverse_bind_matrices() {
+            checked_attribute(&ibm, joints.len(), A::Mat4, &[D::F32], false)?;
+        }
+        let inverse_bind_matrices: Vec<_> = skin
+            .reader(|b| buffers.get(b.index()).copied())
+            .read_inverse_bind_matrices()
+            .map(|m| m.map(|v| Mat4::from_cols_array_2d(&v)).collect())
+            .unwrap_or_else(|| vec![Mat4::IDENTITY; joints.len()]);
+        if inverse_bind_matrices.iter().any(|m| !m.is_finite()) {
+            return Err("Invalid inverse bind matrices".into());
+        }
+        asset.skins.push(ModelSkin {
+            name: skin.name().map(str::to_owned),
+            joints,
+            inverse_bind_matrices,
+            skeleton: skin.skeleton().map(|n| n.index()),
+        });
+    }
+    for node in &asset.nodes {
+        if let (Some(mesh), Some(skin)) = (node.mesh, node.skin) {
+            for &p in &asset.meshes[mesh].primitives {
+                for v in &asset.vertices[asset.primitives[p].vertices.clone()] {
+                    if v.influences.is_empty()
+                        || v.influences
+                            .iter()
+                            .any(|&(joint, _)| joint as usize >= asset.skins[skin].joints.len())
+                    {
+                        return Err(
+                            "Skinned primitive has missing or invalid joint influences".into()
+                        );
+                    }
+                }
+            }
+        }
+    }
+    for animation in gltf.animations() {
+        let mut clip = AnimationClip {
+            name: animation.name().map(str::to_owned),
+            channels: vec![],
+            duration: 0.,
+        };
+        let mut targets = std::collections::HashSet::new();
+        for channel in animation.channels() {
+            let node = channel.target().node().index();
+            let property = match channel.target().property() {
+                gltf::animation::Property::Translation => AnimationProperty::Translation,
+                gltf::animation::Property::Rotation => AnimationProperty::Rotation,
+                gltf::animation::Property::Scale => AnimationProperty::Scale,
+                gltf::animation::Property::MorphTargetWeights => AnimationProperty::Weights,
+            };
+            if !targets.insert((node, property as u8)) {
+                return Err("Animation channels duplicate a node property".into());
+            }
+            if property != AnimationProperty::Weights && asset.nodes[node].matrix.is_some() {
+                return Err("Matrix-authored nodes cannot have TRS animations".into());
+            }
+            let components = match property {
+                AnimationProperty::Rotation => 4,
+                AnimationProperty::Weights => asset.nodes[node]
+                    .mesh
+                    .map(|m| asset.meshes[m].weights.len())
+                    .ok_or("Weight animation targets node without mesh")?,
+                _ => 3,
+            };
+            let sampler = channel.sampler();
+            let interpolation = match sampler.interpolation() {
+                gltf::animation::Interpolation::Step => Interpolation::Step,
+                gltf::animation::Interpolation::Linear => Interpolation::Linear,
+                gltf::animation::Interpolation::CubicSpline => Interpolation::CubicSpline,
+            };
+            let input = sampler.input();
+            checked_attribute(&input, input.count(), A::Scalar, &[D::F32], false)?;
+            let output = sampler.output();
+            checked_attribute(
+                &output,
+                output.count(),
+                match property {
+                    AnimationProperty::Rotation => A::Vec4,
+                    AnimationProperty::Weights => A::Scalar,
+                    _ => A::Vec3,
+                },
+                &[D::F32],
+                false,
+            )?;
+            let reader = channel.reader(|b| buffers.get(b.index()).copied());
+            let times: Vec<_> = reader
+                .read_inputs()
+                .ok_or("Cannot read animation timestamps")?
+                .collect();
+            if times.is_empty()
+                || times.iter().any(|t| !t.is_finite() || *t < 0.)
+                || times.windows(2).any(|w| w[1] <= w[0])
+            {
+                return Err("Animation timestamps must be finite and strictly increasing".into());
+            }
+            let values: Vec<f32> = match reader
+                .read_outputs()
+                .ok_or("Cannot read animation output")?
+            {
+                gltf::animation::util::ReadOutputs::Translations(v)
+                | gltf::animation::util::ReadOutputs::Scales(v) => v.flatten().collect(),
+                gltf::animation::util::ReadOutputs::Rotations(v) => {
+                    v.into_f32().flatten().collect()
+                }
+                gltf::animation::util::ReadOutputs::MorphTargetWeights(v) => v.into_f32().collect(),
+            };
+            if components == 0
+                || values.len()
+                    != times.len()
+                        * components
+                        * if interpolation == Interpolation::CubicSpline {
+                            3
+                        } else {
+                            1
+                        }
+                || values.iter().any(|v| !v.is_finite())
+            {
+                return Err("Invalid animation output count/data".into());
+            }
+            if property == AnimationProperty::Rotation {
+                let width = components
+                    * if interpolation == Interpolation::CubicSpline {
+                        3
+                    } else {
+                        1
+                    };
+                for key in values.chunks_exact(width) {
+                    let value = if interpolation == Interpolation::CubicSpline {
+                        &key[4..8]
+                    } else {
+                        key
+                    };
+                    let length = value.iter().map(|v| v * v).sum::<f32>();
+                    if (length - 1.).abs() > 0.001 {
+                        return Err("Animation rotation key must be a unit quaternion".into());
+                    }
+                }
+            }
+            clip.duration = clip.duration.max(*times.last().unwrap());
+            clip.channels.push(AnimationChannel {
+                node,
+                property,
+                interpolation,
+                times,
+                values,
+                components,
+            });
+        }
+        asset.animations.push(clip);
+    }
+    for scene in gltf.scenes() {
+        asset.scenes.push(ModelScene {
+            name: scene.name().map(str::to_owned),
+            nodes: scene.nodes().map(|n| n.index()).collect(),
+        });
+    }
+    for camera in gltf.cameras() {
+        match camera.projection() {
+            gltf::camera::Projection::Perspective(p) => {
+                if !p.yfov().is_finite()
+                    || p.yfov() <= 0.
+                    || p.yfov() >= std::f32::consts::PI
+                    || !p.znear().is_finite()
+                    || p.znear() <= 0.
+                    || p.zfar()
+                        .is_some_and(|far| !far.is_finite() || far <= p.znear())
+                    || p.aspect_ratio()
+                        .is_some_and(|ratio| !ratio.is_finite() || ratio <= 0.)
+                {
+                    return Err("Invalid perspective camera parameters".into());
+                }
+            }
+            gltf::camera::Projection::Orthographic(o) => {
+                if [o.xmag(), o.ymag(), o.znear(), o.zfar()]
+                    .iter()
+                    .any(|v| !v.is_finite())
+                    || o.xmag() <= 0.
+                    || o.ymag() <= 0.
+                    || o.znear() < 0.
+                    || o.zfar() <= o.znear()
+                {
+                    return Err("Invalid orthographic camera parameters".into());
+                }
+            }
+        }
+        asset.cameras.push(match camera.projection() {
+            gltf::camera::Projection::Perspective(p) => ModelCamera::Perspective {
+                name: camera.name().map(str::to_owned),
+                yfov: p.yfov(),
+                aspect_ratio: p.aspect_ratio(),
+                znear: p.znear(),
+                zfar: p.zfar(),
+            },
+            gltf::camera::Projection::Orthographic(o) => ModelCamera::Orthographic {
+                name: camera.name().map(str::to_owned),
+                xmag: o.xmag(),
+                ymag: o.ymag(),
+                znear: o.znear(),
+                zfar: o.zfar(),
+            },
+        });
+    }
+    // Validate graph/skin relationships even when no scene is selected for rendering.
+    crate::gltf_animation::rest_pose(&asset)?;
+    let children: std::collections::HashSet<_> = asset
+        .nodes
+        .iter()
+        .flat_map(|n| n.children.iter().copied())
+        .collect();
+    if asset.scenes.is_empty() {
+        asset.scenes.push(ModelScene {
+            name: None,
+            nodes: (0..asset.nodes.len())
+                .filter(|node| !children.contains(node))
+                .collect(),
+        });
+        asset.default_scene = Some(0);
+    }
+    for scene in &asset.scenes {
+        let mut roots = std::collections::HashSet::new();
+        if scene
+            .nodes
+            .iter()
+            .any(|&node| children.contains(&node) || !roots.insert(node))
+        {
+            return Err("Scene roots must be distinct nodes without parents".into());
+        }
+    }
+    Ok(asset)
+}
+fn wrap_mode(mode: gltf::texture::WrappingMode) -> crate::gltf_model::WrapMode {
+    match mode {
+        gltf::texture::WrappingMode::ClampToEdge => crate::gltf_model::WrapMode::ClampToEdge,
+        gltf::texture::WrappingMode::MirroredRepeat => crate::gltf_model::WrapMode::MirroredRepeat,
+        gltf::texture::WrappingMode::Repeat => crate::gltf_model::WrapMode::Repeat,
+    }
+}
+fn decode_core_image(bytes: &[u8], mime: Option<&str>) -> Result<(u32, u32, Vec<u8>), String> {
+    use std::io::Cursor;
+    let format = image::guess_format(bytes).map_err(|e| format!("Invalid glTF image: {e}"))?;
+    if !matches!(format, image::ImageFormat::Png | image::ImageFormat::Jpeg) {
+        return Err("glTF core images must be PNG or JPEG".into());
+    }
+    if mime.is_some_and(|m| {
+        m != if format == image::ImageFormat::Png {
+            "image/png"
+        } else {
+            "image/jpeg"
+        }
+    }) {
+        return Err("Image MIME type does not match encoded image".into());
+    }
+    let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(16384);
+    limits.max_image_height = Some(16384);
+    limits.max_alloc = Some(64 * 1024 * 1024);
+    reader.limits(limits);
+    let decoded = reader
+        .decode()
+        .map_err(|e| format!("Cannot decode glTF image: {e}"))?;
+    if u64::from(decoded.width()) * u64::from(decoded.height()) > 16_777_216 {
+        return Err("glTF image pixel limit exceeded".into());
+    }
+    Ok((
+        decoded.width(),
+        decoded.height(),
+        decoded.to_rgba8().into_raw(),
+    ))
+}
+fn validate_core_mode(mode: crate::gltf_model::PrimitiveMode, count: usize) -> Result<(), String> {
+    use crate::gltf_model::PrimitiveMode::*;
+    let valid = match mode {
+        Points => count >= 1,
+        Lines => count >= 2 && count % 2 == 0,
+        LineLoop | LineStrip => count >= 2,
+        Triangles => count >= 3 && count % 3 == 0,
+        TriangleStrip | TriangleFan => count >= 3,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err("Invalid glTF primitive element count".into())
+    }
+}
+pub fn triangle_indices(indices: &[u32], mode: crate::gltf_model::PrimitiveMode) -> Vec<u32> {
+    use crate::gltf_model::PrimitiveMode::*;
+    match mode {
+        Triangles => indices.to_vec(),
+        TriangleStrip => indices
+            .windows(3)
+            .enumerate()
+            .flat_map(|(i, t)| {
+                if i % 2 == 0 {
+                    [t[0], t[1], t[2]]
+                } else {
+                    [t[1], t[0], t[2]]
+                }
+            })
+            .collect(),
+        TriangleFan => indices[1..]
+            .windows(2)
+            .flat_map(|t| [indices[0], t[0], t[1]])
+            .collect(),
+        _ => vec![],
+    }
+}
+fn derive_core_normals(
+    positions: &[[f32; 3]],
+    indices: &[u32],
+    mode: crate::gltf_model::PrimitiveMode,
+) -> Vec<[f32; 3]> {
+    let mut normals = vec![Vec3::ZERO; positions.len()];
+    for tri in triangle_indices(indices, mode).chunks_exact(3) {
+        let a = Vec3::from_array(positions[tri[0] as usize]);
+        let face = (Vec3::from_array(positions[tri[1] as usize]) - a)
+            .cross(Vec3::from_array(positions[tri[2] as usize]) - a);
+        for &i in tri {
+            normals[i as usize] += face;
+        }
+    }
+    normals
+        .into_iter()
+        .map(|n| n.try_normalize().unwrap_or(Vec3::Y).to_array())
+        .collect()
+}
+
+#[cfg(test)]
+mod core_tests {
+    use super::*;
+    use crate::{gltf_animation::*, gltf_model::*};
+    use serde_json::{json, Value};
+    use std::sync::Arc;
+    fn floats(values: &[f32]) -> Vec<u8> {
+        values.iter().flat_map(|v| v.to_le_bytes()).collect()
+    }
+    fn add_accessor(
+        doc: &mut Value,
+        bytes: &mut Vec<u8>,
+        data: &[u8],
+        component: u32,
+        count: usize,
+        kind: &str,
+    ) -> usize {
+        while bytes.len() % 4 != 0 {
+            bytes.push(0);
+        }
+        let view = doc["bufferViews"].as_array().unwrap().len();
+        let offset = bytes.len();
+        bytes.extend_from_slice(data);
+        doc["bufferViews"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"buffer":0,"byteOffset":offset,"byteLength":data.len()}));
+        let index = doc["accessors"].as_array().unwrap().len();
+        let mut accessor =
+            json!({"bufferView":view,"componentType":component,"count":count,"type":kind});
+        if index == 0 {
+            accessor["min"] = json!([0, 0, 0]);
+            accessor["max"] = json!([1, 1, 0]);
+        }
+        doc["accessors"].as_array_mut().unwrap().push(accessor);
+        index
+    }
+    fn fixture() -> (Value, Vec<u8>) {
+        let mut doc = json!({"asset":{"version":"2.0"},"buffers":[{"uri":"a.bin","byteLength":36}],"bufferViews":[],"accessors":[],"meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}]});
+        let mut bytes = vec![];
+        add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[0., 0., 0., 1., 0., 0., 0., 1., 0.]),
+            5126,
+            3,
+            "VEC3",
+        );
+        (doc, bytes)
+    }
+    fn parse_fixture(
+        mut doc: Value,
+        bytes: Vec<u8>,
+        images: Vec<Vec<u8>>,
+    ) -> Result<ModelAsset, String> {
+        doc["buffers"][0]["byteLength"] = json!(bytes.len());
+        parse_model(&serde_json::to_vec(&doc).unwrap(), &[bytes], &images)
+    }
+    #[test]
+    fn real_fox_skin_animation_and_helmet_pbr_images() {
+        let fox = parse_model(include_bytes!("../assets/models/fox/Fox.glb"), &[], &[]).unwrap();
+        assert!(!fox.skins.is_empty());
+        assert!(fox.animations.len() >= 3);
+        assert!(!fox.images.is_empty());
+        let mut instance = ModelInstance::new(Arc::new(fox), None).unwrap();
+        let before = model_bounds(&instance.asset, &instance.pose).unwrap();
+        instance.play(0, true).unwrap();
+        instance.seek(0.5).unwrap();
+        let after = model_bounds(&instance.asset, &instance.pose).unwrap();
+        assert_ne!(before, after);
+        assert!(after.0.is_finite() && after.1.is_finite());
+        let helmet = parse_model(
+            include_bytes!("../assets/models/damaged-helmet/DamagedHelmet.glb"),
+            &[],
+            &[],
+        )
+        .unwrap();
+        let m = &helmet.materials[0];
+        assert!(m.base_color_texture.is_some());
+        assert!(m.metallic_roughness_texture.is_some());
+        assert!(m.normal_texture.is_some());
+        assert!(m.occlusion_texture.is_some());
+        assert!(m.emissive_texture.is_some());
+        assert_eq!(helmet.images.len(), 5);
+        assert!(helmet.vertices.iter().all(|v| !v.tex_coords.is_empty()));
+    }
+    #[test]
+    fn all_core_modes_and_external_png_jpeg_material_uv_sets() {
+        for mode in 0..=6 {
+            let (mut doc, mut bytes) = fixture();
+            if mode == 1 {
+                let accessor = add_accessor(&mut doc, &mut bytes, &[0, 1], 5121, 2, "SCALAR");
+                doc["meshes"][0]["primitives"][0]["indices"] = json!(accessor);
+            }
+            doc["meshes"][0]["primitives"][0]["mode"] = json!(mode);
+            assert!(parse_fixture(doc, bytes, vec![]).is_ok());
+        }
+        for format in [image::ImageFormat::Png, image::ImageFormat::Jpeg] {
+            let (mut doc, mut bytes) = fixture();
+            let uv = add_accessor(
+                &mut doc,
+                &mut bytes,
+                &floats(&[0., 0., 1., 0., 0., 1.]),
+                5126,
+                3,
+                "VEC2",
+            );
+            for set in 0..3 {
+                doc["meshes"][0]["primitives"][0]["attributes"][format!("TEXCOORD_{set}")] =
+                    json!(uv);
+            }
+            doc["meshes"][0]["primitives"][0]["material"] = json!(0);
+            doc["materials"] = json!([{"pbrMetallicRoughness":{"baseColorFactor":[0.25,0.5,0.75,0.6],"metallicFactor":0.4,"roughnessFactor":0.7,"baseColorTexture":{"index":0,"texCoord":2}},"alphaMode":"BLEND","doubleSided":true}]);
+            doc["images"] = json!([{"uri":"image.bin"}]);
+            doc["textures"] = json!([{"source":0,"sampler":0}]);
+            doc["samplers"] =
+                json!([{"wrapS":33071,"wrapT":33648,"minFilter":9987,"magFilter":9728}]);
+            let image = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+                2,
+                1,
+                image::Rgb([12, 34, 56]),
+            ));
+            let mut cursor = std::io::Cursor::new(vec![]);
+            image.write_to(&mut cursor, format).unwrap();
+            let asset = parse_fixture(doc, bytes, vec![cursor.into_inner()]).unwrap();
+            assert_eq!(asset.images[0].rgba.len(), 8);
+            assert_eq!(asset.vertices[0].tex_coords.len(), 3);
+            assert_eq!(asset.materials[0].alpha_mode, AlphaMode::Blend);
+            assert!(asset.materials[0].double_sided);
+            assert_eq!(asset.materials[0].base_color_texture.unwrap().tex_coord, 2);
+            assert_eq!(asset.samplers[0].wrap_s, WrapMode::ClampToEdge);
+            assert_eq!(asset.samplers[0].wrap_t, WrapMode::MirroredRepeat);
+        }
+    }
+    #[test]
+    fn sparse_positions_without_base_and_invalid_sparse_indices() {
+        let (mut doc, mut bytes) = fixture();
+        let indices = add_accessor(&mut doc, &mut bytes, &[0, 1, 2], 5121, 3, "SCALAR");
+        let index_view = doc["accessors"][indices]["bufferView"].clone();
+        doc["accessors"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("bufferView");
+        doc["accessors"][0]["sparse"] = json!({"count":3,"indices":{"bufferView":index_view,"componentType":5121},"values":{"bufferView":0}});
+        let asset = parse_fixture(doc.clone(), bytes.clone(), vec![]).unwrap();
+        assert_eq!(asset.vertices[1].position, [1., 0., 0.]);
+        let offset = doc["bufferViews"][1]["byteOffset"].as_u64().unwrap() as usize;
+        bytes[offset + 1] = 0;
+        assert!(parse_fixture(doc, bytes, vec![])
+            .unwrap_err()
+            .contains("Sparse indices"));
+    }
+    #[test]
+    fn all_joint_sets_morph_then_skin_and_singular_skin_fallback() {
+        let (mut doc, mut bytes) = fixture();
+        let joints0 = add_accessor(&mut doc, &mut bytes, &[0u8; 12], 5121, 3, "VEC4");
+        let weights0 = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[1., 0., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0.]),
+            5126,
+            3,
+            "VEC4",
+        );
+        let joints1 = add_accessor(&mut doc, &mut bytes, &[1u8; 12], 5121, 3, "VEC4");
+        let weights1 = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[1., 0., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0.]),
+            5126,
+            3,
+            "VEC4",
+        );
+        let morph = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[1., 0., 0., 1., 0., 0., 1., 0., 0.]),
+            5126,
+            3,
+            "VEC3",
+        );
+        doc["meshes"][0]["primitives"][0]["attributes"]["JOINTS_0"] = json!(joints0);
+        doc["meshes"][0]["primitives"][0]["attributes"]["WEIGHTS_0"] = json!(weights0);
+        doc["meshes"][0]["primitives"][0]["attributes"]["JOINTS_1"] = json!(joints1);
+        doc["meshes"][0]["primitives"][0]["attributes"]["WEIGHTS_1"] = json!(weights1);
+        doc["meshes"][0]["primitives"][0]["targets"] = json!([{"POSITION":morph}]);
+        doc["meshes"][0]["weights"] = json!([0.5]);
+        doc["nodes"] = json!([{"mesh":0,"skin":0},{"translation":[2,0,0]},{"translation":[4,0,0]}]);
+        doc["skins"] = json!([{"joints":[1,2]}]);
+        doc["scenes"][0]["nodes"] = json!([0, 1, 2]);
+        let mut asset = parse_fixture(doc, bytes, vec![]).unwrap();
+        let pose = default_pose(&asset, 0).unwrap();
+        assert_eq!(asset.vertices[0].influences.len(), 8);
+        assert_eq!(
+            deformed_vertices(&asset, &pose, 0, 0).unwrap()[0].position,
+            [3.5, 0., 0.]
+        );
+        asset.nodes[0].trs.scale = Vec3::ZERO;
+        let pose = default_pose(&asset, 0).unwrap();
+        assert!(pose.skin_world_space[0]);
+        assert_eq!(node_render_matrix(&pose, 0), Mat4::IDENTITY);
+        assert_eq!(
+            deformed_vertices(&asset, &pose, 0, 0).unwrap()[0].position,
+            [3.5, 0., 0.]
+        );
+    }
+    #[test]
+    fn model_mutations_and_updates_are_atomic_on_deformation_overflow() {
+        let (mut doc, mut bytes) = fixture();
+        let morph = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[10., 0., 0., 10., 0., 0., 10., 0., 0.]),
+            5126,
+            3,
+            "VEC3",
+        );
+        doc["meshes"][0]["primitives"][0]["targets"] = json!([{"POSITION":morph}]);
+        doc["meshes"][0]["weights"] = json!([0.]);
+        let times = add_accessor(&mut doc, &mut bytes, &floats(&[0., 1.]), 5126, 2, "SCALAR");
+        let values = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[0., f32::MAX]),
+            5126,
+            2,
+            "SCALAR",
+        );
+        doc["animations"] = json!([{"samplers":[{"input":times,"output":values}],"channels":[{"sampler":0,"target":{"node":0,"path":"weights"}}]}]);
+        let asset = Arc::new(parse_fixture(doc, bytes, vec![]).unwrap());
+        let mut scene = crate::scene::SceneManager::default();
+        let id = scene.add_model(asset).unwrap();
+        let revision = scene.model(id).unwrap().revision;
+        let render_revision = scene.render_revision();
+        assert!(scene.set_model_morph_weights(id, 0, &[f32::MAX]).is_err());
+        assert_eq!(scene.model(id).unwrap().revision, revision);
+        assert_eq!(scene.render_revision(), render_revision);
+        assert_eq!(scene.model(id).unwrap().pose.node_weights[0], [0.]);
+        scene.play_model_animation(id, 0, false, 1.).unwrap();
+        let revision = scene.model(id).unwrap().revision;
+        scene.update(1.);
+        let model = scene.model(id).unwrap();
+        assert_eq!(model.revision, revision);
+        assert_eq!(model.pose.node_weights[0], [0.]);
+        assert_eq!(model.playback.as_ref().unwrap().time, 0.);
+        assert!(!model.playback.as_ref().unwrap().playing);
+        assert!(model.last_error.as_ref().unwrap().contains("overflow"));
+    }
+    #[test]
+    fn no_scene_synthesizes_node_roots_and_cameras_validate() {
+        let (mut doc, bytes) = fixture();
+        doc.as_object_mut().unwrap().remove("scenes");
+        let asset = parse_fixture(doc, bytes, vec![]).unwrap();
+        assert_eq!(asset.scenes.len(), 1);
+        assert_eq!(asset.scenes[0].nodes, [0]);
+        assert!(ModelInstance::new(Arc::new(asset), None).is_ok());
+        let (mut doc, bytes) = fixture();
+        doc["cameras"] = json!([{"type":"perspective","perspective":{"yfov":1.0,"znear":0.1}}]);
+        doc["nodes"][0]["camera"] = json!(0);
+        let asset = parse_fixture(doc.clone(), bytes.clone(), vec![]).unwrap();
+        assert!(matches!(
+            asset.cameras[0],
+            ModelCamera::Perspective { zfar: None, .. }
+        ));
+        doc["cameras"][0]["perspective"]["yfov"] = json!(4.0);
+        assert!(parse_fixture(doc, bytes, vec![]).is_err());
+    }
+    #[test]
+    fn changing_clips_resets_unanimated_morph_weights_and_marks_flat_normals() {
+        let (mut doc, mut bytes) = fixture();
+        let morph = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[1., 0., 0., 1., 0., 0., 1., 0., 0.]),
+            5126,
+            3,
+            "VEC3",
+        );
+        doc["meshes"][0]["primitives"][0]["targets"] = json!([{"POSITION":morph}]);
+        doc["meshes"][0]["weights"] = json!([0.25]);
+        let mut asset = parse_fixture(doc, bytes, vec![]).unwrap();
+        assert!(asset.primitives[0].flat_normals);
+        assert_eq!(asset.vertices[0].tangent, [0., 0., 0., 1.]);
+        asset.animations = vec![
+            AnimationClip {
+                name: None,
+                duration: 1.,
+                channels: vec![AnimationChannel {
+                    node: 0,
+                    property: AnimationProperty::Weights,
+                    interpolation: Interpolation::Step,
+                    times: vec![0.],
+                    values: vec![0.75],
+                    components: 1,
+                }],
+            },
+            AnimationClip {
+                name: None,
+                duration: 1.,
+                channels: vec![AnimationChannel {
+                    node: 0,
+                    property: AnimationProperty::Translation,
+                    interpolation: Interpolation::Step,
+                    times: vec![0.],
+                    values: vec![0., 0., 0.],
+                    components: 3,
+                }],
+            },
+        ];
+        let mut instance = ModelInstance::new(Arc::new(asset), None).unwrap();
+        instance.play(0, false).unwrap();
+        assert_eq!(instance.pose.node_weights[0], [0.75]);
+        instance.play(1, false).unwrap();
+        assert_eq!(instance.pose.node_weights[0], [0.25]);
+        instance.set_morph_weights(0, &[0.4]).unwrap();
+        instance.update(0.1).unwrap();
+        assert_eq!(instance.pose.node_weights[0], [0.4]);
+        instance.play(0, false).unwrap();
+        instance.update(0.1).unwrap();
+        assert_eq!(instance.pose.node_weights[0], [0.75]);
+        instance.stop().unwrap();
+        assert_eq!(instance.pose.node_weights[0], [0.25]);
+        assert!(instance.morph_overrides.is_empty());
+        assert_eq!(
+            deformed_vertices(&instance.asset, &instance.pose, 0, 0).unwrap()[0].tangent,
+            [0., 0., 0., 1.]
+        );
+    }
+    #[test]
+    fn imported_animation_and_scene_model_root_lifecycle() {
+        let (mut doc, mut bytes) = fixture();
+        let times = add_accessor(&mut doc, &mut bytes, &floats(&[0., 2.]), 5126, 2, "SCALAR");
+        let values = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&[0., 0., 0., 4., 0., 0.]),
+            5126,
+            2,
+            "VEC3",
+        );
+        doc["animations"] = json!([{"samplers":[{"input":times,"output":values,"interpolation":"LINEAR"}],"channels":[{"sampler":0,"target":{"node":0,"path":"translation"}}]}]);
+        let asset = Arc::new(parse_fixture(doc, bytes, vec![]).unwrap());
+        let mut scene = crate::scene::SceneManager::default();
+        let id = scene.add_model(asset).unwrap();
+        scene.play_model_animation(id, 0, false, 1.).unwrap();
+        let revision = scene.model(id).unwrap().revision;
+        scene.update(1.);
+        assert!(scene.model(id).unwrap().revision > revision);
+        assert_eq!(
+            scene.model(id).unwrap().pose.local_trs[0].translation,
+            Vec3::new(2., 0., 0.)
+        );
+        scene.pause_model_animation(id, true).unwrap();
+        let revision = scene.model(id).unwrap().revision;
+        scene.update(1.);
+        assert_eq!(scene.model(id).unwrap().revision, revision);
+        scene.seek_model_animation(id, 0.5).unwrap();
+        assert_eq!(scene.model(id).unwrap().pose.local_trs[0].translation.x, 1.);
+        scene.stop_model_animation(id).unwrap();
+        assert_eq!(
+            scene.model(id).unwrap().pose.local_trs[0].translation,
+            Vec3::ZERO
+        );
+        scene.remove_object(id);
+        assert!(scene.model(id).is_none());
+        assert!(scene.play_model_animation(id, 0, false, 1.).is_err());
+    }
+}
+
+\n# File: src/gltf_model.rs
+//! CPU representation of glTF 2.0 core. All indices address the containing asset.
+use glam::{Mat4, Quat, Vec3};
+use std::ops::Range;
+
+#[derive(Clone, Debug)]
+pub struct ModelVertex {
+    pub position: [f32; 3],
+    pub normal: [f32; 3],
+    pub tangent: [f32; 4],
+    pub uv0: [f32; 2],
+    pub uv1: [f32; 2],
+    pub color: [f32; 4],
+    pub joints: [u16; 4],
+    pub weights: [f32; 4],
+    /// All JOINTS_n/WEIGHTS_n sets, including sets beyond zero.
+    pub influences: Vec<(u16, f32)>,
+    pub tex_coords: Vec<[f32; 2]>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrimitiveMode {
+    Points,
+    Lines,
+    LineLoop,
+    LineStrip,
+    Triangles,
+    TriangleStrip,
+    TriangleFan,
+}
+#[derive(Clone, Debug)]
+pub struct MorphTarget {
+    pub positions: Vec<[f32; 3]>,
+    pub normals: Vec<[f32; 3]>,
+    pub tangents: Vec<[f32; 3]>,
+}
+#[derive(Clone, Debug)]
+pub struct ModelPrimitive {
+    /// glTF requires geometric face normals when NORMAL is absent.
+    pub flat_normals: bool,
+    /// Slice in ModelAsset.vertices. Indices are LOCAL to this slice.
+    pub vertices: Range<usize>,
+    pub indices: Vec<u32>,
+    pub mode: PrimitiveMode,
+    pub material: Option<usize>,
+    pub morph_targets: Vec<MorphTarget>,
+}
+#[derive(Clone, Debug)]
+pub struct ModelMesh {
+    pub name: Option<String>,
+    pub primitives: Vec<usize>,
+    pub weights: Vec<f32>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AlphaMode {
+    Opaque,
+    Mask,
+    Blend,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct TextureSlot {
+    pub texture: usize,
+    pub tex_coord: u32,
+}
+#[derive(Clone, Debug)]
+pub struct ModelMaterial {
+    pub name: Option<String>,
+    pub base_color_factor: [f32; 4],
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub emissive_factor: [f32; 3],
+    pub base_color_texture: Option<TextureSlot>,
+    pub metallic_roughness_texture: Option<TextureSlot>,
+    pub normal_texture: Option<TextureSlot>,
+    pub normal_scale: f32,
+    pub occlusion_texture: Option<TextureSlot>,
+    pub occlusion_strength: f32,
+    pub emissive_texture: Option<TextureSlot>,
+    pub alpha_mode: AlphaMode,
+    pub alpha_cutoff: f32,
+    pub double_sided: bool,
+}
+#[derive(Clone, Debug)]
+pub struct ModelImage {
+    pub name: Option<String>,
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+#[derive(Clone, Debug)]
+pub struct ModelTexture {
+    pub image: usize,
+    pub sampler: Option<usize>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WrapMode {
+    ClampToEdge,
+    MirroredRepeat,
+    Repeat,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FilterMode {
+    Nearest,
+    Linear,
+    NearestMipmapNearest,
+    LinearMipmapNearest,
+    NearestMipmapLinear,
+    LinearMipmapLinear,
+}
+#[derive(Clone, Debug)]
+pub struct ModelSampler {
+    pub wrap_s: WrapMode,
+    pub wrap_t: WrapMode,
+    pub mag_filter: Option<FilterMode>,
+    pub min_filter: Option<FilterMode>,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct NodeTrs {
+    pub translation: Vec3,
+    pub rotation: Quat,
+    pub scale: Vec3,
+}
+impl NodeTrs {
+    pub fn matrix(self) -> Mat4 {
+        Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
+    }
+}
+#[derive(Clone, Debug)]
+pub struct ModelNode {
+    pub name: Option<String>,
+    pub children: Vec<usize>,
+    pub mesh: Option<usize>,
+    pub skin: Option<usize>,
+    pub camera: Option<usize>,
+    pub trs: NodeTrs,
+    /// Matrix-authored nodes cannot be targets of TRS animation channels.
+    pub matrix: Option<Mat4>,
+    pub weights: Option<Vec<f32>>,
+}
+#[derive(Clone, Debug)]
+pub struct ModelSkin {
+    pub name: Option<String>,
+    pub joints: Vec<usize>,
+    pub inverse_bind_matrices: Vec<Mat4>,
+    pub skeleton: Option<usize>,
+}
+#[derive(Clone, Debug)]
+pub enum ModelCamera {
+    Perspective {
+        name: Option<String>,
+        yfov: f32,
+        aspect_ratio: Option<f32>,
+        znear: f32,
+        zfar: Option<f32>,
+    },
+    Orthographic {
+        name: Option<String>,
+        xmag: f32,
+        ymag: f32,
+        znear: f32,
+        zfar: f32,
+    },
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Interpolation {
+    Step,
+    Linear,
+    CubicSpline,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AnimationProperty {
+    Translation,
+    Rotation,
+    Scale,
+    Weights,
+}
+#[derive(Clone, Debug)]
+pub struct AnimationChannel {
+    pub node: usize,
+    pub property: AnimationProperty,
+    pub interpolation: Interpolation,
+    pub times: Vec<f32>,
+    /// Flat sample scalars. For CUBICSPLINE each key is [in tangent, value, out tangent].
+    pub values: Vec<f32>,
+    pub components: usize,
+}
+#[derive(Clone, Debug)]
+pub struct AnimationClip {
+    pub name: Option<String>,
+    pub channels: Vec<AnimationChannel>,
+    pub duration: f32,
+}
+#[derive(Clone, Debug)]
+pub struct ModelScene {
+    pub name: Option<String>,
+    pub nodes: Vec<usize>,
+}
+#[derive(Clone, Debug)]
+pub struct ModelAsset {
+    pub vertices: Vec<ModelVertex>,
+    pub primitives: Vec<ModelPrimitive>,
+    pub meshes: Vec<ModelMesh>,
+    pub materials: Vec<ModelMaterial>,
+    pub images: Vec<ModelImage>,
+    pub textures: Vec<ModelTexture>,
+    pub samplers: Vec<ModelSampler>,
+    pub nodes: Vec<ModelNode>,
+    pub skins: Vec<ModelSkin>,
+    pub animations: Vec<AnimationClip>,
+    pub scenes: Vec<ModelScene>,
+    pub default_scene: Option<usize>,
+    pub cameras: Vec<ModelCamera>,
+    pub warnings: Vec<String>,
+}
+#[derive(Clone, Debug)]
+pub struct ModelPose {
+    pub local_trs: Vec<NodeTrs>,
+    pub world_matrices: Vec<Mat4>,
+    pub node_weights: Vec<Vec<f32>>,
+    /// Per mesh NODE, already in that node's local space: inverse(meshWorld)*jointWorld*IBM.
+    pub skin_matrices: Vec<Vec<Mat4>>,
+    /// Singular mesh transforms use world-space skin deformation instead of an inverse.
+    pub skin_world_space: Vec<bool>,
+    /// Nodes reachable from the selected scene; joint matrices may use other nodes.
+    pub active_nodes: Vec<usize>,
+}
+#[derive(Clone, Debug)]
+pub struct AnimationPlayback {
+    pub clip: usize,
+    pub time: f32,
+    pub speed: f32,
+    pub looping: bool,
+    pub playing: bool,
+}
+#[derive(Clone, Debug)]
+pub struct ModelInstance {
+    pub asset: std::sync::Arc<ModelAsset>,
+    pub pose: ModelPose,
+    pub playback: Option<AnimationPlayback>,
+    pub scene: usize,
+    pub revision: u64,
+    pub last_error: Option<String>,
+    /// Manual weights persist for properties not targeted by the active animation.
+    pub morph_overrides: std::collections::BTreeMap<usize, Vec<f32>>,
+}
+
 \n# File: src/input/active_camera.rs
 use crate::input::camera::{Camera, CameraController};
 use crate::input::orbit_camera::OrbitCamera;
@@ -1379,7 +3570,9 @@ impl CameraController for OrbitCamera {
 
 \n# File: src/lib.rs
 pub mod frame_metrics;
+pub mod gltf_animation;
 pub mod gltf_loader;
+pub mod gltf_model;
 pub mod input;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
@@ -2236,7 +4429,6 @@ impl Effects {
     ) -> Result<(), String> {
         let light_count = renderer.scene.lights().len().min(MAX_LIGHTS);
         self.ensure(&renderer.device, target.width, target.height, light_count);
-        renderer.upload_bytes = 0;
         let mut lights = [super::data::EMPTY_LIGHT; MAX_LIGHTS];
         for (dst, light) in lights.iter_mut().zip(renderer.scene.lights().values()) {
             *dst = Light {
@@ -2354,6 +4546,1045 @@ impl Effects {
     }
 }
 
+\n# File: src/render/gltf_gpu.rs
+//! Portable glTF rendering: deformation is computed in Rust once per changed pose,
+//! and the same world-space vertex buffers serve main/reflection/shadow passes.
+use super::data::as_bytes;
+use crate::gltf_model::*;
+use glam::{Mat4, Vec3};
+use std::collections::{HashMap, HashSet};
+use wgpu::util::DeviceExt;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Vertex {
+    position: [f32; 3],
+    normal: [f32; 3],
+    tangent: [f32; 4],
+    uvs: [[f32; 2]; 5],
+    color: [f32; 4],
+}
+impl Vertex {
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        const A: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![0=>Float32x3,1=>Float32x3,2=>Float32x4,3=>Float32x2,4=>Float32x2,5=>Float32x2,6=>Float32x2,7=>Float32x2,8=>Float32x4];
+        wgpu::VertexBufferLayout {
+            array_stride: 96,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &A,
+        }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq)]
+struct Uniform {
+    base: [f32; 4],
+    emissive: [f32; 4],
+    factors: [f32; 4],
+    uv: [u32; 4],
+    extra: [f32; 4],
+    options: [f32; 4],
+}
+struct Material {
+    textures: wgpu::BindGroup,
+    uniform: Uniform,
+    alpha: AlphaMode,
+    double_sided: bool,
+}
+struct Draw {
+    node: usize,
+    primitive: usize,
+    material: usize,
+    vertex: wgpu::Buffer,
+    index: wgpu::Buffer,
+    count: u32,
+    topology: wgpu::PrimitiveTopology,
+    uniform: wgpu::Buffer,
+    bind: wgpu::BindGroup,
+    center: Vec3,
+    negative: bool,
+}
+pub struct GpuModel {
+    draws: Vec<Draw>,
+    materials: Vec<Material>,
+    last_pose: Option<(u64, Mat4, [f32; 4])>,
+    active: HashSet<usize>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PipelineKey {
+    pub format: wgpu::TextureFormat,
+    pub depth_format: wgpu::TextureFormat,
+    pub reflected: bool,
+    pub material_mask: bool,
+    pub shadow: bool,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct Variant {
+    key: PipelineKey,
+    topology: wgpu::PrimitiveTopology,
+    blend: bool,
+    double_sided: bool,
+    negative: bool,
+}
+pub struct GltfGpu {
+    global: wgpu::BindGroupLayout,
+    effects: wgpu::BindGroupLayout,
+    textures: wgpu::BindGroupLayout,
+    material: wgpu::BindGroupLayout,
+    shader: wgpu::ShaderModule,
+    shadow: wgpu::ShaderModule,
+    empty_layout: wgpu::BindGroupLayout,
+    empty_bind: wgpu::BindGroup,
+    pipelines: HashMap<Variant, wgpu::RenderPipeline>,
+}
+impl GltfGpu {
+    pub fn new(
+        device: &wgpu::Device,
+        global: &wgpu::BindGroupLayout,
+        effects: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let mut entries = Vec::new();
+        for i in 0..5 {
+            entries.push(wgpu::BindGroupLayoutEntry {
+                binding: i * 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            });
+            entries.push(wgpu::BindGroupLayoutEntry {
+                binding: i * 2 + 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            });
+        }
+        let textures = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("glTF five material maps"),
+            entries: &entries,
+        });
+        let material = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("glTF material"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(96),
+                },
+                count: None,
+            }],
+        });
+        let source = include_str!("gltf_pbr.wgsl");
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("glTF PBR"),
+            source: wgpu::ShaderSource::Wgsl(source.into()),
+        });
+        let shadow_source = source
+            .replace(
+                "var<uniform> scene: SceneUniforms;",
+                "var<uniform> shadow_view: mat4x4<f32>;",
+            )
+            .replace("scene.view_projection", "shadow_view")
+            .replace("scene.camera_pos", "vec3(0.0)")
+            .replace("scene.lights[i]", "Light(vec3(0.0),0.0,vec3(0.0),0.0)");
+        let shadow = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("glTF masked shadow"),
+            source: wgpu::ShaderSource::Wgsl(shadow_source.into()),
+        });
+        let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("glTF empty shadow effects"),
+            entries: &[],
+        });
+        let empty_bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("glTF empty shadow effects"),
+            layout: &empty_layout,
+            entries: &[],
+        });
+        Self {
+            global: global.clone(),
+            effects: effects.clone(),
+            textures,
+            material,
+            shader,
+            shadow,
+            empty_layout,
+            empty_bind,
+            pipelines: HashMap::new(),
+        }
+    }
+    pub fn upload(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        asset: &ModelAsset,
+    ) -> Result<GpuModel, String> {
+        let limits = device.limits();
+        for image in &asset.images {
+            if image.width == 0
+                || image.height == 0
+                || image.width > limits.max_texture_dimension_2d
+                || image.height > limits.max_texture_dimension_2d
+                || image.rgba.len() as u64 != image.width as u64 * image.height as u64 * 4
+            {
+                return Err("glTF image exceeds device limits or has invalid pixels".into());
+            }
+        }
+        for p in &asset.primitives {
+            if p.vertices.is_empty()
+                || p.vertices.end > asset.vertices.len()
+                || p.vertices.len() as u64 * 96 > limits.max_buffer_size
+                || p.indices.len() as u64 * 12 > limits.max_buffer_size
+                || p.indices.iter().any(|i| *i as usize >= p.vertices.len())
+            {
+                return Err(
+                    "glTF primitive exceeds device buffer limits or has invalid indices".into(),
+                );
+            }
+        }
+        // Bound the aggregate allocation before creating any GPU resources.
+        let mut image_roles = std::collections::HashSet::new();
+        let mut budget = 0u64;
+        for material in &asset.materials {
+            for (slot, srgb) in [
+                (material.base_color_texture, true),
+                (material.metallic_roughness_texture, false),
+                (material.normal_texture, false),
+                (material.occlusion_texture, false),
+                (material.emissive_texture, true),
+            ] {
+                if let Some(slot) = slot {
+                    let texture = asset
+                        .textures
+                        .get(slot.texture)
+                        .ok_or("Invalid material texture")?;
+                    let image = asset
+                        .images
+                        .get(texture.image)
+                        .ok_or("Invalid texture image")?;
+                    if texture.sampler.is_some_and(|s| s >= asset.samplers.len()) {
+                        return Err("Invalid texture sampler".into());
+                    }
+                    // Per texture because samplers may differ even for one image.
+                    if image_roles.insert((slot.texture, srgb)) {
+                        budget = budget.saturating_add(image.rgba.len() as u64 * 2);
+                    }
+                }
+            }
+        }
+        for node in &asset.nodes {
+            if let Some(mesh) = node.mesh {
+                for &primitive in &asset
+                    .meshes
+                    .get(mesh)
+                    .ok_or("Invalid node mesh")?
+                    .primitives
+                {
+                    let primitive = asset
+                        .primitives
+                        .get(primitive)
+                        .ok_or("Invalid mesh primitive")?;
+                    if primitive
+                        .material
+                        .is_some_and(|m| m >= asset.materials.len())
+                    {
+                        return Err("Invalid primitive material".into());
+                    }
+                    budget = budget.saturating_add(
+                        primitive.vertices.len() as u64 * 96
+                            + primitive.indices.len().max(primitive.vertices.len()) as u64 * 12
+                            + 96,
+                    );
+                }
+            }
+        }
+        if budget > 512 * 1024 * 1024 {
+            return Err("glTF resources exceed aggregate GPU upload budget".into());
+        }
+        let mut materials = Vec::new();
+        let mut texture_cache: HashMap<(usize, bool), (wgpu::TextureView, wgpu::Sampler)> =
+            HashMap::new();
+        if asset
+            .images
+            .iter()
+            .map(|i| i.rgba.len() as u64)
+            .sum::<u64>()
+            > 256 * 1024 * 1024
+        {
+            return Err("glTF images exceed GPU upload budget".into());
+        }
+        for source in asset
+            .materials
+            .iter()
+            .map(Some)
+            .chain(std::iter::once(None))
+        {
+            let slots = source
+                .map(|m| {
+                    [
+                        m.base_color_texture,
+                        m.metallic_roughness_texture,
+                        m.normal_texture,
+                        m.occlusion_texture,
+                        m.emissive_texture,
+                    ]
+                })
+                .unwrap_or([None; 5]);
+            let mut views = Vec::new();
+            let mut samplers = Vec::new();
+            for (i, slot) in slots.iter().enumerate() {
+                let srgb = i == 0 || i == 4;
+                let cache_key = (
+                    slot.map(|v| v.texture)
+                        .unwrap_or(usize::MAX - if i == 2 { 1 } else { 0 }),
+                    srgb,
+                );
+                if let Some((view, sampler)) = texture_cache.get(&cache_key) {
+                    views.push(view.clone());
+                    samplers.push(sampler.clone());
+                    continue;
+                }
+                let (width, height, pixels, sampler) = if let Some(slot) = slot {
+                    let tex = asset
+                        .textures
+                        .get(slot.texture)
+                        .ok_or("Invalid material texture")?;
+                    let img = asset.images.get(tex.image).ok_or("Invalid texture image")?;
+                    (
+                        img.width,
+                        img.height,
+                        img.rgba.clone(),
+                        tex.sampler.and_then(|s| asset.samplers.get(s)),
+                    )
+                } else {
+                    (
+                        1,
+                        1,
+                        if i == 2 {
+                            vec![128, 128, 255, 255]
+                        } else {
+                            vec![255; 4]
+                        },
+                        None,
+                    )
+                };
+                let levels = 32 - width.max(height).leading_zeros();
+                let texture = device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("glTF material texture"),
+                    size: wgpu::Extent3d {
+                        width,
+                        height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: levels,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: if srgb {
+                        wgpu::TextureFormat::Rgba8UnormSrgb
+                    } else {
+                        wgpu::TextureFormat::Rgba8Unorm
+                    },
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+                let (mut w, mut h, mut rgba) = (width, height, pixels);
+                for level in 0..levels {
+                    queue.write_texture(
+                        wgpu::TexelCopyTextureInfo {
+                            texture: &texture,
+                            mip_level: level,
+                            origin: wgpu::Origin3d::ZERO,
+                            aspect: wgpu::TextureAspect::All,
+                        },
+                        &rgba,
+                        wgpu::TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(w * 4),
+                            rows_per_image: Some(h),
+                        },
+                        wgpu::Extent3d {
+                            width: w,
+                            height: h,
+                            depth_or_array_layers: 1,
+                        },
+                    );
+                    if level + 1 < levels {
+                        let nw = (w / 2).max(1);
+                        let nh = (h / 2).max(1);
+                        let mut next = vec![0; nw as usize * nh as usize * 4];
+                        for y in 0..nh {
+                            for x in 0..nw {
+                                for c in 0..4 {
+                                    let mut sum = 0.0f32;
+                                    for dy in 0..2 {
+                                        for dx in 0..2 {
+                                            let value = rgba[(((y * 2 + dy).min(h - 1) * w
+                                                + (x * 2 + dx).min(w - 1))
+                                                * 4
+                                                + c)
+                                                as usize]
+                                                as f32
+                                                / 255.0;
+                                            sum += if srgb && c < 3 {
+                                                if value <= 0.04045 {
+                                                    value / 12.92
+                                                } else {
+                                                    ((value + 0.055) / 1.055).powf(2.4)
+                                                }
+                                            } else {
+                                                value
+                                            };
+                                        }
+                                    }
+                                    next[((y * nw + x) * 4 + c) as usize] = {
+                                        let value = sum / 4.0;
+                                        let encoded = if srgb && c < 3 {
+                                            if value <= 0.0031308 {
+                                                value * 12.92
+                                            } else {
+                                                1.055 * value.powf(1.0 / 2.4) - 0.055
+                                            }
+                                        } else {
+                                            value
+                                        };
+                                        (encoded.clamp(0.0, 1.0) * 255.0 + 0.5) as u8
+                                    };
+                                }
+                            }
+                        }
+                        rgba = next;
+                        w = nw;
+                        h = nh;
+                    }
+                }
+                views.push(texture.create_view(&Default::default()));
+                let min = sampler
+                    .and_then(|s| s.min_filter)
+                    .unwrap_or(FilterMode::LinearMipmapLinear);
+                let mag = sampler
+                    .and_then(|s| s.mag_filter)
+                    .unwrap_or(FilterMode::Linear);
+                let filter = |f| {
+                    if matches!(
+                        f,
+                        FilterMode::Nearest
+                            | FilterMode::NearestMipmapNearest
+                            | FilterMode::NearestMipmapLinear
+                    ) {
+                        wgpu::FilterMode::Nearest
+                    } else {
+                        wgpu::FilterMode::Linear
+                    }
+                };
+                samplers.push(device.create_sampler(&wgpu::SamplerDescriptor {
+                    label: Some("glTF sampler"),
+                    address_mode_u: wrap(sampler.map(|s| s.wrap_s)),
+                    address_mode_v: wrap(sampler.map(|s| s.wrap_t)),
+                    mag_filter: filter(mag),
+                    min_filter: filter(min),
+                    mipmap_filter: if matches!(
+                        min,
+                        FilterMode::NearestMipmapLinear | FilterMode::LinearMipmapLinear
+                    ) {
+                        wgpu::MipmapFilterMode::Linear
+                    } else {
+                        wgpu::MipmapFilterMode::Nearest
+                    },
+                    lod_max_clamp: if matches!(min, FilterMode::Nearest | FilterMode::Linear) {
+                        0.0
+                    } else {
+                        32.0
+                    },
+                    ..Default::default()
+                }));
+                texture_cache.insert(
+                    cache_key,
+                    (
+                        views.last().unwrap().clone(),
+                        samplers.last().unwrap().clone(),
+                    ),
+                );
+            }
+            let mut entries = Vec::new();
+            for i in 0..5 {
+                entries.push(wgpu::BindGroupEntry {
+                    binding: i * 2,
+                    resource: wgpu::BindingResource::TextureView(&views[i as usize]),
+                });
+                entries.push(wgpu::BindGroupEntry {
+                    binding: i * 2 + 1,
+                    resource: wgpu::BindingResource::Sampler(&samplers[i as usize]),
+                });
+            }
+            let textures = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("glTF maps"),
+                layout: &self.textures,
+                entries: &entries,
+            });
+            let alpha = source.map(|m| m.alpha_mode).unwrap_or(AlphaMode::Opaque);
+            let double_sided = source.is_some_and(|m| m.double_sided);
+            let uniform = Uniform {
+                base: source.map(|m| m.base_color_factor).unwrap_or([1.0; 4]),
+                emissive: source
+                    .map(|m| {
+                        [
+                            m.emissive_factor[0],
+                            m.emissive_factor[1],
+                            m.emissive_factor[2],
+                            slots[4].map(|s| s.tex_coord as f32).unwrap_or(0.0),
+                        ]
+                    })
+                    .unwrap_or([0.0; 4]),
+                factors: source
+                    .map(|m| {
+                        [
+                            m.metallic_factor,
+                            m.roughness_factor,
+                            m.normal_scale,
+                            m.occlusion_strength,
+                        ]
+                    })
+                    .unwrap_or([1.0; 4]),
+                uv: std::array::from_fn(|i| slots[i].map(|s| s.tex_coord).unwrap_or(0)),
+                extra: [
+                    source.map(|m| m.alpha_cutoff).unwrap_or(0.5),
+                    match alpha {
+                        AlphaMode::Opaque => 0.0,
+                        AlphaMode::Mask => 1.0,
+                        AlphaMode::Blend => 2.0,
+                    },
+                    if double_sided { 1.0 } else { 0.0 },
+                    0.0,
+                ],
+                options: [0.0; 4],
+            };
+            materials.push(Material {
+                textures,
+                uniform,
+                alpha,
+                double_sided,
+            });
+        }
+        let mut draws = Vec::new();
+        for (node, n) in asset.nodes.iter().enumerate() {
+            let Some(mesh) = n.mesh else { continue };
+            for &primitive in &asset.meshes[mesh].primitives {
+                let p = &asset.primitives[primitive];
+                let (indices, topology) = indices(p);
+                let material = p.material.unwrap_or(asset.materials.len());
+                let vertex = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("glTF posed vertices"),
+                    size: p.vertices.len() as u64 * 96,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                let index = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("glTF indices"),
+                    contents: as_bytes(&indices),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
+                let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("glTF material options"),
+                    contents: as_bytes(&[materials[material].uniform]),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
+                let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("glTF model material"),
+                    layout: &self.material,
+                    entries: &[wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: uniform.as_entire_binding(),
+                    }],
+                });
+                draws.push(Draw {
+                    node,
+                    primitive,
+                    material,
+                    vertex,
+                    index,
+                    count: indices.len() as u32,
+                    topology,
+                    uniform,
+                    bind,
+                    center: Vec3::ZERO,
+                    negative: false,
+                });
+            }
+        }
+        Ok(GpuModel {
+            draws,
+            materials,
+            last_pose: None,
+            active: HashSet::new(),
+        })
+    }
+    pub fn update(
+        &self,
+        queue: &wgpu::Queue,
+        model: &mut GpuModel,
+        asset: &ModelAsset,
+        pose: &ModelPose,
+        revision: u64,
+        root: Mat4,
+        options: [f32; 4],
+    ) -> Result<usize, String> {
+        let stamp = (revision, root, options);
+        if model.last_pose.as_ref() == Some(&stamp) {
+            return Ok(0);
+        }
+        model.active = pose.active_nodes.iter().copied().collect();
+        let mut bytes = 0;
+        for draw in &mut model.draws {
+            if !model.active.contains(&draw.node) {
+                continue;
+            }
+            let primitive = &asset.primitives[draw.primitive];
+            let matrix = root * crate::gltf_animation::node_render_matrix(pose, draw.node);
+            let inverse = matrix.inverse().transpose();
+            let normal = if inverse.is_finite() { inverse } else { matrix };
+            draw.negative = matrix.determinant() < 0.0;
+            let source = primitive.material.and_then(|m| asset.materials.get(m));
+            let slots = source
+                .map(|m| {
+                    [
+                        m.base_color_texture,
+                        m.metallic_roughness_texture,
+                        m.normal_texture,
+                        m.occlusion_texture,
+                        m.emissive_texture,
+                    ]
+                })
+                .unwrap_or([None; 5]);
+            let mut vertices = Vec::with_capacity(primitive.vertices.len());
+            let mut center = Vec3::ZERO;
+            for v in
+                crate::gltf_animation::deformed_vertices(asset, pose, draw.node, draw.primitive)?
+            {
+                let mut pos = Vec3::from(v.position);
+                let mut n = Vec3::from(v.normal);
+                let mut t = Vec3::from_slice(&v.tangent[..3]);
+                pos = matrix.transform_point3(pos);
+                n = normal.transform_vector3(n).normalize_or_zero();
+                t = matrix.transform_vector3(t).normalize_or_zero();
+                center += pos;
+                vertices.push(Vertex {
+                    position: pos.into(),
+                    normal: n.into(),
+                    tangent: [
+                        t.x,
+                        t.y,
+                        t.z,
+                        v.tangent[3] * if draw.negative { -1.0 } else { 1.0 },
+                    ],
+                    uvs: std::array::from_fn(|i| {
+                        v.tex_coords
+                            .get(slots[i].map(|s| s.tex_coord as usize).unwrap_or(0))
+                            .copied()
+                            .unwrap_or([0.0; 2])
+                    }),
+                    color: v.color,
+                });
+            }
+            draw.center = center / vertices.len().max(1) as f32;
+            queue.write_buffer(&draw.vertex, 0, as_bytes(&vertices));
+            bytes += vertices.len() * 96;
+            let mut uniform = model.materials[draw.material].uniform;
+            uniform.options = options;
+            uniform.options[3] = if primitive.flat_normals { 1.0 } else { 0.0 };
+            uniform.extra[3] = if matches!(
+                draw.topology,
+                wgpu::PrimitiveTopology::PointList
+                    | wgpu::PrimitiveTopology::LineList
+                    | wgpu::PrimitiveTopology::LineStrip
+            ) {
+                1.0
+            } else {
+                0.0
+            };
+            queue.write_buffer(&draw.uniform, 0, as_bytes(&[uniform]));
+            bytes += 96;
+        }
+        model.last_pose = Some(stamp);
+        Ok(bytes)
+    }
+    pub fn prepare_pipeline(&mut self, device: &wgpu::Device, key: PipelineKey, model: &GpuModel) {
+        for draw in &model.draws {
+            let topology = draw.topology;
+            let material = &model.materials[draw.material];
+            let blend = material.alpha == AlphaMode::Blend;
+            let double_sided = material.double_sided;
+            for negative in [false, true] {
+                let variant = Variant {
+                    key,
+                    topology,
+                    blend,
+                    double_sided,
+                    negative,
+                };
+                if self.pipelines.contains_key(&variant) {
+                    continue;
+                }
+                let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("glTF pipeline layout"),
+                    bind_group_layouts: &[
+                        Some(&self.global),
+                        Some(if key.shadow {
+                            &self.empty_layout
+                        } else {
+                            &self.effects
+                        }),
+                        Some(&self.textures),
+                        Some(&self.material),
+                    ],
+                    immediate_size: 0,
+                });
+                let shader = if key.shadow {
+                    &self.shadow
+                } else {
+                    &self.shader
+                };
+                let mut targets = Vec::new();
+                if !key.shadow {
+                    targets.push(Some(wgpu::ColorTargetState {
+                        format: key.format,
+                        blend: Some(if blend {
+                            wgpu::BlendState::ALPHA_BLENDING
+                        } else {
+                            wgpu::BlendState::REPLACE
+                        }),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }));
+                    if key.material_mask {
+                        targets.push(Some(wgpu::ColorTargetState {
+                            format: wgpu::TextureFormat::Rgba8Unorm,
+                            blend: Some(wgpu::BlendState::REPLACE),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        }));
+                    }
+                }
+                let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("glTF PBR variant"),
+                    layout: Some(&layout),
+                    vertex: wgpu::VertexState {
+                        module: shader,
+                        entry_point: Some("vs_main"),
+                        compilation_options: Default::default(),
+                        buffers: &[Some(Vertex::layout())],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: shader,
+                        entry_point: Some(if key.shadow {
+                            "fs_shadow"
+                        } else if key.material_mask {
+                            "fs_postprocess"
+                        } else {
+                            "fs_main"
+                        }),
+                        compilation_options: Default::default(),
+                        targets: &targets,
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology,
+                        strip_index_format: if matches!(
+                            topology,
+                            wgpu::PrimitiveTopology::LineStrip
+                                | wgpu::PrimitiveTopology::TriangleStrip
+                        ) {
+                            Some(wgpu::IndexFormat::Uint32)
+                        } else {
+                            None
+                        },
+                        cull_mode: if double_sided || key.shadow {
+                            None
+                        } else {
+                            Some(if key.reflected ^ negative {
+                                wgpu::Face::Back
+                            } else {
+                                wgpu::Face::Front
+                            })
+                        },
+                        ..Default::default()
+                    },
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: key.depth_format,
+                        depth_write_enabled: Some(key.shadow || !blend),
+                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                        stencil: Default::default(),
+                        bias: if key.shadow {
+                            wgpu::DepthBiasState {
+                                constant: 2,
+                                slope_scale: 2.0,
+                                clamp: 0.0,
+                            }
+                        } else {
+                            Default::default()
+                        },
+                    }),
+                    multisample: Default::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
+                self.pipelines.insert(variant, pipeline);
+            }
+        }
+    }
+    pub fn draw(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        model: &GpuModel,
+        key: PipelineKey,
+        blend: bool,
+        camera_pos: Vec3,
+    ) {
+        if key.shadow {
+            pass.set_bind_group(1, &self.empty_bind, &[]);
+        }
+        self.draw_many(pass, std::iter::once(model), key, blend, camera_pos);
+    }
+    /// Sort transparent primitives across all visible model roots.
+    pub fn draw_many<'a>(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        models: impl Iterator<Item = &'a GpuModel>,
+        key: PipelineKey,
+        blend: bool,
+        camera_pos: Vec3,
+    ) {
+        if key.shadow {
+            pass.set_bind_group(1, &self.empty_bind, &[]);
+        }
+        let mut draws: Vec<_> = models
+            .flat_map(|model| {
+                model
+                    .draws
+                    .iter()
+                    .filter(move |d| {
+                        model
+                            .last_pose
+                            .as_ref()
+                            .is_some_and(|_| model.active.contains(&d.node))
+                            && (model.materials[d.material].alpha == AlphaMode::Blend) == blend
+                    })
+                    .map(move |d| (model, d))
+            })
+            .collect();
+        if blend {
+            draws.sort_by(|(_, a), (_, b)| {
+                b.center
+                    .distance_squared(camera_pos)
+                    .total_cmp(&a.center.distance_squared(camera_pos))
+            });
+        }
+        for (model, draw) in draws {
+            let material = &model.materials[draw.material];
+            let variant = Variant {
+                key,
+                topology: draw.topology,
+                blend,
+                double_sided: material.double_sided,
+                negative: draw.negative,
+            };
+            let Some(pipeline) = self.pipelines.get(&variant) else {
+                continue;
+            };
+            pass.set_pipeline(pipeline);
+            pass.set_bind_group(2, &material.textures, &[]);
+            pass.set_bind_group(3, &draw.bind, &[]);
+            pass.set_vertex_buffer(0, draw.vertex.slice(..));
+            pass.set_index_buffer(draw.index.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..draw.count, 0, 0..1);
+        }
+    }
+}
+pub fn draw_count(model: &GpuModel, blend: bool) -> usize {
+    model
+        .last_pose
+        .as_ref()
+        .map(|_| {
+            model
+                .draws
+                .iter()
+                .filter(|d| {
+                    model.active.contains(&d.node)
+                        && (model.materials[d.material].alpha == AlphaMode::Blend) == blend
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+fn wrap(mode: Option<WrapMode>) -> wgpu::AddressMode {
+    match mode.unwrap_or(WrapMode::Repeat) {
+        WrapMode::ClampToEdge => wgpu::AddressMode::ClampToEdge,
+        WrapMode::MirroredRepeat => wgpu::AddressMode::MirrorRepeat,
+        WrapMode::Repeat => wgpu::AddressMode::Repeat,
+    }
+}
+fn indices(p: &ModelPrimitive) -> (Vec<u32>, wgpu::PrimitiveTopology) {
+    let input = if p.indices.is_empty() {
+        (0..p.vertices.len() as u32).collect()
+    } else {
+        p.indices.clone()
+    };
+    match p.mode {
+        PrimitiveMode::Points => (input, wgpu::PrimitiveTopology::PointList),
+        PrimitiveMode::Lines => (input, wgpu::PrimitiveTopology::LineList),
+        PrimitiveMode::LineStrip => (input, wgpu::PrimitiveTopology::LineStrip),
+        PrimitiveMode::Triangles => (input, wgpu::PrimitiveTopology::TriangleList),
+        PrimitiveMode::TriangleStrip => (input, wgpu::PrimitiveTopology::TriangleStrip),
+        PrimitiveMode::LineLoop => {
+            let mut out = Vec::new();
+            for i in 0..input.len() {
+                out.push(input[i]);
+                out.push(input[(i + 1) % input.len()]);
+            }
+            (out, wgpu::PrimitiveTopology::LineList)
+        }
+        PrimitiveMode::TriangleFan => {
+            let mut out = Vec::new();
+            for i in 1..input.len().saturating_sub(1) {
+                out.extend_from_slice(&[input[0], input[i], input[i + 1]]);
+            }
+            (out, wgpu::PrimitiveTopology::TriangleList)
+        }
+    }
+}
+
+\n# File: src/render/gltf_pbr.wgsl
+struct Light {
+    position: vec3<f32>,
+    _pad_p: f32,
+    color: vec3<f32>,
+    _pad_c: f32,
+};
+
+const LIGHT_COUNT: u32 = 4u;
+
+struct SceneUniforms {
+    view_projection: mat4x4<f32>,
+    camera_pos: vec3<f32>,
+    _pad0: f32,
+    lights: array<Light, LIGHT_COUNT>,
+};
+
+@group(0) @binding(0) var<uniform> scene: SceneUniforms;
+
+struct EffectsUniforms {
+    shadow_matrices:array<mat4x4<f32>,4>, reflection_matrix:mat4x4<f32>,
+    clip_plane:vec4<f32>, params:vec4<f32>,
+};
+@group(1) @binding(0) var<uniform> effects:EffectsUniforms;
+@group(1) @binding(1) var static_shadow:texture_depth_2d;
+@group(1) @binding(2) var dynamic_shadow:texture_depth_2d;
+@group(1) @binding(3) var shadow_sampler:sampler_comparison;
+@group(1) @binding(4) var reflection_texture:texture_2d<f32>;
+@group(1) @binding(5) var reflection_sampler:sampler;
+@group(1) @binding(6) var static_shadow_1:texture_depth_2d;
+@group(1) @binding(7) var dynamic_shadow_1:texture_depth_2d;
+@group(1) @binding(8) var static_shadow_2:texture_depth_2d;
+@group(1) @binding(9) var dynamic_shadow_2:texture_depth_2d;
+@group(1) @binding(10) var static_shadow_3:texture_depth_2d;
+@group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
+fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
+    switch index {
+        case 0u: { return min(textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
+        case 1u: { return min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
+        case 2u: { return min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
+        case 3u: { return min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
+        default: { return 1.0; }
+    }
+}
+fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
+    let clip=effects.shadow_matrices[index]*vec4(world,1.0);
+    let ndc=clip.xyz/clip.w;
+    if (clip.w<=0.0 || ndc.z<=0.0 || ndc.z>=1.0 || any(abs(ndc.xy)>vec2(1.0))) {return 1.0;}
+    let uv=ndc.xy*vec2(0.5,-0.5)+vec2(0.5);
+    let bias=effects.params.w*(1.0+2.0*(1.0-max(dot(normal,light_direction),0.0)));
+    let depth=ndc.z-bias;
+    let texel=1.0/vec2<f32>(textureDimensions(static_shadow));
+    var visibility=0.0;
+    // Combine static and dynamic visibility per texel, then apply 3x3 PCF.
+    for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+        let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+        visibility+=compare_shadow(index,sample_uv,depth);
+    }}
+    return visibility/9.0;
+}
+
+
+struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4<u32>, extra:vec4<f32>, options:vec4<f32> };
+@group(3) @binding(0) var<uniform> material:Material;
+@group(2) @binding(0) var base_map:texture_2d<f32>;
+@group(2) @binding(1) var base_sampler:sampler;
+@group(2) @binding(2) var mr_map:texture_2d<f32>;
+@group(2) @binding(3) var mr_sampler:sampler;
+@group(2) @binding(4) var normal_map:texture_2d<f32>;
+@group(2) @binding(5) var normal_sampler:sampler;
+@group(2) @binding(6) var ao_map:texture_2d<f32>;
+@group(2) @binding(7) var ao_sampler:sampler;
+@group(2) @binding(8) var emissive_map:texture_2d<f32>;
+@group(2) @binding(9) var emissive_sampler:sampler;
+struct Input { @location(0) position:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32> };
+struct Output { @builtin(position) pos:vec4<f32>, @location(0) world:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32> };
+@vertex fn vs_main(v:Input)->Output { var o:Output; o.pos=scene.view_projection*vec4(v.position,1.0); o.world=v.position; o.normal=v.normal; o.tangent=v.tangent; o.uv0=v.uv0; o.uv1=v.uv1; o.uv2=v.uv2; o.uv3=v.uv3; o.uv4=v.uv4; o.color=v.color; return o; }
+fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }
+fn linear_color(c:vec3<f32>)->vec3<f32> { return select(c/12.92,pow((c+vec3(0.055))/1.055,vec3(2.4)),c>vec3(0.04045)); }
+fn base_color(v:Output)->vec4<f32> { let t=textureSample(base_map,base_sampler,v.uv0); return t*material.base*v.color; }
+fn alpha_test(alpha:f32) { if(material.extra.y==1.0 && alpha<material.extra.x) { discard; } }
+fn unit(v:vec3<f32>)->vec3<f32> { return v*inverseSqrt(max(dot(v,v),0.000000000001)); }
+fn surface(v:Output,front:bool)->vec4<f32> {
+    let p1=dpdx(v.world); let p2=dpdy(v.world); let u1=dpdx(v.uv2); let u2=dpdy(v.uv2);
+    let base=base_color(v); let emission=textureSample(emissive_map,emissive_sampler,v.uv4).rgb*material.emissive.rgb;
+    alpha_test(base.a);
+    if(effects.params.z>0.5 && dot(effects.clip_plane,vec4(v.world,1.0)) < -0.001) { discard; }
+    if(material.extra.w>0.5) { return vec4(base.rgb+emission,base.a); }
+    var n=unit(v.normal); let view=unit(scene.camera_pos-v.world);
+    if(material.options.w>0.5) {
+        let geometric=cross(p1,p2);
+        if(dot(geometric,geometric)>0.0000000001) {
+            n=unit(geometric);
+            if(dot(n,view)<0.0) { n=-n; }
+        }
+    }
+    // Screen-space handedness differs between LH main and reflected passes.
+    if(material.extra.z>0.5 && dot(n,view)<0.0) { n=-n; }
+    let mapped=textureSample(normal_map,normal_sampler,v.uv2).xyz*2.0-vec3(1.0);
+    let scaled=vec3(mapped.xy*material.factors.z,mapped.z);
+    var t=unit(v.tangent.xyz-n*dot(n,v.tangent.xyz));
+    var b=cross(n,t)*v.tangent.w;
+    if(dot(v.tangent.xyz,v.tangent.xyz)<0.01) {
+        let det=u1.x*u2.y-u1.y*u2.x;
+        if(abs(det)>0.0000001) { t=unit((p1*u2.y-p2*u1.y)/det); b=unit((-p1*u2.x+p2*u1.x)/det); }
+        else { t=unit(cross(select(vec3(0.0,1.0,0.0),vec3(1.0,0.0,0.0),abs(n.y)>0.9),n)); b=cross(n,t); }
+    }
+    n=unit(t*scaled.x+b*scaled.y+n*scaled.z);
+    let mr=textureSample(mr_map,mr_sampler,v.uv1);
+    let metallic=clamp(material.factors.x*mr.b,0.0,1.0); let rough=max(0.045,material.factors.y*mr.g);
+    let ao=mix(1.0,textureSample(ao_map,ao_sampler,v.uv3).r,material.factors.w);
+    let f0=mix(vec3(0.04),base.rgb,metallic); let nv=max(dot(n,view),0.0001); let a=rough*rough; let a2=a*a;
+    var color=base.rgb*(1.0-metallic)*0.1*ao;
+    for(var i=0u;i<LIGHT_COUNT;i++) {
+        let delta=scene.lights[i].position-v.world; let l=unit(delta); let h=unit(l+view); let nl=max(dot(n,l),0.0); let nh=max(dot(n,h),0.0); let vh=max(dot(view,h),0.0);
+        let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
+        let gv=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv)); let gl=2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
+        let f=f0+(vec3(1.0)-f0)*pow(1.0-vh,5.0); let spec=d*gv*gl*f/max(4.0*nv*nl,0.0001);
+        var visibility=1.0; if(i<u32(effects.params.x) && material.options.y>0.5) { visibility=shadow_visibility(i,v.world,n,l); }
+        color+=((vec3(1.0)-f)*(1.0-metallic)*base.rgb/3.14159265+spec)*scene.lights[i].color*nl*visibility;
+    }
+    color+=emission;
+    if(effects.params.y>0.5 && material.options.z>0.5 && material.options.x>0.0) {
+        let r=effects.reflection_matrix*vec4(v.world,1.0); let u=r.xy/r.w*vec2(0.5,-0.5)+vec2(0.5);
+        if(r.w>0.0 && all(u>=vec2(0.0)) && all(u<=vec2(1.0))) { color=mix(color,textureSampleLevel(reflection_texture,reflection_sampler,u,0.0).rgb,material.options.x); }
+    }
+    return vec4(color,base.a);
+}
+@fragment fn fs_main(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,select(1.0,c.a,material.extra.y==2.0)); }
+struct PostSurface { @location(0) color:vec4<f32>, @location(1) depth:vec4<f32> };
+@fragment fn fs_postprocess(v:Output,@builtin(front_facing) front:bool)->PostSurface { var o:PostSurface; let c=surface(v,front); o.color=vec4(c.rgb,material.options.x); var e=fract(min(v.pos.z,0.9999999)*vec3(1.0,255.0,65025.0)); e-=e.yzz*vec3(1.0/255.0,1.0/255.0,0.0); o.depth=vec4(e,1.0); return o; }
+@fragment fn fs_shadow(v:Output) { alpha_test(base_color(v).a); if(material.extra.y==2.0 && base_color(v).a<0.5) { discard; } }
+
 \n# File: src/render/mod.rs
 #![cfg(target_arch = "wasm32")]
 
@@ -2362,6 +5593,7 @@ pub mod depth;
 pub mod pipeline;
 pub mod state;
 
+pub mod gltf_gpu;
 pub mod output;
 pub mod renderer;
 pub mod target;
@@ -3862,6 +7094,7 @@ fn build_uniform(
 }
 
 struct PassCache {
+    camera_position: Vec3,
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
@@ -3871,6 +7104,7 @@ impl PassCache {
     fn new(device: &wgpu::Device) -> Self {
         Self {
             queue: RenderQueue::default(),
+            camera_position: Vec3::ZERO,
             key: None,
             batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
             imported: HashMap::new(),
@@ -3896,6 +7130,8 @@ pub struct SceneRenderer {
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
     imported_meshes: HashMap<u32, Mesh>,
+    gltf_gpu: super::gltf_gpu::GltfGpu,
+    gltf_models: HashMap<u32, super::gltf_gpu::GpuModel>,
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
@@ -3969,6 +7205,11 @@ impl SceneRenderer {
         });
         let passes = std::array::from_fn(|_| PassCache::new(&device));
         let effects = Some(Effects::new(&device));
+        let gltf_gpu = super::gltf_gpu::GltfGpu::new(
+            &device,
+            &bind_group_layout,
+            &effects.as_ref().unwrap().layout,
+        );
         Self {
             grid_vertex_buffer,
             grid_vertex_count,
@@ -3984,6 +7225,8 @@ impl SceneRenderer {
             plane_mesh,
             sphere_mesh,
             imported_meshes: HashMap::new(),
+            gltf_gpu,
+            gltf_models: HashMap::new(),
             grid_uniform_buffer,
             grid_bind_group,
             scene: SceneManager::default(),
@@ -4051,13 +7294,62 @@ impl SceneRenderer {
         Ok(id)
     }
     pub fn advance_scene(&mut self, dt: f32) {
+        self.upload_bytes = 0;
         self.frame_metrics.record(dt);
         self.scene.update(dt);
+        self.gltf_models
+            .retain(|id, _| self.scene.object_exists(*id));
+        for (id, gpu) in &mut self.gltf_models {
+            if let (Some(model), Some(object)) =
+                (self.scene.model(*id), self.scene.objects().get(id))
+            {
+                let options = object.render_options;
+                match self.gltf_gpu.update(
+                    &self.queue,
+                    gpu,
+                    &model.asset,
+                    &model.pose,
+                    model.revision,
+                    object.transform.model(),
+                    [
+                        options.reflectivity,
+                        if options.receives_shadow { 1.0 } else { 0.0 },
+                        0.0,
+                        0.0,
+                    ],
+                ) {
+                    Ok(bytes) => self.upload_bytes += bytes,
+                    Err(error) => {
+                        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&error))
+                    }
+                }
+            }
+        }
         self.imported_meshes
             .retain(|id, _| self.scene.object_exists(*id));
         for cache in &mut self.passes {
             cache.imported.retain(|id, _| self.scene.object_exists(*id));
         }
+    }
+    pub fn import_gltf_model(
+        &mut self,
+        asset: std::sync::Arc<crate::gltf_model::ModelAsset>,
+    ) -> Result<u32, String> {
+        // Validate CPU pose before allocating GPU resources or exposing a root ID.
+        let instance = crate::gltf_model::ModelInstance::new(asset.clone(), None)?;
+        let mut gpu = self.gltf_gpu.upload(&self.device, &self.queue, &asset)?;
+        self.gltf_gpu.update(
+            &self.queue,
+            &mut gpu,
+            &asset,
+            &instance.pose,
+            instance.revision,
+            Mat4::IDENTITY,
+            [0.0, 1.0, 0.0, 0.0],
+        )?;
+        let id = self.scene.add_model(asset)?;
+        self.gltf_models.insert(id, gpu);
+        Ok(id)
     }
 
     pub fn prepare_view(&mut self, view: RenderView) {
@@ -4081,6 +7373,7 @@ impl SceneRenderer {
     fn prepare_pass_cache(&mut self, view: RenderView, pass: RenderPassKind, index: usize) {
         self.active_cache = index;
         let cache = &mut self.passes[index];
+        cache.camera_position = view.camera_position;
         let camera_matrix = view.view_projection;
         let camera_pos = view.camera_position;
         let active_lights: Vec<Light> = self
@@ -4152,7 +7445,22 @@ impl SceneRenderer {
             self.passes[0].queue.total as f64,
             self.passes[0].queue.visible as f64,
             (self.passes[0].queue.total - self.passes[0].queue.visible) as f64,
-            self.passes[0].queue.draw_calls() as f64,
+            (self.passes[0].queue.draw_calls()
+                + self.passes[0]
+                    .queue
+                    .imported
+                    .keys()
+                    .filter_map(|id| self.gltf_models.get(id))
+                    .map(|m| {
+                        super::gltf_gpu::draw_count(m, false) + super::gltf_gpu::draw_count(m, true)
+                    })
+                    .sum::<usize>()
+                - self.passes[0]
+                    .queue
+                    .imported
+                    .keys()
+                    .filter(|id| self.gltf_models.contains_key(id))
+                    .count()) as f64,
             self.upload_bytes as f64,
             self.prepare_ms,
             self.frame_metrics.fps,
@@ -4224,6 +7532,19 @@ impl SceneRenderer {
             .or_insert_with(|| {
                 pipeline::build_shadow(&self.device, &self.bind_group_layout, target.format)
             });
+        let gltf_key = super::gltf_gpu::PipelineKey {
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            depth_format: target.format,
+            reflected: false,
+            material_mask: false,
+            shadow: true,
+        };
+        for id in self.passes[self.active_cache].queue.imported.keys() {
+            if let Some(model) = self.gltf_models.get(id) {
+                self.gltf_gpu
+                    .prepare_pipeline(&self.device, gltf_key, model);
+            }
+        }
         let pipeline = &self.shadow_pipelines[&target.format];
         let cache = &self.passes[self.active_cache];
         let mut encoder = self
@@ -4281,11 +7602,19 @@ impl SceneRenderer {
                 if instances.is_empty() {
                     continue;
                 }
-                let mesh = &self.imported_meshes[id];
+                let Some(mesh) = self.imported_meshes.get(id) else {
+                    continue;
+                };
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 pass.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 pass.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
+            }
+            for id in cache.queue.imported.keys() {
+                if let Some(model) = self.gltf_models.get(id) {
+                    self.gltf_gpu
+                        .draw(&mut pass, model, gltf_key, false, cache.camera_position);
+                }
             }
         }
         self.queue.submit(Some(encoder.finish()));
@@ -4360,7 +7689,9 @@ impl SceneRenderer {
         let key = (
             target.color_format,
             target.depth_format,
-            reflected,
+            self.passes[self.active_cache]
+                .key
+                .is_some_and(|k| k.0.determinant() < 0.0),
             target.auxiliary.is_some(),
         );
         self.pipelines.entry(key).or_insert_with(|| {
@@ -4371,12 +7702,27 @@ impl SceneRenderer {
                     key.1,
                     &self.bind_group_layout,
                     &effects.layout,
-                    reflected,
+                    key.2,
                     key.3,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
             )
         });
+        let gltf_key = super::gltf_gpu::PipelineKey {
+            format: target.color_format,
+            depth_format: target.depth_format,
+            reflected: self.passes[self.active_cache]
+                .key
+                .is_some_and(|k| k.0.determinant() < 0.0),
+            material_mask: target.auxiliary.is_some(),
+            shadow: false,
+        };
+        for id in self.passes[self.active_cache].queue.imported.keys() {
+            if let Some(model) = self.gltf_models.get(id) {
+                self.gltf_gpu
+                    .prepare_pipeline(&self.device, gltf_key, model);
+            }
+        }
         // Immutable lookup ends the map mutation before borrowing mesh resources.
         let pipelines = &self.pipelines[&key];
         let cache = &self.passes[self.active_cache];
@@ -4468,11 +7814,32 @@ impl SceneRenderer {
                 if instances.is_empty() {
                     continue;
                 }
-                let mesh = &self.imported_meshes[id];
+                let Some(mesh) = self.imported_meshes.get(id) else {
+                    continue;
+                };
                 rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 rp.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
+            }
+            for id in cache.queue.imported.keys() {
+                if let Some(model) = self.gltf_models.get(id) {
+                    self.gltf_gpu
+                        .draw(&mut rp, model, gltf_key, false, cache.camera_position);
+                }
+            }
+            if reflected || target.auxiliary.is_none() {
+                self.gltf_gpu.draw_many(
+                    &mut rp,
+                    cache
+                        .queue
+                        .imported
+                        .keys()
+                        .filter_map(|id| self.gltf_models.get(id)),
+                    gltf_key,
+                    true,
+                    cache.camera_position,
+                );
             }
             if !reflected
                 && target.auxiliary.is_none()
@@ -4489,6 +7856,91 @@ impl SceneRenderer {
                     rp.draw(0..self.light_vertex_count, 0..1);
                 }
             }
+        }
+        self.queue.submit(Some(encoder.finish()));
+        Ok(())
+    }
+    /// Transparent materials use opaque depth after screen-space effects.
+    pub fn draw_transparent(&mut self, target: &RenderTarget<'_>) -> Result<(), String> {
+        let cache = &self.passes[0];
+        if !cache
+            .queue
+            .imported
+            .keys()
+            .filter_map(|id| self.gltf_models.get(id))
+            .any(|m| super::gltf_gpu::draw_count(m, true) > 0)
+        {
+            return Ok(());
+        }
+        let key = super::gltf_gpu::PipelineKey {
+            format: target.color_format,
+            depth_format: target.depth_format,
+            reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
+            material_mask: false,
+            shadow: false,
+        };
+        for id in cache.queue.imported.keys() {
+            if let Some(model) = self.gltf_models.get(id) {
+                self.gltf_gpu.prepare_pipeline(&self.device, key, model);
+            }
+        }
+        let effects = self.effects.as_ref().unwrap();
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("glTF transparent overlay"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("glTF transparent overlay"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.0,
+                1.0,
+            );
+            pass.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            pass.set_bind_group(0, &self.grid_bind_group, &[]);
+            pass.set_bind_group(1, &effects.scene_group, &[]);
+            self.gltf_gpu.draw_many(
+                &mut pass,
+                cache
+                    .queue
+                    .imported
+                    .keys()
+                    .filter_map(|id| self.gltf_models.get(id)),
+                key,
+                true,
+                cache.camera_position,
+            );
         }
         self.queue.submit(Some(encoder.finish()));
         Ok(())
@@ -4524,6 +7976,7 @@ pub struct State {
     pub backend: String,
     pub aspect: f32,
     view: RenderView,
+    model_camera: Option<(u32, usize)>,
 }
 impl Deref for State {
     type Target = SceneRenderer;
@@ -4550,6 +8003,7 @@ impl State {
             postprocess,
             backend,
             aspect,
+            model_camera: None,
             view: RenderView {
                 view_projection: Mat4::IDENTITY,
                 camera_position: Vec3::ZERO,
@@ -4601,6 +8055,69 @@ impl State {
             view_projection: camera_matrix,
             camera_position: camera_pos,
         };
+        if let Some((id, node)) = self.model_camera {
+            if let Some(view) = self.imported_camera_view(id, node) {
+                self.view = view;
+            } else {
+                self.model_camera = None;
+            }
+        }
+    }
+    pub fn clear_model_camera(&mut self) {
+        self.model_camera = None;
+    }
+    pub fn use_model_camera(&mut self, id: u32, node: usize) -> bool {
+        if self.imported_camera_view(id, node).is_none() {
+            return false;
+        }
+        self.model_camera = Some((id, node));
+        true
+    }
+    fn imported_camera_view(&self, id: u32, node: usize) -> Option<RenderView> {
+        let model = self.scene.model(id)?;
+        if !model.pose.active_nodes.contains(&node) {
+            return None;
+        }
+        let camera = model.asset.nodes.get(node)?.camera?;
+        let root = self.scene.objects().get(&id)?.transform.model();
+        let world = root * model.pose.world_matrices[node];
+        if world.determinant().abs() < 1e-10 {
+            return None;
+        }
+        let projection = match &model.asset.cameras[camera] {
+            crate::gltf_model::ModelCamera::Perspective {
+                yfov,
+                aspect_ratio,
+                znear,
+                zfar,
+                ..
+            } => match zfar {
+                Some(far) => glam::camera::rh::proj::directx::perspective(
+                    *yfov,
+                    aspect_ratio.unwrap_or(self.aspect),
+                    *znear,
+                    *far,
+                ),
+                None => glam::camera::rh::proj::directx::perspective_infinite(
+                    *yfov,
+                    aspect_ratio.unwrap_or(self.aspect),
+                    *znear,
+                ),
+            },
+            crate::gltf_model::ModelCamera::Orthographic {
+                xmag,
+                ymag,
+                znear,
+                zfar,
+                ..
+            } => glam::camera::rh::proj::directx::orthographic(
+                -*xmag, *xmag, -*ymag, *ymag, *znear, *zfar,
+            ),
+        };
+        Some(RenderView {
+            view_projection: projection * world.inverse(),
+            camera_position: world.transform_point3(Vec3::ZERO),
+        })
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
@@ -4637,6 +8154,9 @@ impl State {
                 auxiliary: None,
                 ..target
             };
+            self.renderer
+                .draw_transparent(&overlays)
+                .map_err(|e| JsValue::from_str(&e))?;
             self.renderer.draw_helpers(&overlays);
         } else {
             self.renderer
@@ -5084,6 +8604,7 @@ struct LightOrbit {
 #[derive(Default)]
 pub struct SceneManager {
     objects: BTreeMap<u32, SceneObject>,
+    models: BTreeMap<u32, crate::gltf_model::ModelInstance>,
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
     next_id: u32,
@@ -5185,6 +8706,100 @@ impl SceneManager {
     pub fn lights(&self) -> &BTreeMap<u32, Light> {
         &self.lights
     }
+    pub fn models(&self) -> &BTreeMap<u32, crate::gltf_model::ModelInstance> {
+        &self.models
+    }
+    pub fn model(&self, id: u32) -> Option<&crate::gltf_model::ModelInstance> {
+        self.models.get(&id)
+    }
+    pub fn add_model(
+        &mut self,
+        asset: std::sync::Arc<crate::gltf_model::ModelAsset>,
+    ) -> Result<u32, String> {
+        let model = crate::gltf_model::ModelInstance::new(asset, None)?;
+        let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose)?;
+        let id = self.add_imported(min, max);
+        if id == INVALID_ID {
+            return Err("Cannot allocate model root".into());
+        }
+        self.models.insert(id, model);
+        Ok(id)
+    }
+    fn commit_model(
+        &mut self,
+        id: u32,
+        model: crate::gltf_model::ModelInstance,
+    ) -> Result<(), String> {
+        let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose)?;
+        let object = self
+            .objects
+            .get_mut(&id)
+            .ok_or("Model root does not exist")?;
+        object.local_bounds = Some((min, max));
+        object.refresh_render_data();
+        self.models.insert(id, model);
+        self.changed(id);
+        Ok(())
+    }
+    fn mutate_model(
+        &mut self,
+        id: u32,
+        operation: impl FnOnce(&mut crate::gltf_model::ModelInstance) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let mut candidate = self
+            .models
+            .get(&id)
+            .ok_or("Model root does not exist")?
+            .clone();
+        operation(&mut candidate)?;
+        candidate.last_error = None;
+        self.commit_model(id, candidate)
+    }
+    pub fn play_model_animation(
+        &mut self,
+        id: u32,
+        clip: usize,
+        looping: bool,
+        speed: f32,
+    ) -> Result<(), String> {
+        if !speed.is_finite() {
+            return Err("Animation speed must be finite".into());
+        }
+        self.mutate_model(id, |model| {
+            model.play(clip, looping)?;
+            model.playback.as_mut().unwrap().speed = speed;
+            Ok(())
+        })
+    }
+    pub fn pause_model_animation(&mut self, id: u32, paused: bool) -> Result<(), String> {
+        let model = self
+            .models
+            .get_mut(&id)
+            .ok_or("Model root does not exist")?;
+        model
+            .playback
+            .as_mut()
+            .ok_or("Model has no active animation")?
+            .playing = !paused;
+        Ok(())
+    }
+    pub fn seek_model_animation(&mut self, id: u32, time: f32) -> Result<(), String> {
+        self.mutate_model(id, |model| model.seek(time))
+    }
+    pub fn stop_model_animation(&mut self, id: u32) -> Result<(), String> {
+        self.mutate_model(id, |model| model.stop())
+    }
+    pub fn select_model_scene(&mut self, id: u32, scene: usize) -> Result<(), String> {
+        self.mutate_model(id, |model| model.select_scene(scene))
+    }
+    pub fn set_model_morph_weights(
+        &mut self,
+        id: u32,
+        node: usize,
+        weights: &[f32],
+    ) -> Result<(), String> {
+        self.mutate_model(id, |model| model.set_morph_weights(node, weights))
+    }
     pub fn object_exists(&self, id: u32) -> bool {
         self.objects.contains_key(&id)
     }
@@ -5246,6 +8861,7 @@ impl SceneManager {
     }
     pub fn clear_scene(&mut self) {
         self.objects.clear();
+        self.models.clear();
         self.mirror_object = None;
         self.spins.clear();
         self.static_revision = self.static_revision.wrapping_add(1);
@@ -5273,6 +8889,7 @@ impl SceneManager {
         if self.objects.remove(&id).is_none() {
             return false;
         }
+        self.models.remove(&id);
         self.render_revision = self.render_revision.wrapping_add(1);
         if was_static {
             self.static_revision = self.static_revision.wrapping_add(1);
@@ -5458,6 +9075,33 @@ impl SceneManager {
     pub fn update(&mut self, dt: f32) {
         if self.paused || !dt.is_finite() || dt <= 0.0 {
             return;
+        }
+        let active: Vec<_> = self
+            .models
+            .iter()
+            .filter(|(_, model)| {
+                model
+                    .playback
+                    .as_ref()
+                    .is_some_and(|p| p.playing && p.speed != 0.)
+            })
+            .map(|(&id, _)| id)
+            .collect();
+        for id in active {
+            let mut candidate = self.models[&id].clone();
+            let result = match candidate.update(dt) {
+                Ok(true) => self.commit_model(id, candidate),
+                Ok(false) => Ok(()),
+                Err(error) => Err(error),
+            };
+            if let Err(error) = result {
+                if let Some(model) = self.models.get_mut(&id) {
+                    model.last_error = Some(error);
+                    if let Some(playback) = &mut model.playback {
+                        playback.playing = false;
+                    }
+                }
+            }
         }
         self.time += dt;
         let now = self.time;
@@ -6438,6 +10082,144 @@ pub fn load_gltf(bytes: &[u8], buffers: js_sys::Array) -> Result<u32, JsValue> {
 }
 
 #[wasm_bindgen]
+pub fn gltf_resource_uris(bytes: &[u8]) -> Result<String, JsValue> {
+    let resources = crate::gltf_loader::resource_uris(bytes).map_err(|e| JsValue::from_str(&e))?;
+    Ok(serde_json::json!({"buffers":resources.buffers,"images":resources.images}).to_string())
+}
+
+fn model_resources(
+    bytes: &[u8],
+    buffers: js_sys::Array,
+    images: js_sys::Array,
+) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), JsValue> {
+    let mut total = bytes.len();
+    if total > 128 * 1024 * 1024 || buffers.length() + images.length() > 1024 {
+        return Err(JsValue::from_str("glTF překračuje limity zdrojů"));
+    }
+    let mut convert = |array: js_sys::Array| -> Result<Vec<Vec<u8>>, JsValue> {
+        array
+            .iter()
+            .map(|value| {
+                if !value.is_instance_of::<js_sys::Uint8Array>() {
+                    return Err(JsValue::from_str("glTF zdroje musí být Uint8Array"));
+                }
+                let value = value.unchecked_into::<js_sys::Uint8Array>();
+                total = total.saturating_add(value.length() as usize);
+                if total > 128 * 1024 * 1024 {
+                    return Err(JsValue::from_str("glTF překračuje 128 MiB"));
+                }
+                Ok(value.to_vec())
+            })
+            .collect()
+    };
+    Ok((convert(buffers)?, convert(images)?))
+}
+#[wasm_bindgen]
+pub fn load_gltf_model(
+    bytes: &[u8],
+    buffers: js_sys::Array,
+    images: js_sys::Array,
+) -> Result<u32, JsValue> {
+    let (buffers, images) = model_resources(bytes, buffers, images)?;
+    let asset = crate::gltf_loader::parse_model(bytes, &buffers, &images)
+        .map_err(|e| JsValue::from_str(&e))?;
+    for warning in &asset.warnings {
+        web_sys::console::warn_1(&JsValue::from_str(warning));
+    }
+    STATE.with(|s| {
+        let s = s.borrow();
+        let engine = s
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let result = engine
+            .borrow_mut()
+            .import_gltf_model(std::sync::Arc::new(asset))
+            .map_err(|e| JsValue::from_str(&e));
+        result
+    })
+}
+#[wasm_bindgen]
+pub fn model_info(id: u32) -> Result<String, JsValue> {
+    STATE.with(|s| {
+        let state=s.borrow();
+        let engine=state.as_ref().ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let engine=engine.borrow();
+        let model=engine.scene.model(id).ok_or_else(|| JsValue::from_str("Model neexistuje"))?;
+        let asset=&model.asset;
+        let animations:Vec<_>=asset.animations.iter().enumerate().map(|(i,a)| serde_json::json!({"name":a.name.clone().unwrap_or_else(||format!("Animation {i}")),"duration":a.duration})).collect();
+        let nodes:Vec<_>=asset.nodes.iter().enumerate().map(|(i,n)| serde_json::json!({"name":n.name.clone().unwrap_or_else(||format!("Node {i}")),"mesh":n.mesh,"camera":n.camera,"morphTargets":n.mesh.and_then(|m|asset.meshes[m].primitives.first()).map(|p|asset.primitives[*p].morph_targets.len()).unwrap_or(0)})).collect();
+        let scenes:Vec<_>=asset.scenes.iter().enumerate().map(|(i,s)|serde_json::json!({"name":s.name.clone().unwrap_or_else(||format!("Scene {i}"))})).collect();
+        let playback=model.playback.as_ref().map(|p|serde_json::json!({"clip":p.clip,"time":p.time,"speed":p.speed,"looping":p.looping,"playing":p.playing}));
+        Ok(serde_json::json!({"animations":animations,"nodes":nodes,"scenes":scenes,"scene":model.scene,"playback":playback,"primitives":asset.primitives.len(),"materials":asset.materials.len(),"textures":asset.textures.len(),"skins":asset.skins.len(),"lastError":model.last_error}).to_string())
+    })
+}
+#[wasm_bindgen]
+pub fn play_model_animation(id: u32, clip: usize, looping: bool, speed: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .play_model_animation(id, clip, looping, speed)
+                .is_ok()
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn pause_model_animation(id: u32, paused: bool) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .pause_model_animation(id, paused)
+                .is_ok()
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn seek_model_animation(id: u32, time: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.seek_model_animation(id, time).is_ok())
+    })
+}
+#[wasm_bindgen]
+pub fn stop_model_animation(id: u32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.stop_model_animation(id).is_ok())
+    })
+}
+#[wasm_bindgen]
+pub fn select_model_scene(id: u32, scene: usize) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.select_model_scene(id, scene).is_ok())
+    })
+}
+#[wasm_bindgen]
+pub fn set_model_morph_weights(id: u32, node: usize, weights: &[f32]) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .set_model_morph_weights(id, node, weights)
+                .is_ok()
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn use_model_camera(id: u32, node: usize) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().use_model_camera(id, node))
+    })
+}
+
+#[wasm_bindgen]
 pub fn configure_god_rays(density: f32, exposure: f32) -> bool {
     STATE.with(|state| {
         state
@@ -6708,16 +10490,31 @@ pub fn set_grid_visible(show: bool) {
 
 #[wasm_bindgen]
 pub fn set_camera_view(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> bool {
-    CAMERA.with(|camera| {
+    let accepted = CAMERA.with(|camera| {
         camera.borrow().as_ref().is_some_and(|c| {
             c.borrow_mut()
                 .set_view(glam::Vec3::new(px, py, pz), glam::Vec3::new(tx, ty, tz))
         })
-    })
+    });
+    if accepted {
+        STATE.with(|s| {
+            if let Some(s) = s.borrow().as_ref() {
+                s.borrow_mut().clear_model_camera();
+            }
+        });
+    }
+    accepted
 }
 
 #[wasm_bindgen]
 pub fn set_camera_mode(mode: &str) {
+    if mode == "free" || mode == "orbit" {
+        STATE.with(|s| {
+            if let Some(s) = s.borrow().as_ref() {
+                s.borrow_mut().clear_model_camera();
+            }
+        });
+    }
     CAMERA.with(|c| {
         if let Some(cam) = &*c.borrow() {
             let mut cam = cam.borrow_mut();
