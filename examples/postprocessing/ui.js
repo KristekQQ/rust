@@ -3,7 +3,7 @@ export function createUI(container, engine) {
     if (!container) throw new Error('Chybí UI');
     container.innerHTML = `
         <a href="../">← Rozcestník / ukončit render</a>
-        <h1>Kaluž a světlo v mlze</h1>
+        <h1>Kamenný most, kaluž a světlo v mlze</h1>
         <label><input type="checkbox" name="ssr" checked> Screen-space reflections</label>
         <label>Síla SSR <input type="range" name="ssrStrength" min="0" max="1" step="0.05" value="0.85"></label>
         <label><input type="checkbox" name="godRays" checked> Volumetrické paprsky</label>
@@ -15,6 +15,7 @@ export function createUI(container, engine) {
         <button id="verify">Ověřit řetězec</button>
         <pre role="status"></pre>
         <p>Táhni myší pro změnu pohledu. Odrazy obsahují pouze objekty viditelné kamerou. Paprsky se počítají v prostoru ze stínových map prvního světla.</p>
+        <p>Most: <a href="https://kenney.nl/assets/nature-kit">Kenney Nature Kit (CC0)</a>. <a href="../../docs/GLTF.md">Import glTF</a>.</p>
         <p><a href="main.js">main.js</a> · <a href="scene.js">scene.js</a> · <a href="ui.js">ui.js</a></p>`;
     const field = name => container.querySelector(`[name="${name}"]`);
     const apply = () => {

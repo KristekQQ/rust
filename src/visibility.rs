@@ -25,19 +25,24 @@ impl ObjectRenderData {
         frustum.intersects_aabb(self.center, self.half_extent)
     }
     pub(crate) fn new(mesh: MeshKind, transform: Transform) -> Self {
-        let model = transform.model();
         let local = match mesh {
             MeshKind::Cube => Vec3::splat(0.5),
             MeshKind::Plane => Vec3::new(0.5, 0.0, 0.5),
             MeshKind::Sphere => Vec3::ONE,
+            MeshKind::Imported(_) => Vec3::ZERO,
         };
+        Self::with_bounds(transform, -local, local)
+    }
+    pub(crate) fn with_bounds(transform: Transform, min: Vec3, max: Vec3) -> Self {
+        let model = transform.model();
+        let local = (max - min) * 0.5;
         Self {
             instance: InstanceData {
                 model: model.to_cols_array_2d(),
                 normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
                 material: [0.0, 1.0, 0.0, 0.0],
             },
-            center: transform.position,
+            center: model.transform_point3((max + min) * 0.5),
             half_extent: model.x_axis.truncate().abs() * local.x
                 + model.y_axis.truncate().abs() * local.y
                 + model.z_axis.truncate().abs() * local.z,
@@ -90,6 +95,7 @@ impl RenderPassKind {
 #[derive(Default)]
 pub struct RenderQueue {
     pub batches: [Vec<InstanceData>; 3],
+    pub imported: std::collections::BTreeMap<u32, Vec<InstanceData>>,
     pub total: usize,
     pub visible: usize,
 }
@@ -105,6 +111,10 @@ impl RenderQueue {
         pass: RenderPassKind,
     ) {
         for batch in &mut self.batches {
+            batch.clear();
+        }
+        self.imported.retain(|id, _| scene.object_exists(*id));
+        for batch in self.imported.values_mut() {
             batch.clear();
         }
         self.total = 0;
@@ -130,6 +140,7 @@ impl RenderQueue {
                 MeshKind::Cube => 0,
                 MeshKind::Plane => 1,
                 MeshKind::Sphere => 2,
+                MeshKind::Imported(_) => 3,
             };
             let mut instance = data.instance;
             instance.material = [
@@ -142,7 +153,11 @@ impl RenderQueue {
                 },
                 0.0,
             ];
-            self.batches[index].push(instance);
+            if let MeshKind::Imported(mesh_id) = object.mesh {
+                self.imported.entry(mesh_id).or_default().push(instance);
+            } else {
+                self.batches[index].push(instance);
+            }
             self.visible += 1;
         }
     }
@@ -151,6 +166,11 @@ impl RenderQueue {
             .iter()
             .filter(|batch| !batch.is_empty())
             .count()
+            + self
+                .imported
+                .values()
+                .filter(|batch| !batch.is_empty())
+                .count()
     }
 }
 
@@ -320,6 +340,7 @@ mod tests {
                 MeshKind::Cube => Vec3::splat(0.5),
                 MeshKind::Plane => Vec3::new(0.5, 0.0, 0.5),
                 MeshKind::Sphere => Vec3::ONE,
+                MeshKind::Imported(_) => Vec3::ZERO,
             };
             for x in [-1.0, 1.0] {
                 for y in [-1.0, 1.0] {
@@ -329,6 +350,44 @@ mod tests {
                             ((point - data.center).abs() - data.half_extent).max_element() < 1e-5
                         );
                     }
+                }
+            }
+        }
+    }
+    #[test]
+    fn imported_bounds_follow_transforms_and_pass_filters() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_imported(Vec3::new(99.9, -0.1, 0.9), Vec3::new(100.1, 0.1, 1.1));
+        let mut q = RenderQueue::default();
+        q.extract(&scene, camera(), true);
+        assert_eq!(q.visible, 0);
+        scene.set_object_position(id, Vec3::new(-100.0, 0.0, 0.0));
+        q.extract(&scene, camera(), true);
+        assert_eq!((q.visible, q.draw_calls()), (1, 1));
+        assert_eq!(q.imported[&id].len(), 1);
+        q.extract_pass(&scene, camera(), true, RenderPassKind::ShadowStatic);
+        assert_eq!(q.visible, 0);
+        q.extract_pass(&scene, camera(), true, RenderPassKind::ShadowDynamic);
+        assert_eq!(q.visible, 1);
+        scene.remove_object(id);
+        q.extract(&scene, camera(), true);
+        assert!(q.imported.is_empty());
+    }
+    #[test]
+    fn non_origin_bounds_contain_rotated_negative_scaled_corners() {
+        let min = Vec3::new(2.0, -1.0, 3.0);
+        let max = Vec3::new(4.0, 2.0, 7.0);
+        let t = Transform::new(
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(0.4, 0.8, 0.2),
+            Vec3::new(-2.0, 3.0, 0.5),
+        );
+        let data = ObjectRenderData::with_bounds(t, min, max);
+        for x in [min.x, max.x] {
+            for y in [min.y, max.y] {
+                for z in [min.z, max.z] {
+                    let point = t.model().transform_point3(Vec3::new(x, y, z));
+                    assert!(((point - data.center).abs() - data.half_extent).max_element() < 1e-5);
                 }
             }
         }

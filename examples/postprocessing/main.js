@@ -10,7 +10,7 @@ const engine = await initEngine(canvas, { backend });
 engine.set_grid_visible(false);
 engine.set_light_helpers_visible(false);
 engine.set_render_effects(true, false);
-createScene(engine.scene);
+await createScene(engine.scene);
 await loadPuddleMask(engine);
 
 // Add effects through the same SDK. Rust runs the ordered chain once per frame.

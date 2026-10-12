@@ -15,6 +15,48 @@ thread_local! {
 }
 
 #[wasm_bindgen]
+pub fn gltf_buffer_uris(bytes: &[u8]) -> Result<js_sys::Array, JsValue> {
+    let uris = crate::gltf_loader::buffer_uris(bytes).map_err(|e| JsValue::from_str(&e))?;
+    Ok(uris.iter().map(|uri| JsValue::from_str(uri)).collect())
+}
+#[wasm_bindgen]
+pub fn load_gltf(bytes: &[u8], buffers: js_sys::Array) -> Result<u32, JsValue> {
+    let mut external = Vec::new();
+    let mut total_bytes = bytes.len();
+    if total_bytes > 128 * 1024 * 1024 || buffers.length() > 1024 {
+        return Err(JsValue::from_str(
+            "glTF překračuje limit velikosti nebo počtu bufferů",
+        ));
+    }
+    for value in buffers.iter() {
+        if !value.is_instance_of::<js_sys::Uint8Array>() {
+            return Err(JsValue::from_str("glTF buffers musí být Uint8Array"));
+        }
+        let buffer = value.unchecked_into::<js_sys::Uint8Array>();
+        total_bytes = total_bytes.saturating_add(buffer.length() as usize);
+        if total_bytes > 128 * 1024 * 1024 {
+            return Err(JsValue::from_str("glTF překračuje limit 128 MiB"));
+        }
+        external.push(buffer.to_vec());
+    }
+    let model = crate::gltf_loader::parse(bytes, &external).map_err(|e| JsValue::from_str(&e))?;
+    for warning in &model.warnings {
+        web_sys::console::warn_1(&JsValue::from_str(warning));
+    }
+    STATE.with(|state| {
+        let state = state.borrow();
+        let engine = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let result = engine
+            .borrow_mut()
+            .import_model(&model)
+            .map_err(|e| JsValue::from_str(&e));
+        result
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_postprocess(name: &str, enabled: bool, strength: f32) -> bool {
     STATE.with(|state| {
         state

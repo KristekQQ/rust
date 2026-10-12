@@ -39,6 +39,7 @@ export class SceneLight {
 // Thin command facade for the Rust SceneManager, not a second manager in JS.
 export class Scene {
     #wasm;
+    #loadEpoch = 0;
     constructor(wasm) { this.#wasm = wasm; Object.freeze(this); }
     get objectCount() { return this.#wasm.scene_object_count(); }
     get lightCount() { return this.#wasm.scene_light_count(); }
@@ -49,12 +50,61 @@ export class Scene {
         accepted(id !== 0xffffffff);
         return new SceneObject(this.#wasm, id);
     }
+    /** Transport only; format parsing, transforms, bounds and GPU upload are Rust. */
+    async loadModel(url) {
+        const epoch = this.#loadEpoch;
+        let source = new URL(url, location.href);
+        let remaining = 128 * 1024 * 1024;
+        const checkCurrent = () => {
+            if (epoch !== this.#loadEpoch) throw new Error('Načítání modelu zrušeno vymazáním scény');
+        };
+        const fetchBytes = async (resource, root = false) => {
+            checkCurrent();
+            const response = await fetch(resource);
+            if (root && response.url) source = new URL(response.url);
+            if (!response.ok) throw new Error(`Model nelze načíst: ${response.status} ${resource}`);
+            if (Number(response.headers.get('content-length')) > remaining) {
+                await response.body?.cancel();
+                throw new Error('Model je příliš velký');
+            }
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('Model nemá tělo odpovědi');
+            const chunks = [];
+            let length = 0;
+            try {
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    checkCurrent();
+                    if (done) break;
+                    if (value.length > remaining) throw new Error('Model je příliš velký');
+                    remaining -= value.length;
+                    length += value.length;
+                    chunks.push(value);
+                }
+            } catch (error) {
+                await reader.cancel();
+                throw error;
+            } finally { reader.releaseLock(); }
+            const bytes = new Uint8Array(length);
+            let offset = 0;
+            for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+            return bytes;
+        };
+        const bytes = await fetchBytes(source, true);
+        const uris = this.#wasm.gltf_buffer_uris(bytes);
+        if (uris.length > 1024) throw new Error('Model má příliš mnoho bufferů');
+        const buffers = [];
+        // Bound total download memory; do not fetch all external buffers concurrently.
+        for (const uri of uris) buffers.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
+        checkCurrent();
+        return this.#create(this.#wasm.load_gltf(bytes, buffers));
+    }
     createLight({ position = [0, 0, 0], color = [1, 1, 1] } = {}) {
         const id = this.#wasm.add_light(...position, ...color);
         accepted(id >= 0);
         return new SceneLight(this.#wasm, id);
     }
-    clear() { this.#wasm.clear_all(); }
+    clear() { this.#loadEpoch++; this.#wasm.clear_all(); }
     setMirror(object) { accepted(this.#wasm.configure_planar_mirror(object.id)); }
 }
 

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><title>glTF SDK test</title>
+<h1>glTF – skutečný Rust/WASM import</h1><pre id="result" role="status">Probíhá test…</pre>
+<canvas id="gpu-canvas" width="640" height="360"></canvas>
+<script type="module">
+import { initEngine } from '../js/engine.js';
+const result = document.getElementById('result');
+const assert = (value, message) => { if (!value) throw new Error(message); };
+const frames = async () => { for (let i=0;i<12;i++) await new Promise(requestAnimationFrame); };
+try {
+    const engine = await initEngine(document.getElementById('gpu-canvas'), {
+        backend: new URLSearchParams(location.search).get('backend') || 'auto' });
+    const scene = engine.scene;
+    const url = new URL('../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb', location.href);
+    const bridge = await scene.loadModel(url);
+    bridge.setScale([5,7,3]).setPosition([0,-0.65,0]).setRotation([0,Math.PI/4,0])
+        .setRenderOptions({isStatic:true});
+    const triangle = await scene.loadModel(new URL('./fixtures/gltf/triangle.gltf', location.href));
+    triangle.setPosition([2,0,0]).spin([0,0.2,0]);
+    const floor = scene.createPlane([0,-1,0]).setScale([15,1,15])
+        .setRenderOptions({isStatic:true,castsShadow:false,reflectivity:0.8});
+    scene.setMirror(floor);
+    scene.createLight({position:[-3,4,-3]});
+    engine.set_grid_visible(false);
+    engine.set_render_effects(true,true);
+    await frames();
+    assert(scene.objectCount===3 && bridge.exists && triangle.exists,'GLB + relative .bin import');
+    const stats=engine.renderer_stats(), effects=engine.effects_stats();
+    assert(stats.visible===3 && stats.drawCalls===3,'Imported and built-in geometry draw batches');
+    assert(effects.staticVisible>0 && effects.dynamicVisible>0 && effects.reflectionVisible===2,'Custom meshes in shadow and reflection passes');
+    const before=scene.objectCount;
+    let rejected=false;
+    try { await scene.loadModel('data:application/json,%7B%7D'); } catch { rejected=true; }
+    assert(rejected && scene.objectCount===before,'Invalid import is atomic');
+    const pending=scene.loadModel(url);
+    scene.clear();
+    rejected=false;
+    try { await pending; } catch { rejected=true; }
+    assert(rejected && scene.objectCount===0,'Clear invalidates pending imports');
+    await frames();
+    assert(engine.renderer_stats().drawCalls===0,'Clear prunes imported draw batches');
+    const replacement=await scene.loadModel(url);
+    assert(replacement.id!==bridge.id && !bridge.exists,'Stable imported object IDs');
+    replacement.remove();
+    await frames();
+    assert(scene.objectCount===0 && engine.renderer_stats().drawCalls===0,'Remove custom mesh');
+    result.textContent=`PASS: ${engine.renderer_backend()} · GLB, external glTF buffers, transforms, custom draws, static/dynamic shadows, planar reflection, invalid file, clear during load, removal.`;
+} catch(error) { result.textContent=`FAIL: ${error.message ?? error}`; console.error(error); }
+</script></html>

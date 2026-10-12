@@ -1,3 +1,20 @@
+# Statický import glTF – 2026-10-12
+
+`src/gltf_loader.rs` parsuje glTF 2.0/GLB, skládá node transformace, normály,
+barvy a indexy do jednoho meshe; `Scene.loadModel(url)` v JS řeší pouze transport.
+Podporována neprůhledná TRIANGLES geometrie s baseColorFactor/COLOR_0,
+externí buffery a GLB BIN. Textury, skins, morphs, alpha/two-sided materiály,
+komprese a required extensions odmítnuty; animace použije pouze statickou pózu.
+Limity a veřejné API: `docs/GLTF.md`. `MeshKind::Imported(id)` má vlastní
+bounds a u32 GPU index buffer, účast ve všech color/depth průchodech.
+GPU mesh/instance buffery se odstraní v příštím advance_scene po remove/clear.
+Scene.clear invaliduje čekající JS import; transport má společný stream limit128MiB
+(včetně zdrojového dokumentu), používá finální URL po redirectu.
+Ukázka `examples/postprocessing/scene.js` načítá skutečný CC0 Kenney bridge GLB;
+původ/licence v assets/models/kenney-nature-bridge-stone-round.
+`tests/gltf-sdk.html` ověřuje GLB i externí .bin, transformy, stín/odraz,
+neplatná data, clear při fetch a odstranění na skutečném WASM enginu.
+
 # Kvalita god rays – 2026-10-12
 
 Radiální emitter-disk nahrazen 32krokovým kamerovým raymarchingem do prvního

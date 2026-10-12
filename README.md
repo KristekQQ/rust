@@ -282,3 +282,9 @@ http://127.0.0.1:8000/examples/. Viz [návod](examples/README.md).
 
 [SSR, kaluž a god rays](examples/postprocessing/index.html) používají rozšiřitelný
 Rust/WGSL řetězec. [API a přidání efektu](docs/POSTPROCESSING.md).
+
+## Statické glTF modely
+
+`await engine.scene.loadModel(url)` načte `.gltf` nebo `.glb` do Rust scény.
+Podporu geometrie, materiálů a limity popisuje [docs/GLTF.md](docs/GLTF.md).
+Ukázka [postprocessing](examples/postprocessing/) používá skutečný CC0 kamenný most.

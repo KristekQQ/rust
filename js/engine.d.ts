@@ -41,6 +41,8 @@ export class Scene {
     createCube(position?: Vector3): SceneObject;
     createPlane(position?: Vector3): SceneObject;
     createSphere(position?: Vector3): SceneObject;
+    /** Load static glTF2/GLB geometry. Rust parses it; returned handle uses normal scene commands. */
+    loadModel(url: string | URL): Promise<SceneObject>;
     createLight(options?: LightOptions): SceneLight;
     clear(): void;
     setMirror(object: SceneObject): void;

@@ -15,6 +15,7 @@ pub enum MeshKind {
     Cube,
     Plane,
     Sphere,
+    Imported(u32),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -69,11 +70,16 @@ pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
     pub render_options: RenderOptions,
+    local_bounds: Option<(Vec3, Vec3)>,
     pub(crate) render_data: crate::visibility::ObjectRenderData,
 }
 impl SceneObject {
     fn refresh_render_data(&mut self) {
-        self.render_data = crate::visibility::ObjectRenderData::new(self.mesh, self.transform);
+        self.render_data = if let Some((min, max)) = self.local_bounds {
+            crate::visibility::ObjectRenderData::with_bounds(self.transform, min, max)
+        } else {
+            crate::visibility::ObjectRenderData::new(self.mesh, self.transform)
+        };
     }
 }
 #[derive(Clone, Copy)]
@@ -230,10 +236,26 @@ impl SceneManager {
                 mesh,
                 transform,
                 render_options: RenderOptions::default(),
+                local_bounds: None,
                 render_data: crate::visibility::ObjectRenderData::new(mesh, transform),
             },
         );
         self.render_revision = self.render_revision.wrapping_add(1);
+        id
+    }
+    pub fn add_imported(&mut self, min: Vec3, max: Vec3) -> u32 {
+        if !min.is_finite() || !max.is_finite() || min.cmpgt(max).any() {
+            return INVALID_ID;
+        }
+        let id = self.add_object(
+            MeshKind::Imported(0),
+            Transform::new(Vec3::ZERO, Vec3::ZERO, Vec3::ONE),
+        );
+        if let Some(object) = self.objects.get_mut(&id) {
+            object.mesh = MeshKind::Imported(id);
+            object.local_bounds = Some((min, max));
+            object.refresh_render_data();
+        }
         id
     }
     pub fn add_cube(&mut self, position: Vec3) -> u32 {

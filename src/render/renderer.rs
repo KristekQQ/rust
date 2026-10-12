@@ -59,6 +59,7 @@ struct Mesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     index_count: u32,
+    index_format: wgpu::IndexFormat,
 }
 
 impl Mesh {
@@ -79,6 +80,34 @@ impl Mesh {
             vertex_buffer,
             index_buffer,
             index_count: indices.len() as u32,
+            index_format: wgpu::IndexFormat::Uint16,
+        }
+    }
+    fn imported(device: &wgpu::Device, model: &crate::gltf_loader::ImportedMesh) -> Self {
+        let vertices: Vec<Vertex> = model
+            .vertices
+            .iter()
+            .map(|v| Vertex {
+                position: v.position,
+                color: v.color,
+                normal: v.normal,
+            })
+            .collect();
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("glTF vertices"),
+            contents: data::as_bytes(&vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("glTF u32 indices"),
+            contents: data::as_bytes(&model.indices),
+            usage: wgpu::BufferUsages::INDEX,
+        });
+        Self {
+            vertex_buffer,
+            index_buffer,
+            index_count: model.indices.len() as u32,
+            index_format: wgpu::IndexFormat::Uint32,
         }
     }
 }
@@ -108,6 +137,7 @@ struct PassCache {
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
+    imported: HashMap<u32, InstanceBatch>,
 }
 impl PassCache {
     fn new(device: &wgpu::Device) -> Self {
@@ -115,6 +145,7 @@ impl PassCache {
             queue: RenderQueue::default(),
             key: None,
             batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
+            imported: HashMap::new(),
         }
     }
 }
@@ -136,6 +167,7 @@ pub struct SceneRenderer {
     cube_mesh: Mesh,
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
+    imported_meshes: HashMap<u32, Mesh>,
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
@@ -223,6 +255,7 @@ impl SceneRenderer {
             cube_mesh,
             plane_mesh,
             sphere_mesh,
+            imported_meshes: HashMap::new(),
             grid_uniform_buffer,
             grid_bind_group,
             scene: SceneManager::default(),
@@ -265,13 +298,38 @@ impl SceneRenderer {
             MeshKind::Cube => &self.cube_mesh,
             MeshKind::Plane => &self.plane_mesh,
             MeshKind::Sphere => &self.sphere_mesh,
+            MeshKind::Imported(id) => &self.imported_meshes[&id],
         }
     }
 
     /// Advance simulation once per frame, independently of the number of views.
+    pub fn import_model(
+        &mut self,
+        model: &crate::gltf_loader::ImportedMesh,
+    ) -> Result<u32, String> {
+        let limit = self.device.limits().max_buffer_size;
+        if model.vertices.len() as u64 * 36 > limit || model.indices.len() as u64 * 4 > limit {
+            return Err("glTF model překračuje limity GPU bufferu".into());
+        }
+        let mesh = Mesh::imported(&self.device, model);
+        let id = self.scene.add_imported(
+            Vec3::from_array(model.bounds_min),
+            Vec3::from_array(model.bounds_max),
+        );
+        if id == crate::scene::INVALID_ID {
+            return Err("glTF model nelze přidat do scény".into());
+        }
+        self.imported_meshes.insert(id, mesh);
+        Ok(id)
+    }
     pub fn advance_scene(&mut self, dt: f32) {
         self.frame_metrics.record(dt);
         self.scene.update(dt);
+        self.imported_meshes
+            .retain(|id, _| self.scene.object_exists(*id));
+        for cache in &mut self.passes {
+            cache.imported.retain(|id, _| self.scene.object_exists(*id));
+        }
     }
 
     pub fn prepare_view(&mut self, view: RenderView) {
@@ -324,6 +382,14 @@ impl SceneRenderer {
                 .queue
                 .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
             for (batch, instances) in cache.batches.iter_mut().zip(&cache.queue.batches) {
+                self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
+            }
+            cache.imported.retain(|id, _| self.scene.object_exists(*id));
+            for (id, instances) in &cache.queue.imported {
+                let batch = cache
+                    .imported
+                    .entry(*id)
+                    .or_insert_with(|| InstanceBatch::new(&self.device, 1));
                 self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
             }
             cache.key = Some(key);
@@ -480,8 +546,18 @@ impl SceneRenderer {
                 let mesh = self.mesh(kind);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 pass.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
-                pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+            }
+            for (id, instances) in &cache.queue.imported {
+                if instances.is_empty() {
+                    continue;
+                }
+                let mesh = &self.imported_meshes[id];
+                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                pass.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
+                pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+                pass.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
             }
         }
         self.queue.submit(Some(encoder.finish()));
@@ -657,8 +733,18 @@ impl SceneRenderer {
                 let mesh = self.mesh(kind);
                 rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 rp.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
-                rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
+            }
+            for (id, instances) in &cache.queue.imported {
+                if instances.is_empty() {
+                    continue;
+                }
+                let mesh = &self.imported_meshes[id];
+                rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                rp.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
+                rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+                rp.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
             }
             if !reflected
                 && target.auxiliary.is_none()
