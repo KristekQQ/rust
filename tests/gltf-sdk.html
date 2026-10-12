@@ -11,9 +11,10 @@ try {
     const engine = await initEngine(document.getElementById('gpu-canvas'), {
         backend: new URLSearchParams(location.search).get('backend') || 'auto' });
     const scene = engine.scene;
-    const url = new URL('../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb', location.href);
+    const cathedral = new URLSearchParams(location.search).get('model') === 'cathedral';
+    const url = new URL(cathedral ? '../assets/models/sibenik-cathedral/sibenik-geometry.glb' : '../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb', location.href);
     const bridge = await scene.loadModel(url);
-    bridge.setScale([5,7,3]).setPosition([0,-0.65,0]).setRotation([0,Math.PI/4,0])
+    bridge.setScale(cathedral ? [0.8,0.8,0.8] : [5,7,3]).setPosition(cathedral ? [0,11.2498456,0] : [0,-0.65,0]).setRotation([0,cathedral ? 0 : Math.PI/4,0])
         .setRenderOptions({isStatic:true});
     const triangle = await scene.loadModel(new URL('./fixtures/gltf/triangle.gltf', location.href));
     triangle.setPosition([2,0,0]).spin([0,0.2,0]);

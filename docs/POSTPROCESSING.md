@@ -52,7 +52,9 @@ i dynamickou stínovou mapu prvního světla, směrovou HG fázi a exponenciáln
 Stabilní prostorový jitter omezuje pravidelné pásy; temporal accumulation není
 implementována. Zdroj už nemusí být vidět na obrazovce.
 
-Ukázka používá kamenný průchod a nepravidelné skály místo barevných lamel.
+Ukázka používá skutečný interiér katedrály Šibenik (75 273 trojúhelníků),
+bez textur a animací. Geometry-only GLB vzniká offline převodem staženého OBJ;
+provenance a nekomerční licence CC BY-NC jsou v assets/models/sibenik-cathedral.
 Stínové mapy se sdílejí s rendererem; další stínové průchody ani kopie nejsou
 potřeba. `enable('godRays', { strength })` a pořadí řetězce zůstávají stejné.
 

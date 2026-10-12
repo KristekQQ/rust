@@ -154,6 +154,7 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         schedule_remove_object: wasm.schedule_remove_object,
         schedule_remove_light: wasm.schedule_remove_light,
         set_camera_mode: wasm.set_camera_mode,
+        setCameraView(position, target) { accepted(wasm.set_camera_view(...position, ...target)); },
         set_grid_visible: wasm.set_grid_visible,
         set_light_helpers_visible: wasm.set_light_helpers_visible,
         set_output_mode: wasm.set_output_mode,

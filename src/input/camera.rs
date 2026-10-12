@@ -35,6 +35,28 @@ impl Camera {
         }
     }
 
+    /// Configure a free-camera view. All orientation calculations remain in Rust.
+    pub fn set_view(&mut self, position: Vec3, target: Vec3) -> bool {
+        let direction = target - position;
+        if !position.is_finite()
+            || !target.is_finite()
+            || !direction.is_finite()
+            || direction.length_squared() < 1e-8
+            || !direction.length_squared().is_finite()
+        {
+            return false;
+        }
+        let forward = direction.normalize();
+        if forward.x * forward.x + forward.z * forward.z < 1e-4 {
+            return false;
+        }
+        self.position = position;
+        self.yaw = forward.z.atan2(forward.x);
+        self.pitch = forward.y.asin();
+        self.pressed.clear();
+        true
+    }
+
     pub fn set_aspect(&mut self, aspect: f32) {
         self.aspect = aspect;
     }

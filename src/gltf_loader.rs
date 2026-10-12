@@ -615,6 +615,19 @@ mod tests {
         }
     }
     #[test]
+    fn real_sibenik_architecture_has_complete_large_triangle_mesh() {
+        let bytes = include_bytes!("../assets/models/sibenik-cathedral/sibenik-geometry.glb");
+        let model = parse(bytes, &[]).unwrap();
+        assert_eq!(model.vertices.len(), 148_866);
+        assert_eq!(model.indices.len(), 75_273 * 3);
+        assert!(model.indices.iter().any(|&i| i > u16::MAX as u32));
+        assert!(model.vertices.iter().all(|v| {
+            Vec3::from_array(v.position).is_finite()
+                && (Vec3::from_array(v.normal).length() - 1.0).abs() < 1e-5
+        }));
+        assert!(model.bounds_min[0] < -20.0 && model.bounds_max[1] >= 15.3);
+    }
+    #[test]
     fn real_kenney_bridge_glb_has_finite_geometry() {
         let bytes = include_bytes!(
             "../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb"

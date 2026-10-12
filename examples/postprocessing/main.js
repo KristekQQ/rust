@@ -7,6 +7,7 @@ const canvas = document.getElementById('gpu-canvas');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Chybí canvas');
 const backend = new URLSearchParams(location.search).get('backend') === 'webgl' ? 'webgl' : 'auto';
 const engine = await initEngine(canvas, { backend });
+engine.setCameraView([12, 3, 0], [-8, 5, 0]);
 engine.set_grid_visible(false);
 engine.set_light_helpers_visible(false);
 engine.set_render_effects(true, false);

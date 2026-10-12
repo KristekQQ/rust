@@ -16,6 +16,11 @@ try {
     const engine = await initEngine(document.getElementById("gpu-canvas"), {
         backend: new URLSearchParams(location.search).get("backend") || "auto",
     });
+    engine.setCameraView([5, 3, 5], [0, 0, 0]);
+    let cameraRejected = false;
+    try { engine.setCameraView([5, 3, 5], [5, 3, 5]); } catch { cameraRejected = true; }
+    assert(cameraRejected, 'Degenerate camera target rejected');
+    engine.set_camera_mode('orbit');
     const scene = engine.scene;
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Engine must start empty");
     createScene(scene);
@@ -61,7 +66,7 @@ try {
     assert(engine.postprocessing.stats().passes === 2, 'Two postprocess passes');
     engine.postprocessing.disable('ssr'); engine.postprocessing.disable('godRays');
     assert(engine.postprocessing.stats().targets === 0, 'Postprocess targets released');
-    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.";
+    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nCamera view, empty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.";
 } catch (error) {
     console.error(error);
     result.textContent = `FAIL: ${error.message}`;

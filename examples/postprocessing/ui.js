@@ -3,7 +3,7 @@ export function createUI(container, engine) {
     if (!container) throw new Error('Chybí UI');
     container.innerHTML = `
         <a href="../">← Rozcestník / ukončit render</a>
-        <h1>Kamenný most, kaluž a světlo v mlze</h1>
+        <h1>Katedrála Šibenik · geometrie a světlo</h1>
         <label><input type="checkbox" name="ssr" checked> Screen-space reflections</label>
         <label>Síla SSR <input type="range" name="ssrStrength" min="0" max="1" step="0.05" value="0.85"></label>
         <label><input type="checkbox" name="godRays" checked> Volumetrické paprsky</label>
@@ -12,10 +12,11 @@ export function createUI(container, engine) {
         <label><input type="checkbox" name="texture"> Výstup přes texturu</label>
         <label><input type="checkbox" name="grid"> Pomocná mřížka</label>
         <label><input type="checkbox" name="helpers"> Značky světel</label>
+        <button data-camera="free">Free kamera</button><button data-camera="orbit">Orbit kamera</button>
         <button id="verify">Ověřit řetězec</button>
         <pre role="status"></pre>
-        <p>Táhni myší pro změnu pohledu. Odrazy obsahují pouze objekty viditelné kamerou. Paprsky se počítají v prostoru ze stínových map prvního světla.</p>
-        <p>Most: <a href="https://kenney.nl/assets/nature-kit">Kenney Nature Kit (CC0)</a>. <a href="../../docs/GLTF.md">Import glTF</a>.</p>
+        <p>Táhni myší pro změnu pohledu. WASD: pohyb · Q/E: výška · Shift: rychleji. Odrazy obsahují pouze objekty viditelné kamerou. Paprsky se počítají v prostoru ze stínových map prvního světla.</p>
+        <p>Model: Marko Dabrovic, opravy Kenzie Lamar. <a href="https://casual-effects.com/data/">McGuire Computer Graphics Archive</a> · CC BY-NC (nekomerční demo). <a href="../../docs/GLTF.md">Import glTF</a>.</p>
         <p><a href="main.js">main.js</a> · <a href="scene.js">scene.js</a> · <a href="ui.js">ui.js</a></p>`;
     const field = name => container.querySelector(`[name="${name}"]`);
     const apply = () => {
@@ -29,6 +30,11 @@ export function createUI(container, engine) {
         engine.set_output_mode(field('texture').checked ? 'texture' : 'canvas');
     };
     container.addEventListener('input', apply);
+    const cameraClick = event => {
+        const mode = event.target instanceof HTMLElement ? event.target.dataset.camera : undefined;
+        if (mode === 'free' || mode === 'orbit') engine.set_camera_mode(mode);
+    };
+    container.addEventListener('click', cameraClick);
     let message = '';
     const frames = async () => { for (let i = 0; i < 6; i++) await new Promise(requestAnimationFrame); };
     container.querySelector('#verify').onclick = async () => {
@@ -67,5 +73,5 @@ export function createUI(container, engine) {
         const r = engine.renderer_stats();
         container.querySelector('[role="status"]').textContent = `${message}\n${engine.renderer_backend()} · ${r.fps.toFixed(0)} FPS\nPost průchody ${p.passes}\nCíle ${p.targets} · ${p.width} × ${p.height}`;
     }, 250);
-    return { dispose() { clearInterval(timer); container.removeEventListener('input', apply); } };
+    return { dispose() { clearInterval(timer); container.removeEventListener('input', apply); container.removeEventListener('click', cameraClick); } };
 }

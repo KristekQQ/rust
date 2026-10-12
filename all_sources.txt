@@ -695,6 +695,19 @@ mod tests {
         }
     }
     #[test]
+    fn real_sibenik_architecture_has_complete_large_triangle_mesh() {
+        let bytes = include_bytes!("../assets/models/sibenik-cathedral/sibenik-geometry.glb");
+        let model = parse(bytes, &[]).unwrap();
+        assert_eq!(model.vertices.len(), 148_866);
+        assert_eq!(model.indices.len(), 75_273 * 3);
+        assert!(model.indices.iter().any(|&i| i > u16::MAX as u32));
+        assert!(model.vertices.iter().all(|v| {
+            Vec3::from_array(v.position).is_finite()
+                && (Vec3::from_array(v.normal).length() - 1.0).abs() < 1e-5
+        }));
+        assert!(model.bounds_min[0] < -20.0 && model.bounds_max[1] >= 15.3);
+    }
+    #[test]
     fn real_kenney_bridge_glb_has_finite_geometry() {
         let bytes = include_bytes!(
             "../assets/models/kenney-nature-bridge-stone-round/bridge_stone_round.glb"
@@ -783,6 +796,14 @@ impl ActiveCamera {
         self.active = ty;
     }
 
+    pub fn set_view(&mut self, position: Vec3, target: Vec3) -> bool {
+        if !self.free.set_view(position, target) {
+            return false;
+        }
+        self.set_type(CameraType::Free);
+        true
+    }
+
     pub fn set_aspect(&mut self, aspect: f32) {
         self.free.set_aspect(aspect);
         self.orbit.set_aspect(aspect);
@@ -837,6 +858,22 @@ impl CameraController for ActiveCamera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_free_view_projects_target_and_rejects_invalid_input() {
+        let mut camera = ActiveCamera::new(1.0);
+        let position = Vec3::new(12.0, 3.0, 0.0);
+        let target = Vec3::new(-8.0, 5.0, 0.0);
+        assert!(camera.set_view(position, target));
+        assert_eq!(camera.position(), position);
+        let clip = camera.matrix() * target.extend(1.0);
+        assert!(clip.x.abs() < 1e-5 && clip.y.abs() < 1e-5 && clip.w > 0.0);
+        let previous = camera.matrix();
+        for bad in [position, Vec3::splat(f32::NAN), position + Vec3::Y] {
+            assert!(!camera.set_view(position, bad));
+            assert_eq!(camera.matrix(), previous);
+        }
+    }
 
     #[test]
     fn switching_camera_releases_held_keys() {
@@ -914,6 +951,28 @@ impl Camera {
             pressed: HashSet::new(),
             aspect,
         }
+    }
+
+    /// Configure a free-camera view. All orientation calculations remain in Rust.
+    pub fn set_view(&mut self, position: Vec3, target: Vec3) -> bool {
+        let direction = target - position;
+        if !position.is_finite()
+            || !target.is_finite()
+            || !direction.is_finite()
+            || direction.length_squared() < 1e-8
+            || !direction.length_squared().is_finite()
+        {
+            return false;
+        }
+        let forward = direction.normalize();
+        if forward.x * forward.x + forward.z * forward.z < 1e-4 {
+            return false;
+        }
+        self.position = position;
+        self.yaw = forward.z.atan2(forward.x);
+        self.pitch = forward.y.asin();
+        self.pressed.clear();
+        true
     }
 
     pub fn set_aspect(&mut self, aspect: f32) {
@@ -6561,6 +6620,16 @@ pub fn set_grid_visible(show: bool) {
             st.borrow_mut().set_grid_visible(show);
         }
     });
+}
+
+#[wasm_bindgen]
+pub fn set_camera_view(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> bool {
+    CAMERA.with(|camera| {
+        camera.borrow().as_ref().is_some_and(|c| {
+            c.borrow_mut()
+                .set_view(glam::Vec3::new(px, py, pz), glam::Vec3::new(tx, ty, tz))
+        })
+    })
 }
 
 #[wasm_bindgen]

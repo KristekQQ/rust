@@ -287,4 +287,4 @@ Rust/WGSL řetězec. [API a přidání efektu](docs/POSTPROCESSING.md).
 
 `await engine.scene.loadModel(url)` načte `.gltf` nebo `.glb` do Rust scény.
 Podporu geometrie, materiálů a limity popisuje [docs/GLTF.md](docs/GLTF.md).
-Ukázka [postprocessing](examples/postprocessing/) používá skutečný CC0 kamenný most.
+Ukázka [postprocessing](examples/postprocessing/) používá komplexní interiér katedrály Šibenik (CC BY-NC, pouze nekomerční demonstrační asset).

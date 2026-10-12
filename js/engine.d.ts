@@ -79,6 +79,6 @@ export interface PostProcessing {
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
     stats(): { passes: number; width: number; height: number; targets: number; frames: number };
 }
-export type Engine = Readonly<RawEngine & { readonly scene: Scene; readonly postprocessing: PostProcessing; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+export type Engine = Readonly<RawEngine & { readonly scene: Scene; readonly postprocessing: PostProcessing; setCameraView(position: Vector3, target: Vector3): void; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;

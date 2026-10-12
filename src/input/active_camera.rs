@@ -28,6 +28,14 @@ impl ActiveCamera {
         self.active = ty;
     }
 
+    pub fn set_view(&mut self, position: Vec3, target: Vec3) -> bool {
+        if !self.free.set_view(position, target) {
+            return false;
+        }
+        self.set_type(CameraType::Free);
+        true
+    }
+
     pub fn set_aspect(&mut self, aspect: f32) {
         self.free.set_aspect(aspect);
         self.orbit.set_aspect(aspect);
@@ -82,6 +90,22 @@ impl CameraController for ActiveCamera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_free_view_projects_target_and_rejects_invalid_input() {
+        let mut camera = ActiveCamera::new(1.0);
+        let position = Vec3::new(12.0, 3.0, 0.0);
+        let target = Vec3::new(-8.0, 5.0, 0.0);
+        assert!(camera.set_view(position, target));
+        assert_eq!(camera.position(), position);
+        let clip = camera.matrix() * target.extend(1.0);
+        assert!(clip.x.abs() < 1e-5 && clip.y.abs() < 1e-5 && clip.w > 0.0);
+        let previous = camera.matrix();
+        for bad in [position, Vec3::splat(f32::NAN), position + Vec3::Y] {
+            assert!(!camera.set_view(position, bad));
+            assert_eq!(camera.matrix(), previous);
+        }
+    }
 
     #[test]
     fn switching_camera_releases_held_keys() {

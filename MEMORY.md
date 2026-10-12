@@ -1,3 +1,18 @@
+# Komplexní konstrukce Šibenik – 2026-10-12
+
+Postprocessing příklad nyní načítá skutečnou katedrálu z McGuire Graphics Archive.
+`scripts/convert-sibenik.py` převádí stažený OBJ ZIP offline do geometry-only GLB:
+75 273 trojúhelníků / 148 866 vrcholů (indexy přesahují u16), ~4.5MB;
+UV/textury a původní materiály vynechány, 11 nulových trojúhelníků odstraněno.
+Asset je CC BY-NC dle oficiálních metadat, pouze nekomerční demo, není CC0.
+Provenance, originální copyright a metadata: assets/models/sibenik-cathedral.
+Scéna se autorsky definuje v JS, je statická, bez animovaných koulí.
+`engine.setCameraView(position,target)` nastavuje Free kameru přes Rust:
+validace, yaw/pitch a input reset jsou v camera.rs/active_camera.rs.
+Úvodní pohled podél hlavní lodě a světla určuje examples/postprocessing/main.js/scene.js.
+`tests/gltf-sdk.html?model=cathedral` testuje velký model a odstranění v WASM.
+Původní Kenney GLB zůstává malým integračním fixture; starší záznam níže je historický.
+
 # Statický import glTF – 2026-10-12
 
 `src/gltf_loader.rs` parsuje glTF 2.0/GLB, skládá node transformace, normály,

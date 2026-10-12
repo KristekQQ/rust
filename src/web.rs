@@ -316,6 +316,16 @@ pub fn set_grid_visible(show: bool) {
 }
 
 #[wasm_bindgen]
+pub fn set_camera_view(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> bool {
+    CAMERA.with(|camera| {
+        camera.borrow().as_ref().is_some_and(|c| {
+            c.borrow_mut()
+                .set_view(glam::Vec3::new(px, py, pz), glam::Vec3::new(tx, ty, tz))
+        })
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_camera_mode(mode: &str) {
     CAMERA.with(|c| {
         if let Some(cam) = &*c.borrow() {
