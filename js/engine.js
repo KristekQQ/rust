@@ -73,6 +73,20 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
 
     return Object.freeze({
         scene: new Scene(wasm),
+        // Thin commands only: pass order, resources and execution live in Rust.
+        postprocessing: Object.freeze({
+            enable(name, { strength = 0.6 } = {}) {
+                accepted(wasm.set_postprocess(name, true, strength));
+            },
+            disable(name) { accepted(wasm.set_postprocess(name, false, 0)); },
+            setReflectionMask({ width, height, pixels, center = [0, 0], size = [1, 1] }) {
+                accepted(wasm.set_reflection_mask(width, height, pixels, ...center, ...size));
+            },
+            stats() {
+                const [passes, width, height, targets, frames] = wasm.postprocess_stats();
+                return { passes, width, height, targets, frames };
+            },
+        }),
         add_cube: wasm.add_cube,
         add_plane: wasm.add_plane,
         add_sphere: wasm.add_sphere,

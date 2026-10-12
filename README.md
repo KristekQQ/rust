@@ -273,7 +273,12 @@ SDK přidává `setRenderOptions`, `spin`, `scene.setMirror`,
 
 ## JavaScript examples
 
-[Rozcestník pěti samostatných ukázek](examples/index.html) odkazuje na aplikace
+[Rozcestník samostatných ukázek](examples/index.html) odkazuje na aplikace
 s vlastními main.js a scene.js; začni [základním příkladem](examples/basic/main.js)
 přes Rust/WASM SDK. Spuštění: `scripts/run-local.sh`, potom
 http://127.0.0.1:8000/examples/. Viz [návod](examples/README.md).
+
+### Postprocessing
+
+[SSR, kaluž a god rays](examples/postprocessing/index.html) používají rozšiřitelný
+Rust/WGSL řetězec. [API a přidání efektu](docs/POSTPROCESSING.md).

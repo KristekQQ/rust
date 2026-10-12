@@ -1,5 +1,7 @@
 //! Browser host connecting the scene renderer to a canvas output.
-use super::{output::CanvasOutput, renderer::SceneRenderer, target::RenderView};
+use super::{
+    output::CanvasOutput, postprocess::PostProcessor, renderer::SceneRenderer, target::RenderView,
+};
 use glam::{Mat4, Vec3};
 use std::ops::{Deref, DerefMut};
 use wasm_bindgen::JsValue;
@@ -8,6 +10,7 @@ use web_sys::HtmlCanvasElement;
 pub struct State {
     renderer: SceneRenderer,
     output: CanvasOutput,
+    postprocess: PostProcessor,
     pub backend: String,
     pub aspect: f32,
     view: RenderView,
@@ -27,9 +30,11 @@ impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
         let aspect = output.aspect();
+        let postprocess = PostProcessor::new(&device, output.color_format());
         Ok(Self {
             renderer: SceneRenderer::new(device, queue),
             output,
+            postprocess,
             backend,
             aspect,
             view: RenderView {
@@ -41,6 +46,30 @@ impl State {
     pub fn resize(&mut self, width: u32, height: u32) {
         self.output.resize(&self.renderer.device, width, height);
         self.aspect = self.output.aspect();
+    }
+    pub fn set_postprocess(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
+        self.postprocess.set_effect(name, enabled, strength)
+    }
+    pub fn set_reflection_mask(
+        &mut self,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        center: glam::Vec2,
+        size: glam::Vec2,
+    ) -> bool {
+        self.postprocess.set_reflection_mask(
+            &self.renderer.device,
+            &self.renderer.queue,
+            width,
+            height,
+            pixels,
+            center,
+            size,
+        )
+    }
+    pub fn postprocess_stats(&self) -> [f64; 5] {
+        self.postprocess.stats()
     }
     pub fn set_output_mode(&mut self, mode: &str) -> bool {
         match mode {
@@ -63,9 +92,35 @@ impl State {
         };
         self.output.ensure_target(&self.renderer.device);
         let target = self.output.target(&frame);
-        self.renderer
-            .render_view(self.view, &target)
-            .map_err(|e| JsValue::from_str(&e))?;
+        if self.postprocess.enabled() {
+            self.postprocess
+                .ensure_size(&self.renderer.device, target.width, target.height);
+            self.renderer
+                .render_view(self.view, &self.postprocess.target())
+                .map_err(|e| JsValue::from_str(&e))?;
+            let light = self.renderer.scene.lights().values().next();
+            let (position, color) = light
+                .map(|l| (l.position, l.color))
+                .unwrap_or((Vec3::ZERO, Vec3::ZERO));
+            self.postprocess.render(
+                &self.renderer.device,
+                &self.renderer.queue,
+                self.view,
+                position,
+                color,
+                target.color,
+            );
+            let overlays = super::target::RenderTarget {
+                depth: self.postprocess.target().depth,
+                auxiliary: None,
+                ..target
+            };
+            self.renderer.draw_helpers(&overlays);
+        } else {
+            self.renderer
+                .render_view(self.view, &target)
+                .map_err(|e| JsValue::from_str(&e))?;
+        }
         self.output
             .present(frame, &self.renderer.device, &self.renderer.queue);
         Ok(())

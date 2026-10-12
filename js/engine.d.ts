@@ -68,6 +68,15 @@ export interface EffectStats {
     staticVisible:number; dynamicVisible:number; reflectionVisible:number;
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
-export type Engine = Readonly<RawEngine & { readonly scene: Scene; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+export type PostEffectName = "ssr" | "godRays";
+export interface PostProcessing {
+    /** Strength 0..1. Unknown effects and invalid values throw. Computed in Rust/WGSL. */
+    enable(name: PostEffectName, options?: { strength?: number }): void;
+    disable(name: PostEffectName): void;
+    /** Grayscale mask on world XZ: 0 dry, 255 reflective. Uploaded once. */
+    setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
+    stats(): { passes: number; width: number; height: number; targets: number; frames: number };
+}
+export type Engine = Readonly<RawEngine & { readonly scene: Scene; readonly postprocessing: PostProcessing; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;

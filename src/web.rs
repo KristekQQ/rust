@@ -15,6 +15,48 @@ thread_local! {
 }
 
 #[wasm_bindgen]
+pub fn set_postprocess(name: &str, enabled: bool, strength: f32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().set_postprocess(name, enabled, strength))
+    })
+}
+#[wasm_bindgen]
+pub fn set_reflection_mask(
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+    x: f32,
+    z: f32,
+    size_x: f32,
+    size_z: f32,
+) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut().set_reflection_mask(
+                width,
+                height,
+                pixels,
+                glam::Vec2::new(x, z),
+                glam::Vec2::new(size_x, size_z),
+            )
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn postprocess_stats() -> Vec<f64> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|s| s.borrow().postprocess_stats().to_vec())
+            .unwrap_or_default()
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_render_effects(shadows: bool, reflections: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {

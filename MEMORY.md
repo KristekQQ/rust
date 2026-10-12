@@ -1,3 +1,13 @@
+# Postprocessing – 2026-10-12
+
+Rust render/postprocess.rs + WGSL: SSR a screen-space god rays, registry EFFECTS,
+ping-pong targets, offscreen reflectivity alpha metadata, opaque final output.
+SDK engine.postprocessing enable/disable/setReflectionMask/stats. Scéna
+examples/postprocessing obsahuje SVG masku kaluže načtenou JS pouze při startu;
+Rust drží masku a GPU průchody. Post depth je packed RGB8 v druhém MRT attachmentu kvůli WebGL samplerům.
+Instance material.x = obecná reflektivita, .z = aktivní planar mirror flag.
+Omezení a rozšíření: docs/POSTPROCESSING.md. Statistika frames měří submity.
+
 # Samostatné aplikace a nástroje – aktuální rozhodnutí 2026-10-05
 
 examples/index.html je statický rozcestník bez canvasu/WASM. Každý z basic,

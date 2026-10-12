@@ -10,6 +10,7 @@ pub fn build(
     layout: &BindGroupLayout,
     effects: &BindGroupLayout,
     reflected: bool,
+    material_mask: bool,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -17,6 +18,18 @@ pub fn build(
         bind_group_layouts: &[Some(layout), Some(effects)],
         immediate_size: 0,
     });
+    let mut targets = vec![Some(wgpu::ColorTargetState {
+        format,
+        blend: Some(wgpu::BlendState::REPLACE),
+        write_mask: wgpu::ColorWrites::ALL,
+    })];
+    if material_mask {
+        targets.push(Some(wgpu::ColorTargetState {
+            format: TextureFormat::Rgba8Unorm,
+            blend: Some(wgpu::BlendState::REPLACE),
+            write_mask: wgpu::ColorWrites::ALL,
+        }));
+    }
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("pipeline"),
         layout: Some(&pipeline_layout),
@@ -31,13 +44,13 @@ pub fn build(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some("fs_main"),
+            entry_point: Some(if material_mask {
+                "fs_postprocess"
+            } else {
+                "fs_main"
+            }),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
+            targets: &targets,
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,

@@ -133,13 +133,13 @@ impl RenderQueue {
             };
             let mut instance = data.instance;
             instance.material = [
+                options.reflectivity,
+                if options.receives_shadow { 1.0 } else { 0.0 },
                 if Some(*id) == scene.mirror_object {
-                    options.reflectivity
+                    1.0
                 } else {
                     0.0
                 },
-                if options.receives_shadow { 1.0 } else { 0.0 },
-                0.0,
                 0.0,
             ];
             self.batches[index].push(instance);
@@ -159,6 +159,31 @@ mod tests {
     use super::*;
     fn camera() -> Mat4 {
         glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
+    }
+    #[test]
+    fn ssr_reflectivity_is_independent_of_planar_mirror_registration() {
+        let mut scene = SceneManager::default();
+        let floor = scene.add_plane(Vec3::ZERO);
+        let cube = scene.add_cube(Vec3::ZERO);
+        for id in [floor, cube] {
+            assert!(scene.set_render_options(
+                id,
+                crate::scene::RenderOptions {
+                    reflectivity: 0.85,
+                    ..Default::default()
+                }
+            ));
+        }
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        for batch in &queue.batches[..2] {
+            assert_eq!(batch[0].material[0], 0.85);
+            assert_eq!(batch[0].material[2], 0.0);
+        }
+        assert!(scene.configure_mirror(floor));
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        assert_eq!(queue.batches[1][0].material[2], 1.0);
+        assert_eq!(queue.batches[0][0].material[2], 0.0);
     }
     #[test]
     fn pass_filtering_partitions_casters_and_excludes_mirror_feedback() {

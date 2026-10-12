@@ -101,6 +101,9 @@ impl CanvasOutput {
             backend,
         ))
     }
+    pub fn color_format(&self) -> wgpu::TextureFormat {
+        self.config.format.add_srgb_suffix()
+    }
     pub fn aspect(&self) -> f32 {
         self.config.width as f32 / self.config.height as f32
     }
@@ -256,6 +259,7 @@ impl CanvasOutput {
         RenderTarget {
             color,
             depth,
+            auxiliary: None,
             color_format: self.config.format.add_srgb_suffix(),
             depth_format: DEPTH_FORMAT,
             width: self.config.width,

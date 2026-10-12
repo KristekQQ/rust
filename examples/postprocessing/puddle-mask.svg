@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs><filter id="soft"><feGaussianBlur stdDeviation="4"/></filter></defs>
+  <rect width="256" height="256" fill="black"/>
+  <path fill="white" filter="url(#soft)" d="M28 96C18 73 45 41 75 53C96 23 136 39 151 51C184 34 219 62 210 90C242 110 220 140 204 152C218 184 184 215 154 197C124 233 91 205 76 194C41 205 21 174 35 149C14 132 10 108 28 96Z"/>
+  <ellipse cx="171" cy="149" rx="12" ry="9" fill="black" filter="url(#soft)"/>
+</svg>

@@ -55,7 +55,13 @@ try {
     scene.clear();
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Rust clear");
     createScene(scene);
-    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear.";
+    engine.postprocessing.enable('ssr', { strength: 0.7 });
+    engine.postprocessing.enable('godRays', { strength: 0.4 });
+    for (let i = 0; i < 8; i++) await new Promise(requestAnimationFrame);
+    assert(engine.postprocessing.stats().passes === 2, 'Two postprocess passes');
+    engine.postprocessing.disable('ssr'); engine.postprocessing.disable('godRays');
+    assert(engine.postprocessing.stats().targets === 0, 'Postprocess targets released');
+    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nEmpty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.";
 } catch (error) {
     console.error(error);
     result.textContent = `FAIL: ${error.message}`;

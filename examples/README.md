@@ -8,6 +8,7 @@ Každý příklad je samostatná stránka:
 - `shadows/`: dva stíny, statické objekty a Rust animace.
 - `mirror/`: rozšíření ukázky stínů o render odrazu do textury.
 - `lights/`: světelné orbity počítané Rustem.
+- `postprocessing/`: texturovaná kaluž, SSR a god rays; vlastní volitelné UI.
 - `culling/`: 10 000 krychlí vytvořených jednou; Rust vybírá viditelné instance.
 
 Každá složka obsahuje `index.html`, `main.js` a `scene.js`.
@@ -62,3 +63,5 @@ konkrétní `createScene` a volá ji sama. SDK nezná ukázky.
 „Pozastavit simulaci“ zastaví pohyb, ale hlavní pohled dál renderuje.
 „Ukončit render“ naviguje na statický rozcestník a zruší stránku s WASM/GPU.
 Otevírej příklady ve stejné kartě, pokud nechceš více běžících enginů.
+
+Postprocess API a přidání efektu: [POSTPROCESSING](../docs/POSTPROCESSING.md).

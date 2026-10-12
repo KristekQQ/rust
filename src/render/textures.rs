@@ -89,6 +89,7 @@ impl ColorTarget {
         RenderTarget {
             color: &self.color,
             depth: &self.depth,
+            auxiliary: None,
             color_format: self.format,
             depth_format: DepthTarget::FORMAT,
             width: self.width,

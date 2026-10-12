@@ -173,9 +173,6 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        if options.reflectivity > 0.0 && object.mesh != MeshKind::Plane {
-            return false;
-        }
         let was_static = object.render_options.is_static;
         object.render_options = options;
         self.changed(id);

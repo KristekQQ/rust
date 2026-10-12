@@ -109,8 +109,7 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
     return visibility/9.0;
 }
 
-@fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn shade_surface(input: VertexOutput) -> vec4<f32> {
     if (effects.params.z>0.5 && dot(effects.clip_plane,vec4(input.world_pos,1.0)) < -0.001) { discard; }
     let normal = normalize(input.world_normal);
     let view_dir = normalize(scene.camera_pos - input.world_pos);
@@ -138,17 +137,34 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         result += (diff * input.color + spec) * light.color * visibility;
     }
 
-    if(effects.params.y>0.5 && input.material.x>0.0) {
+    if(effects.params.y>0.5 && input.material.z>0.5 && input.material.x>0.0) {
         let reflected=effects.reflection_matrix*vec4(input.world_pos,1.0);
         let uv=reflected.xy/reflected.w*vec2(0.5,-0.5)+vec2(0.5);
         if(reflected.w>0.0 && all(uv>=vec2(0.0)) && all(uv<=vec2(1.0))) {
             result=mix(result,textureSampleLevel(reflection_texture,reflection_sampler,uv,0.0).rgb,input.material.x);
         }
     }
-    return vec4<f32>(result, 1.0);
+    return vec4<f32>(result, input.material.x);
 }
 
 @fragment
 fn fs_color(input: VertexOutput) -> @location(0) vec4<f32> {
     return vec4<f32>(input.color, 1.0);
+}
+
+// Alpha is material metadata only in the offscreen postprocessing path.
+@fragment fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    return vec4(shade_surface(input).rgb, 1.0);
+}
+struct PostSurface {
+    @location(0) color: vec4<f32>,
+    @location(1) depth: vec4<f32>,
+};
+@fragment fn fs_postprocess(input: VertexOutput) -> PostSurface {
+    var output: PostSurface;
+    output.color = shade_surface(input);
+    var encoded = fract(min(input.pos.z, 0.9999999) * vec3(1.0, 255.0, 65025.0));
+    encoded -= encoded.yzz * vec3(1.0 / 255.0, 1.0 / 255.0, 0.0);
+    output.depth = vec4(encoded, 1.0);
+    return output;
 }

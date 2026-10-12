@@ -1138,7 +1138,7 @@ pub fn create(device: &Device, w: u32, h: u32, format: TextureFormat) -> (Textur
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         view_formats: &[],
     });
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -1584,6 +1584,8 @@ pub mod target;
 pub mod effects;
 pub mod textures;
 
+pub mod postprocess;
+
 \n# File: src/render/output.rs
 //! Browser presentation adapter. Only this module knows about canvas/surfaces.
 use super::{
@@ -1687,6 +1689,9 @@ impl CanvasOutput {
             queue,
             backend,
         ))
+    }
+    pub fn color_format(&self) -> wgpu::TextureFormat {
+        self.config.format.add_srgb_suffix()
     }
     pub fn aspect(&self) -> f32 {
         self.config.width as f32 / self.config.height as f32
@@ -1843,6 +1848,7 @@ impl CanvasOutput {
         RenderTarget {
             color,
             depth,
+            auxiliary: None,
             color_format: self.config.format.add_srgb_suffix(),
             depth_format: DEPTH_FORMAT,
             width: self.config.width,
@@ -1909,6 +1915,7 @@ pub fn build(
     layout: &BindGroupLayout,
     effects: &BindGroupLayout,
     reflected: bool,
+    material_mask: bool,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -1916,6 +1923,18 @@ pub fn build(
         bind_group_layouts: &[Some(layout), Some(effects)],
         immediate_size: 0,
     });
+    let mut targets = vec![Some(wgpu::ColorTargetState {
+        format,
+        blend: Some(wgpu::BlendState::REPLACE),
+        write_mask: wgpu::ColorWrites::ALL,
+    })];
+    if material_mask {
+        targets.push(Some(wgpu::ColorTargetState {
+            format: TextureFormat::Rgba8Unorm,
+            blend: Some(wgpu::BlendState::REPLACE),
+            write_mask: wgpu::ColorWrites::ALL,
+        }));
+    }
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("pipeline"),
         layout: Some(&pipeline_layout),
@@ -1930,13 +1949,13 @@ pub fn build(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some("fs_main"),
+            entry_point: Some(if material_mask {
+                "fs_postprocess"
+            } else {
+                "fs_main"
+            }),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
+            targets: &targets,
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
@@ -2056,6 +2075,681 @@ pub fn build_shadow(
         multiview_mask: None,
         cache: None,
     })
+}
+
+\n# File: src/render/postprocess.rs
+//! Depth-aware fragment postprocessing, independent of a browser or surface.
+use super::{
+    data::as_bytes,
+    target::{RenderTarget, RenderView},
+    textures::ColorTarget,
+};
+use glam::{Vec2, Vec3};
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Uniforms {
+    inverse_view_projection: [[f32; 4]; 4],
+    view_projection: [[f32; 4]; 4],
+    camera: [f32; 4],
+    light_clip: [f32; 4],
+    light_color: [f32; 4],
+    // strength, final output flag, width, height; all fields are 16-byte aligned.
+    params: [f32; 4],
+    mask_params: [f32; 4],
+}
+// Rust offsets match WGSL matrices and vec4 fields (208 bytes total).
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 208);
+const _: () = assert!(std::mem::offset_of!(Uniforms, params) == 176);
+
+// Add a WGSL fragment entry point and a descriptor to extend the chain.
+// All passes read original scene depth; intermediate alpha is material metadata.
+struct EffectDescriptor {
+    name: &'static str,
+    entry_point: &'static str,
+    shader_source: &'static str,
+}
+const EFFECTS: &[EffectDescriptor] = &[
+    EffectDescriptor {
+        name: "ssr",
+        entry_point: "fs_ssr",
+        shader_source: include_str!("postprocess.wgsl"),
+    },
+    EffectDescriptor {
+        name: "godRays",
+        entry_point: "fs_god_rays",
+        shader_source: include_str!("postprocess.wgsl"),
+    },
+];
+struct Effect {
+    name: &'static str,
+    enabled: bool,
+    strength: f32,
+    pipeline: wgpu::RenderPipeline,
+    uniform: wgpu::Buffer,
+}
+struct Intermediate {
+    _texture: wgpu::Texture,
+    view: wgpu::TextureView,
+}
+impl Intermediate {
+    fn new(device: &wgpu::Device, width: u32, height: u32, format: wgpu::TextureFormat) -> Self {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("postprocess ping-pong"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&Default::default());
+        Self {
+            _texture: texture,
+            view,
+        }
+    }
+}
+struct ReflectionMask {
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    params: [f32; 4],
+    enabled: bool,
+    needs_white_upload: bool,
+}
+impl ReflectionMask {
+    fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("world XZ reflection mask"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&Default::default());
+        Self {
+            texture,
+            view,
+            params: [0.0, 0.0, 1.0, 1.0],
+            enabled: false,
+            needs_white_upload: true,
+        }
+    }
+    fn upload(&self, queue: &wgpu::Queue, width: u32, height: u32, pixels: &[u8]) {
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            pixels,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+}
+struct Targets {
+    scene: ColorTarget,
+    depth_color: Intermediate,
+    ping: [Intermediate; 2],
+    bind_groups: Vec<[wgpu::BindGroup; 3]>,
+}
+pub struct PostProcessor {
+    format: wgpu::TextureFormat,
+    layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    depth_sampler: wgpu::Sampler,
+    effects: Vec<Effect>,
+    reflection_mask: ReflectionMask,
+    targets: Option<Targets>,
+    submitted_frames: u64,
+    last_pass_count: usize,
+}
+impl PostProcessor {
+    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("postprocess layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: wgpu::BufferSize::new(
+                            std::mem::size_of::<Uniforms>() as u64
+                        ),
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("postprocess linear clamp"),
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let depth_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("postprocess nearest depth"),
+            ..Default::default()
+        });
+        let effects = EFFECTS
+            .iter()
+            .map(|descriptor| {
+                let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some(descriptor.name),
+                    source: wgpu::ShaderSource::Wgsl(descriptor.shader_source.into()),
+                });
+                let pipeline_layout =
+                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                        label: Some("postprocess pipeline layout"),
+                        bind_group_layouts: &[Some(&layout)],
+                        immediate_size: 0,
+                    });
+                let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("depth-aware postprocess"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader,
+                        entry_point: Some("vs_main"),
+                        compilation_options: Default::default(),
+                        buffers: &[],
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: Some(descriptor.entry_point),
+                        compilation_options: Default::default(),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format,
+                            blend: Some(wgpu::BlendState::REPLACE),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                    }),
+                    primitive: Default::default(),
+                    depth_stencil: None,
+                    multisample: Default::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
+                Effect {
+                    name: descriptor.name,
+                    pipeline,
+                    enabled: false,
+                    strength: 0.5,
+                    uniform: device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some(descriptor.name),
+                        size: std::mem::size_of::<Uniforms>() as u64,
+                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    }),
+                }
+            })
+            .collect();
+        Self {
+            format,
+            layout,
+            sampler,
+            depth_sampler,
+            effects,
+            reflection_mask: ReflectionMask::new(device, 1, 1),
+            targets: None,
+            submitted_frames: 0,
+            last_pass_count: 0,
+        }
+    }
+    /// R8 bytes map world XZ to UV: (position - center) / size + 0.5.
+    /// Wet/dry base-color shading is applied by the SSR pass only.
+    pub fn set_reflection_mask(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        center: Vec2,
+        size: Vec2,
+    ) -> bool {
+        if width == 0
+            || height == 0
+            || width > 1024
+            || height > 1024
+            || !center.is_finite()
+            || !size.is_finite()
+            || size.x <= 0.0
+            || size.y <= 0.0
+            || width
+                .checked_mul(height)
+                .and_then(|n| usize::try_from(n).ok())
+                != Some(pixels.len())
+        {
+            return false;
+        }
+        let mut mask = ReflectionMask::new(device, width, height);
+        mask.upload(queue, width, height, pixels);
+        mask.params = [center.x, center.y, size.x, size.y];
+        mask.enabled = true;
+        mask.needs_white_upload = false;
+        self.reflection_mask = mask;
+        self.targets = None;
+        self.last_pass_count = 0;
+        true
+    }
+    pub fn set_effect(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
+        if !strength.is_finite() || !(0.0..=1.0).contains(&strength) {
+            return false;
+        }
+        let Some(effect) = self.effects.iter_mut().find(|effect| effect.name == name) else {
+            return false;
+        };
+        effect.enabled = enabled;
+        effect.strength = strength;
+        if !self.enabled() {
+            self.targets = None;
+            self.last_pass_count = 0;
+        }
+        true
+    }
+    pub fn enabled(&self) -> bool {
+        self.effects
+            .iter()
+            .any(|effect| effect.enabled && effect.strength > 0.0)
+    }
+    pub fn ensure_size(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        if !self.enabled() || width == 0 || height == 0 {
+            self.targets = None;
+            self.last_pass_count = 0;
+            return;
+        }
+        if self
+            .targets
+            .as_ref()
+            .is_some_and(|targets| targets.scene.width == width && targets.scene.height == height)
+        {
+            return;
+        }
+        let scene = ColorTarget::new(device, "postprocess scene", width, height, self.format);
+        let depth_color = Intermediate::new(device, width, height, wgpu::TextureFormat::Rgba8Unorm);
+        let ping: [Intermediate; 2] =
+            std::array::from_fn(|_| Intermediate::new(device, width, height, self.format));
+        let sources = [&scene.color, &ping[0].view, &ping[1].view];
+        let bind_groups = self.effects.iter().map(|effect| {
+            std::array::from_fn(|source_index| {
+                device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some(effect.name),
+                    layout: &self.layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(sources[source_index]),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(&depth_color.view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: effect.uniform.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 4,
+                            resource: wgpu::BindingResource::Sampler(&self.depth_sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 6,
+                            resource: wgpu::BindingResource::TextureView(
+                                &self.reflection_mask.view,
+                            ),
+                        },
+                    ],
+                })
+            })
+        });
+        let bind_groups = bind_groups.collect();
+        self.targets = Some(Targets {
+            scene,
+            depth_color,
+            ping,
+            bind_groups,
+        });
+    }
+    /// Call ensure_size before requesting the scene render attachments.
+    pub fn target(&self) -> RenderTarget<'_> {
+        let targets = self
+            .targets
+            .as_ref()
+            .expect("ensure_size before postprocess target");
+        let mut target = targets.scene.target();
+        target.auxiliary = Some(&targets.depth_color.view);
+        target
+    }
+    /// Frames count successful queue.submit calls, not GPU completion timestamps.
+    pub fn stats(&self) -> [f64; 5] {
+        let passes = if self.enabled() {
+            self.last_pass_count as f64
+        } else {
+            0.0
+        };
+        self.targets.as_ref().map_or(
+            [passes, 0.0, 0.0, 0.0, self.submitted_frames as f64],
+            |targets| {
+                [
+                    passes,
+                    targets.scene.width as f64,
+                    targets.scene.height as f64,
+                    4.0,
+                    self.submitted_frames as f64,
+                ]
+            },
+        )
+    }
+    pub fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        view: RenderView,
+        light_position: Vec3,
+        light_color: Vec3,
+        output: &wgpu::TextureView,
+    ) {
+        // new() has no queue; initialize its white fallback once, before sampling.
+        if self.reflection_mask.needs_white_upload {
+            self.reflection_mask.upload(queue, 1, 1, &[255]);
+            self.reflection_mask.needs_white_upload = false;
+        }
+        let Some(targets) = &self.targets else {
+            return;
+        };
+        let active: Vec<_> = self
+            .effects
+            .iter()
+            .enumerate()
+            .filter(|(_, effect)| effect.enabled && effect.strength > 0.0)
+            .collect();
+        if active.is_empty() {
+            return;
+        }
+        let light_clip = view.view_projection * light_position.extend(1.0);
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("postprocess chain"),
+        });
+        for (index, (effect_index, effect)) in active.iter().enumerate() {
+            let uniforms = Uniforms {
+                inverse_view_projection: view.view_projection.inverse().to_cols_array_2d(),
+                view_projection: view.view_projection.to_cols_array_2d(),
+                camera: view
+                    .camera_position
+                    .extend(if self.reflection_mask.enabled {
+                        1.0
+                    } else {
+                        0.0
+                    })
+                    .to_array(),
+                light_clip: light_clip.to_array(),
+                light_color: light_color.extend(1.0).to_array(),
+                params: [
+                    effect.strength,
+                    if index + 1 == active.len() { 1.0 } else { 0.0 },
+                    targets.scene.width as f32,
+                    targets.scene.height as f32,
+                ],
+                mask_params: self.reflection_mask.params,
+            };
+            queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
+            let destination = if index + 1 == active.len() {
+                output
+            } else {
+                &targets.ping[index % 2].view
+            };
+            let source_index = if index == 0 { 0 } else { 1 + (index - 1) % 2 };
+            let bind_group = &targets.bind_groups[*effect_index][source_index];
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some(effect.name),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: destination,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&effect.pipeline);
+            pass.set_bind_group(0, bind_group, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        queue.submit(Some(encoder.finish()));
+        self.last_pass_count = active.len();
+        self.submitted_frames = self.submitted_frames.saturating_add(1);
+    }
+}
+
+\n# File: src/render/postprocess.wgsl
+struct Uniforms {
+    inverse_view_projection: mat4x4<f32>,
+    view_projection: mat4x4<f32>,
+    camera: vec4<f32>,
+    light_clip: vec4<f32>,
+    light_color: vec4<f32>,
+    params: vec4<f32>,
+    mask_params: vec4<f32>,
+};
+@group(0) @binding(0) var scene_texture: texture_2d<f32>;
+@group(0) @binding(1) var scene_sampler: sampler;
+@group(0) @binding(2) var scene_depth: texture_2d<f32>;
+@group(0) @binding(3) var<uniform> uniforms: Uniforms;
+@group(0) @binding(4) var depth_sampler: sampler;
+@group(0) @binding(6) var reflection_mask: texture_2d<f32>;
+struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
+@vertex fn vs_main(@builtin(vertex_index) index: u32) -> Output {
+    let positions = array<vec2<f32>, 3>(vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+    let p = positions[index];
+    var output: Output;
+    output.position = vec4(p, 0.0, 1.0);
+    output.uv = vec2((p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5);
+    return output;
+}
+fn depth_at(uv: vec2<f32>) -> f32 {
+    let size = vec2<i32>(uniforms.params.zw);
+    let pixel = clamp(vec2<i32>(uv * uniforms.params.zw), vec2<i32>(0), size - vec2<i32>(1));
+    // RGB base-255 depth packing avoids depth-sampler LOD limitations in GLSL ES300.
+    // An auxiliary attachment cleared to white represents untouched far depth.
+    let packed = textureSampleLevel(scene_depth, depth_sampler, (vec2<f32>(pixel) + vec2(0.5)) / uniforms.params.zw, 0.0).rgb;
+    return clamp(dot(packed, vec3(1.0, 1.0 / 255.0, 1.0 / 65025.0)), 0.0, 1.0);
+}
+fn world_at(uv: vec2<f32>, depth: f32) -> vec3<f32> {
+    let p = uniforms.inverse_view_projection * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
+    return p.xyz / p.w;
+}
+fn inside(uv: vec2<f32>) -> bool { return all(uv > vec2(0.0)) && all(uv < vec2(1.0)); }
+fn scene_at(uv: vec2<f32>) -> vec4<f32> { return textureSampleLevel(scene_texture, scene_sampler, uv, 0.0); }
+fn reflection_mask_at(position: vec3<f32>) -> f32 {
+    if uniforms.camera.w < 0.5 { return 1.0; }
+    let mask_uv = (position.xz - uniforms.mask_params.xy) / uniforms.mask_params.zw + vec2(0.5);
+    if !all(mask_uv >= vec2(0.0)) || !all(mask_uv <= vec2(1.0)) { return 0.0; }
+    return textureSampleLevel(reflection_mask, scene_sampler, mask_uv, 0.0).r;
+}
+fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
+    let depth = depth_at(uv);
+    if depth >= 0.999999 || source.a <= 0.001 { return source.rgb; }
+    let position = world_at(uv, depth);
+    // Choose the nearer depth neighbour on each axis to reduce silhouette normals.
+    let pixel = 1.0 / uniforms.params.zw;
+    let left = world_at(uv - vec2(pixel.x, 0.0), depth_at(uv - vec2(pixel.x, 0.0)));
+    let right = world_at(uv + vec2(pixel.x, 0.0), depth_at(uv + vec2(pixel.x, 0.0)));
+    let up = world_at(uv - vec2(0.0, pixel.y), depth_at(uv - vec2(0.0, pixel.y)));
+    let down = world_at(uv + vec2(0.0, pixel.y), depth_at(uv + vec2(0.0, pixel.y)));
+    let dx = select(position - left, right - position, distance(right, position) < distance(left, position));
+    let dy = select(position - up, down - position, distance(down, position) < distance(up, position));
+    let raw_normal = cross(dx, dy);
+    if dot(raw_normal, raw_normal) < 0.000000000001 { return source.rgb; }
+    let incident = normalize(position - uniforms.camera.xyz);
+    var normal = normalize(raw_normal);
+    if dot(normal, incident) > 0.0 { normal = -normal; }
+    let direction = reflect(incident, normal);
+    let camera_distance = distance(position, uniforms.camera.xyz);
+    let step_length = clamp(camera_distance * 0.025, 0.04, 0.5);
+    let thickness = clamp(camera_distance * 0.012, 0.06, 0.4);
+    let origin = position + normal * max(0.025, thickness * 0.5);
+    var previous_t = 0.0;
+    var previous_delta = -thickness;
+    for (var step = 1u; step <= 64u; step += 1u) {
+        let t = f32(step) * step_length;
+        let ray = origin + direction * t;
+        let clip = uniforms.view_projection * vec4(ray, 1.0);
+        if clip.w <= 0.0 { break; }
+        let ndc = clip.xyz / clip.w;
+        let sample_uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+        if !inside(sample_uv) || ndc.z < 0.0 || ndc.z > 1.0 { break; }
+        let sampled_depth = depth_at(sample_uv);
+        if sampled_depth >= 0.999999 { previous_t = t; previous_delta = -thickness; continue; }
+        let surface = world_at(sample_uv, sampled_depth);
+        // Signed separation along the camera ray detects front-to-back crossings.
+        let eye_direction = normalize(ray - uniforms.camera.xyz);
+        let delta = dot(ray - surface, eye_direction);
+        if step > 2u && previous_delta < 0.0 && delta >= 0.0 {
+            var low = previous_t;
+            var high = t;
+            var hit_uv = sample_uv;
+            var hit_delta = delta;
+            // Refine the crossing; reject depth discontinuities thicker than geometry budget.
+            for (var refine = 0u; refine < 5u; refine += 1u) {
+                let mid = (low + high) * 0.5;
+                let mid_ray = origin + direction * mid;
+                let mid_clip = uniforms.view_projection * vec4(mid_ray, 1.0);
+                let mid_ndc = mid_clip.xyz / mid_clip.w;
+                let mid_uv = vec2(mid_ndc.x * 0.5 + 0.5, 0.5 - mid_ndc.y * 0.5);
+                let mid_surface = world_at(mid_uv, depth_at(mid_uv));
+                let mid_delta = dot(mid_ray - mid_surface, normalize(mid_ray - uniforms.camera.xyz));
+                if mid_delta >= 0.0 { high = mid; hit_uv = mid_uv; hit_delta = mid_delta; } else { low = mid; }
+            }
+            let separation = length((hit_uv - uv) * uniforms.params.zw);
+            if hit_delta < thickness && separation > 3.0 {
+                let border = min(min(hit_uv.x, 1.0 - hit_uv.x), min(hit_uv.y, 1.0 - hit_uv.y));
+                let edge_fade = smoothstep(0.0, 0.08, border);
+                let range_fade = 1.0 - smoothstep(40.0, 64.0, f32(step));
+                let fresnel = 0.2 + 0.8 * pow(1.0 - max(dot(-incident, normal), 0.0), 5.0);
+                let weight = clamp(source.a * reflection_mask_at(position) * uniforms.params.x * edge_fade * range_fade * fresnel, 0.0, 1.0);
+                return mix(source.rgb, scene_at(hit_uv).rgb, weight);
+            }
+        }
+        previous_t = t;
+        previous_delta = delta;
+    }
+    return source.rgb;
+}
+fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
+    let clip = uniforms.light_clip;
+    if clip.w <= 0.0 { return source; }
+    let ndc = clip.xyz / clip.w;
+    let light_uv = vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+    if !inside(light_uv) || ndc.z <= 0.0 || ndc.z >= 1.0 { return source; }
+    // Sample a finite emitter disk so a partially covered light casts radial shafts.
+    // Each sample is blocked by geometry in front of the projected light depth.
+    let source_radius = 0.065;
+    let aspect = uniforms.params.z / uniforms.params.w;
+    let radial_step = (light_uv - uv) / 48.0;
+    var sample_uv = uv;
+    var illumination = 0.0;
+    var decay = 1.0;
+    for (var sample = 0u; sample < 48u; sample += 1u) {
+        sample_uv += radial_step;
+        let offset = (sample_uv - light_uv) * vec2(aspect, 1.0);
+        let emitter = 1.0 - smoothstep(source_radius * 0.25, source_radius, length(offset));
+        let visible = select(0.0, 1.0, depth_at(sample_uv) + 0.0005 >= ndc.z);
+        illumination += emitter * visible * decay;
+        decay *= 0.975;
+    }
+    let border = min(min(light_uv.x, 1.0 - light_uv.x), min(light_uv.y, 1.0 - light_uv.y));
+    let edge_fade = smoothstep(0.0, 0.06, border);
+    return source + max(uniforms.light_color.rgb, vec3(0.0)) * illumination * (uniforms.params.x * edge_fade / 12.0);
+}
+// Intermediate alpha remains material metadata; final output alpha is opaque. Keep SSR before color-only effects in EFFECTS by default.
+@fragment fn fs_ssr(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    var surface = source;
+    let depth = depth_at(input.uv);
+    if uniforms.camera.w > 0.5 && source.a > 0.001 && depth < 0.999999 {
+        let wetness = reflection_mask_at(world_at(input.uv, depth));
+        surface = vec4(source.rgb * mix(1.0, 0.58, wetness), source.a);
+    }
+    return vec4(reflected_color(input.uv, surface), select(source.a, 1.0, uniforms.params.y > 0.5));
+}
+@fragment fn fs_god_rays(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    return vec4(god_rays(input.uv, source.rgb), select(source.a, 1.0, uniforms.params.y > 0.5));
 }
 
 \n# File: src/render/present.wgsl
@@ -2206,7 +2900,7 @@ pub struct SceneRenderer {
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
     pipelines: HashMap<
-        (wgpu::TextureFormat, wgpu::TextureFormat, bool),
+        (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool),
         (wgpu::RenderPipeline, wgpu::RenderPipeline),
     >,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -2218,6 +2912,7 @@ pub struct SceneRenderer {
     pub scene: SceneManager,
     passes: [PassCache; 2 + MAX_LIGHTS * 2],
     active_cache: usize,
+    helper_pipelines: HashMap<(wgpu::TextureFormat, wgpu::TextureFormat), wgpu::RenderPipeline>,
     shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     effects: Option<Effects>,
     pub frustum_culling: bool,
@@ -2305,6 +3000,7 @@ impl SceneRenderer {
             passes,
             active_cache: 0,
             shadow_pipelines: HashMap::new(),
+            helper_pipelines: HashMap::new(),
             effects,
             frustum_culling: true,
             upload_bytes: 0,
@@ -2548,6 +3244,65 @@ impl SceneRenderer {
         self.queue.submit(Some(encoder.finish()));
         Ok(())
     }
+    /// Draw developer overlays after postprocessing; exclude them from reflection/depth inputs.
+    pub fn draw_helpers(&mut self, target: &RenderTarget<'_>) {
+        if !self.draw_grid && !self.draw_light_helpers {
+            return;
+        }
+        let key = (target.color_format, target.depth_format);
+        self.helper_pipelines.entry(key).or_insert_with(|| {
+            pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout)
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("postprocess helpers"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("developer overlays"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.helper_pipelines[&key]);
+            pass.set_bind_group(0, &self.grid_bind_group, &[]);
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.0,
+                1.0,
+            );
+            if self.draw_grid {
+                pass.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+                pass.draw(0..self.grid_vertex_count, 0..1);
+            }
+            if self.draw_light_helpers {
+                pass.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                pass.draw(0..self.light_vertex_count, 0..1);
+            }
+        }
+        self.queue.submit(Some(encoder.finish()));
+    }
     pub(super) fn draw_color(
         &mut self,
         target: &RenderTarget<'_>,
@@ -2555,7 +3310,12 @@ impl SceneRenderer {
         reflected: bool,
     ) -> Result<(), String> {
         target.validate()?;
-        let key = (target.color_format, target.depth_format, reflected);
+        let key = (
+            target.color_format,
+            target.depth_format,
+            reflected,
+            target.auxiliary.is_some(),
+        );
         self.pipelines.entry(key).or_insert_with(|| {
             (
                 pipeline::build(
@@ -2565,6 +3325,7 @@ impl SceneRenderer {
                     &self.bind_group_layout,
                     &effects.layout,
                     reflected,
+                    key.3,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
             )
@@ -2577,18 +3338,34 @@ impl SceneRenderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("encoder"),
             });
+        let mut attachments = vec![Some(wgpu::RenderPassColorAttachment {
+            view: target.color,
+            resolve_target: None,
+            depth_slice: None,
+            ops: wgpu::Operations {
+                load: target.color_load,
+                store: wgpu::StoreOp::Store,
+            },
+        })];
+        if let Some(auxiliary) = target.auxiliary {
+            attachments.push(Some(wgpu::RenderPassColorAttachment {
+                view: auxiliary,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: match target.depth_load {
+                        wgpu::LoadOp::Load => wgpu::LoadOp::Load,
+                        wgpu::LoadOp::Clear(_) => wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        wgpu::LoadOp::DontCare(v) => wgpu::LoadOp::DontCare(v),
+                    },
+                    store: wgpu::StoreOp::Store,
+                },
+            }));
+        }
         {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target.color,
-                    resolve_target: None,
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        load: target.color_load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
+                color_attachments: &attachments,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: target.depth,
                     depth_ops: Some(wgpu::Operations {
@@ -2640,14 +3417,17 @@ impl SceneRenderer {
                 rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
-            if !reflected && (self.draw_grid || self.draw_light_helpers) {
+            if !reflected
+                && target.auxiliary.is_none()
+                && (self.draw_grid || self.draw_light_helpers)
+            {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
-                if self.draw_grid {
+                if target.auxiliary.is_none() && self.draw_grid {
                     rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                     rp.draw(0..self.grid_vertex_count, 0..1);
                 }
-                if self.draw_light_helpers {
+                if target.auxiliary.is_none() && self.draw_light_helpers {
                     rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
                     rp.draw(0..self.light_vertex_count, 0..1);
                 }
@@ -2672,7 +3452,9 @@ struct Input {
 
 \n# File: src/render/state.rs
 //! Browser host connecting the scene renderer to a canvas output.
-use super::{output::CanvasOutput, renderer::SceneRenderer, target::RenderView};
+use super::{
+    output::CanvasOutput, postprocess::PostProcessor, renderer::SceneRenderer, target::RenderView,
+};
 use glam::{Mat4, Vec3};
 use std::ops::{Deref, DerefMut};
 use wasm_bindgen::JsValue;
@@ -2681,6 +3463,7 @@ use web_sys::HtmlCanvasElement;
 pub struct State {
     renderer: SceneRenderer,
     output: CanvasOutput,
+    postprocess: PostProcessor,
     pub backend: String,
     pub aspect: f32,
     view: RenderView,
@@ -2700,9 +3483,11 @@ impl State {
     pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
         let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
         let aspect = output.aspect();
+        let postprocess = PostProcessor::new(&device, output.color_format());
         Ok(Self {
             renderer: SceneRenderer::new(device, queue),
             output,
+            postprocess,
             backend,
             aspect,
             view: RenderView {
@@ -2714,6 +3499,30 @@ impl State {
     pub fn resize(&mut self, width: u32, height: u32) {
         self.output.resize(&self.renderer.device, width, height);
         self.aspect = self.output.aspect();
+    }
+    pub fn set_postprocess(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
+        self.postprocess.set_effect(name, enabled, strength)
+    }
+    pub fn set_reflection_mask(
+        &mut self,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        center: glam::Vec2,
+        size: glam::Vec2,
+    ) -> bool {
+        self.postprocess.set_reflection_mask(
+            &self.renderer.device,
+            &self.renderer.queue,
+            width,
+            height,
+            pixels,
+            center,
+            size,
+        )
+    }
+    pub fn postprocess_stats(&self) -> [f64; 5] {
+        self.postprocess.stats()
     }
     pub fn set_output_mode(&mut self, mode: &str) -> bool {
         match mode {
@@ -2736,9 +3545,35 @@ impl State {
         };
         self.output.ensure_target(&self.renderer.device);
         let target = self.output.target(&frame);
-        self.renderer
-            .render_view(self.view, &target)
-            .map_err(|e| JsValue::from_str(&e))?;
+        if self.postprocess.enabled() {
+            self.postprocess
+                .ensure_size(&self.renderer.device, target.width, target.height);
+            self.renderer
+                .render_view(self.view, &self.postprocess.target())
+                .map_err(|e| JsValue::from_str(&e))?;
+            let light = self.renderer.scene.lights().values().next();
+            let (position, color) = light
+                .map(|l| (l.position, l.color))
+                .unwrap_or((Vec3::ZERO, Vec3::ZERO));
+            self.postprocess.render(
+                &self.renderer.device,
+                &self.renderer.queue,
+                self.view,
+                position,
+                color,
+                target.color,
+            );
+            let overlays = super::target::RenderTarget {
+                depth: self.postprocess.target().depth,
+                auxiliary: None,
+                ..target
+            };
+            self.renderer.draw_helpers(&overlays);
+        } else {
+            self.renderer
+                .render_view(self.view, &target)
+                .map_err(|e| JsValue::from_str(&e))?;
+        }
         self.output
             .present(frame, &self.renderer.device, &self.renderer.queue);
         Ok(())
@@ -2794,6 +3629,8 @@ impl Viewport {
 /// must match this descriptor; wgpu validates the underlying GPU resources.
 pub struct RenderTarget<'a> {
     pub color: &'a wgpu::TextureView,
+    /// Optional packed depth attachment for portable screen-space effects.
+    pub auxiliary: Option<&'a wgpu::TextureView>,
     pub depth: &'a wgpu::TextureView,
     pub color_format: wgpu::TextureFormat,
     pub depth_format: wgpu::TextureFormat,
@@ -2959,6 +3796,7 @@ impl ColorTarget {
         RenderTarget {
             color: &self.color,
             depth: &self.depth,
+            auxiliary: None,
             color_format: self.format,
             depth_format: DepthTarget::FORMAT,
             width: self.width,
@@ -3234,9 +4072,6 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        if options.reflectivity > 0.0 && object.mesh != MeshKind::Plane {
-            return false;
-        }
         let was_static = object.render_options.is_static;
         object.render_options = options;
         self.changed(id);
@@ -3846,8 +4681,7 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
     return visibility/9.0;
 }
 
-@fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn shade_surface(input: VertexOutput) -> vec4<f32> {
     if (effects.params.z>0.5 && dot(effects.clip_plane,vec4(input.world_pos,1.0)) < -0.001) { discard; }
     let normal = normalize(input.world_normal);
     let view_dir = normalize(scene.camera_pos - input.world_pos);
@@ -3875,19 +4709,36 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         result += (diff * input.color + spec) * light.color * visibility;
     }
 
-    if(effects.params.y>0.5 && input.material.x>0.0) {
+    if(effects.params.y>0.5 && input.material.z>0.5 && input.material.x>0.0) {
         let reflected=effects.reflection_matrix*vec4(input.world_pos,1.0);
         let uv=reflected.xy/reflected.w*vec2(0.5,-0.5)+vec2(0.5);
         if(reflected.w>0.0 && all(uv>=vec2(0.0)) && all(uv<=vec2(1.0))) {
             result=mix(result,textureSampleLevel(reflection_texture,reflection_sampler,uv,0.0).rgb,input.material.x);
         }
     }
-    return vec4<f32>(result, 1.0);
+    return vec4<f32>(result, input.material.x);
 }
 
 @fragment
 fn fs_color(input: VertexOutput) -> @location(0) vec4<f32> {
     return vec4<f32>(input.color, 1.0);
+}
+
+// Alpha is material metadata only in the offscreen postprocessing path.
+@fragment fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    return vec4(shade_surface(input).rgb, 1.0);
+}
+struct PostSurface {
+    @location(0) color: vec4<f32>,
+    @location(1) depth: vec4<f32>,
+};
+@fragment fn fs_postprocess(input: VertexOutput) -> PostSurface {
+    var output: PostSurface;
+    output.color = shade_surface(input);
+    var encoded = fract(min(input.pos.z, 0.9999999) * vec3(1.0, 255.0, 65025.0));
+    encoded -= encoded.yzz * vec3(1.0 / 255.0, 1.0 / 255.0, 0.0);
+    output.depth = vec4(encoded, 1.0);
+    return output;
 }
 
 \n# File: src/test_scenes.rs
@@ -4157,13 +5008,13 @@ impl RenderQueue {
             };
             let mut instance = data.instance;
             instance.material = [
+                options.reflectivity,
+                if options.receives_shadow { 1.0 } else { 0.0 },
                 if Some(*id) == scene.mirror_object {
-                    options.reflectivity
+                    1.0
                 } else {
                     0.0
                 },
-                if options.receives_shadow { 1.0 } else { 0.0 },
-                0.0,
                 0.0,
             ];
             self.batches[index].push(instance);
@@ -4183,6 +5034,31 @@ mod tests {
     use super::*;
     fn camera() -> Mat4 {
         glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
+    }
+    #[test]
+    fn ssr_reflectivity_is_independent_of_planar_mirror_registration() {
+        let mut scene = SceneManager::default();
+        let floor = scene.add_plane(Vec3::ZERO);
+        let cube = scene.add_cube(Vec3::ZERO);
+        for id in [floor, cube] {
+            assert!(scene.set_render_options(
+                id,
+                crate::scene::RenderOptions {
+                    reflectivity: 0.85,
+                    ..Default::default()
+                }
+            ));
+        }
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        for batch in &queue.batches[..2] {
+            assert_eq!(batch[0].material[0], 0.85);
+            assert_eq!(batch[0].material[2], 0.0);
+        }
+        assert!(scene.configure_mirror(floor));
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        assert_eq!(queue.batches[1][0].material[2], 1.0);
+        assert_eq!(queue.batches[0][0].material[2], 0.0);
     }
     #[test]
     fn pass_filtering_partitions_casters_and_excludes_mirror_feedback() {
@@ -4367,6 +5243,48 @@ use crate::render::state::State;
 thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+}
+
+#[wasm_bindgen]
+pub fn set_postprocess(name: &str, enabled: bool, strength: f32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().set_postprocess(name, enabled, strength))
+    })
+}
+#[wasm_bindgen]
+pub fn set_reflection_mask(
+    width: u32,
+    height: u32,
+    pixels: &[u8],
+    x: f32,
+    z: f32,
+    size_x: f32,
+    size_z: f32,
+) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut().set_reflection_mask(
+                width,
+                height,
+                pixels,
+                glam::Vec2::new(x, z),
+                glam::Vec2::new(size_x, size_z),
+            )
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn postprocess_stats() -> Vec<f64> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|s| s.borrow().postprocess_stats().to_vec())
+            .unwrap_or_default()
+    })
 }
 
 #[wasm_bindgen]

@@ -129,7 +129,7 @@ pub struct SceneRenderer {
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
     pipelines: HashMap<
-        (wgpu::TextureFormat, wgpu::TextureFormat, bool),
+        (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool),
         (wgpu::RenderPipeline, wgpu::RenderPipeline),
     >,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -141,6 +141,7 @@ pub struct SceneRenderer {
     pub scene: SceneManager,
     passes: [PassCache; 2 + MAX_LIGHTS * 2],
     active_cache: usize,
+    helper_pipelines: HashMap<(wgpu::TextureFormat, wgpu::TextureFormat), wgpu::RenderPipeline>,
     shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     effects: Option<Effects>,
     pub frustum_culling: bool,
@@ -228,6 +229,7 @@ impl SceneRenderer {
             passes,
             active_cache: 0,
             shadow_pipelines: HashMap::new(),
+            helper_pipelines: HashMap::new(),
             effects,
             frustum_culling: true,
             upload_bytes: 0,
@@ -471,6 +473,65 @@ impl SceneRenderer {
         self.queue.submit(Some(encoder.finish()));
         Ok(())
     }
+    /// Draw developer overlays after postprocessing; exclude them from reflection/depth inputs.
+    pub fn draw_helpers(&mut self, target: &RenderTarget<'_>) {
+        if !self.draw_grid && !self.draw_light_helpers {
+            return;
+        }
+        let key = (target.color_format, target.depth_format);
+        self.helper_pipelines.entry(key).or_insert_with(|| {
+            pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout)
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("postprocess helpers"),
+            });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("developer overlays"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.helper_pipelines[&key]);
+            pass.set_bind_group(0, &self.grid_bind_group, &[]);
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.0,
+                1.0,
+            );
+            if self.draw_grid {
+                pass.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+                pass.draw(0..self.grid_vertex_count, 0..1);
+            }
+            if self.draw_light_helpers {
+                pass.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                pass.draw(0..self.light_vertex_count, 0..1);
+            }
+        }
+        self.queue.submit(Some(encoder.finish()));
+    }
     pub(super) fn draw_color(
         &mut self,
         target: &RenderTarget<'_>,
@@ -478,7 +539,12 @@ impl SceneRenderer {
         reflected: bool,
     ) -> Result<(), String> {
         target.validate()?;
-        let key = (target.color_format, target.depth_format, reflected);
+        let key = (
+            target.color_format,
+            target.depth_format,
+            reflected,
+            target.auxiliary.is_some(),
+        );
         self.pipelines.entry(key).or_insert_with(|| {
             (
                 pipeline::build(
@@ -488,6 +554,7 @@ impl SceneRenderer {
                     &self.bind_group_layout,
                     &effects.layout,
                     reflected,
+                    key.3,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
             )
@@ -500,18 +567,34 @@ impl SceneRenderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("encoder"),
             });
+        let mut attachments = vec![Some(wgpu::RenderPassColorAttachment {
+            view: target.color,
+            resolve_target: None,
+            depth_slice: None,
+            ops: wgpu::Operations {
+                load: target.color_load,
+                store: wgpu::StoreOp::Store,
+            },
+        })];
+        if let Some(auxiliary) = target.auxiliary {
+            attachments.push(Some(wgpu::RenderPassColorAttachment {
+                view: auxiliary,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: match target.depth_load {
+                        wgpu::LoadOp::Load => wgpu::LoadOp::Load,
+                        wgpu::LoadOp::Clear(_) => wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        wgpu::LoadOp::DontCare(v) => wgpu::LoadOp::DontCare(v),
+                    },
+                    store: wgpu::StoreOp::Store,
+                },
+            }));
+        }
         {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target.color,
-                    resolve_target: None,
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        load: target.color_load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
+                color_attachments: &attachments,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: target.depth,
                     depth_ops: Some(wgpu::Operations {
@@ -563,14 +646,17 @@ impl SceneRenderer {
                 rp.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..count);
             }
-            if !reflected && (self.draw_grid || self.draw_light_helpers) {
+            if !reflected
+                && target.auxiliary.is_none()
+                && (self.draw_grid || self.draw_light_helpers)
+            {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
-                if self.draw_grid {
+                if target.auxiliary.is_none() && self.draw_grid {
                     rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                     rp.draw(0..self.grid_vertex_count, 0..1);
                 }
-                if self.draw_light_helpers {
+                if target.auxiliary.is_none() && self.draw_light_helpers {
                     rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
                     rp.draw(0..self.light_vertex_count, 0..1);
                 }
