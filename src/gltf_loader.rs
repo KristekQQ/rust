@@ -289,7 +289,7 @@ fn append_primitive(
     }
     let index_count = primitive.indices().map_or(count, |a| a.count());
     if index_count == 0
-        || index_count % 3 != 0
+        || !index_count.is_multiple_of(3)
         || out
             .indices
             .len()
@@ -317,7 +317,7 @@ fn append_primitive(
         return Err("Triangle index is outside vertex range".into());
     }
     if mirrored {
-        for triangle in indices.chunks_exact_mut(3) {
+        for triangle in indices.as_chunks_mut::<3>().0 {
             triangle.swap(1, 2);
         }
     }
@@ -327,7 +327,7 @@ fn append_primitive(
             .collect()
     } else {
         let mut normals = vec![Vec3::ZERO; count];
-        for tri in indices.chunks_exact(3) {
+        for tri in indices.as_chunks::<3>().0 {
             let a = positions[tri[0] as usize];
             let face = (positions[tri[1] as usize] - a).cross(positions[tri[2] as usize] - a);
             if !face.is_finite() {
@@ -415,11 +415,11 @@ mod tests {
     }
     fn glb(json: &[u8], bin: &[u8]) -> Vec<u8> {
         let mut json = json.to_vec();
-        while json.len() % 4 != 0 {
+        while !json.len().is_multiple_of(4) {
             json.push(b' ');
         }
         let mut bin = bin.to_vec();
-        while bin.len() % 4 != 0 {
+        while !bin.len().is_multiple_of(4) {
             bin.push(0);
         }
         let mut bytes = Vec::new();
@@ -638,7 +638,7 @@ mod tests {
         let blocked = |light: Vec3, end: Vec3| {
             let start = to_local(light);
             let direction = to_local(end) - start;
-            model.indices.chunks_exact(3).any(|ids| {
+            model.indices.as_chunks::<3>().0.iter().any(|ids| {
                 let a = Vec3::from_array(model.vertices[ids[0] as usize].position);
                 let edge1 = Vec3::from_array(model.vertices[ids[1] as usize].position) - a;
                 let edge2 = Vec3::from_array(model.vertices[ids[2] as usize].position) - a;
@@ -1225,10 +1225,10 @@ pub fn parse_model(
                     }
                 }
             }
-            let max_tex = tex_sets.iter().max().copied().map_or(0, |n| n as usize + 1);
-            if max_tex > 32 {
+            if tex_sets.iter().any(|&set| set >= 32) {
                 return Err("Texture coordinate set limit exceeded".into());
             }
+            let max_tex = tex_sets.iter().max().copied().map_or(0, |n| n as usize + 1);
             let mut tex_coords = vec![vec![[0.; 2]; count]; max_tex];
             for set in tex_sets {
                 tex_coords[set as usize] = reader
@@ -1491,6 +1491,7 @@ pub fn parse_model(
             }
         }
     }
+    let mut expanded_animation_scalars = 0usize;
     for animation in gltf.animations() {
         let mut clip = AnimationClip {
             name: animation.name().map(str::to_owned),
@@ -1540,6 +1541,31 @@ pub fn parse_model(
                 &[D::F32],
                 false,
             )?;
+            let output_scalars = output
+                .count()
+                .checked_mul(output.dimensions().multiplicity())
+                .ok_or("Animation size overflow")?;
+            let expected = input
+                .count()
+                .checked_mul(components)
+                .and_then(|n| {
+                    n.checked_mul(if interpolation == Interpolation::CubicSpline {
+                        3
+                    } else {
+                        1
+                    })
+                })
+                .ok_or("Animation size overflow")?;
+            if components == 0 || output_scalars != expected {
+                return Err("Invalid animation output count/data".into());
+            }
+            expanded_animation_scalars = expanded_animation_scalars
+                .checked_add(input.count())
+                .and_then(|n| n.checked_add(output_scalars))
+                .ok_or("Animation size overflow")?;
+            if expanded_animation_scalars > 16 * 1024 * 1024 {
+                return Err("Expanded animation data exceeds memory limit".into());
+            }
             let reader = channel.reader(|b| buffers.get(b.index()).copied());
             let times: Vec<_> = reader
                 .read_inputs()
@@ -1562,17 +1588,7 @@ pub fn parse_model(
                 }
                 gltf::animation::util::ReadOutputs::MorphTargetWeights(v) => v.into_f32().collect(),
             };
-            if components == 0
-                || values.len()
-                    != times.len()
-                        * components
-                        * if interpolation == Interpolation::CubicSpline {
-                            3
-                        } else {
-                            1
-                        }
-                || values.iter().any(|v| !v.is_finite())
-            {
+            if values.len() != expected || values.iter().any(|v| !v.is_finite()) {
                 return Err("Invalid animation output count/data".into());
             }
             if property == AnimationProperty::Rotation {
@@ -1730,9 +1746,9 @@ fn validate_core_mode(mode: crate::gltf_model::PrimitiveMode, count: usize) -> R
     use crate::gltf_model::PrimitiveMode::*;
     let valid = match mode {
         Points => count >= 1,
-        Lines => count >= 2 && count % 2 == 0,
+        Lines => count >= 2 && count.is_multiple_of(2),
         LineLoop | LineStrip => count >= 2,
-        Triangles => count >= 3 && count % 3 == 0,
+        Triangles => count >= 3 && count.is_multiple_of(3),
         TriangleStrip | TriangleFan => count >= 3,
     };
     if valid {
@@ -1769,7 +1785,7 @@ fn derive_core_normals(
     mode: crate::gltf_model::PrimitiveMode,
 ) -> Vec<[f32; 3]> {
     let mut normals = vec![Vec3::ZERO; positions.len()];
-    for tri in triangle_indices(indices, mode).chunks_exact(3) {
+    for tri in triangle_indices(indices, mode).as_chunks::<3>().0 {
         let a = Vec3::from_array(positions[tri[0] as usize]);
         let face = (Vec3::from_array(positions[tri[1] as usize]) - a)
             .cross(Vec3::from_array(positions[tri[2] as usize]) - a);
@@ -1800,7 +1816,7 @@ mod core_tests {
         count: usize,
         kind: &str,
     ) -> usize {
-        while bytes.len() % 4 != 0 {
+        while !bytes.len().is_multiple_of(4) {
             bytes.push(0);
         }
         let view = doc["bufferViews"].as_array().unwrap().len();
@@ -1840,6 +1856,71 @@ mod core_tests {
     ) -> Result<ModelAsset, String> {
         doc["buffers"][0]["byteLength"] = json!(bytes.len());
         parse_model(&serde_json::to_vec(&doc).unwrap(), &[bytes], &images)
+    }
+    #[test]
+    fn shared_morph_weights_and_invalid_pose_lengths_are_rejected() {
+        let (doc, bytes) = fixture();
+        let mut asset = parse_fixture(doc, bytes, vec![]).unwrap();
+        let mut pose = rest_pose(&asset).unwrap();
+        pose.world_matrices.clear();
+        assert!(recompute_world(&asset, &mut pose)
+            .unwrap_err()
+            .contains("node count mismatch"));
+        asset.meshes[0].weights = vec![0.; 1024];
+        asset.nodes = vec![asset.nodes[0].clone(); 20_000];
+        assert!(rest_pose(&asset)
+            .unwrap_err()
+            .contains("pose exceeds memory limit"));
+    }
+    #[test]
+    fn excessive_shared_skin_pose_is_rejected_before_expansion() {
+        let (mut doc, bytes) = fixture();
+        doc["nodes"] = json!((0..5000).map(|_| json!({"skin":0})).collect::<Vec<_>>());
+        doc["skins"] = json!([{"joints":(0..5000).collect::<Vec<_>>()}]);
+        let error = parse_fixture(doc, bytes, vec![]).unwrap_err();
+        assert!(error.contains("pose exceeds memory limit"), "{error}");
+    }
+    #[test]
+    fn shared_animation_samplers_have_an_expanded_memory_budget() {
+        let (mut doc, mut bytes) = fixture();
+        let keys = 4096;
+        let times = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&(0..keys).map(|i| i as f32).collect::<Vec<_>>()),
+            5126,
+            keys,
+            "SCALAR",
+        );
+        let values = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&vec![0.; keys * 3]),
+            5126,
+            keys,
+            "VEC3",
+        );
+        doc["nodes"] = json!((0..1100).map(|_| json!({})).collect::<Vec<_>>());
+        doc["animations"] = json!([{"samplers":[{"input":times,"output":values}],"channels":(0..1100).map(|node| json!({"sampler":0,"target":{"node":node,"path":"translation"}})).collect::<Vec<_>>()}]);
+        let error = parse_fixture(doc, bytes, vec![]).unwrap_err();
+        assert!(
+            error.contains("animation data exceeds memory limit"),
+            "{error}"
+        );
+    }
+    #[test]
+    fn texture_coordinate_indices_are_bounded_before_wasm_conversion() {
+        for set in [31u32, 32, u32::MAX] {
+            let (mut doc, mut bytes) = fixture();
+            let uv = add_accessor(&mut doc, &mut bytes, &floats(&[0.; 6]), 5126, 3, "VEC2");
+            doc["meshes"][0]["primitives"][0]["attributes"][format!("TEXCOORD_{set}")] = json!(uv);
+            let result = parse_fixture(doc, bytes, vec![]);
+            if set == 31 {
+                assert!(result.is_ok());
+            } else {
+                assert!(result.unwrap_err().contains("coordinate set limit"));
+            }
+        }
     }
     #[test]
     fn real_fox_skin_animation_and_helmet_pbr_images() {

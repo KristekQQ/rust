@@ -13,9 +13,16 @@ const result = document.getElementById("result");
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 try {
     const { initEngine } = await import(`../js/engine.js?v=${Date.now()}`);
-    const engine = await initEngine(document.getElementById("gpu-canvas"), {
-        backend: new URLSearchParams(location.search).get("backend") || "auto",
-    });
+    const canvas = document.getElementById("gpu-canvas");
+    const options = { backend: new URLSearchParams(location.search).get("backend") || "auto" };
+    const [engine, concurrent] = await Promise.all([initEngine(canvas, options), initEngine(canvas, options)]);
+    assert(engine === concurrent, 'Concurrent init reuses one engine');
+    const reimported = await import(`../js/engine.js?repeat=${Date.now()}`);
+    assert(await reimported.initEngine(canvas, options) === engine, 'Repeated SDK import reuses one runtime');
+    const detached = document.createElement('canvas'); detached.id = 'gpu-canvas';
+    let detachedRejected = false;
+    try { await initEngine(detached, options); } catch { detachedRejected = true; }
+    assert(detachedRejected, 'Detached canvas rejected');
     engine.setCameraView([5, 3, 5], [0, 0, 0]);
     let cameraRejected = false;
     try { engine.setCameraView([5, 3, 5], [5, 3, 5]); } catch { cameraRejected = true; }
@@ -70,7 +77,7 @@ try {
     assert(engine.postprocessing.stats().passes === 2, 'Two postprocess passes');
     engine.postprocessing.disable('ssr'); engine.postprocessing.disable('godRays');
     assert(engine.postprocessing.stats().targets === 0, 'Postprocess targets released');
-    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nCamera view, empty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.";
+    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nSingle runtime initialization, detached canvas rejection, camera view, empty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.";
 } catch (error) {
     console.error(error);
     result.textContent = `FAIL: ${error.message}`;

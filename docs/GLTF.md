@@ -18,7 +18,7 @@ console.log(model.info); // snímek metadat a přehrávání z Rustu
 
 ## Import a materiály
 
-`.gltf` a `.glb` mohou obsahovat externí buffery, relativní PNG/JPEG, data URI i vložené bufferView obrázky. URI se řeší vůči finální URL modelu po přesměrování. SDK načítá zdroje postupně; celkový přenos je omezen na 128 MiB. `scene.clear()` zneplatní čekající importy. Chyba importu nepřidá částečný model do scény.
+`.gltf` a `.glb` mohou obsahovat externí buffery, relativní PNG/JPEG, data URI i vložené bufferView obrázky. URI se řeší vůči finální URL modelu po přesměrování. SDK načítá zdroje postupně; celkový přenos je omezen na 128 MiB. `scene.clear()` zneplatní čekající importy a zruší jejich stahování i čtení streamů. Chyba importu nepřidá částečný model do scény.
 
 PBR používá glTF metallic–roughness: base color, metallic/roughness, normal map, occlusion a emissive včetně faktorů. Base color/emissive jsou sRGB; ostatní mapy jsou lineární. Renderer respektuje UV sady, barvy vrcholů, tangenty, wrap/filter samplery a mipmapy. Podporuje OPAQUE, MASK s alphaCutoff, BLEND a doubleSided. Materiály jednotlivých primitiv zůstávají oddělené. Geometrie zachovává uzly a sdílené mesh reference.
 
@@ -44,7 +44,7 @@ OPAQUE a MASK se vykreslují do hlavního obrazu, pomocné hloubky, odrazové te
 
 Cílem je glTF 2.0 core, nikoli všechna existující rozšíření. Nepodporované `extensionsRequired` skončí s konkrétní chybou; volitelná rozšíření používají základní glTF fallback s upozorněním. Draco, meshopt, KTX2/BasisU, transmission, clearcoat a další rozšířené materiály nejsou v této verzi implementované. Podpora PBR není tvrzení o Khronos certifikaci celého importeru.
 
-Velikosti obrázků a bufferů se kontrolují proti limitům zařízení. Soubor, který překročí parserové/GPU limity, se odmítne s chybou. Přesné ochranné limity jsou v Rust loaderu a GPU uploadu.
+Velikosti obrázků a bufferů se kontrolují proti limitům zařízení. Soubor, který překročí parserové/GPU limity, se odmítne s chybou. Rozbalená data všech animačních kanálů mají společný limit 64 MiB; jedna póza včetně kopií skin matic a morph vah má limit 64 MiB. Sdílené zdroje se započítávají za každou rozbalenou kopii. Přesné ochranné limity jsou v Rust loaderu a GPU uploadu.
 
 ## Ukázky a ověření
 

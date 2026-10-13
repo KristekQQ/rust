@@ -1,6 +1,6 @@
 use wgpu::VertexBufferLayout;
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub color: [f32; 3],
@@ -172,17 +172,13 @@ pub const INDICES: &[u16] = &[
     20, 21, 22, 20, 22, 23, // bottom
 ];
 
-pub fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
-    unsafe {
-        std::slice::from_raw_parts(
-            data.as_ptr() as *const u8,
-            data.len() * std::mem::size_of::<T>(),
-        )
-    }
+/// Only initialized, padding-free GPU data may be viewed as bytes.
+pub fn as_bytes<T: bytemuck::Pod>(data: &[T]) -> &[u8] {
+    bytemuck::cast_slice(data)
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Light {
     pub position: [f32; 3],
     pub _pad_p: f32,
@@ -200,7 +196,7 @@ pub const EMPTY_LIGHT: Light = Light {
 };
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SceneUniforms {
     pub view_projection: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
@@ -382,7 +378,7 @@ mod tests {
 
     fn assert_winding_matches_normals(vertices: &[Vertex], indices: &[u16]) {
         let mut checked = 0;
-        for triangle in indices.chunks_exact(3) {
+        for triangle in indices.as_chunks::<3>().0 {
             let a = vertices[triangle[0] as usize];
             let b = vertices[triangle[1] as usize];
             let c = vertices[triangle[2] as usize];
@@ -421,7 +417,7 @@ mod tests {
         }; MAX_LIGHTS];
         let vertices = light_rays(&lights);
         assert_eq!(vertices.len(), MAX_LIGHTS * LIGHT_VERTICES_PER_LIGHT);
-        for helper in vertices.chunks_exact(LIGHT_VERTICES_PER_LIGHT) {
+        for helper in vertices.as_chunks::<LIGHT_VERTICES_PER_LIGHT>().0 {
             assert_eq!(
                 helper[LIGHT_VERTICES_PER_LIGHT - 2].position,
                 lights[0].position
@@ -482,7 +478,7 @@ impl crate::visibility::InstanceData {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct EffectsUniforms {
     pub shadow_matrices: [[[f32; 4]; 4]; MAX_LIGHTS],
     pub reflection_matrix: [[f32; 4]; 4],

@@ -98,7 +98,58 @@ pub fn default_pose(asset: &ModelAsset, scene: usize) -> Result<ModelPose, Strin
 }
 
 /// Default transforms for every node, including assets with no scenes.
+const MAX_POSE_BYTES: usize = 64 * 1024 * 1024;
+
+// Count expanded per-node data, not just the shared mesh/skin source arrays.
+fn validate_pose_budget(asset: &ModelAsset) -> Result<(), String> {
+    let base = std::mem::size_of::<NodeTrs>()
+        + std::mem::size_of::<Mat4>()
+        + 2 * std::mem::size_of::<Vec<f32>>()
+        + std::mem::size_of::<usize>()
+        + 1;
+    let mut bytes = asset
+        .nodes
+        .len()
+        .checked_mul(base)
+        .ok_or("Pose size overflow")?;
+    for node in &asset.nodes {
+        let mesh = node
+            .mesh
+            .map(|i| asset.meshes.get(i).ok_or("Invalid mesh index"))
+            .transpose()?;
+        let weights = node
+            .weights
+            .as_ref()
+            .map_or_else(|| mesh.map_or(0, |m| m.weights.len()), Vec::len);
+        bytes = bytes
+            .checked_add(weights.checked_mul(4).ok_or("Pose size overflow")?)
+            .ok_or("Pose size overflow")?;
+        if let Some(index) = node.skin {
+            let skin = asset.skins.get(index).ok_or("Invalid skin index")?;
+            if skin.joints.len() != skin.inverse_bind_matrices.len() {
+                return Err("Skin inverse bind matrix count mismatch".into());
+            }
+            bytes = bytes
+                .checked_add(
+                    skin.joints
+                        .len()
+                        .checked_mul(std::mem::size_of::<Mat4>())
+                        .ok_or("Pose size overflow")?,
+                )
+                .ok_or("Pose size overflow")?;
+        }
+        if bytes > MAX_POSE_BYTES {
+            return Err("Expanded model pose exceeds memory limit".into());
+        }
+    }
+    if bytes > MAX_POSE_BYTES {
+        return Err("Expanded model pose exceeds memory limit".into());
+    }
+    Ok(())
+}
+
 pub fn rest_pose(asset: &ModelAsset) -> Result<ModelPose, String> {
+    validate_pose_budget(asset)?;
     let mut pose = ModelPose {
         local_trs: asset.nodes.iter().map(|n| n.trs).collect(),
         world_matrices: vec![Mat4::IDENTITY; asset.nodes.len()],
@@ -122,6 +173,16 @@ pub fn rest_pose(asset: &ModelAsset) -> Result<ModelPose, String> {
 }
 
 pub fn recompute_world(asset: &ModelAsset, pose: &mut ModelPose) -> Result<(), String> {
+    validate_pose_budget(asset)?;
+    let n = asset.nodes.len();
+    if pose.local_trs.len() != n
+        || pose.world_matrices.len() != n
+        || pose.node_weights.len() != n
+        || pose.skin_matrices.len() != n
+        || pose.skin_world_space.len() != n
+    {
+        return Err("Model pose node count mismatch".into());
+    }
     let mut parents = vec![None; asset.nodes.len()];
     for (i, node) in asset.nodes.iter().enumerate() {
         for &child in &node.children {

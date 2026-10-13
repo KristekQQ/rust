@@ -46,7 +46,9 @@ try {
     control('verify').onclick=async()=>{
         const assert=(ok,message)=>{if(!ok)throw new Error(message);};
         try {
-            createScene(engine.scene); control('shadows').checked=true;control('mirror').checked=true;control('pause').checked=true;
+            createScene(engine.scene);
+            engine.scene.createCube([0, 2, 0]).setScale([-1, 1, 1]).setRenderOptions({isStatic:true});
+            control('shadows').checked=true;control('mirror').checked=true;control('pause').checked=true;
             engine.set_render_effects(true,true);engine.set_simulation_paused(true);applyHelpers();await frames();
             const before=engine.effects_stats();await frames();const paused=engine.effects_stats();
             assert(paused.staticUpdates===before.staticUpdates && paused.dynamicUpdates===before.dynamicUpdates && paused.reflectionUpdates===before.reflectionUpdates,'Cache se v klidu obnovuje');
@@ -67,7 +69,7 @@ try {
             const resized=engine.effects_stats();assert(resized.reflectionWidth===400 && resized.reflectionHeight===225,'Odraz nereaguje na resize');
             engine.set_output_mode('texture');await frames();engine.set_output_mode('canvas');
             engine.resize(innerWidth,innerHeight);await frames();
-            message='PASS: stíny obou světel, cache, pomůcky bez odrazu, pohyb, resize, textura';
+            message='PASS: stíny obou světel, zrcadlené měřítko, cache, pomůcky bez odrazu, pohyb, resize, textura';
         }catch(error){message=`FAIL: ${error.message}`;console.error(error);}
     };
     setInterval(()=>{

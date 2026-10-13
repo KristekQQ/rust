@@ -71,14 +71,20 @@ impl CanvasOutput {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
-            width: canvas.width().max(1),
-            height: canvas.height().max(1),
+            width: canvas
+                .width()
+                .clamp(1, device.limits().max_texture_dimension_2d),
+            height: canvas
+                .height()
+                .clamp(1, device.limits().max_texture_dimension_2d),
             present_mode: caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
             view_formats: vec![view_format],
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
+        canvas.set_width(config.width);
+        canvas.set_height(config.height);
         surface.configure(&device, &config);
 
         let depth_format = wgpu::TextureFormat::Depth32Float;
@@ -111,6 +117,9 @@ impl CanvasOutput {
         if width == 0 || height == 0 {
             return;
         }
+        let limit = device.limits().max_texture_dimension_2d;
+        let width = width.min(limit);
+        let height = height.min(limit);
         if self.config.width == width && self.config.height == height {
             return;
         }

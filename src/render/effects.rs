@@ -189,6 +189,7 @@ impl Effects {
             stats: Default::default(),
         }
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     fn group(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,

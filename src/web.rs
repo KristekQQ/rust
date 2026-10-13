@@ -9,9 +9,13 @@ use crate::input::camera::CameraController;
 use crate::input::{keyboard, mouse};
 use crate::render::state::State;
 
+type ImportedResources = (Vec<Vec<u8>>, Vec<Vec<u8>>);
+type AnimationFrameCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
+
 thread_local! {
-    static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
-    static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+    static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
+    static STARTING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = const { RefCell::new(None) };
 }
 
 #[wasm_bindgen]
@@ -66,7 +70,7 @@ fn model_resources(
     bytes: &[u8],
     buffers: js_sys::Array,
     images: js_sys::Array,
-) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), JsValue> {
+) -> Result<ImportedResources, JsValue> {
     let mut total = bytes.len();
     if total > 128 * 1024 * 1024 || buffers.length() + images.length() > 1024 {
         return Err(JsValue::from_str("glTF překračuje limity zdrojů"));
@@ -507,16 +511,20 @@ pub fn resize(width: u32, height: u32) {
     if width == 0 || height == 0 {
         return;
     }
-    STATE.with(|s| {
-        if let Some(st) = &*s.borrow() {
-            st.borrow_mut().resize(width, height);
-        }
+    let aspect = STATE.with(|s| {
+        s.borrow().as_ref().map(|st| {
+            let mut state = st.borrow_mut();
+            state.resize(width, height);
+            state.aspect
+        })
     });
-    CAMERA.with(|c| {
-        if let Some(cam) = &*c.borrow() {
-            cam.borrow_mut().set_aspect(width as f32 / height as f32);
-        }
-    });
+    if let Some(aspect) = aspect {
+        CAMERA.with(|c| {
+            if let Some(cam) = &*c.borrow() {
+                cam.borrow_mut().set_aspect(aspect);
+            }
+        });
+    }
 }
 
 #[wasm_bindgen]
@@ -573,6 +581,7 @@ pub fn remove_object(id: u32) -> bool {
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
 pub fn set_object_transform(
     id: u32,
     x: f32,
@@ -600,6 +609,7 @@ pub fn set_object_transform(
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
 pub fn set_cube_transform(
     id: u32,
     x: f32,
@@ -696,6 +706,7 @@ pub fn schedule_remove_light(id: u32, delay: f32) -> bool {
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
 pub fn set_light_orbit(
     id: u32,
     radius: f32,
@@ -755,17 +766,34 @@ pub async fn start() -> Result<(), JsValue> {
     if STATE.with(|state| state.borrow().is_some()) {
         return Ok(());
     }
+    if STARTING.with(|flag| flag.replace(true)) {
+        return Err(JsValue::from_str(
+            "Engine initialization already in progress",
+        ));
+    }
+    struct StartingGuard;
+    impl Drop for StartingGuard {
+        fn drop(&mut self) {
+            STARTING.with(|flag| flag.set(false));
+        }
+    }
+    let _guard = StartingGuard;
     console_error_panic_hook::set_once();
-    let window = web_sys::window().unwrap();
-    let document = window.document().unwrap();
+    let window =
+        web_sys::window().ok_or_else(|| JsValue::from_str("Browser window unavailable"))?;
+    let document = window
+        .document()
+        .ok_or_else(|| JsValue::from_str("Browser document unavailable"))?;
+    let performance = window
+        .performance()
+        .ok_or_else(|| JsValue::from_str("Browser performance unavailable"))?;
     let canvas = document
         .get_element_by_id("gpu-canvas")
-        .unwrap()
+        .ok_or_else(|| JsValue::from_str("Canvas gpu-canvas not found"))?
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
     STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
-    let performance = window.performance().unwrap();
     let aspect = state.borrow().aspect;
     let camera = Rc::new(RefCell::new(ActiveCamera::new(aspect)));
     CAMERA.with(|c| *c.borrow_mut() = Some(camera.clone()));
@@ -774,7 +802,7 @@ pub async fn start() -> Result<(), JsValue> {
     mouse::attach(&window, &canvas, camera.clone());
 
     let prev_time = Rc::new(RefCell::new(performance.now()));
-    let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
+    let f: AnimationFrameCallback = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();

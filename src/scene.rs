@@ -497,6 +497,7 @@ impl SceneManager {
         *light = Light { position, color };
         true
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn set_light_orbit(
         &mut self,
         id: u32,

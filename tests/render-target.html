@@ -46,8 +46,15 @@ try {
                 const stats = engine.renderer_stats();
                 if (stats.total !== 3 || stats.visible === 0 || stats.drawCalls === 0) throw new Error('Chybí scéna');
             }
+            // Oversized u32 dimensions must be bounded before GPU allocation.
+            engine.resize(0xffffffff, 1); await frames();
+            const canvas = document.getElementById('gpu-canvas');
+            if (canvas.width === 0xffffffff || canvas.width === 0 || canvas.height !== 1) throw new Error('GPU dimension limit not applied');
+            let invalidSize = false;
+            try { engine.resize(-1, 10); } catch { invalidSize = true; }
+            if (!invalidSize) throw new Error('Negative dimensions accepted');
             small = false; size(); await frames();
-            message = 'PASS: přepínání, změna rozlišení, scéna a odmítnutí neplatného režimu';
+            message = 'PASS: přepínání, změna rozlišení, GPU limity, scéna a odmítnutí neplatného režimu';
         } catch (error) { message = `FAIL: ${error.message}`; console.error(error); }
     };
     setInterval(() => {

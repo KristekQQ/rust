@@ -3,7 +3,7 @@ use crate::scene::{MeshKind, SceneManager, Transform};
 use glam::{Mat4, Vec3, Vec4};
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceData {
     pub model: [[f32; 4]; 4],
     pub normal_matrix: [[f32; 4]; 4],

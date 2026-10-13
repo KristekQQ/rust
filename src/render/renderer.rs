@@ -14,6 +14,13 @@ use crate::render::{
 };
 use std::collections::HashMap;
 
+type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool);
+type ColorPipelines = (
+    wgpu::RenderPipeline,
+    wgpu::RenderPipeline,
+    wgpu::RenderPipeline,
+);
+
 struct InstanceBatch {
     buffer: wgpu::Buffer,
     capacity: usize,
@@ -138,6 +145,7 @@ struct PassCache {
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
+    mirrored_batches: [InstanceBatch; 3],
     imported: HashMap<u32, InstanceBatch>,
 }
 impl PassCache {
@@ -147,6 +155,7 @@ impl PassCache {
             camera_position: Vec3::ZERO,
             key: None,
             batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
+            mirrored_batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
             imported: HashMap::new(),
         }
     }
@@ -161,10 +170,7 @@ pub struct SceneRenderer {
     pub draw_light_helpers: bool,
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
-    pipelines: HashMap<
-        (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool),
-        (wgpu::RenderPipeline, wgpu::RenderPipeline),
-    >,
+    pipelines: HashMap<ColorPipelineKey, ColorPipelines>,
     bind_group_layout: wgpu::BindGroupLayout,
     cube_mesh: Mesh,
     plane_mesh: Mesh,
@@ -442,8 +448,27 @@ impl SceneRenderer {
             cache
                 .queue
                 .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
-            for (batch, instances) in cache.batches.iter_mut().zip(&cache.queue.batches) {
-                self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
+            for (index, instances) in cache.queue.batches.iter().enumerate() {
+                if !instances
+                    .iter()
+                    .any(|i| Mat4::from_cols_array_2d(&i.model).determinant() < 0.0)
+                {
+                    self.upload_bytes +=
+                        cache.batches[index].upload(&self.device, &self.queue, instances);
+                    self.upload_bytes +=
+                        cache.mirrored_batches[index].upload(&self.device, &self.queue, &[]);
+                    continue;
+                }
+                // A negative determinant reverses triangle winding. Keep instancing
+                // within each winding group rather than drawing inside-out surfaces.
+                let (mirrored, normal): (Vec<_>, Vec<_>) = instances
+                    .iter()
+                    .copied()
+                    .partition(|i| Mat4::from_cols_array_2d(&i.model).determinant() < 0.0);
+                self.upload_bytes +=
+                    cache.batches[index].upload(&self.device, &self.queue, &normal);
+                self.upload_bytes +=
+                    cache.mirrored_batches[index].upload(&self.device, &self.queue, &mirrored);
             }
             cache.imported.retain(|id, _| self.scene.object_exists(*id));
             for (id, instances) in &cache.queue.imported {
@@ -486,6 +511,12 @@ impl SceneRenderer {
             self.passes[0].queue.visible as f64,
             (self.passes[0].queue.total - self.passes[0].queue.visible) as f64,
             (self.passes[0].queue.draw_calls()
+                + self.passes[0]
+                    .batches
+                    .iter()
+                    .zip(&self.passes[0].mirrored_batches)
+                    .filter(|(a, b)| !a.uploaded.is_empty() && !b.uploaded.is_empty())
+                    .count()
                 + self.passes[0]
                     .queue
                     .imported
@@ -628,15 +659,17 @@ impl SceneRenderer {
                 .into_iter()
                 .enumerate()
             {
-                let count = cache.queue.batches[index].len() as u32;
-                if count == 0 {
-                    continue;
-                }
                 let mesh = self.mesh(kind);
-                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                pass.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
-                pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
-                pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+                for batch in [&cache.batches[index], &cache.mirrored_batches[index]] {
+                    let count = batch.uploaded.len() as u32;
+                    if count == 0 {
+                        continue;
+                    }
+                    pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    pass.set_vertex_buffer(1, batch.buffer.slice(..));
+                    pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+                    pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+                }
             }
             for (id, instances) in &cache.queue.imported {
                 if instances.is_empty() {
@@ -746,6 +779,15 @@ impl SceneRenderer {
                     key.3,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    &effects.layout,
+                    !key.2,
+                    key.3,
+                ),
             )
         });
         let gltf_key = super::gltf_gpu::PipelineKey {
@@ -840,15 +882,21 @@ impl SceneRenderer {
                 .into_iter()
                 .enumerate()
             {
-                let count = cache.queue.batches[index].len() as u32;
-                if count == 0 {
-                    continue;
-                }
                 let mesh = self.mesh(kind);
-                rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                rp.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
-                rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
-                rp.draw_indexed(0..mesh.index_count, 0, 0..count);
+                for (batch, pipeline) in [
+                    (&cache.batches[index], &pipelines.0),
+                    (&cache.mirrored_batches[index], &pipelines.2),
+                ] {
+                    let count = batch.uploaded.len() as u32;
+                    if count == 0 {
+                        continue;
+                    }
+                    rp.set_pipeline(pipeline);
+                    rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    rp.set_vertex_buffer(1, batch.buffer.slice(..));
+                    rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+                    rp.draw_indexed(0..mesh.index_count, 0, 0..count);
+                }
             }
             for (id, instances) in &cache.queue.imported {
                 if instances.is_empty() {
@@ -857,6 +905,13 @@ impl SceneRenderer {
                 let Some(mesh) = self.imported_meshes.get(id) else {
                     continue;
                 };
+                rp.set_pipeline(
+                    if Mat4::from_cols_array_2d(&instances[0].model).determinant() < 0.0 {
+                        &pipelines.2
+                    } else {
+                        &pipelines.0
+                    },
+                );
                 rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 rp.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);

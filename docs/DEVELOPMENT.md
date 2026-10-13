@@ -11,6 +11,8 @@ Use checks for the changed area, after dependent writers finish. Group native bu
 | Shadow/reflection/pass cache | `tests/render-effects.html` verify button + SDK integration on WebGPU + WebGL |
 | Postprocessing/PBR interaction | Affected example and its verify control on WebGPU + WebGL; inspect real effect on/off or pose change |
 | glTF runtime/PBR | `tests/gltf-full.html`, `tests/gltf-sdk.html` on WebGPU + WebGL; actual textured/animated model for rendering changes |
+| Mirrored transforms / winding | `tests/render-mirrored.html` pixel assertions and `tests/render-effects.html` verify on WebGPU + WebGL |
+| SDK lifecycle/loading | `npm run test:sdk`; `tests/scene-sdk.html` and `tests/gltf-sdk.html` on both backends |
 | Backend initialization | `index.html?backend=auto` and `index.html?backend=webgl` |
 | Guidance/docs only | Validate links/config/skill as relevant; no GPU rebuild. Before commit still run native tests + pre-push |
 
@@ -19,6 +21,7 @@ cargo test
 RUSTFLAGS=--cfg=web_sys_unstable_apis cargo check --target wasm32-unknown-unknown
 RUSTFLAGS=--cfg=web_sys_unstable_apis wasm-pack build --target web
 npm run typecheck
+npm run test:sdk
 ```
 
 `scripts/run-local.sh [port]` builds then serves loopback HTTP with no-store headers. Reuse a healthy running server; do not build a second time just to start serving. Generated `pkg/` is ignored. Match SDK exports to freshly built WASM and use final resource URLs after redirects. Initialize with `await initEngine(...)` before commands. SDK owns no simulation/RAF loop.

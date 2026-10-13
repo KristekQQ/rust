@@ -7,7 +7,7 @@ use super::{
 use glam::{Vec2, Vec3};
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
     inverse_view_projection: [[f32; 4]; 4],
     view_projection: [[f32; 4]; 4],
@@ -396,6 +396,7 @@ impl PostProcessor {
     }
     /// R8 bytes map world XZ to UV: (position - center) / size + 0.5.
     /// Wet/dry base-color shading is applied by the SSR pass only.
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn set_reflection_mask(
         &mut self,
         device: &wgpu::Device,
@@ -556,6 +557,7 @@ impl PostProcessor {
             },
         )
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn render(
         &mut self,
         device: &wgpu::Device,

@@ -57,6 +57,7 @@ export class ModelObject extends SceneObject {
 export class Scene {
     #wasm;
     #loadEpoch = 0;
+    #loads = new Map();
     constructor(wasm) { this.#wasm = wasm; Object.freeze(this); }
     get objectCount() { return this.#wasm.scene_object_count(); }
     get lightCount() { return this.#wasm.scene_light_count(); }
@@ -70,14 +71,18 @@ export class Scene {
     /** Transport only; format parsing, transforms, bounds and GPU upload are Rust. */
     async loadModel(url) {
         const epoch = this.#loadEpoch;
+        const controller = new AbortController();
+        const readers = new Set();
         let source = new URL(url, location.href);
         let remaining = 128 * 1024 * 1024;
+        this.#loads.set(controller, readers);
         const checkCurrent = () => {
-            if (epoch !== this.#loadEpoch) throw new Error('Načítání modelu zrušeno vymazáním scény');
+            if (controller.signal.aborted || epoch !== this.#loadEpoch) throw new Error('Načítání modelu zrušeno vymazáním scény');
         };
         const fetchBytes = async (resource, root = false) => {
             checkCurrent();
-            const response = await fetch(resource);
+            const response = await fetch(resource, { signal: controller.signal });
+            checkCurrent();
             if (root && response.url) source = new URL(response.url);
             if (!response.ok) throw new Error(`Model nelze načíst: ${response.status} ${resource}`);
             if (Number(response.headers.get('content-length')) > remaining) {
@@ -86,6 +91,7 @@ export class Scene {
             }
             const reader = response.body?.getReader();
             if (!reader) throw new Error('Model nemá tělo odpovědi');
+            readers.add(reader);
             const chunks = [];
             let length = 0;
             try {
@@ -99,40 +105,81 @@ export class Scene {
                     chunks.push(value);
                 }
             } catch (error) {
-                await reader.cancel();
+                try { await reader.cancel(); } catch { /* Preserve the transport error. */ }
                 throw error;
-            } finally { reader.releaseLock(); }
+            } finally { readers.delete(reader); reader.releaseLock(); }
             const bytes = new Uint8Array(length);
             let offset = 0;
             for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
             return bytes;
         };
-        const bytes = await fetchBytes(source, true);
-        const { buffers: uris, images: imageUris } = JSON.parse(this.#wasm.gltf_resource_uris(bytes));
-        if (uris.length + imageUris.length > 1024) throw new Error('Model má příliš mnoho zdrojů');
-        const buffers = [];
-        // Bound total download memory; do not fetch all external buffers concurrently.
-        for (const uri of uris) buffers.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
-        const images = [];
-        for (const uri of imageUris) images.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
-        checkCurrent();
-        const id = this.#wasm.load_gltf_model(bytes, buffers, images);
-        accepted(id !== 0xffffffff);
-        return new ModelObject(this.#wasm, id);
+        try {
+            const bytes = await fetchBytes(source, true);
+            const { buffers: uris, images: imageUris } = JSON.parse(this.#wasm.gltf_resource_uris(bytes));
+            if (uris.length + imageUris.length > 1024) throw new Error('Model má příliš mnoho zdrojů');
+            const buffers = [];
+            // Bound total download memory; do not fetch all external buffers concurrently.
+            for (const uri of uris) buffers.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
+            const images = [];
+            for (const uri of imageUris) images.push(uri ? await fetchBytes(new URL(uri, source)) : new Uint8Array());
+            checkCurrent();
+            const id = this.#wasm.load_gltf_model(bytes, buffers, images);
+            accepted(id !== 0xffffffff);
+            return new ModelObject(this.#wasm, id);
+        } finally {
+            this.#loads.delete(controller);
+        }
     }
     createLight({ position = [0, 0, 0], color = [1, 1, 1] } = {}) {
         const id = this.#wasm.add_light(...position, ...color);
         accepted(id >= 0);
         return new SceneLight(this.#wasm, id);
     }
-    clear() { this.#loadEpoch++; this.#wasm.clear_all(); }
+    clear() {
+        this.#loadEpoch++;
+        for (const [controller, readers] of this.#loads) {
+            controller.abort(new Error('Načítání modelu zrušeno vymazáním scény'));
+            for (const reader of readers) {
+                // Cancel custom streams too; aborting fetch alone need not unblock them.
+                try { Promise.resolve(reader.cancel()).catch(() => {}); } catch { /* Already closed. */ }
+            }
+        }
+        this.#loads.clear();
+        this.#wasm.clear_all();
+    }
     setMirror(object) { accepted(this.#wasm.configure_planar_mirror(object.id)); }
 }
+
+// Share ownership across cache-busted SDK imports as well as repeated calls.
+const initializationKey = Symbol.for('webgpu_wasm.engine.initialization');
 
 export async function initEngine(canvas, { backend = "auto" } = {}) {
     if (!(canvas instanceof HTMLCanvasElement) || canvas.id !== "gpu-canvas") {
         throw new Error('Engine vyžaduje canvas s id="gpu-canvas".');
     }
+    if (canvas.ownerDocument !== document || !canvas.isConnected || document.getElementById('gpu-canvas') !== canvas) {
+        throw new Error('Engine vyžaduje canvas připojený k aktuálnímu dokumentu.');
+    }
+    if (backend !== 'auto' && backend !== 'webgl') throw new Error('Neplatný backend enginu.');
+    const current = globalThis[initializationKey];
+    if (current) {
+        if (current.canvas !== canvas || current.backend !== backend) {
+            throw new Error('Engine již inicializuje nebo používá jiný canvas či backend.');
+        }
+        return current.promise;
+    }
+    const initialization = { canvas, backend, promise: null };
+    globalThis[initializationKey] = initialization;
+    initialization.promise = initializeEngine(canvas, backend);
+    try {
+        return await initialization.promise;
+    } catch (error) {
+        if (globalThis[initializationKey] === initialization) delete globalThis[initializationKey];
+        throw error;
+    }
+}
+
+async function initializeEngine(canvas, backend) {
     canvas.dataset.backend = backend;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -188,7 +235,12 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
             const [staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight,shadowLightCount,...updates] = wasm.effects_stats();
             return {staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight,shadowLightCount,staticUpdatesByLight:updates.slice(0,4),dynamicUpdatesByLight:updates.slice(4,8)};
         },
-        resize: wasm.resize,
+        resize(width, height) {
+            if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 0xffffffff)) {
+                throw new Error('Rozměry enginu musí být kladná celá čísla typu u32.');
+            }
+            wasm.resize(width, height);
+        },
         renderer_backend: wasm.renderer_backend,
         set_frustum_culling: wasm.set_frustum_culling,
         renderer_stats() {

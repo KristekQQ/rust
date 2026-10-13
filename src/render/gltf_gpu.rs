@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
     normal: [f32; 3],
@@ -26,7 +26,7 @@ impl Vertex {
     }
 }
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniform {
     base: [f32; 4],
     emissive: [f32; 4],
@@ -572,6 +572,7 @@ impl GltfGpu {
             active: HashSet::new(),
         })
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn update(
         &self,
         queue: &wgpu::Queue,

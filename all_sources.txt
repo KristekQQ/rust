@@ -8,6 +8,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+bytemuck = { version = "1.25", features = ["derive"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 wgpu = { version = "30.0.1", default-features = false, features = ["std", "webgpu", "webgl", "wgsl"] }
@@ -180,7 +181,58 @@ pub fn default_pose(asset: &ModelAsset, scene: usize) -> Result<ModelPose, Strin
 }
 
 /// Default transforms for every node, including assets with no scenes.
+const MAX_POSE_BYTES: usize = 64 * 1024 * 1024;
+
+// Count expanded per-node data, not just the shared mesh/skin source arrays.
+fn validate_pose_budget(asset: &ModelAsset) -> Result<(), String> {
+    let base = std::mem::size_of::<NodeTrs>()
+        + std::mem::size_of::<Mat4>()
+        + 2 * std::mem::size_of::<Vec<f32>>()
+        + std::mem::size_of::<usize>()
+        + 1;
+    let mut bytes = asset
+        .nodes
+        .len()
+        .checked_mul(base)
+        .ok_or("Pose size overflow")?;
+    for node in &asset.nodes {
+        let mesh = node
+            .mesh
+            .map(|i| asset.meshes.get(i).ok_or("Invalid mesh index"))
+            .transpose()?;
+        let weights = node
+            .weights
+            .as_ref()
+            .map_or_else(|| mesh.map_or(0, |m| m.weights.len()), Vec::len);
+        bytes = bytes
+            .checked_add(weights.checked_mul(4).ok_or("Pose size overflow")?)
+            .ok_or("Pose size overflow")?;
+        if let Some(index) = node.skin {
+            let skin = asset.skins.get(index).ok_or("Invalid skin index")?;
+            if skin.joints.len() != skin.inverse_bind_matrices.len() {
+                return Err("Skin inverse bind matrix count mismatch".into());
+            }
+            bytes = bytes
+                .checked_add(
+                    skin.joints
+                        .len()
+                        .checked_mul(std::mem::size_of::<Mat4>())
+                        .ok_or("Pose size overflow")?,
+                )
+                .ok_or("Pose size overflow")?;
+        }
+        if bytes > MAX_POSE_BYTES {
+            return Err("Expanded model pose exceeds memory limit".into());
+        }
+    }
+    if bytes > MAX_POSE_BYTES {
+        return Err("Expanded model pose exceeds memory limit".into());
+    }
+    Ok(())
+}
+
 pub fn rest_pose(asset: &ModelAsset) -> Result<ModelPose, String> {
+    validate_pose_budget(asset)?;
     let mut pose = ModelPose {
         local_trs: asset.nodes.iter().map(|n| n.trs).collect(),
         world_matrices: vec![Mat4::IDENTITY; asset.nodes.len()],
@@ -204,6 +256,16 @@ pub fn rest_pose(asset: &ModelAsset) -> Result<ModelPose, String> {
 }
 
 pub fn recompute_world(asset: &ModelAsset, pose: &mut ModelPose) -> Result<(), String> {
+    validate_pose_budget(asset)?;
+    let n = asset.nodes.len();
+    if pose.local_trs.len() != n
+        || pose.world_matrices.len() != n
+        || pose.node_weights.len() != n
+        || pose.skin_matrices.len() != n
+        || pose.skin_world_space.len() != n
+    {
+        return Err("Model pose node count mismatch".into());
+    }
     let mut parents = vec![None; asset.nodes.len()];
     for (i, node) in asset.nodes.iter().enumerate() {
         for &child in &node.children {
@@ -897,7 +959,7 @@ fn append_primitive(
     }
     let index_count = primitive.indices().map_or(count, |a| a.count());
     if index_count == 0
-        || index_count % 3 != 0
+        || !index_count.is_multiple_of(3)
         || out
             .indices
             .len()
@@ -925,7 +987,7 @@ fn append_primitive(
         return Err("Triangle index is outside vertex range".into());
     }
     if mirrored {
-        for triangle in indices.chunks_exact_mut(3) {
+        for triangle in indices.as_chunks_mut::<3>().0 {
             triangle.swap(1, 2);
         }
     }
@@ -935,7 +997,7 @@ fn append_primitive(
             .collect()
     } else {
         let mut normals = vec![Vec3::ZERO; count];
-        for tri in indices.chunks_exact(3) {
+        for tri in indices.as_chunks::<3>().0 {
             let a = positions[tri[0] as usize];
             let face = (positions[tri[1] as usize] - a).cross(positions[tri[2] as usize] - a);
             if !face.is_finite() {
@@ -1023,11 +1085,11 @@ mod tests {
     }
     fn glb(json: &[u8], bin: &[u8]) -> Vec<u8> {
         let mut json = json.to_vec();
-        while json.len() % 4 != 0 {
+        while !json.len().is_multiple_of(4) {
             json.push(b' ');
         }
         let mut bin = bin.to_vec();
-        while bin.len() % 4 != 0 {
+        while !bin.len().is_multiple_of(4) {
             bin.push(0);
         }
         let mut bytes = Vec::new();
@@ -1246,7 +1308,7 @@ mod tests {
         let blocked = |light: Vec3, end: Vec3| {
             let start = to_local(light);
             let direction = to_local(end) - start;
-            model.indices.chunks_exact(3).any(|ids| {
+            model.indices.as_chunks::<3>().0.iter().any(|ids| {
                 let a = Vec3::from_array(model.vertices[ids[0] as usize].position);
                 let edge1 = Vec3::from_array(model.vertices[ids[1] as usize].position) - a;
                 let edge2 = Vec3::from_array(model.vertices[ids[2] as usize].position) - a;
@@ -1833,10 +1895,10 @@ pub fn parse_model(
                     }
                 }
             }
-            let max_tex = tex_sets.iter().max().copied().map_or(0, |n| n as usize + 1);
-            if max_tex > 32 {
+            if tex_sets.iter().any(|&set| set >= 32) {
                 return Err("Texture coordinate set limit exceeded".into());
             }
+            let max_tex = tex_sets.iter().max().copied().map_or(0, |n| n as usize + 1);
             let mut tex_coords = vec![vec![[0.; 2]; count]; max_tex];
             for set in tex_sets {
                 tex_coords[set as usize] = reader
@@ -2099,6 +2161,7 @@ pub fn parse_model(
             }
         }
     }
+    let mut expanded_animation_scalars = 0usize;
     for animation in gltf.animations() {
         let mut clip = AnimationClip {
             name: animation.name().map(str::to_owned),
@@ -2148,6 +2211,31 @@ pub fn parse_model(
                 &[D::F32],
                 false,
             )?;
+            let output_scalars = output
+                .count()
+                .checked_mul(output.dimensions().multiplicity())
+                .ok_or("Animation size overflow")?;
+            let expected = input
+                .count()
+                .checked_mul(components)
+                .and_then(|n| {
+                    n.checked_mul(if interpolation == Interpolation::CubicSpline {
+                        3
+                    } else {
+                        1
+                    })
+                })
+                .ok_or("Animation size overflow")?;
+            if components == 0 || output_scalars != expected {
+                return Err("Invalid animation output count/data".into());
+            }
+            expanded_animation_scalars = expanded_animation_scalars
+                .checked_add(input.count())
+                .and_then(|n| n.checked_add(output_scalars))
+                .ok_or("Animation size overflow")?;
+            if expanded_animation_scalars > 16 * 1024 * 1024 {
+                return Err("Expanded animation data exceeds memory limit".into());
+            }
             let reader = channel.reader(|b| buffers.get(b.index()).copied());
             let times: Vec<_> = reader
                 .read_inputs()
@@ -2170,17 +2258,7 @@ pub fn parse_model(
                 }
                 gltf::animation::util::ReadOutputs::MorphTargetWeights(v) => v.into_f32().collect(),
             };
-            if components == 0
-                || values.len()
-                    != times.len()
-                        * components
-                        * if interpolation == Interpolation::CubicSpline {
-                            3
-                        } else {
-                            1
-                        }
-                || values.iter().any(|v| !v.is_finite())
-            {
+            if values.len() != expected || values.iter().any(|v| !v.is_finite()) {
                 return Err("Invalid animation output count/data".into());
             }
             if property == AnimationProperty::Rotation {
@@ -2338,9 +2416,9 @@ fn validate_core_mode(mode: crate::gltf_model::PrimitiveMode, count: usize) -> R
     use crate::gltf_model::PrimitiveMode::*;
     let valid = match mode {
         Points => count >= 1,
-        Lines => count >= 2 && count % 2 == 0,
+        Lines => count >= 2 && count.is_multiple_of(2),
         LineLoop | LineStrip => count >= 2,
-        Triangles => count >= 3 && count % 3 == 0,
+        Triangles => count >= 3 && count.is_multiple_of(3),
         TriangleStrip | TriangleFan => count >= 3,
     };
     if valid {
@@ -2377,7 +2455,7 @@ fn derive_core_normals(
     mode: crate::gltf_model::PrimitiveMode,
 ) -> Vec<[f32; 3]> {
     let mut normals = vec![Vec3::ZERO; positions.len()];
-    for tri in triangle_indices(indices, mode).chunks_exact(3) {
+    for tri in triangle_indices(indices, mode).as_chunks::<3>().0 {
         let a = Vec3::from_array(positions[tri[0] as usize]);
         let face = (Vec3::from_array(positions[tri[1] as usize]) - a)
             .cross(Vec3::from_array(positions[tri[2] as usize]) - a);
@@ -2408,7 +2486,7 @@ mod core_tests {
         count: usize,
         kind: &str,
     ) -> usize {
-        while bytes.len() % 4 != 0 {
+        while !bytes.len().is_multiple_of(4) {
             bytes.push(0);
         }
         let view = doc["bufferViews"].as_array().unwrap().len();
@@ -2448,6 +2526,71 @@ mod core_tests {
     ) -> Result<ModelAsset, String> {
         doc["buffers"][0]["byteLength"] = json!(bytes.len());
         parse_model(&serde_json::to_vec(&doc).unwrap(), &[bytes], &images)
+    }
+    #[test]
+    fn shared_morph_weights_and_invalid_pose_lengths_are_rejected() {
+        let (doc, bytes) = fixture();
+        let mut asset = parse_fixture(doc, bytes, vec![]).unwrap();
+        let mut pose = rest_pose(&asset).unwrap();
+        pose.world_matrices.clear();
+        assert!(recompute_world(&asset, &mut pose)
+            .unwrap_err()
+            .contains("node count mismatch"));
+        asset.meshes[0].weights = vec![0.; 1024];
+        asset.nodes = vec![asset.nodes[0].clone(); 20_000];
+        assert!(rest_pose(&asset)
+            .unwrap_err()
+            .contains("pose exceeds memory limit"));
+    }
+    #[test]
+    fn excessive_shared_skin_pose_is_rejected_before_expansion() {
+        let (mut doc, bytes) = fixture();
+        doc["nodes"] = json!((0..5000).map(|_| json!({"skin":0})).collect::<Vec<_>>());
+        doc["skins"] = json!([{"joints":(0..5000).collect::<Vec<_>>()}]);
+        let error = parse_fixture(doc, bytes, vec![]).unwrap_err();
+        assert!(error.contains("pose exceeds memory limit"), "{error}");
+    }
+    #[test]
+    fn shared_animation_samplers_have_an_expanded_memory_budget() {
+        let (mut doc, mut bytes) = fixture();
+        let keys = 4096;
+        let times = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&(0..keys).map(|i| i as f32).collect::<Vec<_>>()),
+            5126,
+            keys,
+            "SCALAR",
+        );
+        let values = add_accessor(
+            &mut doc,
+            &mut bytes,
+            &floats(&vec![0.; keys * 3]),
+            5126,
+            keys,
+            "VEC3",
+        );
+        doc["nodes"] = json!((0..1100).map(|_| json!({})).collect::<Vec<_>>());
+        doc["animations"] = json!([{"samplers":[{"input":times,"output":values}],"channels":(0..1100).map(|node| json!({"sampler":0,"target":{"node":node,"path":"translation"}})).collect::<Vec<_>>()}]);
+        let error = parse_fixture(doc, bytes, vec![]).unwrap_err();
+        assert!(
+            error.contains("animation data exceeds memory limit"),
+            "{error}"
+        );
+    }
+    #[test]
+    fn texture_coordinate_indices_are_bounded_before_wasm_conversion() {
+        for set in [31u32, 32, u32::MAX] {
+            let (mut doc, mut bytes) = fixture();
+            let uv = add_accessor(&mut doc, &mut bytes, &floats(&[0.; 6]), 5126, 3, "VEC2");
+            doc["meshes"][0]["primitives"][0]["attributes"][format!("TEXCOORD_{set}")] = json!(uv);
+            let result = parse_fixture(doc, bytes, vec![]);
+            if set == 31 {
+                assert!(result.is_ok());
+            } else {
+                assert!(result.unwrap_err().contains("coordinate set limit"));
+            }
+        }
     }
     #[test]
     fn real_fox_skin_animation_and_helmet_pbr_images() {
@@ -3599,7 +3742,7 @@ mod test_scenes;
 \n# File: src/render/data.rs
 use wgpu::VertexBufferLayout;
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     pub position: [f32; 3],
     pub color: [f32; 3],
@@ -3771,17 +3914,13 @@ pub const INDICES: &[u16] = &[
     20, 21, 22, 20, 22, 23, // bottom
 ];
 
-pub fn as_bytes<T: Copy>(data: &[T]) -> &[u8] {
-    unsafe {
-        std::slice::from_raw_parts(
-            data.as_ptr() as *const u8,
-            data.len() * std::mem::size_of::<T>(),
-        )
-    }
+/// Only initialized, padding-free GPU data may be viewed as bytes.
+pub fn as_bytes<T: bytemuck::Pod>(data: &[T]) -> &[u8] {
+    bytemuck::cast_slice(data)
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Light {
     pub position: [f32; 3],
     pub _pad_p: f32,
@@ -3799,7 +3938,7 @@ pub const EMPTY_LIGHT: Light = Light {
 };
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SceneUniforms {
     pub view_projection: [[f32; 4]; 4],
     pub camera_pos: [f32; 3],
@@ -3981,7 +4120,7 @@ mod tests {
 
     fn assert_winding_matches_normals(vertices: &[Vertex], indices: &[u16]) {
         let mut checked = 0;
-        for triangle in indices.chunks_exact(3) {
+        for triangle in indices.as_chunks::<3>().0 {
             let a = vertices[triangle[0] as usize];
             let b = vertices[triangle[1] as usize];
             let c = vertices[triangle[2] as usize];
@@ -4020,7 +4159,7 @@ mod tests {
         }; MAX_LIGHTS];
         let vertices = light_rays(&lights);
         assert_eq!(vertices.len(), MAX_LIGHTS * LIGHT_VERTICES_PER_LIGHT);
-        for helper in vertices.chunks_exact(LIGHT_VERTICES_PER_LIGHT) {
+        for helper in vertices.as_chunks::<LIGHT_VERTICES_PER_LIGHT>().0 {
             assert_eq!(
                 helper[LIGHT_VERTICES_PER_LIGHT - 2].position,
                 lights[0].position
@@ -4081,7 +4220,7 @@ impl crate::visibility::InstanceData {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct EffectsUniforms {
     pub shadow_matrices: [[[f32; 4]; 4]; MAX_LIGHTS],
     pub reflection_matrix: [[f32; 4]; 4],
@@ -4315,6 +4454,7 @@ impl Effects {
             stats: Default::default(),
         }
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     fn group(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
@@ -4556,7 +4696,7 @@ use std::collections::{HashMap, HashSet};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Vertex {
     position: [f32; 3],
     normal: [f32; 3],
@@ -4575,7 +4715,7 @@ impl Vertex {
     }
 }
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniform {
     base: [f32; 4],
     emissive: [f32; 4],
@@ -5121,6 +5261,7 @@ impl GltfGpu {
             active: HashSet::new(),
         })
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn update(
         &self,
         queue: &wgpu::Queue,
@@ -5677,14 +5818,20 @@ impl CanvasOutput {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
-            width: canvas.width().max(1),
-            height: canvas.height().max(1),
+            width: canvas
+                .width()
+                .clamp(1, device.limits().max_texture_dimension_2d),
+            height: canvas
+                .height()
+                .clamp(1, device.limits().max_texture_dimension_2d),
             present_mode: caps.present_modes[0],
             desired_maximum_frame_latency: 2,
             alpha_mode: caps.alpha_modes[0],
             view_formats: vec![view_format],
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
+        canvas.set_width(config.width);
+        canvas.set_height(config.height);
         surface.configure(&device, &config);
 
         let depth_format = wgpu::TextureFormat::Depth32Float;
@@ -5717,6 +5864,9 @@ impl CanvasOutput {
         if width == 0 || height == 0 {
             return;
         }
+        let limit = device.limits().max_texture_dimension_2d;
+        let width = width.min(limit);
+        let height = height.min(limit);
         if self.config.width == width && self.config.height == height {
             return;
         }
@@ -6104,7 +6254,7 @@ use super::{
 use glam::{Vec2, Vec3};
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
     inverse_view_projection: [[f32; 4]; 4],
     view_projection: [[f32; 4]; 4],
@@ -6493,6 +6643,7 @@ impl PostProcessor {
     }
     /// R8 bytes map world XZ to UV: (position - center) / size + 0.5.
     /// Wet/dry base-color shading is applied by the SSR pass only.
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn set_reflection_mask(
         &mut self,
         device: &wgpu::Device,
@@ -6653,6 +6804,7 @@ impl PostProcessor {
             },
         )
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn render(
         &mut self,
         device: &wgpu::Device,
@@ -6974,6 +7126,13 @@ use crate::render::{
 };
 use std::collections::HashMap;
 
+type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool);
+type ColorPipelines = (
+    wgpu::RenderPipeline,
+    wgpu::RenderPipeline,
+    wgpu::RenderPipeline,
+);
+
 struct InstanceBatch {
     buffer: wgpu::Buffer,
     capacity: usize,
@@ -7098,6 +7257,7 @@ struct PassCache {
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
+    mirrored_batches: [InstanceBatch; 3],
     imported: HashMap<u32, InstanceBatch>,
 }
 impl PassCache {
@@ -7107,6 +7267,7 @@ impl PassCache {
             camera_position: Vec3::ZERO,
             key: None,
             batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
+            mirrored_batches: std::array::from_fn(|_| InstanceBatch::new(device, 1)),
             imported: HashMap::new(),
         }
     }
@@ -7121,10 +7282,7 @@ pub struct SceneRenderer {
     pub draw_light_helpers: bool,
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
-    pipelines: HashMap<
-        (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool),
-        (wgpu::RenderPipeline, wgpu::RenderPipeline),
-    >,
+    pipelines: HashMap<ColorPipelineKey, ColorPipelines>,
     bind_group_layout: wgpu::BindGroupLayout,
     cube_mesh: Mesh,
     plane_mesh: Mesh,
@@ -7402,8 +7560,27 @@ impl SceneRenderer {
             cache
                 .queue
                 .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
-            for (batch, instances) in cache.batches.iter_mut().zip(&cache.queue.batches) {
-                self.upload_bytes += batch.upload(&self.device, &self.queue, instances);
+            for (index, instances) in cache.queue.batches.iter().enumerate() {
+                if !instances
+                    .iter()
+                    .any(|i| Mat4::from_cols_array_2d(&i.model).determinant() < 0.0)
+                {
+                    self.upload_bytes +=
+                        cache.batches[index].upload(&self.device, &self.queue, instances);
+                    self.upload_bytes +=
+                        cache.mirrored_batches[index].upload(&self.device, &self.queue, &[]);
+                    continue;
+                }
+                // A negative determinant reverses triangle winding. Keep instancing
+                // within each winding group rather than drawing inside-out surfaces.
+                let (mirrored, normal): (Vec<_>, Vec<_>) = instances
+                    .iter()
+                    .copied()
+                    .partition(|i| Mat4::from_cols_array_2d(&i.model).determinant() < 0.0);
+                self.upload_bytes +=
+                    cache.batches[index].upload(&self.device, &self.queue, &normal);
+                self.upload_bytes +=
+                    cache.mirrored_batches[index].upload(&self.device, &self.queue, &mirrored);
             }
             cache.imported.retain(|id, _| self.scene.object_exists(*id));
             for (id, instances) in &cache.queue.imported {
@@ -7446,6 +7623,12 @@ impl SceneRenderer {
             self.passes[0].queue.visible as f64,
             (self.passes[0].queue.total - self.passes[0].queue.visible) as f64,
             (self.passes[0].queue.draw_calls()
+                + self.passes[0]
+                    .batches
+                    .iter()
+                    .zip(&self.passes[0].mirrored_batches)
+                    .filter(|(a, b)| !a.uploaded.is_empty() && !b.uploaded.is_empty())
+                    .count()
                 + self.passes[0]
                     .queue
                     .imported
@@ -7588,15 +7771,17 @@ impl SceneRenderer {
                 .into_iter()
                 .enumerate()
             {
-                let count = cache.queue.batches[index].len() as u32;
-                if count == 0 {
-                    continue;
-                }
                 let mesh = self.mesh(kind);
-                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                pass.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
-                pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
-                pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+                for batch in [&cache.batches[index], &cache.mirrored_batches[index]] {
+                    let count = batch.uploaded.len() as u32;
+                    if count == 0 {
+                        continue;
+                    }
+                    pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    pass.set_vertex_buffer(1, batch.buffer.slice(..));
+                    pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+                    pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+                }
             }
             for (id, instances) in &cache.queue.imported {
                 if instances.is_empty() {
@@ -7706,6 +7891,15 @@ impl SceneRenderer {
                     key.3,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    &effects.layout,
+                    !key.2,
+                    key.3,
+                ),
             )
         });
         let gltf_key = super::gltf_gpu::PipelineKey {
@@ -7800,15 +7994,21 @@ impl SceneRenderer {
                 .into_iter()
                 .enumerate()
             {
-                let count = cache.queue.batches[index].len() as u32;
-                if count == 0 {
-                    continue;
-                }
                 let mesh = self.mesh(kind);
-                rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                rp.set_vertex_buffer(1, cache.batches[index].buffer.slice(..));
-                rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
-                rp.draw_indexed(0..mesh.index_count, 0, 0..count);
+                for (batch, pipeline) in [
+                    (&cache.batches[index], &pipelines.0),
+                    (&cache.mirrored_batches[index], &pipelines.2),
+                ] {
+                    let count = batch.uploaded.len() as u32;
+                    if count == 0 {
+                        continue;
+                    }
+                    rp.set_pipeline(pipeline);
+                    rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    rp.set_vertex_buffer(1, batch.buffer.slice(..));
+                    rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+                    rp.draw_indexed(0..mesh.index_count, 0, 0..count);
+                }
             }
             for (id, instances) in &cache.queue.imported {
                 if instances.is_empty() {
@@ -7817,6 +8017,13 @@ impl SceneRenderer {
                 let Some(mesh) = self.imported_meshes.get(id) else {
                     continue;
                 };
+                rp.set_pipeline(
+                    if Mat4::from_cols_array_2d(&instances[0].model).determinant() < 0.0 {
+                        &pipelines.2
+                    } else {
+                        &pipelines.0
+                    },
+                );
                 rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 rp.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
@@ -8236,6 +8443,25 @@ impl RenderTarget<'_> {
     }
 }
 
+/// A reusable depth-only pass target, e.g. a shadow map or depth prepass.
+pub struct DepthRenderTarget<'a> {
+    pub depth: &'a wgpu::TextureView,
+    pub format: wgpu::TextureFormat,
+    pub width: u32,
+    pub height: u32,
+    pub viewport: Viewport,
+    pub load: wgpu::LoadOp<f32>,
+}
+impl DepthRenderTarget<'_> {
+    pub fn validate(&self) -> Result<(), String> {
+        self.viewport.validate(self.width, self.height)?;
+        if !self.format.has_depth_aspect() {
+            return Err("Depth target requires a depth format".into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8271,25 +8497,6 @@ mod tests {
         }
         .validate(u32::MAX, 600)
         .is_err());
-    }
-}
-
-/// A reusable depth-only pass target, e.g. a shadow map or depth prepass.
-pub struct DepthRenderTarget<'a> {
-    pub depth: &'a wgpu::TextureView,
-    pub format: wgpu::TextureFormat,
-    pub width: u32,
-    pub height: u32,
-    pub viewport: Viewport,
-    pub load: wgpu::LoadOp<f32>,
-}
-impl DepthRenderTarget<'_> {
-    pub fn validate(&self) -> Result<(), String> {
-        self.viewport.validate(self.width, self.height)?;
-        if !self.format.has_depth_aspect() {
-            return Err("Depth target requires a depth format".into());
-        }
-        Ok(())
     }
 }
 
@@ -8985,6 +9192,7 @@ impl SceneManager {
         *light = Light { position, color };
         true
     }
+    #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn set_light_orbit(
         &mut self,
         id: u32,
@@ -9613,7 +9821,7 @@ use crate::scene::{MeshKind, SceneManager, Transform};
 use glam::{Mat4, Vec3, Vec4};
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceData {
     pub model: [[f32; 4]; 4],
     pub normal_matrix: [[f32; 4]; 4],
@@ -10034,9 +10242,13 @@ use crate::input::camera::CameraController;
 use crate::input::{keyboard, mouse};
 use crate::render::state::State;
 
+type ImportedResources = (Vec<Vec<u8>>, Vec<Vec<u8>>);
+type AnimationFrameCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
+
 thread_local! {
-    static STATE: RefCell<Option<Rc<RefCell<State>>>> = RefCell::new(None);
-    static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = RefCell::new(None);
+    static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
+    static STARTING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = const { RefCell::new(None) };
 }
 
 #[wasm_bindgen]
@@ -10091,7 +10303,7 @@ fn model_resources(
     bytes: &[u8],
     buffers: js_sys::Array,
     images: js_sys::Array,
-) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), JsValue> {
+) -> Result<ImportedResources, JsValue> {
     let mut total = bytes.len();
     if total > 128 * 1024 * 1024 || buffers.length() + images.length() > 1024 {
         return Err(JsValue::from_str("glTF překračuje limity zdrojů"));
@@ -10532,16 +10744,20 @@ pub fn resize(width: u32, height: u32) {
     if width == 0 || height == 0 {
         return;
     }
-    STATE.with(|s| {
-        if let Some(st) = &*s.borrow() {
-            st.borrow_mut().resize(width, height);
-        }
+    let aspect = STATE.with(|s| {
+        s.borrow().as_ref().map(|st| {
+            let mut state = st.borrow_mut();
+            state.resize(width, height);
+            state.aspect
+        })
     });
-    CAMERA.with(|c| {
-        if let Some(cam) = &*c.borrow() {
-            cam.borrow_mut().set_aspect(width as f32 / height as f32);
-        }
-    });
+    if let Some(aspect) = aspect {
+        CAMERA.with(|c| {
+            if let Some(cam) = &*c.borrow() {
+                cam.borrow_mut().set_aspect(aspect);
+            }
+        });
+    }
 }
 
 #[wasm_bindgen]
@@ -10598,6 +10814,7 @@ pub fn remove_object(id: u32) -> bool {
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
 pub fn set_object_transform(
     id: u32,
     x: f32,
@@ -10625,6 +10842,7 @@ pub fn set_object_transform(
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
 pub fn set_cube_transform(
     id: u32,
     x: f32,
@@ -10721,6 +10939,7 @@ pub fn schedule_remove_light(id: u32, delay: f32) -> bool {
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
 pub fn set_light_orbit(
     id: u32,
     radius: f32,
@@ -10780,17 +10999,34 @@ pub async fn start() -> Result<(), JsValue> {
     if STATE.with(|state| state.borrow().is_some()) {
         return Ok(());
     }
+    if STARTING.with(|flag| flag.replace(true)) {
+        return Err(JsValue::from_str(
+            "Engine initialization already in progress",
+        ));
+    }
+    struct StartingGuard;
+    impl Drop for StartingGuard {
+        fn drop(&mut self) {
+            STARTING.with(|flag| flag.set(false));
+        }
+    }
+    let _guard = StartingGuard;
     console_error_panic_hook::set_once();
-    let window = web_sys::window().unwrap();
-    let document = window.document().unwrap();
+    let window =
+        web_sys::window().ok_or_else(|| JsValue::from_str("Browser window unavailable"))?;
+    let document = window
+        .document()
+        .ok_or_else(|| JsValue::from_str("Browser document unavailable"))?;
+    let performance = window
+        .performance()
+        .ok_or_else(|| JsValue::from_str("Browser performance unavailable"))?;
     let canvas = document
         .get_element_by_id("gpu-canvas")
-        .unwrap()
+        .ok_or_else(|| JsValue::from_str("Canvas gpu-canvas not found"))?
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
     let state = Rc::new(RefCell::new(State::new(&canvas).await?));
     STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
-    let performance = window.performance().unwrap();
     let aspect = state.borrow().aspect;
     let camera = Rc::new(RefCell::new(ActiveCamera::new(aspect)));
     CAMERA.with(|c| *c.borrow_mut() = Some(camera.clone()));
@@ -10799,7 +11035,7 @@ pub async fn start() -> Result<(), JsValue> {
     mouse::attach(&window, &canvas, camera.clone());
 
     let prev_time = Rc::new(RefCell::new(performance.now()));
-    let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
+    let f: AnimationFrameCallback = Rc::new(RefCell::new(None));
     let g = f.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();
