@@ -189,6 +189,9 @@ pub struct SceneRenderer {
     pub frustum_culling: bool,
     pub upload_bytes: usize,
     pub prepare_ms: f64,
+    debug_enabled: bool,
+    cull_ms: f64,
+    cull_cached: bool,
     frame_metrics: crate::frame_metrics::FrameMetrics,
     last_lights: [Light; MAX_LIGHTS],
 }
@@ -284,6 +287,9 @@ impl SceneRenderer {
             frustum_culling: true,
             upload_bytes: 0,
             prepare_ms: 0.0,
+            debug_enabled: false,
+            cull_ms: 0.0,
+            cull_cached: true,
             frame_metrics: crate::frame_metrics::FrameMetrics::default(),
             last_lights: lights_array,
         }
@@ -444,10 +450,22 @@ impl SceneRenderer {
             self.frustum_culling,
         );
 
+        // No additional clock reads or BVH counters when diagnostics are off.
+        let clock = (self.debug_enabled && index == 0)
+            .then(|| web_sys::window().and_then(|w| w.performance()))
+            .flatten();
+        if index == 0 && self.debug_enabled {
+            self.cull_cached = cache.key == Some(key);
+            self.cull_ms = 0.0;
+        }
         if cache.key != Some(key) {
+            let start = clock.as_ref().map(|p| p.now());
             cache
                 .queue
                 .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
+            if let (Some(clock), Some(start)) = (clock, start) {
+                self.cull_ms = clock.now() - start;
+            }
             for (index, instances) in cache.queue.batches.iter().enumerate() {
                 if !instances
                     .iter()
@@ -536,6 +554,52 @@ impl SceneRenderer {
             self.prepare_ms,
             self.frame_metrics.fps,
             self.frame_metrics.frame_ms,
+        ]
+    }
+
+    pub fn set_debug_diagnostics(&mut self, enabled: bool) {
+        self.debug_enabled = enabled;
+        // Only the main-view HUD reports traversal; auxiliary passes need no counters.
+        self.passes[0].queue.collect_stats = enabled;
+        if !enabled {
+            self.passes[0].queue.culling_stats = Default::default();
+            self.cull_ms = 0.0;
+            self.cull_cached = true;
+        }
+    }
+    pub fn debug_values(&self) -> serde_json::Value {
+        let stats = self.render_stats();
+        let bvh = self.passes[0].queue.culling_stats;
+        serde_json::json!({
+            "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],
+            "cullMs": self.cull_ms, "cullCached": self.cull_cached,
+            "total": stats[0], "visible": stats[1], "culled": stats[2],
+            "bvhNodes": bvh.nodes_visited, "objectTests": bvh.object_tests,
+            "staticRebuilds": bvh.static_rebuilds, "dynamicRebuilds": bvh.dynamic_rebuilds,
+        })
+    }
+    pub fn debug_lines(&self) -> Vec<String> {
+        let q = &self.passes[0].queue;
+        vec![
+            format!(
+                "FPS {:.1} FRAME {:.2} MS",
+                self.frame_metrics.fps, self.frame_metrics.frame_ms
+            ),
+            if self.cull_cached {
+                format!("CPU {:.2} MS CULL CACHED", self.prepare_ms)
+            } else {
+                format!("CPU {:.2} MS CULL {:.2} MS", self.prepare_ms, self.cull_ms)
+            },
+            format!(
+                "FRUSTUM {}/{} CULLED {}",
+                q.visible,
+                q.total,
+                q.total.saturating_sub(q.visible)
+            ),
+            format!(
+                "BVH {} NODES TESTS {}",
+                q.culling_stats.nodes_visited, q.culling_stats.object_tests
+            ),
         ]
     }
 

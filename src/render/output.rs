@@ -31,7 +31,9 @@ pub struct CanvasOutput {
 impl CanvasOutput {
     pub async fn new(
         canvas: &HtmlCanvasElement,
+        check_current: impl Fn() -> Result<(), JsValue>,
     ) -> Result<(Self, wgpu::Device, wgpu::Queue, String), JsValue> {
+        check_current()?;
         let instance_desc = wgpu::InstanceDescriptor {
             backends: if canvas.get_attribute("data-backend").as_deref() == Some("webgl") {
                 wgpu::Backends::GL
@@ -41,12 +43,14 @@ impl CanvasOutput {
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         };
         let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
+        check_current()?;
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        check_current()?;
         let backend = format!("{:?}", adapter.get_info().backend);
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
@@ -60,6 +64,7 @@ impl CanvasOutput {
             })
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        check_current()?;
         let caps = surface.get_capabilities(&adapter);
         let format = caps
             .formats
@@ -83,6 +88,7 @@ impl CanvasOutput {
             view_formats: vec![view_format],
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
+        check_current()?;
         canvas.set_width(config.width);
         canvas.set_height(config.height);
         surface.configure(&device, &config);

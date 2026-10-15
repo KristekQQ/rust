@@ -11,8 +11,8 @@ impl FrameMetrics {
         if !dt.is_finite() || dt <= 0.0 {
             return;
         }
-        // A background-tab pause is not a useful rendering sample.
-        if dt > 0.25 {
+        // Count slow sub-second frames too; discard longer stalls.
+        if dt > 1.0 {
             *self = Self::default();
             return;
         }
@@ -45,5 +45,13 @@ mod tests {
             metrics.record(1.0 / 30.0);
         }
         assert!((metrics.fps - 30.0).abs() < 0.001);
+    }
+    #[test]
+    fn slow_frames_still_report_fps_instead_of_zero() {
+        let mut metrics = FrameMetrics::default();
+        metrics.record(0.35);
+        metrics.record(0.35);
+        assert!((metrics.fps - 1.0 / 0.35).abs() < 0.001);
+        assert!((metrics.frame_ms - 350.0).abs() < 0.001);
     }
 }

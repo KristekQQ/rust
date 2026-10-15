@@ -43,5 +43,5 @@ Manual visual checks additionally inspected front/back sphere lighting, nonunifo
 
 - Browser tests cover this Mac/browser's WebGPU and WebGL implementations; they do not establish VR/device compatibility, sustained performance or absence of every leak.
 - Current glTF support remains the documented core subset. Optional extensions such as KHR_materials_unlit produce a fallback warning; passing tests do not mean support for every extension, PBR environment lighting or animation blending.
-- The SDK retains one canvas/backend per page. Switching ownership requires a page reload; explicit engine disposal is not part of the current API.
+- At this review milestone the SDK retained one canvas/backend per page without disposal. The subsequent harness work adds `engine.dispose()` and same-canvas reinitialization; see the current README and development guide. Switching backend can still require a new canvas because of browser context ownership.
 - Memory budgets bound individual expanded assets/poses, not total application memory across arbitrary concurrent models.

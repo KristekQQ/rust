@@ -13,9 +13,36 @@ type ImportedResources = (Vec<Vec<u8>>, Vec<Vec<u8>>);
 type AnimationFrameCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
 
 thread_local! {
+    static RUNTIME: RefCell<Option<Runtime>> = const { RefCell::new(None) };
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
-    static STARTING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = const { RefCell::new(None) };
+}
+
+struct Runtime {
+    window: web_sys::Window,
+    frame: Rc<std::cell::Cell<Option<i32>>>,
+    _callback: AnimationFrameCallback,
+    _listeners: Vec<keyboard::Listener>,
+}
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        if let Some(id) = self.frame.take() {
+            let _ = self.window.cancel_animation_frame(id);
+        }
+        self._callback.borrow_mut().take();
+    }
+}
+
+/// Release the frame loop, input listeners, camera and GPU scene resources.
+#[wasm_bindgen]
+pub fn dispose() {
+    GENERATION.with(|generation| generation.set(generation.get().wrapping_add(1)));
+    STARTING.with(|starting| starting.set(None));
+    RUNTIME.with(|runtime| runtime.borrow_mut().take());
+    CAMERA.with(|camera| camera.borrow_mut().take());
+    STATE.with(|state| state.borrow_mut().take());
 }
 
 #[wasm_bindgen]
@@ -353,6 +380,26 @@ pub fn renderer_stats() -> js_sys::Float64Array {
 }
 
 #[wasm_bindgen]
+pub fn set_debug_overlay(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_debug_overlay(enabled);
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn debug_stats() -> String {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().debug_stats())
+            .unwrap_or_else(|| "{}".into())
+    })
+}
+
+#[wasm_bindgen]
 pub fn renderer_backend() -> String {
     STATE.with(|state| {
         state
@@ -504,6 +551,117 @@ pub fn set_camera_mode(mode: &str) {
             }
         }
     });
+}
+
+/// Attach input and a chase camera to an existing glTF root, never spawn a scene.
+#[wasm_bindgen]
+pub fn control_character(
+    id: u32,
+    speed: f32,
+    run_speed: f32,
+    model_yaw: f32,
+    idle: i32,
+    walk: i32,
+    run: i32,
+) -> bool {
+    STATE.with(|state| {
+        let state = state.borrow();
+        let Some(state) = state.as_ref() else {
+            return false;
+        };
+        let mut state = state.borrow_mut();
+        let Some(model) = state.scene.model(id) else {
+            return false;
+        };
+        let indices = [idle, walk, run];
+        if indices.iter().any(|index| {
+            *index < -1 || (*index >= 0 && *index as usize >= model.asset.animations.len())
+        }) {
+            return false;
+        }
+        let Some(object) = state.scene.objects().get(&id) else {
+            return false;
+        };
+        let position = object.transform.position;
+        let clips = indices.map(|index| (index >= 0).then_some(index as usize));
+        let accepted = CAMERA.with(|camera| {
+            camera.borrow().as_ref().is_some_and(|camera| {
+                camera
+                    .borrow_mut()
+                    .follow_object(id, position, speed, run_speed, model_yaw, clips)
+            })
+        });
+        if accepted {
+            state.clear_model_camera();
+        }
+        accepted
+    })
+}
+
+#[wasm_bindgen]
+pub fn character_state() -> String {
+    CAMERA.with(|camera| {
+        camera
+            .borrow()
+            .as_ref()
+            .and_then(|camera| {
+                let camera = camera.borrow();
+                camera.character_state().map(|state| (state, camera.character_physics_state()))
+            })
+            .map(|((id, position, moving, running), physics)| {
+                let (grounded, vertical_velocity, candidates) = physics.unwrap_or((false, 0.0, 0));
+                serde_json::json!({
+                    "id": id, "position": position.to_array(), "moving": moving, "running": running,
+                    "grounded": grounded, "verticalVelocity": vertical_velocity, "collisionCandidates": candidates
+                })
+                .to_string()
+            })
+            .unwrap_or_else(|| "null".into())
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_box_collider(id: u32, hx: f32, hy: f32, hz: f32, ox: f32, oy: f32, oz: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().scene.set_box_collider(
+                id,
+                glam::Vec3::new(hx, hy, hz),
+                glam::Vec3::new(ox, oy, oz),
+            )
+        })
+    })
+}
+
+#[wasm_bindgen]
+pub fn remove_collider(id: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.remove_collider(id))
+    })
+}
+
+#[wasm_bindgen]
+pub fn configure_character_physics(
+    hx: f32,
+    hy: f32,
+    hz: f32,
+    gravity: f32,
+    jump_speed: f32,
+) -> bool {
+    let physics = crate::input::character::CharacterPhysics {
+        half_extents: glam::Vec3::new(hx, hy, hz),
+        gravity,
+        jump_speed,
+    };
+    CAMERA.with(|camera| {
+        camera
+            .borrow()
+            .as_ref()
+            .is_some_and(|camera| camera.borrow_mut().set_character_physics(physics))
+    })
 }
 
 #[wasm_bindgen]
@@ -762,22 +920,54 @@ pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> boo
 }
 
 #[wasm_bindgen]
-pub async fn start() -> Result<(), JsValue> {
+pub fn start() -> js_sys::Promise {
     if STATE.with(|state| state.borrow().is_some()) {
-        return Ok(());
+        return js_sys::Promise::resolve(&JsValue::UNDEFINED);
     }
-    if STARTING.with(|flag| flag.replace(true)) {
-        return Err(JsValue::from_str(
+    let generation = GENERATION.with(|generation| generation.get());
+    if STARTING.with(|flag| {
+        if flag.get().is_some() {
+            true
+        } else {
+            flag.set(Some(generation));
+            false
+        }
+    }) {
+        return js_sys::Promise::reject(&JsValue::from_str(
             "Engine initialization already in progress",
         ));
     }
-    struct StartingGuard;
+    // Reserve ownership before the first asynchronous poll, so synchronous dispose
+    // also invalidates a just-returned start promise.
+    wasm_bindgen_futures::future_to_promise(async move {
+        start_runtime(generation).await?;
+        Ok(JsValue::UNDEFINED)
+    })
+}
+
+fn check_start_generation(generation: u64) -> Result<(), JsValue> {
+    if GENERATION.with(|current| current.get()) != generation {
+        Err(JsValue::from_str(
+            "Engine initialization canceled by dispose",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+async fn start_runtime(generation: u64) -> Result<(), JsValue> {
+    struct StartingGuard(u64);
     impl Drop for StartingGuard {
         fn drop(&mut self) {
-            STARTING.with(|flag| flag.set(false));
+            STARTING.with(|flag| {
+                if flag.get() == Some(self.0) {
+                    flag.set(None);
+                }
+            });
         }
     }
-    let _guard = StartingGuard;
+    let _guard = StartingGuard(generation);
+    check_start_generation(generation)?;
     console_error_panic_hook::set_once();
     let window =
         web_sys::window().ok_or_else(|| JsValue::from_str("Browser window unavailable"))?;
@@ -792,18 +982,22 @@ pub async fn start() -> Result<(), JsValue> {
         .ok_or_else(|| JsValue::from_str("Canvas gpu-canvas not found"))?
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
-    let state = Rc::new(RefCell::new(State::new(&canvas).await?));
-    STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
+    let state = Rc::new(RefCell::new(
+        State::new(&canvas, || check_start_generation(generation)).await?,
+    ));
+    check_start_generation(generation)?;
     let aspect = state.borrow().aspect;
     let camera = Rc::new(RefCell::new(ActiveCamera::new(aspect)));
-    CAMERA.with(|c| *c.borrow_mut() = Some(camera.clone()));
 
-    keyboard::attach(&window, camera.clone());
-    mouse::attach(&window, &canvas, camera.clone());
+    let mut listeners = keyboard::attach(&window, camera.clone())?;
+    listeners.extend(mouse::attach(&window, &canvas, camera.clone())?);
 
     let prev_time = Rc::new(RefCell::new(performance.now()));
     let f: AnimationFrameCallback = Rc::new(RefCell::new(None));
     let g = f.clone();
+    let weak = Rc::downgrade(&f);
+    let frame = Rc::new(std::cell::Cell::new(None));
+    let frame_c = frame.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();
     let camera_c = camera.clone();
@@ -811,16 +1005,18 @@ pub async fn start() -> Result<(), JsValue> {
     let prev_time_c = prev_time.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+        frame_c.set(None);
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
         {
             let mut cam = camera_c.borrow_mut();
-            cam.update(dt);
-            let cam_pos = cam.position();
-            let cam_matrix = cam.matrix();
             let mut st = state_c.borrow_mut();
             let prepare_start = perf_c.now();
+            cam.update(dt);
+            cam.update_scene(&mut st.scene, dt);
+            let cam_pos = cam.position();
+            let cam_matrix = cam.matrix();
             st.update(dt, cam_matrix, cam_pos);
 
             if let Err(error) = st.render() {
@@ -835,11 +1031,28 @@ pub async fn start() -> Result<(), JsValue> {
             }
             st.prepare_ms = perf_c.now() - prepare_start;
         }
-        window_c
-            .request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref())
-            .unwrap();
+        if let Some(callback) = weak.upgrade() {
+            if let Ok(id) = window_c.request_animation_frame(
+                callback.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+            ) {
+                frame_c.set(Some(id));
+            }
+        }
     }) as Box<dyn FnMut()>));
 
-    window.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())?;
+    check_start_generation(generation)?;
+    frame.set(Some(window.request_animation_frame(
+        g.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+    )?));
+    STATE.with(|s| *s.borrow_mut() = Some(state));
+    CAMERA.with(|c| *c.borrow_mut() = Some(camera));
+    RUNTIME.with(|runtime| {
+        *runtime.borrow_mut() = Some(Runtime {
+            window,
+            frame,
+            _callback: g,
+            _listeners: listeners,
+        })
+    });
     Ok(())
 }

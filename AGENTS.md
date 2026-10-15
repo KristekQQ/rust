@@ -7,3 +7,5 @@ Keep Rust/WGSL layouts and `src/web.rs` exports consistent with `js/engine.js`, 
 Use `MEMORY.md` only for orientation/current decisions; consult linked docs only for the affected area. Choose required checks from [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Native tests omit wasm32 renderer/web code. Preserve independent pass visibility, static revisions and resource cleanup. Respect `rust-toolchain.toml`; inspect Cargo configuration before source/offline changes.
 
 Before committing/pushing: `cargo test` must pass, then run `scripts/pre-push` to update `all_sources.txt`. Preserve unrelated staging.
+
+Use `npm run verify` for an integrated milestone; `verify:native` or `verify:browser` for affected checks. Browser verification rejects stale `pkg/`, backend fallback and console errors. Local hook installation: `git config --local core.hooksPath scripts`. CI software WebGL is a separate validation state from local WebGPU.

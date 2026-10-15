@@ -10,7 +10,7 @@ případně `?backend=webgl`. Hlavní stránka nadále načítá původní malou
 | --- | --- |
 | `scene.rs` | transformace, render options, statická revize, simulace, identita zrcadla |
 | `render_math.rs` | normalizovaná rovina, odražený pohled, světelný pohled; nativní testy |
-| `visibility.rs` | konzervativní AABB/frustum test a filtry pro každý průchod |
+| `visibility.rs` + `spatial.rs` | konzervativní AABB/frustum test, statický/dynamický BVH a filtry pro každý průchod |
 | `render/target.rs` | vypůjčené color/depth a samostatné depth cíle, viewport, Clear/Load |
 | `render/textures.rs` | vlastnictví a tvorba opakovaně použitelných barevných/hloubkových textur |
 | `render/renderer.rs` | GPU meshe, nezávislé cache hlavní kamery, odrazu a dvojice stínů pro každé světlo, barevné a hloubkové vykreslení |
@@ -71,6 +71,27 @@ Více zrcadel, environment cubemaps, průhlednost, roughness mip chain a VR/WebX
 binding zatím nejsou implementovány.
 
 ## JS/TS příkazy
+
+### Volitelný informační panel
+
+`engine.setDebugOverlay(true/false)` zapíná panel přímo v obrazu; výchozí stav je
+vypnuto. Ukázky `fox-control` a `culling` používají F3. Rust/WGSL jej kreslí až
+za scénou a postprocessingem, nikoliv do stínů nebo zrcadla. Zobrazuje FPS,
+interval RAF, CPU čas přípravy, čas hlavního cullingu, viditelné/vyřazené objekty
+a práci BVH. `CULL CACHED` znamená, že tento snímek nepotřeboval nový výběr.
+Nejde o GPU timestampy ani occlusion culling.
+
+Text a instance bitmapových znaků se obnovují nejvýše 4× za sekundu (navíc po
+zapnutí/resize). Mezi obnovami se používá stejný GPU buffer a jeden draw call.
+Vypnutý panel nevytváří GPU prostředky, nepřipravuje text, nenahrává ani nekreslí;
+nepřidává časová měření ani diagnostické počítání BVH. `engine.debugStats()` je
+jednorázový diagnostický dotaz, nikoliv JS animační smyčka.
+
+Statický BVH sleduje statickou revizi. Dynamický se při změně geometrie refituje,
+při změně členství přestaví. Kamera stromy nemění; každý průchod používá vlastní
+frustum a filtry. BVH kolizí zůstává samostatný, protože má jinou geometrii a dotazy.
+
+### Scéna a efekty
 
 ```js
 const engine = await initEngine(canvas);

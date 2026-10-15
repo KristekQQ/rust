@@ -2,37 +2,61 @@
 
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::Window;
+use web_sys::{EventTarget, Window};
 
 use crate::input::camera::CameraController;
 
-pub fn attach<T>(window: &Window, cam: Rc<RefCell<T>>)
+pub struct Listener {
+    target: EventTarget,
+    name: &'static str,
+    callback: Closure<dyn FnMut(web_sys::Event)>,
+}
+impl Listener {
+    pub fn new(
+        target: &EventTarget,
+        name: &'static str,
+        callback: impl FnMut(web_sys::Event) + 'static,
+    ) -> Result<Self, wasm_bindgen::JsValue> {
+        let callback = Closure::wrap(Box::new(callback) as Box<dyn FnMut(web_sys::Event)>);
+        target.add_event_listener_with_callback(name, callback.as_ref().unchecked_ref())?;
+        Ok(Self {
+            target: target.clone(),
+            name,
+            callback,
+        })
+    }
+}
+impl Drop for Listener {
+    fn drop(&mut self) {
+        let _ = self
+            .target
+            .remove_event_listener_with_callback(self.name, self.callback.as_ref().unchecked_ref());
+    }
+}
+
+pub fn attach<T>(
+    window: &Window,
+    cam: Rc<RefCell<T>>,
+) -> Result<Vec<Listener>, wasm_bindgen::JsValue>
 where
     T: CameraController + 'static,
 {
-    let cam_down = cam.clone();
-    let key_down = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
-        cam_down.borrow_mut().key_down(e.code());
-    }) as Box<dyn FnMut(_)>);
-    window
-        .add_event_listener_with_callback("keydown", key_down.as_ref().unchecked_ref())
-        .unwrap();
-    key_down.forget();
-
-    let cam_up = cam.clone();
-    let key_up = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
-        cam_up.borrow_mut().key_up(e.code());
-    }) as Box<dyn FnMut(_)>);
-    window
-        .add_event_listener_with_callback("keyup", key_up.as_ref().unchecked_ref())
-        .unwrap();
-    key_up.forget();
-
-    let on_blur = Closure::wrap(Box::new(move || {
-        cam.borrow_mut().clear_input();
-    }) as Box<dyn FnMut()>);
-    window
-        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
-        .unwrap();
-    on_blur.forget();
+    let down = cam.clone();
+    let up = cam.clone();
+    Ok(vec![
+        Listener::new(window.as_ref(), "keydown", move |e| {
+            let event = e.unchecked_into::<web_sys::KeyboardEvent>();
+            // Jump is a fresh key press, never an auto-repeat after pause/blur.
+            if event.code() != "Space" || !event.repeat() {
+                down.borrow_mut().key_down(event.code());
+            }
+        })?,
+        Listener::new(window.as_ref(), "keyup", move |e| {
+            up.borrow_mut()
+                .key_up(e.unchecked_into::<web_sys::KeyboardEvent>().code())
+        })?,
+        Listener::new(window.as_ref(), "blur", move |_| {
+            cam.borrow_mut().clear_input()
+        })?,
+    ])
 }

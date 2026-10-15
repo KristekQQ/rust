@@ -20,6 +20,7 @@ pre { white-space: pre-wrap; } a { color: #c7d8ff; }
 </div>
 <script type="module">
 import { createScene } from "../examples/basic/scene.js";
+import { capturePixels, assertForeground, assertChanged } from './pixels.js';
 
 const result = document.getElementById('result');
 try {
@@ -41,6 +42,22 @@ try {
     document.getElementById('check').onclick = async () => {
         try {
             if (engine.set_output_mode('invalid')) throw new Error('Neplatný režim musí být odmítnut');
+            engine.resize(640, 360);
+            engine.set_grid_visible(false); engine.set_light_helpers_visible(false);
+            engine.setCameraView([3, 3, 6], [0, 0, 0]);
+            engine.set_output_mode('canvas');
+            const direct = await capturePixels(document.getElementById('gpu-canvas'));
+            assertForeground(direct, 'Direct canvas output');
+            engine.set_output_mode('texture');
+            const texture = await capturePixels(document.getElementById('gpu-canvas'));
+            assertForeground(texture, 'Texture presentation');
+            let different = 0;
+            for (let i = 0; i < direct.data.length; i += 4) {
+                if (Math.abs(direct.data[i] - texture.data[i]) + Math.abs(direct.data[i + 1] - texture.data[i + 1]) + Math.abs(direct.data[i + 2] - texture.data[i + 2]) > 20) different++;
+            }
+            if (different > direct.width * direct.height * .02) throw new Error(`Canvas/texture presentation differs (${different} pixels)`);
+            engine.setCameraView([-3, 3, 6], [0, 0, 0]);
+            assertChanged(texture, await capturePixels(document.getElementById('gpu-canvas')), 'Texture presents new frames');
             for (const next of ['texture', 'canvas', 'texture']) {
                 setMode(next); small = !small; size(); await frames();
                 const stats = engine.renderer_stats();
@@ -54,7 +71,7 @@ try {
             try { engine.resize(-1, 10); } catch { invalidSize = true; }
             if (!invalidSize) throw new Error('Negative dimensions accepted');
             small = false; size(); await frames();
-            message = 'PASS: přepínání, změna rozlišení, GPU limity, scéna a odmítnutí neplatného režimu';
+            message = 'PASS: pixely canvasu/textury, nové snímky, přepínání, rozlišení, GPU limity a odmítnutí parametrů';
         } catch (error) { message = `FAIL: ${error.message}`; console.error(error); }
     };
     setInterval(() => {

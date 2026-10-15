@@ -1,14 +1,15 @@
-import { floor, staticCube } from "../shared/scene-helpers.js";
-
 // Tato funkce scénu sestaví jednou. Každý další frame obsluhuje Rust.
 /** @typedef {import("../../js/engine.js").Vector3} Vector3 */
 /** @param {import("../../js/engine.js").Scene} scene */
 export function createScene(scene) {
     scene.clear();
-    floor(scene);
+    scene.createPlane([0,-1,0]).setScale([12,1,12])
+        .setRenderOptions({isStatic:true,castsShadow:false});
     /** @type {Vector3[]} */
     const blocks=[[-1.8,-0.5,0],[0,-0.5,-1.8],[1.8,-0.5,0]];
-    for(const position of blocks) staticCube(scene,position);
+    for(const position of blocks) {
+        scene.createCube(position).setScale([1,1,1]).setRenderOptions({isStatic:true});
+    }
     scene.createSphere([0,0.2,0.5]).setScale([0.7,1.1,0.7]);
     // radius = poloměr, height = výška, speed = radiány/s, phase = počáteční úhel.
     // Záporná speed obrátí směr. Rust při pohybu aktualizuje světelné stínové mapy.

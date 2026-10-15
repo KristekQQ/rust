@@ -13,4 +13,5 @@ pub mod target;
 pub mod effects;
 pub mod textures;
 
+mod hud;
 pub mod postprocess;

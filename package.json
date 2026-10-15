@@ -8,6 +8,12 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test:sdk": "node --test tests/sdk-unit.test.mjs"
+    "test:sdk": "node --test tests/sdk-unit.test.mjs",
+    "test:harness": "node --test tests/harness-unit.test.mjs",
+    "verify:fast": "npm run typecheck && npm run test:sdk && npm run test:harness",
+    "test:browser": "node scripts/test-browser.mjs",
+    "verify": "bash scripts/verify.sh all",
+    "verify:native": "bash scripts/verify.sh native",
+    "verify:browser": "bash scripts/verify.sh browser"
   }
 }

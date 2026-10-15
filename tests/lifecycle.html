@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Rust runtime lifecycle</title>
+<pre id="result" role="status">Probíhá test…</pre>
+<canvas id="gpu-canvas" width="640" height="360"></canvas>
+<script type="module">
+import { capturePixels, assertForeground, assertChanged } from './pixels.js';
+const result = document.getElementById('result');
+const canvas = document.getElementById('gpu-canvas');
+const assert = (ok, message) => {
+    if (!ok) throw new Error(`${message} (listeners=${listeners.size}: ${[...listeners.values()].join(',')}; frames=${frames.size}; callbacks=${callbacks})`);
+};
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+// Observe only runtime input listeners and RAF, without introducing a test RAF loop.
+const names = new Set(['keydown', 'keyup', 'blur', 'pointerdown', 'pointerup', 'mousemove']);
+const listeners = new Map();
+const originalAdd = EventTarget.prototype.addEventListener;
+const originalRemove = EventTarget.prototype.removeEventListener;
+EventTarget.prototype.addEventListener = function(name, callback, options) {
+    if ((this === window || this === canvas) && names.has(name)) listeners.set(callback, name);
+    return originalAdd.call(this, name, callback, options);
+};
+EventTarget.prototype.removeEventListener = function(name, callback, options) {
+    if ((this === window || this === canvas) && names.has(name)) listeners.delete(callback);
+    return originalRemove.call(this, name, callback, options);
+};
+const originalRAF = window.requestAnimationFrame;
+const originalCancel = window.cancelAnimationFrame;
+const frames = new Set();
+let callbacks = 0;
+window.requestAnimationFrame = callback => {
+    const id = originalRAF.call(window, time => { frames.delete(id); callbacks++; callback(time); });
+    frames.add(id);
+    return id;
+};
+window.cancelAnimationFrame = id => { frames.delete(id); originalCancel.call(window, id); };
+let engine, direct;
+try {
+    const { initEngine } = await import(`../js/engine.js?v=${Date.now()}`);
+    const backend = new URLSearchParams(location.search).get('backend') || 'auto';
+    const expected = backend === 'webgl' ? 'Gl' : 'BrowserWebGpu';
+    // Exercise the public WASM boundary itself, including cancellation before its
+    // first async poll and an immediate retry while the old promise is pending.
+    canvas.dataset.backend = backend;
+    direct = await import(`../pkg/webgpu_wasm.js?lifecycle=${Date.now()}`);
+    await direct.default({ module_or_path: new URL(`../pkg/webgpu_wasm_bg.wasm?lifecycle=${Date.now()}`, import.meta.url) });
+    const pending = direct.start();
+    const canceled = pending.then(() => false, error => String(error).includes('canceled by dispose'));
+    direct.dispose();
+    const retry = direct.start();
+    assert(await canceled, 'Public start is invalidated by synchronous dispose');
+    await retry;
+    assert(direct.renderer_backend() === expected, 'Canceled start does not clear new startup ownership');
+    assert(listeners.size === 6 && frames.size === 1, 'Only replacement public start installs runtime');
+    direct.dispose();
+    await wait(80);
+    assert(listeners.size === 0 && frames.size === 0, 'Canceled public start cannot resurrect runtime');
+    if (backend === 'auto') {
+        // Hold adapter negotiation to deterministically dispose inside State::new's await.
+        const gpu = navigator.gpu;
+        const requestAdapter = gpu.requestAdapter;
+        let enter, release;
+        const entered = new Promise(resolve => { enter = resolve; });
+        const gate = new Promise(resolve => { release = resolve; });
+        let held = false;
+        gpu.requestAdapter = async function(options) {
+            const adapter = await requestAdapter.call(this, options);
+            if (!held) { held = true; enter(); await gate; }
+            return adapter;
+        };
+        try {
+            const inFlight = direct.start();
+            const canceledFlight = inFlight.then(() => false, error => String(error).includes('canceled by dispose'));
+            await entered;
+            direct.dispose();
+            // Finish the NEW runtime first, while the canceled one remains suspended.
+            await direct.start();
+            assert(direct.renderer_backend() === expected, 'New runtime uses requested backend');
+            direct.set_grid_visible(false);
+            direct.set_light_helpers_visible(false);
+            direct.set_camera_view(5, 3, 5, 0, 0, 0);
+            const id = direct.add_cube(0, 0, 0);
+            direct.add_light(2, 4, 3, 1, 1, 1);
+            const beforeRelease = await capturePixels(canvas);
+            assertForeground(beforeRelease, 'Replacement before canceled adapter release');
+            release();
+            assert(await canceledFlight, 'Dispose during adapter negotiation rejects pending start');
+            assert(listeners.size === 6 && frames.size === 1, 'Canceled init preserves replacement listeners and RAF');
+            assert(direct.object_exists(id), 'Canceled init preserves new Rust scene');
+            direct.set_object_position(id, -2, 0, 0);
+            const afterRelease = await capturePixels(canvas);
+            assertForeground(afterRelease, 'Replacement after canceled adapter release');
+            assertChanged(beforeRelease, afterRelease, 'Replacement renders commands after canceled init finishes');
+        } finally {
+            release();
+            gpu.requestAdapter = requestAdapter;
+        }
+        direct.dispose();
+    }
+
+
+    let old, handle;
+    for (let cycle = 0; cycle < 3; cycle++) {
+        engine = await initEngine(canvas, { backend });
+        const actual = engine.renderer_backend();
+        document.documentElement.dataset.rendererBackend = actual;
+        assert(actual === expected, `Expected ${expected}, got ${actual}`);
+        assert(engine.scene.objectCount === 0, 'Reinit starts empty');
+        assert(listeners.size === 6, `Exactly six runtime input listeners, got ${listeners.size}`);
+        const current = engine.scene.createCube();
+        if (old) {
+            for (const action of [() => handle.setPosition([1, 0, 0]), () => old.add_cube(0, 0, 0)]) {
+                let rejected = false; try { action(); } catch { rejected = true; }
+                assert(rejected && current.exists, 'Disposed commands cannot control replacement');
+            }
+            old.dispose();
+            assert(await initEngine(canvas, { backend }) === engine, 'Old dispose preserves new ownership');
+        }
+        const before = callbacks;
+        await wait(150);
+        assert(callbacks > before && frames.size === 1, 'One active Rust RAF chain');
+        old = engine; handle = current;
+        engine.dispose(); engine.dispose();
+        assert(listeners.size === 0 && frames.size === 0, 'Dispose removes listeners and cancels RAF');
+        const stopped = callbacks;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+        canvas.dispatchEvent(new PointerEvent('pointerdown', { buttons: 1 }));
+        window.dispatchEvent(new MouseEvent('mousemove', { buttons: 1 }));
+        await wait(80);
+        assert(callbacks === stopped, 'Disposed RAF remains stopped after input');
+    }
+    result.textContent = `PASS: ${expected} dispose/reinit ×3; listener cleanup, stopped RAF, stale handles, ownership, pending public start cancellation`;
+} catch (error) {
+    console.error(error);
+    result.textContent = `FAIL: ${error.message}`;
+} finally {
+    engine?.dispose();
+    direct?.dispose();
+    EventTarget.prototype.addEventListener = originalAdd;
+    EventTarget.prototype.removeEventListener = originalRemove;
+    window.requestAnimationFrame = originalRAF;
+    window.cancelAnimationFrame = originalCancel;
+}
+</script>
+</html>

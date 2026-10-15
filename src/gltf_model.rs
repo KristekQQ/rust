@@ -235,6 +235,8 @@ pub struct ModelInstance {
     pub asset: std::sync::Arc<ModelAsset>,
     pub pose: ModelPose,
     pub playback: Option<AnimationPlayback>,
+    /// Identity of an explicit playback command; normal animation frames keep it.
+    pub playback_revision: u64,
     pub scene: usize,
     pub revision: u64,
     pub last_error: Option<String>,

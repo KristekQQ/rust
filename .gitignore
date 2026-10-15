@@ -5,5 +5,6 @@
 vendor/
 .idea/
 node_modules/
-package-lock.json
 render.png
+all_sources.txt.*
+/output/

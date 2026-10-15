@@ -92,12 +92,133 @@ impl RenderPassKind {
     }
 }
 
+/// Query work is per extraction; rebuild counters include only tracked synchronizations.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct CullingStats {
+    pub nodes_visited: usize,
+    pub object_tests: usize,
+    pub static_rebuilds: usize,
+    pub dynamic_rebuilds: usize,
+}
+
+#[derive(Default)]
+pub(crate) struct VisibilityIndex {
+    static_tree: crate::spatial::Bvh,
+    dynamic_tree: crate::spatial::Bvh,
+    static_revision: Option<u64>,
+    render_revision: Option<u64>,
+    totals: [usize; 4],
+    static_rebuilds: usize,
+    dynamic_rebuilds: usize,
+}
+impl VisibilityIndex {
+    pub(crate) fn sync(&mut self, scene: &SceneManager, collect_stats: bool) {
+        if self.render_revision == Some(scene.render_revision()) {
+            return;
+        }
+        let rebuild_static = self.static_revision != Some(scene.static_revision());
+        let mut statics = Vec::new();
+        let mut dynamics = Vec::new();
+        self.totals = [0; 4];
+        for (&id, object) in scene.objects() {
+            for pass in [
+                RenderPassKind::Main,
+                RenderPassKind::Reflection,
+                RenderPassKind::ShadowStatic,
+                RenderPassKind::ShadowDynamic,
+            ] {
+                self.totals[pass.index()] += usize::from(included(scene, id, object, pass));
+            }
+            let data = &object.render_data;
+            let entry = (
+                id,
+                crate::spatial::Bounds {
+                    center: data.center,
+                    half_extent: data.half_extent,
+                },
+            );
+            if object.render_options.is_static {
+                if rebuild_static {
+                    statics.push(entry);
+                }
+            } else {
+                dynamics.push(entry);
+            }
+        }
+        if rebuild_static {
+            self.static_tree.update(&statics, true);
+            if collect_stats {
+                self.static_rebuilds += 1;
+            }
+            self.static_revision = Some(scene.static_revision());
+        }
+        let rebuilt = self.dynamic_tree.update(&dynamics, false);
+        if collect_stats && rebuilt {
+            self.dynamic_rebuilds += 1;
+        }
+        self.render_revision = Some(scene.render_revision());
+    }
+    fn query<const TRACK: bool>(
+        &self,
+        scene: &SceneManager,
+        frustum: &Frustum,
+        pass: RenderPassKind,
+        output: &mut Vec<u32>,
+    ) -> CullingStats {
+        let mut stats = CullingStats {
+            static_rebuilds: self.static_rebuilds,
+            dynamic_rebuilds: self.dynamic_rebuilds,
+            ..Default::default()
+        };
+        let intersects =
+            |b: crate::spatial::Bounds| frustum.intersects_aabb(b.center, b.half_extent);
+        let eligible = |id| included(scene, id, &scene.objects()[&id], pass);
+        if pass != RenderPassKind::ShadowDynamic {
+            self.static_tree.query::<TRACK>(
+                &intersects,
+                &eligible,
+                output,
+                &mut stats.nodes_visited,
+                &mut stats.object_tests,
+            );
+        }
+        if pass != RenderPassKind::ShadowStatic {
+            self.dynamic_tree.query::<TRACK>(
+                &intersects,
+                &eligible,
+                output,
+                &mut stats.nodes_visited,
+                &mut stats.object_tests,
+            );
+        }
+        output.sort_unstable();
+        stats
+    }
+}
+
+fn included(
+    scene: &SceneManager,
+    id: u32,
+    object: &crate::scene::SceneObject,
+    pass: RenderPassKind,
+) -> bool {
+    let options = object.render_options;
+    match pass {
+        RenderPassKind::Main => true,
+        RenderPassKind::Reflection => Some(id) != scene.mirror_object,
+        RenderPassKind::ShadowStatic => options.casts_shadow && options.is_static,
+        RenderPassKind::ShadowDynamic => options.casts_shadow && !options.is_static,
+    }
+}
+
 #[derive(Default)]
 pub struct RenderQueue {
     pub batches: [Vec<InstanceData>; 3],
     pub imported: std::collections::BTreeMap<u32, Vec<InstanceData>>,
     pub total: usize,
     pub visible: usize,
+    pub culling_stats: CullingStats,
+    pub collect_stats: bool,
 }
 impl RenderQueue {
     pub fn extract(&mut self, scene: &SceneManager, view_projection: Mat4, culling: bool) {
@@ -120,22 +241,38 @@ impl RenderQueue {
         self.total = 0;
         self.visible = 0;
         let frustum = Frustum::from_view_projection(view_projection);
-        for (id, object) in scene.objects() {
-            let options = object.render_options;
-            let included = match pass {
-                RenderPassKind::Main => true,
-                RenderPassKind::Reflection => Some(*id) != scene.mirror_object,
-                RenderPassKind::ShadowStatic => options.casts_shadow && options.is_static,
-                RenderPassKind::ShadowDynamic => options.casts_shadow && !options.is_static,
+        let mut candidates = Vec::new();
+        self.culling_stats = CullingStats::default();
+        if culling {
+            let index = scene.visibility_index(self.collect_stats);
+            self.total = if pass == RenderPassKind::Reflection {
+                index.totals[RenderPassKind::Main.index()]
+                    - usize::from(
+                        scene
+                            .mirror_object
+                            .is_some_and(|id| scene.object_exists(id)),
+                    )
+            } else {
+                index.totals[pass.index()]
             };
-            if !included {
-                continue;
-            }
-            self.total += 1;
+            self.culling_stats = if self.collect_stats {
+                index.query::<true>(scene, &frustum, pass, &mut candidates)
+            } else {
+                index.query::<false>(scene, &frustum, pass, &mut candidates)
+            };
+        } else {
+            candidates.extend(
+                scene
+                    .objects()
+                    .iter()
+                    .filter_map(|(&id, object)| included(scene, id, object, pass).then_some(id)),
+            );
+            self.total = candidates.len();
+        }
+        for id in &candidates {
+            let object = &scene.objects()[id];
+            let options = object.render_options;
             let data = &object.render_data;
-            if culling && !frustum.intersects_aabb(data.center, data.half_extent) {
-                continue;
-            }
             let index = match object.mesh {
                 MeshKind::Cube => 0,
                 MeshKind::Plane => 1,
@@ -177,6 +314,279 @@ impl RenderQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn assert_brute_force(scene: &SceneManager, matrix: Mat4, pass: RenderPassKind, culling: bool) {
+        let frustum = Frustum::from_view_projection(matrix);
+        let mut expected = RenderQueue::default();
+        for (&id, object) in scene.objects() {
+            let options = object.render_options;
+            let eligible = match pass {
+                RenderPassKind::Main => true,
+                RenderPassKind::Reflection => Some(id) != scene.mirror_object,
+                RenderPassKind::ShadowStatic => options.is_static && options.casts_shadow,
+                RenderPassKind::ShadowDynamic => !options.is_static && options.casts_shadow,
+            };
+            if !eligible {
+                continue;
+            }
+            expected.total += 1;
+            if culling && !object.render_data.intersects(&frustum) {
+                continue;
+            }
+            expected.visible += 1;
+            let mut instance = object.render_data.instance;
+            let options = object.render_options;
+            instance.material = [
+                options.reflectivity,
+                if options.receives_shadow { 1.0 } else { 0.0 },
+                if Some(id) == scene.mirror_object {
+                    1.0
+                } else {
+                    0.0
+                },
+                0.0,
+            ];
+            match object.mesh {
+                MeshKind::Cube => expected.batches[0].push(instance),
+                MeshKind::Plane => expected.batches[1].push(instance),
+                MeshKind::Sphere => expected.batches[2].push(instance),
+                MeshKind::Imported(mesh) => {
+                    expected.imported.entry(mesh).or_default().push(instance)
+                }
+            }
+        }
+        for track in [false, true] {
+            let mut actual = RenderQueue {
+                collect_stats: track,
+                ..Default::default()
+            };
+            actual.extract_pass(scene, matrix, culling, pass);
+            assert_eq!(
+                (actual.total, actual.visible),
+                (expected.total, expected.visible)
+            );
+            for (a, b) in actual.batches.iter().zip(&expected.batches) {
+                assert_instances(a, b);
+            }
+            assert_eq!(
+                actual.imported.values().filter(|v| !v.is_empty()).count(),
+                expected.imported.len()
+            );
+            for (id, batch) in &expected.imported {
+                assert_instances(&actual.imported[id], batch);
+            }
+            if !track || !culling {
+                assert_eq!(
+                    (
+                        actual.culling_stats.nodes_visited,
+                        actual.culling_stats.object_tests
+                    ),
+                    (0, 0)
+                );
+            }
+        }
+    }
+    fn assert_instances(actual: &[InstanceData], expected: &[InstanceData]) {
+        assert_eq!(actual.len(), expected.len());
+        for (a, b) in actual.iter().zip(expected) {
+            assert_eq!(a.model, b.model);
+            assert_eq!(a.normal_matrix, b.normal_matrix);
+            assert_eq!(a.material, b.material);
+        }
+    }
+    fn compare_passes(scene: &SceneManager) {
+        let reflected_view = Mat4::from_scale(Vec3::new(1.0, -1.0, 1.0))
+            * Mat4::from_translation(Vec3::new(-2.0, -1.0, 0.0));
+        for matrix in [
+            camera(),
+            camera() * reflected_view,
+            crate::render_math::shadow_view_projection(Vec3::new(-3.0, 7.0, 4.0)),
+            camera() * Mat4::from_translation(Vec3::new(-200.0, 0.0, 0.0)),
+        ] {
+            for pass in [
+                RenderPassKind::Main,
+                RenderPassKind::Reflection,
+                RenderPassKind::ShadowStatic,
+                RenderPassKind::ShadowDynamic,
+            ] {
+                for culling in [false, true] {
+                    assert_brute_force(scene, matrix, pass, culling);
+                }
+            }
+        }
+    }
+    #[test]
+    fn bvh_matches_brute_force_across_passes_mutations_and_planar_imports() {
+        let mut scene = SceneManager::default();
+        let floor = scene.add_plane(Vec3::new(0.0, 0.0, 2.0));
+        scene.set_render_options(
+            floor,
+            crate::scene::RenderOptions {
+                reflectivity: 0.8,
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        scene.configure_mirror(floor);
+        for i in 0..180 {
+            let mesh = [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere][i % 3];
+            let id = scene.add_object(
+                mesh,
+                Transform::new(
+                    Vec3::new(
+                        (i % 19) as f32 - 9.0,
+                        (i % 7) as f32 - 3.0,
+                        (i % 23) as f32 - 5.0,
+                    ),
+                    Vec3::new(0.3, 0.7, -0.2),
+                    Vec3::new(-1.5, 0.2, 2.0),
+                ),
+            );
+            scene.set_render_options(
+                id,
+                crate::scene::RenderOptions {
+                    is_static: i % 2 == 0,
+                    casts_shadow: i % 5 != 0,
+                    receives_shadow: i % 3 == 0,
+                    reflectivity: 0.25,
+                },
+            );
+        }
+        let imported = scene.add_imported(Vec3::new(2.0, 0.0, 1.0), Vec3::new(4.0, 0.0, 3.0));
+        // Multiple object IDs share one imported batch; spatial traversal order
+        // must not reorder its instances or change mirrored winding matrices.
+        scene.add_object(
+            MeshKind::Imported(imported),
+            Transform::new(
+                Vec3::new(0.0, 0.0, 2.0),
+                Vec3::ZERO,
+                Vec3::new(-1.0, 1.0, 1.0),
+            ),
+        );
+        scene.add_object(
+            MeshKind::Imported(imported),
+            Transform::new(Vec3::new(1.0, 0.0, 3.0), Vec3::ZERO, Vec3::ONE),
+        );
+        scene.set_object_transform(
+            imported,
+            Vec3::new(-2.0, 0.0, 1.0),
+            Vec3::new(0.3, 0.2, 0.8),
+            Vec3::new(-2.0, 1.0, 0.5),
+        );
+        compare_passes(&scene);
+        scene.set_object_position(imported, Vec3::new(100.0, 0.0, 0.0));
+        compare_passes(&scene);
+        scene.set_render_options(
+            imported,
+            crate::scene::RenderOptions {
+                is_static: true,
+                casts_shadow: false,
+                receives_shadow: false,
+                reflectivity: 0.6,
+            },
+        );
+        compare_passes(&scene);
+        scene.set_render_options(imported, crate::scene::RenderOptions::default());
+        scene.mirror_object = None;
+        compare_passes(&scene);
+        scene.remove_object(imported);
+        scene.remove_object(floor);
+        compare_passes(&scene);
+        scene.clear_scene();
+        compare_passes(&scene);
+        scene.add_cube(Vec3::new(0.0, 0.0, 2.0));
+        compare_passes(&scene);
+    }
+    #[test]
+    fn sparse_bvh_prunes_objects_and_refits_without_static_rebuilds() {
+        let mut scene = SceneManager::default();
+        scene.load_culling_demo();
+        let static_id = *scene.objects().keys().next().unwrap();
+        scene.set_render_options(
+            static_id,
+            crate::scene::RenderOptions {
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        let dynamic_id = *scene.objects().keys().nth(1).unwrap();
+        let mut queue = RenderQueue {
+            collect_stats: true,
+            ..Default::default()
+        };
+        queue.extract(&scene, camera(), true);
+        let stats = queue.culling_stats;
+        assert!(stats.object_tests < 1000, "{:?}", stats);
+        assert!(stats.nodes_visited > 0);
+        for matrix in [
+            camera(),
+            camera() * Mat4::from_translation(Vec3::new(-100.0, 0.0, 0.0)),
+        ] {
+            queue.extract(&scene, matrix, true);
+            assert_eq!(queue.culling_stats.static_rebuilds, stats.static_rebuilds);
+            assert_eq!(queue.culling_stats.dynamic_rebuilds, stats.dynamic_rebuilds);
+        }
+        scene.set_object_position(dynamic_id, Vec3::new(0.0, 0.0, 2.0));
+        queue.extract(&scene, camera(), true);
+        assert_eq!(queue.culling_stats.static_rebuilds, stats.static_rebuilds);
+        assert_eq!(queue.culling_stats.dynamic_rebuilds, stats.dynamic_rebuilds);
+        assert_brute_force(&scene, camera(), RenderPassKind::Main, true);
+        scene.set_object_position(static_id, Vec3::new(0.0, 0.0, 2.0));
+        queue.extract(&scene, camera(), true);
+        assert_eq!(
+            queue.culling_stats.static_rebuilds,
+            stats.static_rebuilds + 1
+        );
+        scene.remove_object(dynamic_id);
+        queue.extract(&scene, camera(), true);
+        assert_eq!(
+            queue.culling_stats.dynamic_rebuilds,
+            stats.dynamic_rebuilds + 1
+        );
+        queue.extract(&scene, camera(), false);
+        assert_eq!((queue.total, queue.visible), (9999, 9999));
+        assert_eq!(
+            (
+                queue.culling_stats.nodes_visited,
+                queue.culling_stats.object_tests
+            ),
+            (0, 0)
+        );
+    }
+    #[test]
+    fn disabled_diagnostics_do_not_count_rebuilds_or_queries() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        scene.set_render_options(
+            id,
+            crate::scene::RenderOptions {
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, camera(), true);
+        scene.set_object_position(id, Vec3::X);
+        queue.extract(&scene, camera(), true);
+        {
+            let index = scene.visibility_index(false);
+            assert_eq!((index.static_rebuilds, index.dynamic_rebuilds), (0, 0));
+        }
+        assert_eq!(
+            (
+                queue.culling_stats.nodes_visited,
+                queue.culling_stats.object_tests
+            ),
+            (0, 0)
+        );
+        queue.collect_stats = true;
+        scene.set_object_position(id, Vec3::ZERO);
+        queue.extract(&scene, camera(), true);
+        assert_eq!(queue.culling_stats.static_rebuilds, 1);
+        queue.collect_stats = false;
+        scene.set_object_position(id, Vec3::X);
+        queue.extract(&scene, camera(), true);
+        assert_eq!(scene.visibility_index(false).static_rebuilds, 1);
+    }
     fn camera() -> Mat4 {
         glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
     }

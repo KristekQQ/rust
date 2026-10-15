@@ -15,21 +15,17 @@ engine.set_render_effects(false, false);
 engine.set_grid_visible(true);
 engine.set_light_helpers_visible(false);
 
-// 4. Jednou vytvoříme scénu přes SDK. Žádná vlastní requestAnimationFrame smyčka.
 createScene(engine.scene);
-
-// 5. Volitelný nástrojový panel. V hotové hře tento import a volání odstraníš.
 const tools = createTools(document.getElementById("tools"), engine, {
     title: "01 · Základní scéna",
     defaults: {shadows: false, mirror: false, grid: true, helpers: false},
     onReset: () => createScene(engine.scene),
 });
-
-// 6. Rozměr canvasu sledujeme nezávisle na nástrojovém panelu.
 const fit = () => engine.resize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
 fit();
 window.addEventListener("resize", fit);
 window.addEventListener("pagehide", () => {
     tools.dispose();
+    engine.dispose();
     window.removeEventListener("resize", fit);
 }, { once: true });

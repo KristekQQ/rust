@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ovládej lišku · Rust engine</title>
+    <link rel="stylesheet" href="../shared/example.css">
+    <style>canvas:fullscreen { width: 100vw; height: 100vh; }</style>
+</head>
+<body>
+    <main>
+        <canvas id="gpu-canvas" tabindex="0" aria-label="Scéna s ovladatelnou liškou"></canvas>
+        <aside>
+            <a href="../">← Ukázky</a>
+            <h1>Ovládej lišku</h1>
+            <p>Klikni do hry pro fullscreen a zachycení kurzoru. F3 zapíná/vypíná informační panel přímo v obrazu.</p>
+            <p>W / S: vpřed a vzad<br>A / D: do stran<br>Mezerník: skok<br>Shift: běh<br>R: zpět na start<br>Myš: otočení kamery<br>Esc: opustit hru</p>
+            <p>Směr pohybu se řídí kamerou. Liška se otočí ve směru pohybu a sama přepíná mezi klidem, chůzí a během.</p>
+            <pre id="status" role="status">Načítám lišku…</pre>
+            <p>Vyskákej po čtyřech plošinách. Bloky a stěna jsou pevné; gravitace tě stáhne dolů. Další skok je možný až po dopadu. R tě vrátí na start.</p>
+            <p>Uprav <a href="scene.js">scene.js</a> pro vlastní svět a <a href="main.js">main.js</a> pro rychlosti a animace. Tento panel můžeš odstranit.</p>
+            <p>Fox: PixelMannen (CC0), tomkranis a AsoboStudio/scurest (CC BY 4.0). <a href="../../assets/models/fox/README.md">Licence modelu</a></p>
+        </aside>
+    </main>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

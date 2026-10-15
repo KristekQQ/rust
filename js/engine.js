@@ -1,37 +1,61 @@
 // JavaScript bridge to the Rust engine. GPU state and the frame loop live in Rust.
 // The current Rust API supports one canvas with the id "gpu-canvas" per page.
+/** @typedef {import('./engine.d.ts').Vector3} Vector3 */
+/** @typedef {typeof import('../pkg/webgpu_wasm.js') & {dispose(): void}} Wasm */
+/** @typedef {{canvas: HTMLCanvasElement, backend: 'auto'|'webgl', promise: Promise<import('./engine.d.ts').Engine> | null}} Initialization */
+/** @param {boolean} ok */
 function accepted(ok) {
     if (!ok) throw new Error("Rust engine odmítl příkaz: neplatný objekt nebo parametry.");
 }
 
+/** @type {WeakMap<object, Wasm>} */
+const handleBindings = new WeakMap();
+
 // These handles hold only an ID and a WASM binding, never scene/simulation state.
 export class SceneObject {
     #wasm;
-    constructor(wasm, id) { this.#wasm = wasm; this.id = id; Object.freeze(this); }
+    /** @param {Wasm} wasm @param {number} id */
+    constructor(wasm, id) { this.#wasm = wasm; handleBindings.set(this, wasm); this.id = id; Object.freeze(this); }
     get exists() { return this.#wasm.object_exists(this.id); }
+    /** @param {Vector3} position */
     setPosition(position) { accepted(this.#wasm.set_object_position(this.id, ...position)); return this; }
+    /** @param {Vector3} radians */
     setRotation(radians) { accepted(this.#wasm.set_object_rotation(this.id, ...radians)); return this; }
+    /** @param {Vector3} scale */
     setScale(scale) { accepted(this.#wasm.set_object_scale(this.id, ...scale)); return this; }
+    /** @param {{halfExtents?: Vector3, offset?: Vector3}} [options] */
+    setCollider({ halfExtents = [0.5, 0.5, 0.5], offset = [0, 0, 0] } = {}) {
+        accepted(this.#wasm.set_box_collider(this.id, ...halfExtents, ...offset)); return this;
+    }
+    removeCollider() { accepted(this.#wasm.remove_collider(this.id)); return this; }
+    /** @param {Vector3} degrees @param {import("./engine.d.ts").RotationOptions} [options] */
     rotate(degrees, { delay = 0, duration = 1 } = {}) {
         accepted(this.#wasm.schedule_rotate(this.id, ...degrees, delay, duration)); return this;
     }
+    /** @param {{isStatic?: boolean, castsShadow?: boolean, receivesShadow?: boolean, reflectivity?: number}} [options] */
     setRenderOptions({isStatic=false, castsShadow=true, receivesShadow=true, reflectivity=0} = {}) {
         accepted(this.#wasm.set_object_render_options(this.id,isStatic,castsShadow,receivesShadow,reflectivity)); return this;
     }
+    /** @param {Vector3} radiansPerSecond */
     spin(radiansPerSecond) { accepted(this.#wasm.set_object_spin(this.id,...radiansPerSecond)); return this; }
+    /** @param {number} seconds */
     removeAfter(seconds) { accepted(this.#wasm.schedule_remove_object(this.id, seconds)); return this; }
     remove() { accepted(this.#wasm.remove_object(this.id)); }
 }
 
 export class SceneLight {
     #wasm;
-    constructor(wasm, id) { this.#wasm = wasm; this.id = id; Object.freeze(this); }
+    /** @param {Wasm} wasm @param {number} id */
+    constructor(wasm, id) { this.#wasm = wasm; handleBindings.set(this, wasm); this.id = id; Object.freeze(this); }
     get exists() { return this.#wasm.light_exists(this.id); }
+    /** @param {Vector3} position @param {Vector3} color */
     set(position, color) { accepted(this.#wasm.set_light(this.id, ...position, ...color)); return this; }
+    /** @param {import("./engine.d.ts").OrbitOptions} options */
     orbit({ radius, height, speed, phase = 0, pulse = 0, color = [1, 1, 1] }) {
         accepted(this.#wasm.set_light_orbit(this.id, radius, height, speed, phase, pulse, ...color)); return this;
     }
     stopOrbit() { accepted(this.#wasm.clear_light_orbit(this.id)); return this; }
+    /** @param {number} seconds */
     removeAfter(seconds) { accepted(this.#wasm.schedule_remove_light(this.id, seconds)); return this; }
     remove() { accepted(this.#wasm.remove_light(this.id)); }
 }
@@ -39,17 +63,24 @@ export class SceneLight {
 /** glTF root handle. Pose, playback and imported hierarchy remain in Rust. */
 export class ModelObject extends SceneObject {
     #wasm;
+    /** @param {Wasm} wasm @param {number} id */
     constructor(wasm, id) { super(wasm, id); this.#wasm = wasm; }
+    /** @returns {import("./engine.d.ts").ModelInfo} */
     get info() { return JSON.parse(this.#wasm.model_info(this.id)); }
+    /** @param {number|string} [clip] @param {{loop?: boolean, speed?: number}} [options] */
     playAnimation(clip = 0, { loop = true, speed = 1 } = {}) {
         const index = typeof clip === 'string' ? this.info.animations.findIndex(a => a.name === clip) : clip;
         accepted(this.#wasm.play_model_animation(this.id, index, loop, speed)); return this;
     }
     pauseAnimation(paused = true) { accepted(this.#wasm.pause_model_animation(this.id, paused)); return this; }
+    /** @param {number} seconds */
     seekAnimation(seconds) { accepted(this.#wasm.seek_model_animation(this.id, seconds)); return this; }
     stopAnimation() { accepted(this.#wasm.stop_model_animation(this.id)); return this; }
+    /** @param {number} index */
     selectScene(index) { accepted(this.#wasm.select_model_scene(this.id, index)); return this; }
-    setMorphWeights(node, weights) { accepted(this.#wasm.set_model_morph_weights(this.id, node, weights)); return this; }
+    /** @param {number} node @param {readonly number[]} weights */
+    setMorphWeights(node, weights) { accepted(this.#wasm.set_model_morph_weights(this.id, node, new Float32Array(weights))); return this; }
+    /** @param {number} node */
     useCamera(node) { accepted(this.#wasm.use_model_camera(this.id, node)); return this; }
 }
 
@@ -57,21 +88,31 @@ export class ModelObject extends SceneObject {
 export class Scene {
     #wasm;
     #loadEpoch = 0;
+    /** @type {Map<AbortController, Set<ReadableStreamDefaultReader<Uint8Array>>>} */
     #loads = new Map();
+    /** @param {Wasm} wasm */
     constructor(wasm) { this.#wasm = wasm; Object.freeze(this); }
     get objectCount() { return this.#wasm.scene_object_count(); }
     get lightCount() { return this.#wasm.scene_light_count(); }
+    /** @param {Vector3} [position] */
     createCube(position = [0, 0, 0]) { return this.#create(this.#wasm.add_cube(...position)); }
+    /** @param {Vector3} [position] */
     createPlane(position = [0, 0, 0]) { return this.#create(this.#wasm.add_plane(...position)); }
+    /** @param {Vector3} [position] */
     createSphere(position = [0, 0, 0]) { return this.#create(this.#wasm.add_sphere(...position)); }
+    /** @param {number} id */
     #create(id) {
         accepted(id !== 0xffffffff);
         return new SceneObject(this.#wasm, id);
     }
     /** Transport only; format parsing, transforms, bounds and GPU upload are Rust. */
+    /** @param {string|URL} url */
     async loadModel(url) {
+        // Reject a disposed scene before opening any transport.
+        this.#wasm.scene_object_count();
         const epoch = this.#loadEpoch;
         const controller = new AbortController();
+        /** @type {Set<ReadableStreamDefaultReader<Uint8Array>>} */
         const readers = new Set();
         let source = new URL(url, location.href);
         let remaining = 128 * 1024 * 1024;
@@ -79,6 +120,7 @@ export class Scene {
         const checkCurrent = () => {
             if (controller.signal.aborted || epoch !== this.#loadEpoch) throw new Error('Načítání modelu zrušeno vymazáním scény');
         };
+        /** @param {URL} resource @param {boolean} [root] */
         const fetchBytes = async (resource, root = false) => {
             checkCurrent();
             const response = await fetch(resource, { signal: controller.signal });
@@ -130,12 +172,18 @@ export class Scene {
             this.#loads.delete(controller);
         }
     }
+    /** @param {import("./engine.d.ts").LightOptions} [options] */
     createLight({ position = [0, 0, 0], color = [1, 1, 1] } = {}) {
         const id = this.#wasm.add_light(...position, ...color);
         accepted(id >= 0);
         return new SceneLight(this.#wasm, id);
     }
     clear() {
+        this.cancelLoads();
+        this.#wasm.clear_all();
+    }
+    /** @internal Cancel transport before releasing the runtime. */
+    cancelLoads() {
         this.#loadEpoch++;
         for (const [controller, readers] of this.#loads) {
             controller.abort(new Error('Načítání modelu zrušeno vymazáním scény'));
@@ -145,14 +193,19 @@ export class Scene {
             }
         }
         this.#loads.clear();
-        this.#wasm.clear_all();
     }
-    setMirror(object) { accepted(this.#wasm.configure_planar_mirror(object.id)); }
+    /** @param {SceneObject} object */
+    setMirror(object) {
+        accepted(handleBindings.get(object) === this.#wasm);
+        accepted(this.#wasm.configure_planar_mirror(object.id));
+    }
 }
 
 // Share ownership across cache-busted SDK imports as well as repeated calls.
 const initializationKey = Symbol.for('webgpu_wasm.engine.initialization');
+const ownership = /** @type {Record<symbol, Initialization | undefined>} */ (/** @type {unknown} */ (globalThis));
 
+/** @param {HTMLCanvasElement} canvas @param {{backend?: "auto"|"webgl"}} [options] @returns {Promise<import("./engine.d.ts").Engine>} */
 export async function initEngine(canvas, { backend = "auto" } = {}) {
     if (!(canvas instanceof HTMLCanvasElement) || canvas.id !== "gpu-canvas") {
         throw new Error('Engine vyžaduje canvas s id="gpu-canvas".');
@@ -161,45 +214,70 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         throw new Error('Engine vyžaduje canvas připojený k aktuálnímu dokumentu.');
     }
     if (backend !== 'auto' && backend !== 'webgl') throw new Error('Neplatný backend enginu.');
-    const current = globalThis[initializationKey];
+    const current = ownership[initializationKey];
     if (current) {
         if (current.canvas !== canvas || current.backend !== backend) {
             throw new Error('Engine již inicializuje nebo používá jiný canvas či backend.');
         }
-        return current.promise;
+        return /** @type {Promise<import("./engine.d.ts").Engine>} */ (current.promise);
     }
+    /** @type {Initialization} */
     const initialization = { canvas, backend, promise: null };
-    globalThis[initializationKey] = initialization;
-    initialization.promise = initializeEngine(canvas, backend);
+    ownership[initializationKey] = initialization;
+    initialization.promise = initializeEngine(canvas, backend, initialization);
     try {
         return await initialization.promise;
     } catch (error) {
-        if (globalThis[initializationKey] === initialization) delete globalThis[initializationKey];
+        if (ownership[initializationKey] === initialization) delete ownership[initializationKey];
         throw error;
     }
 }
 
-async function initializeEngine(canvas, backend) {
+/** @param {HTMLCanvasElement} canvas @param {"auto"|"webgl"} backend @param {Initialization} initialization */
+async function initializeEngine(canvas, backend, initialization) {
     canvas.dataset.backend = backend;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
     const version = Date.now();
-    const wasm = await import(`../pkg/webgpu_wasm.js?v=${version}`);
-    await wasm.default({ module_or_path: new URL(`../pkg/webgpu_wasm_bg.wasm?v=${version}`, import.meta.url) });
-    await wasm.start();
+    const bindings = /** @type {Wasm} */ (await import(`../pkg/webgpu_wasm.js?v=${version}`));
+    await bindings.default({ module_or_path: new URL(`../pkg/webgpu_wasm_bg.wasm?v=${version}`, import.meta.url) });
+    await bindings.start();
+    let disposed = false;
+    // All commands, including raw exports and old handles, share a runtime lifetime.
+    const wasm = new Proxy(bindings, { get(target, property, receiver) {
+        const value = Reflect.get(target, property, receiver);
+        if (typeof value !== "function") return value;
+        return (/** @type {unknown[]} */ ...args) => {
+            if (disposed) throw new Error("Engine byl ukončen.");
+            return value(...args);
+        };
+    } });
+    const scene = new Scene(wasm);
 
-    return Object.freeze({
-        scene: new Scene(wasm),
+    /** @type {import("./engine.d.ts").Engine} */
+    const engine = Object.freeze({
+        scene,
+        dispose() {
+            if (disposed) return;
+            scene.cancelLoads();
+            disposed = true;
+            try { bindings.dispose(); } finally {
+                if (ownership[initializationKey] === initialization) delete ownership[initializationKey];
+            }
+        },
         // Thin commands only: pass order, resources and execution live in Rust.
         postprocessing: Object.freeze({
+            /** @param {import("./engine.d.ts").PostEffectName} name */
             enable(name, { strength = 0.6 } = {}) {
                 accepted(wasm.set_postprocess(name, true, strength));
             },
             configureGodRays({ density = 0.035, exposure = 2.5 } = {}) {
                 accepted(wasm.configure_god_rays(density, exposure));
             },
+            /** @param {import("./engine.d.ts").PostEffectName} name */
             disable(name) { accepted(wasm.set_postprocess(name, false, 0)); },
+            /** @param {Parameters<import("./engine.d.ts").PostProcessing["setReflectionMask"]>[0]} options */
             setReflectionMask({ width, height, pixels, center = [0, 0], size = [1, 1] }) {
                 accepted(wasm.set_reflection_mask(width, height, pixels, ...center, ...size));
             },
@@ -225,7 +303,34 @@ async function initializeEngine(canvas, backend) {
         schedule_remove_object: wasm.schedule_remove_object,
         schedule_remove_light: wasm.schedule_remove_light,
         set_camera_mode: wasm.set_camera_mode,
+        /** @param {Vector3} position @param {Vector3} target */
         setCameraView(position, target) { accepted(wasm.set_camera_view(...position, ...target)); },
+        /** @param {ModelObject} model @param {import('./engine.d.ts').CharacterOptions} [options] */
+        controlCharacter(model, { speed = 2.5, runSpeed = 5, modelForwardYaw = 0, animations = {}, physics } = {}) {
+            if (!(model instanceof ModelObject) || handleBindings.get(model) !== wasm) {
+                throw new Error('Postava musí být model tohoto enginu.');
+            }
+            if (![speed, runSpeed, modelForwardYaw].every(Number.isFinite) || speed <= 0 || runSpeed <= 0) {
+                throw new Error('Rychlosti musí být kladná konečná čísla a natočení konečné číslo.');
+            }
+            const clips = model.info.animations;
+            const indices = [animations.idle, animations.walk, animations.run].map(name => {
+                if (name === undefined) return -1;
+                const index = clips.findIndex(clip => clip.name === name);
+                if (index < 0) throw new Error(`Model nemá animaci ${name}.`);
+                return index;
+            });
+            const body = physics?.halfExtents ?? [0.4, 0.8, 0.8];
+            const gravity = physics?.gravity ?? 18;
+            const jumpSpeed = physics?.jumpSpeed ?? 7;
+            if (physics && (body.length !== 3 || ![...body, gravity, jumpSpeed]
+                .every(value => Number.isFinite(Math.fround(value)) && Math.fround(value) > 0))) {
+                throw new Error('Rozměry těla, gravitace a rychlost skoku musí být kladná konečná čísla.');
+            }
+            accepted(wasm.control_character(model.id, speed, runSpeed, modelForwardYaw, indices[0], indices[1], indices[2]));
+            if (physics) accepted(wasm.configure_character_physics(body[0], body[1], body[2], gravity, jumpSpeed));
+        },
+        characterState() { return JSON.parse(wasm.character_state()); },
         set_grid_visible: wasm.set_grid_visible,
         set_light_helpers_visible: wasm.set_light_helpers_visible,
         set_output_mode: wasm.set_output_mode,
@@ -235,6 +340,7 @@ async function initializeEngine(canvas, backend) {
             const [staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight,shadowLightCount,...updates] = wasm.effects_stats();
             return {staticUpdates,dynamicUpdates,reflectionUpdates,staticVisible,dynamicVisible,reflectionVisible,passes,shadowResolution,reflectionWidth,reflectionHeight,shadowLightCount,staticUpdatesByLight:updates.slice(0,4),dynamicUpdatesByLight:updates.slice(4,8)};
         },
+        /** @param {number} width @param {number} height */
         resize(width, height) {
             if (![width, height].every(value => Number.isInteger(value) && value > 0 && value <= 0xffffffff)) {
                 throw new Error('Rozměry enginu musí být kladná celá čísla typu u32.');
@@ -243,9 +349,14 @@ async function initializeEngine(canvas, backend) {
         },
         renderer_backend: wasm.renderer_backend,
         set_frustum_culling: wasm.set_frustum_culling,
+        /** Optional Rust-rendered HUD; disabled by default. */
+        /** @param {boolean} enabled */
+        setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },
+        debugStats() { return JSON.parse(wasm.debug_stats()); },
         renderer_stats() {
             const [total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs] = wasm.renderer_stats();
             return {total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs};
         },
     });
+    return engine;
 }

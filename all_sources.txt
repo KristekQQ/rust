@@ -29,7 +29,653 @@ js-sys = "0.3"
 gltf = { version = "1.4", default-features = false, features = ["utils", "names", "extras"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde_json = "1.0"
-\n# File: src/frame_metrics.rs
+
+# File: src/collision.rs
+//! Static AABB collisions. The scene owner rebuilds the BVH on collider revisions.
+//!
+//! Character motion resolves Y, then X, then Z. This deliberately provides no
+//! stepping, triangle collision, or recovery from an initially overlapping box.
+
+use glam::Vec3;
+
+const LEAF_SIZE: usize = 4;
+const CONTACT_EPSILON: f32 = 1.0e-4;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Aabb {
+    pub min: Vec3,
+    pub max: Vec3,
+}
+
+impl Aabb {
+    /// Rejects non-finite coordinates and zero or negative extents on any axis.
+    pub fn new(min: Vec3, max: Vec3) -> Option<Self> {
+        (min.is_finite() && max.is_finite() && max.cmpgt(min).all()).then_some(Self { min, max })
+    }
+
+    fn union(self, other: Self) -> Self {
+        Self {
+            min: self.min.min(other.min),
+            max: self.max.max(other.max),
+        }
+    }
+
+    // Inclusive broadphase overlap retains touching faces for support probing.
+    fn intersects(self, other: Self) -> bool {
+        self.min.cmple(other.max).all() && self.max.cmpge(other.min).all()
+    }
+
+    fn translated(self, offset: Vec3) -> Self {
+        Self {
+            min: self.min + offset,
+            max: self.max + offset,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Collider {
+    pub id: u32,
+    pub bounds: Aabb,
+}
+
+#[derive(Debug)]
+enum NodeKind {
+    Leaf { start: usize, end: usize },
+    Branch { left: usize, right: usize },
+}
+
+#[derive(Debug)]
+struct Node {
+    bounds: Aabb,
+    kind: NodeKind,
+}
+
+#[derive(Default)]
+pub struct CollisionWorld {
+    colliders: Vec<Collider>,
+    nodes: Vec<Node>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MotionResult {
+    pub position: Vec3,
+    pub grounded: bool,
+    pub hit_ceiling: bool,
+    /// Exact broadphase query hits, after filtering out `ignore_id`.
+    pub candidates: usize,
+}
+
+impl CollisionWorld {
+    pub fn rebuild(&mut self, colliders: Vec<Collider>) {
+        // Public AABB fields allow malformed boxes; do not let them poison BVH bounds.
+        self.colliders = colliders
+            .into_iter()
+            .filter(|c| Aabb::new(c.bounds.min, c.bounds.max).is_some())
+            .collect();
+        self.nodes.clear();
+        if !self.colliders.is_empty() {
+            self.build_node(0, self.colliders.len());
+        }
+    }
+
+    fn build_node(&mut self, start: usize, end: usize) -> usize {
+        let bounds = self.colliders[start + 1..end]
+            .iter()
+            .fold(self.colliders[start].bounds, |b, c| b.union(c.bounds));
+        let index = self.nodes.len();
+        self.nodes.push(Node {
+            bounds,
+            kind: NodeKind::Leaf { start, end },
+        });
+        if end - start > LEAF_SIZE {
+            let extent = bounds.max - bounds.min;
+            let axis = if extent.x >= extent.y && extent.x >= extent.z {
+                0
+            } else if extent.y >= extent.z {
+                1
+            } else {
+                2
+            };
+            let middle = start + (end - start) / 2;
+            self.colliders[start..end].select_nth_unstable_by(middle - start, |a, b| {
+                let center_a = a.bounds.min[axis] * 0.5 + a.bounds.max[axis] * 0.5;
+                let center_b = b.bounds.min[axis] * 0.5 + b.bounds.max[axis] * 0.5;
+                center_a.total_cmp(&center_b).then(a.id.cmp(&b.id))
+            });
+            let left = self.build_node(start, middle);
+            let right = self.build_node(middle, end);
+            self.nodes[index].kind = NodeKind::Branch { left, right };
+        }
+        index
+    }
+
+    /// Returns exact inclusive AABB overlaps; result order is unspecified.
+    pub fn query(&self, bounds: Aabb, ignore_id: Option<u32>) -> Vec<Collider> {
+        let mut hits = Vec::new();
+        self.visit_query(bounds, ignore_id, |c| hits.push(c));
+        hits
+    }
+
+    // Returns leaf collider checks so native tests can verify actual BVH pruning.
+    fn visit_query(
+        &self,
+        bounds: Aabb,
+        ignore_id: Option<u32>,
+        mut hit: impl FnMut(Collider),
+    ) -> usize {
+        if self.nodes.is_empty() {
+            return 0;
+        }
+        let mut stack = vec![0];
+        let mut checks = 0;
+        while let Some(index) = stack.pop() {
+            let node = &self.nodes[index];
+            if !node.bounds.intersects(bounds) {
+                continue;
+            }
+            match node.kind {
+                NodeKind::Leaf { start, end } => {
+                    for collider in &self.colliders[start..end] {
+                        checks += 1;
+                        if Some(collider.id) != ignore_id && collider.bounds.intersects(bounds) {
+                            hit(*collider);
+                        }
+                    }
+                }
+                NodeKind::Branch { left, right } => {
+                    stack.push(right);
+                    stack.push(left);
+                }
+            }
+        }
+        checks
+    }
+
+    /// Sweeps an upright box with its bottom at `feet.y`, preserving wall sliding.
+    /// Invalid motion inputs return the original feet without collision flags.
+    pub fn move_character(
+        &self,
+        feet: Vec3,
+        half_extents: Vec3,
+        delta: Vec3,
+        ignore_id: Option<u32>,
+    ) -> MotionResult {
+        let mut result = MotionResult {
+            position: feet,
+            grounded: false,
+            hit_ceiling: false,
+            candidates: 0,
+        };
+        if !feet.is_finite()
+            || !half_extents.is_finite()
+            || !half_extents.cmpgt(Vec3::ZERO).all()
+            || !delta.is_finite()
+            || !(feet + delta).is_finite()
+        {
+            return result;
+        }
+        let horizontal = Vec3::new(half_extents.x, 0.0, half_extents.z);
+        let Some(mut body) = Aabb::new(
+            feet - horizontal,
+            feet + horizontal + Vec3::Y * (half_extents.y * 2.0),
+        ) else {
+            return result;
+        };
+        let destination = body.translated(delta);
+        if !destination.min.is_finite() || !destination.max.is_finite() {
+            return result;
+        }
+        let swept = body.union(destination);
+        let candidates = self.query(
+            Aabb {
+                min: swept.min - Vec3::splat(CONTACT_EPSILON),
+                max: swept.max + Vec3::splat(CONTACT_EPSILON),
+            },
+            ignore_id,
+        );
+        result.candidates = candidates.len();
+
+        for axis in [1, 0, 2] {
+            let requested = delta[axis];
+            let mut travel = requested;
+            let mut contact_face = None;
+            for collider in &candidates {
+                let obstacle = collider.bounds;
+                if !overlaps_other_axes(body, obstacle, axis) {
+                    continue;
+                }
+                if requested > 0.0 {
+                    let gap = obstacle.min[axis] - body.max[axis];
+                    if gap >= -CONTACT_EPSILON && gap <= travel {
+                        travel = gap.max(0.0);
+                        contact_face = Some(obstacle.min[axis]);
+                    }
+                } else if requested < 0.0 {
+                    let gap = obstacle.max[axis] - body.min[axis];
+                    if gap <= CONTACT_EPSILON && gap >= travel {
+                        travel = gap.min(0.0);
+                        contact_face = Some(obstacle.max[axis]);
+                    }
+                }
+            }
+            let mut offset = Vec3::ZERO;
+            offset[axis] = travel;
+            body = body.translated(offset);
+            result.position[axis] += travel;
+            if let Some(face) = contact_face {
+                // Snap to the face to prevent subtraction/addition roundoff from
+                // making the next sweep start just inside a thin obstacle.
+                let size = half_extents[axis] * 2.0;
+                if requested > 0.0 {
+                    body.max[axis] = face;
+                    body.min[axis] = face - size;
+                } else {
+                    body.min[axis] = face;
+                    body.max[axis] = face + size;
+                }
+                result.position[axis] = if axis == 1 {
+                    body.min[axis]
+                } else if requested > 0.0 {
+                    face - half_extents[axis]
+                } else {
+                    face + half_extents[axis]
+                };
+                if axis == 1 && requested > 0.0 {
+                    result.hit_ceiling = true;
+                }
+            }
+        }
+
+        // Probe final support, after horizontal movement: landing then walking off
+        // a platform in the same move must not leave a stale grounded flag.
+        result.grounded = delta.y <= 0.0
+            && candidates.iter().any(|c| {
+                let gap = body.min.y - c.bounds.max.y;
+                (-CONTACT_EPSILON..=CONTACT_EPSILON).contains(&gap)
+                    && overlaps_other_axes(body, c.bounds, 1)
+            });
+        result
+    }
+}
+
+fn overlaps_other_axes(a: Aabb, b: Aabb, movement_axis: usize) -> bool {
+    (0..3).filter(|axis| *axis != movement_axis).all(|axis| {
+        // Strict overlap lets the character slide along an already touching face.
+        a.min[axis] < b.max[axis] && a.max[axis] > b.min[axis]
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HALF: Vec3 = Vec3::new(0.5, 1.0, 0.5);
+
+    fn collider(id: u32, min: [f32; 3], max: [f32; 3]) -> Collider {
+        Collider {
+            id,
+            bounds: Aabb::new(Vec3::from_array(min), Vec3::from_array(max)).unwrap(),
+        }
+    }
+
+    fn world(colliders: Vec<Collider>) -> CollisionWorld {
+        let mut world = CollisionWorld::default();
+        world.rebuild(colliders);
+        world
+    }
+
+    fn assert_position(actual: Vec3, expected: Vec3) {
+        assert!(
+            actual.abs_diff_eq(expected, 1.0e-4),
+            "{actual:?} != {expected:?}"
+        );
+    }
+
+    #[test]
+    fn aabb_requires_finite_positive_extents() {
+        assert!(Aabb::new(Vec3::ZERO, Vec3::ONE).is_some());
+        for max in [Vec3::ZERO, Vec3::new(1.0, 0.0, 1.0), Vec3::NEG_ONE] {
+            assert!(Aabb::new(Vec3::ZERO, max).is_none());
+        }
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert!(Aabb::new(Vec3::new(value, 0.0, 0.0), Vec3::ONE).is_none());
+            assert!(Aabb::new(Vec3::ZERO, Vec3::new(1.0, value, 1.0)).is_none());
+        }
+    }
+
+    #[test]
+    fn wall_sliding_preserves_tangent_motion_and_face_contact() {
+        let world = world(vec![collider(1, [2.0, -5.0, -20.0], [2.1, 5.0, 20.0])]);
+        let first = world.move_character(Vec3::ZERO, HALF, Vec3::new(8.0, 0.0, 3.0), None);
+        assert_position(first.position, Vec3::new(1.5, 0.0, 3.0));
+        let second = world.move_character(first.position, HALF, Vec3::new(4.0, 0.0, 2.0), None);
+        assert_position(second.position, Vec3::new(1.5, 0.0, 5.0));
+        assert!(!second.grounded && !second.hit_ceiling);
+    }
+
+    #[test]
+    fn perpendicular_corner_blocks_both_horizontal_axes() {
+        let world = world(vec![
+            collider(1, [2.0, -2.0, -10.0], [2.1, 5.0, 10.0]),
+            collider(2, [-10.0, -2.0, 2.0], [10.0, 5.0, 2.1]),
+        ]);
+        let result = world.move_character(Vec3::ZERO, HALF, Vec3::new(50.0, 0.0, 50.0), None);
+        assert_position(result.position, Vec3::new(1.5, 0.0, 1.5));
+        assert_eq!(result.candidates, 2);
+    }
+
+    #[test]
+    fn high_speed_cannot_cross_thin_walls_in_either_direction() {
+        let world = world(vec![collider(1, [2.0, -5.0, -5.0], [2.001, 5.0, 5.0])]);
+        let positive = world.move_character(Vec3::ZERO, HALF, Vec3::X * 10000.0, None);
+        assert_position(positive.position, Vec3::new(1.5, 0.0, 0.0));
+        let negative = world.move_character(Vec3::X * 10.0, HALF, -Vec3::X * 10000.0, None);
+        assert_position(negative.position, Vec3::new(2.501, 0.0, 0.0));
+    }
+
+    #[test]
+    fn repeated_fractional_face_contacts_do_not_tunnel() {
+        let world = world(vec![collider(
+            1,
+            [2.1337, -5.0, -1000.0],
+            [2.1338, 5.0, 1000.0],
+        )]);
+        let half = Vec3::new(0.3, 0.8, 0.3);
+        let mut feet = Vec3::new(0.123, 0.0, 0.0);
+        for _ in 0..100 {
+            feet = world
+                .move_character(feet, half, Vec3::new(1000.0, 0.0, 0.125), None)
+                .position;
+            assert!((feet.x - (2.1337 - half.x)).abs() <= CONTACT_EPSILON);
+        }
+        assert_position(feet, Vec3::new(2.1337 - half.x, 0.0, 12.5));
+    }
+
+    #[test]
+    fn z_sweep_blocks_a_thin_wall() {
+        let world = world(vec![collider(1, [-5.0, -5.0, 2.0], [5.0, 5.0, 2.001])]);
+        let result = world.move_character(Vec3::ZERO, HALF, Vec3::Z * 10000.0, None);
+        assert_position(result.position, Vec3::new(0.0, 0.0, 1.5));
+        let reverse = world.move_character(Vec3::Z * 10.0, HALF, -Vec3::Z * 10000.0, None);
+        assert_position(reverse.position, Vec3::new(0.0, 0.0, 2.501));
+    }
+
+    #[test]
+    fn floor_landing_and_zero_vertical_delta_keep_support() {
+        let world = world(vec![collider(1, [-20.0, -0.01, -20.0], [20.0, 0.0, 20.0])]);
+        let landing = world.move_character(Vec3::Y * 50.0, HALF, -Vec3::Y * 1000.0, None);
+        assert_position(landing.position, Vec3::ZERO);
+        assert!(landing.grounded && !landing.hit_ceiling);
+        let standing = world.move_character(landing.position, HALF, Vec3::ZERO, None);
+        assert!(standing.grounded);
+        let walking = world.move_character(standing.position, HALF, Vec3::X * 4.0, None);
+        assert_position(walking.position, Vec3::X * 4.0);
+        assert!(walking.grounded);
+    }
+
+    #[test]
+    fn highest_platform_catches_fall_before_floor() {
+        let world = world(vec![
+            collider(1, [-20.0, -1.0, -20.0], [20.0, 0.0, 20.0]),
+            collider(2, [-2.0, 2.9, -2.0], [2.0, 3.0, 2.0]),
+        ]);
+        let result = world.move_character(Vec3::Y * 10.0, HALF, -Vec3::Y * 100.0, None);
+        assert_position(result.position, Vec3::Y * 3.0);
+        assert!(result.grounded);
+        assert_eq!(result.candidates, 2);
+    }
+
+    #[test]
+    fn ceiling_stops_head_at_high_speed_and_exact_contact() {
+        let world = world(vec![collider(1, [-5.0, 4.0, -5.0], [5.0, 4.01, 5.0])]);
+        for rise in [2.0, 1000.0] {
+            let result = world.move_character(Vec3::ZERO, HALF, Vec3::Y * rise, None);
+            assert_position(result.position, Vec3::Y * 2.0);
+            assert!(result.hit_ceiling && !result.grounded);
+        }
+    }
+
+    #[test]
+    fn walking_off_support_clears_grounded_even_after_landing() {
+        let world = world(vec![collider(1, [-1.0, -0.1, -1.0], [1.0, 0.0, 1.0])]);
+        let edge = world.move_character(Vec3::ZERO, HALF, Vec3::X * 1.5, None);
+        assert!(!edge.grounded); // Mere edge contact has no supporting footprint.
+        let off = world.move_character(Vec3::Y * 2.0, HALF, Vec3::new(4.0, -5.0, 0.0), None);
+        assert_position(off.position, Vec3::X * 4.0);
+        assert!(!off.grounded);
+        let fall = world.move_character(off.position, HALF, -Vec3::Y, None);
+        assert_position(fall.position, Vec3::new(4.0, -1.0, 0.0));
+        assert!(!fall.grounded);
+    }
+
+    #[test]
+    fn support_probe_is_tiny_and_jumping_clears_support() {
+        let world = world(vec![collider(1, [-5.0, -1.0, -5.0], [5.0, 0.0, 5.0])]);
+        let near = world.move_character(Vec3::Y * (CONTACT_EPSILON * 0.5), HALF, Vec3::ZERO, None);
+        assert!(near.grounded);
+        let far = world.move_character(Vec3::Y * (CONTACT_EPSILON * 2.0), HALF, Vec3::ZERO, None);
+        assert!(!far.grounded);
+        let jump = world.move_character(Vec3::ZERO, HALF, Vec3::Y * (CONTACT_EPSILON * 0.5), None);
+        assert!(!jump.grounded);
+    }
+
+    #[test]
+    fn ignores_own_id_in_queries_motion_and_support() {
+        let bounds = collider(7, [2.0, -1.0, -5.0], [2.1, 5.0, 5.0]);
+        let world = world(vec![bounds]);
+        assert_eq!(world.query(bounds.bounds, None).len(), 1);
+        assert!(world.query(bounds.bounds, Some(7)).is_empty());
+        let result = world.move_character(Vec3::ZERO, HALF, Vec3::X * 10.0, Some(7));
+        assert_position(result.position, Vec3::X * 10.0);
+        assert_eq!(result.candidates, 0);
+        let floor = world.move_character(Vec3::new(2.0, 5.0, 0.0), HALF, Vec3::ZERO, Some(7));
+        assert!(!floor.grounded);
+    }
+
+    #[test]
+    fn no_auto_step_on_low_obstacle() {
+        let world = world(vec![collider(1, [2.0, 0.0, -5.0], [3.0, 0.2, 5.0])]);
+        let result = world.move_character(Vec3::ZERO, HALF, Vec3::X * 10.0, None);
+        assert_position(result.position, Vec3::X * 1.5);
+    }
+
+    #[test]
+    fn bvh_exactly_matches_brute_force_queries() {
+        let mut seed = 0x1234_5678_u32;
+        let mut random = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / 16_777_216.0
+        };
+        let mut colliders = Vec::new();
+        for id in 0..257 {
+            let min = Vec3::new(random(), random(), random()) * 100.0 - Vec3::splat(50.0);
+            let extent = Vec3::new(random(), random(), random()) * 8.0 + Vec3::splat(0.01);
+            colliders.push(Collider {
+                id,
+                bounds: Aabb::new(min, min + extent).unwrap(),
+            });
+        }
+        let world = world(colliders.clone());
+        for i in 0..200 {
+            let min = Vec3::new(random(), random(), random()) * 100.0 - Vec3::splat(50.0);
+            let bounds = Aabb::new(min, min + Vec3::splat(20.0)).unwrap();
+            let ignore = (i % 2 == 0).then_some(i);
+            let mut expected: Vec<_> = colliders
+                .iter()
+                .filter(|c| Some(c.id) != ignore && c.bounds.intersects(bounds))
+                .map(|c| c.id)
+                .collect();
+            let mut actual: Vec<_> = world.query(bounds, ignore).iter().map(|c| c.id).collect();
+            actual.sort_unstable();
+            expected.sort_unstable();
+            assert_eq!(actual, expected, "query {i}");
+        }
+        // Every collider's own bounds, including exact face/edge overlaps.
+        for c in &colliders {
+            let mut expected: Vec<_> = colliders
+                .iter()
+                .filter(|other| other.bounds.intersects(c.bounds))
+                .map(|other| other.id)
+                .collect();
+            let mut actual: Vec<_> = world
+                .query(c.bounds, None)
+                .iter()
+                .map(|other| other.id)
+                .collect();
+            actual.sort_unstable();
+            expected.sort_unstable();
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn bvh_prunes_separated_colliders_and_rebuild_clears_old_nodes() {
+        let mut world = world(
+            (0..1024)
+                .map(|id| {
+                    let x = id as f32 * 10.0;
+                    collider(id, [x, 0.0, 0.0], [x + 1.0, 1.0, 1.0])
+                })
+                .collect(),
+        );
+        let bounds = Aabb::new(Vec3::ZERO, Vec3::ONE).unwrap();
+        let mut hits = Vec::new();
+        let checks = world.visit_query(bounds, None, |c| hits.push(c.id));
+        assert_eq!(hits, vec![0]);
+        assert!(checks <= LEAF_SIZE, "tested {checks} of 1024 colliders");
+        let motion = world.move_character(Vec3::new(-2.0, 0.0, 0.5), HALF, Vec3::X * 4.0, None);
+        assert_eq!(motion.candidates, 1);
+        world.rebuild(Vec::new());
+        assert!(world.query(bounds, None).is_empty());
+        assert!(world.nodes.is_empty());
+        world.rebuild(vec![collider(9, [0.0; 3], [1.0; 3])]);
+        assert_eq!(world.query(bounds, None)[0].id, 9);
+    }
+
+    #[test]
+    fn empty_world_and_invalid_motion_are_stable() {
+        let world = CollisionWorld::default();
+        let result = world.move_character(Vec3::ZERO, HALF, Vec3::new(3.0, -2.0, 4.0), None);
+        assert_position(result.position, Vec3::new(3.0, -2.0, 4.0));
+        assert_eq!(result.candidates, 0);
+        assert!(!result.grounded && !result.hit_ceiling);
+        for half in [Vec3::ZERO, Vec3::NEG_ONE, Vec3::splat(f32::NAN)] {
+            let result = world.move_character(Vec3::ONE, half, Vec3::X, None);
+            assert_position(result.position, Vec3::ONE);
+        }
+    }
+}
+
+
+# File: src/debug_overlay.rs
+//! Tiny bitmap HUD geometry. Called only when the optional overlay refreshes.
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct HudRect {
+    pub rect: [f32; 4],
+    pub color: [f32; 4],
+}
+
+pub fn geometry(lines: &[String], width: u32, height: u32) -> Vec<HudRect> {
+    let scale = if width >= 480 { 2.0 } else { 1.0 };
+    let mut result = Vec::new();
+    let mut rect = |x: f32, y: f32, w: f32, h: f32, color| {
+        result.push(HudRect {
+            rect: [
+                x / width as f32 * 2.0 - 1.0,
+                1.0 - y / height as f32 * 2.0,
+                w / width as f32 * 2.0,
+                -h / height as f32 * 2.0,
+            ],
+            color,
+        });
+    };
+    let columns = lines.iter().map(String::len).max().unwrap_or(0);
+    rect(
+        8.0,
+        8.0,
+        columns as f32 * 6.0 * scale + 12.0,
+        lines.len() as f32 * 10.0 * scale + 10.0,
+        [0.015, 0.025, 0.04, 0.85],
+    );
+    for (line, text) in lines.iter().enumerate() {
+        for (column, ch) in text.chars().enumerate() {
+            for (row, bits) in glyph(ch).iter().enumerate() {
+                for pixel in 0..5 {
+                    if bits & (1 << (4 - pixel)) != 0 {
+                        rect(
+                            14.0 + (column * 6 + pixel) as f32 * scale,
+                            13.0 + (line * 10 + row) as f32 * scale,
+                            scale,
+                            scale,
+                            [0.85, 0.95, 1.0, 1.0],
+                        );
+                    }
+                }
+            }
+        }
+    }
+    result
+}
+
+fn glyph(ch: char) -> [u8; 7] {
+    match ch {
+        '0' => [14, 17, 19, 21, 25, 17, 14],
+        '1' => [4, 12, 4, 4, 4, 4, 14],
+        '2' => [14, 17, 1, 2, 4, 8, 31],
+        '3' => [30, 1, 1, 14, 1, 1, 30],
+        '4' => [2, 6, 10, 18, 31, 2, 2],
+        '5' => [31, 16, 16, 30, 1, 1, 30],
+        '6' => [14, 16, 16, 30, 17, 17, 14],
+        '7' => [31, 1, 2, 4, 8, 8, 8],
+        '8' => [14, 17, 17, 14, 17, 17, 14],
+        '9' => [14, 17, 17, 15, 1, 1, 14],
+        'A' => [14, 17, 17, 31, 17, 17, 17],
+        'B' => [30, 17, 17, 30, 17, 17, 30],
+        'C' => [14, 17, 16, 16, 16, 17, 14],
+        'D' => [30, 17, 17, 17, 17, 17, 30],
+        'E' => [31, 16, 16, 30, 16, 16, 31],
+        'F' => [31, 16, 16, 30, 16, 16, 16],
+        'H' => [17, 17, 17, 31, 17, 17, 17],
+        'I' => [14, 4, 4, 4, 4, 4, 14],
+        'L' => [16, 16, 16, 16, 16, 16, 31],
+        'M' => [17, 27, 21, 21, 17, 17, 17],
+        'N' => [17, 25, 21, 19, 17, 17, 17],
+        'O' => [14, 17, 17, 17, 17, 17, 14],
+        'P' => [30, 17, 17, 30, 16, 16, 16],
+        'R' => [30, 17, 17, 30, 20, 18, 17],
+        'S' => [15, 16, 16, 14, 1, 1, 30],
+        'T' => [31, 4, 4, 4, 4, 4, 4],
+        'U' => [17, 17, 17, 17, 17, 17, 14],
+        'V' => [17, 17, 17, 17, 17, 10, 4],
+        '.' => [0, 0, 0, 0, 0, 6, 6],
+        '/' => [1, 1, 2, 4, 8, 16, 16],
+        '-' => [0, 0, 0, 31, 0, 0, 0],
+        _ => [0; 7],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn hud_has_panel_and_finite_pixel_geometry() {
+        let rects = geometry(&["FPS 60.0 FRAME 16.67 MS".into()], 800, 600);
+        assert!(rects.len() > 100);
+        assert!(rects.iter().all(|r| r.rect.iter().all(|v| v.is_finite())));
+        assert_eq!(rects[0].color[3], 0.85);
+    }
+    #[test]
+    fn all_metric_letters_have_glyphs() {
+        for c in "FPSFRAMECPUMSCULLACHEDFRUSTMBVHNODETESTS0123456789./".chars() {
+            assert_ne!(glyph(c), [0; 7], "{c}");
+        }
+    }
+}
+
+
+# File: src/frame_metrics.rs
 //! Browser frame-loop timing, not GPU execution timing.
 #[derive(Default)]
 pub struct FrameMetrics {
@@ -43,8 +689,8 @@ impl FrameMetrics {
         if !dt.is_finite() || dt <= 0.0 {
             return;
         }
-        // A background-tab pause is not a useful rendering sample.
-        if dt > 0.25 {
+        // Count slow sub-second frames too; discard longer stalls.
+        if dt > 1.0 {
             *self = Self::default();
             return;
         }
@@ -78,9 +724,18 @@ mod tests {
         }
         assert!((metrics.fps - 30.0).abs() < 0.001);
     }
+    #[test]
+    fn slow_frames_still_report_fps_instead_of_zero() {
+        let mut metrics = FrameMetrics::default();
+        metrics.record(0.35);
+        metrics.record(0.35);
+        assert!((metrics.fps - 1.0 / 0.35).abs() < 0.001);
+        assert!((metrics.frame_ms - 350.0).abs() < 0.001);
+    }
 }
 
-\n# File: src/gltf_animation.rs
+
+# File: src/gltf_animation.rs
 //! Animation sampling and CPU morph/skin deformation; no browser or GPU state.
 use crate::gltf_model::*;
 use glam::{Mat3, Mat4, Quat, Vec3};
@@ -370,6 +1025,7 @@ impl ModelInstance {
             asset,
             pose,
             playback: None,
+            playback_revision: 0,
             scene,
             revision: 1,
             last_error: None,
@@ -389,12 +1045,14 @@ impl ModelInstance {
             looping,
             playing: true,
         });
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.revision = self.revision.wrapping_add(1);
         Ok(())
     }
     pub fn stop(&mut self) -> Result<(), String> {
         let pose = default_pose(&self.asset, self.scene)?;
         self.playback = None;
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.pose = pose;
         self.morph_overrides.clear();
         self.revision = self.revision.wrapping_add(1);
@@ -413,6 +1071,7 @@ impl ModelInstance {
         let clip = playback.clip;
         apply_clip(&self.asset, &mut self.pose, playback.clip, target)?;
         playback.time = target;
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.apply_morph_overrides(clip);
         self.revision = self.revision.wrapping_add(1);
         Ok(())
@@ -452,6 +1111,7 @@ impl ModelInstance {
         self.pose = default_pose(&self.asset, scene)?;
         self.scene = scene;
         self.playback = None;
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.morph_overrides.clear();
         self.revision = self.revision.wrapping_add(1);
         Ok(())
@@ -667,7 +1327,8 @@ mod tests {
     }
 }
 
-\n# File: src/gltf_loader.rs
+
+# File: src/gltf_loader.rs
 //! Bounded, CPU-only import of static, opaque glTF 2.0 triangle geometry.
 //! Buffer fetching belongs to the caller; this module performs no file or network I/O.
 use glam::{Mat3, Mat4, Vec3};
@@ -2903,7 +3564,8 @@ mod core_tests {
     }
 }
 
-\n# File: src/gltf_model.rs
+
+# File: src/gltf_model.rs
 //! CPU representation of glTF 2.0 core. All indices address the containing asset.
 use glam::{Mat4, Quat, Vec3};
 use std::ops::Range;
@@ -3141,6 +3803,8 @@ pub struct ModelInstance {
     pub asset: std::sync::Arc<ModelAsset>,
     pub pose: ModelPose,
     pub playback: Option<AnimationPlayback>,
+    /// Identity of an explicit playback command; normal animation frames keep it.
+    pub playback_revision: u64,
     pub scene: usize,
     pub revision: u64,
     pub last_error: Option<String>,
@@ -3148,8 +3812,10 @@ pub struct ModelInstance {
     pub morph_overrides: std::collections::BTreeMap<usize, Vec<f32>>,
 }
 
-\n# File: src/input/active_camera.rs
+
+# File: src/input/active_camera.rs
 use crate::input::camera::{Camera, CameraController};
+use crate::input::character::CharacterController;
 use crate::input::orbit_camera::OrbitCamera;
 use glam::{Mat4, Vec3};
 
@@ -3163,6 +3829,9 @@ pub struct ActiveCamera {
     free: Camera,
     orbit: OrbitCamera,
     active: CameraType,
+    character: Option<CharacterController>,
+    pending_characters: Vec<CharacterController>,
+    aspect: f32,
 }
 
 impl ActiveCamera {
@@ -3171,12 +3840,22 @@ impl ActiveCamera {
             free: Camera::new(aspect),
             orbit: OrbitCamera::new(aspect),
             active: CameraType::Orbit,
+            character: None,
+            pending_characters: Vec::new(),
+            aspect,
         }
     }
 
     pub fn set_type(&mut self, ty: CameraType) {
         self.clear_input();
+        self.detach_character();
         self.active = ty;
+    }
+
+    fn detach_character(&mut self) {
+        if let Some(character) = self.character.take() {
+            self.pending_characters.push(character);
+        }
     }
 
     pub fn set_view(&mut self, position: Vec3, target: Vec3) -> bool {
@@ -3188,11 +3867,78 @@ impl ActiveCamera {
     }
 
     pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
         self.free.set_aspect(aspect);
         self.orbit.set_aspect(aspect);
+        if let Some(character) = &mut self.character {
+            character.set_aspect(aspect);
+        }
+    }
+
+    /// Clips are ordered idle, walk, run. Invalid options leave the current view intact.
+    pub fn follow_object(
+        &mut self,
+        id: u32,
+        position: Vec3,
+        speed: f32,
+        run_speed: f32,
+        model_yaw: f32,
+        clips: [Option<usize>; 3],
+    ) -> bool {
+        let Some(character) = CharacterController::new(
+            id,
+            position,
+            speed,
+            run_speed,
+            model_yaw,
+            clips,
+            self.aspect,
+        ) else {
+            return false;
+        };
+        self.clear_input();
+        self.detach_character();
+        self.character = Some(character);
+        true
+    }
+
+    /// Call before reading matrix() each frame; update() alone never moves a character.
+    pub fn update_scene(&mut self, scene: &mut crate::scene::SceneManager, dt: f32) {
+        // Complete old ownership first, so a rebind wins even within the same frame.
+        for character in self.pending_characters.drain(..) {
+            character.finish(scene);
+        }
+        if let Some(character) = &mut self.character {
+            if !character.update_scene(scene, dt) {
+                self.clear_input();
+                self.character = None;
+            }
+        }
+    }
+
+    pub fn character_state(&self) -> Option<(u32, Vec3, bool, bool)> {
+        self.character.as_ref().map(CharacterController::state)
+    }
+
+    pub fn set_character_physics(
+        &mut self,
+        physics: crate::input::character::CharacterPhysics,
+    ) -> bool {
+        self.character
+            .as_mut()
+            .is_some_and(|character| character.set_physics(physics))
+    }
+
+    pub fn character_physics_state(&self) -> Option<(bool, f32, usize)> {
+        self.character
+            .as_ref()
+            .map(CharacterController::physics_state)
     }
 
     fn active_mut(&mut self) -> &mut dyn CameraController {
+        if let Some(character) = &mut self.character {
+            return character;
+        }
         match self.active {
             CameraType::Free => &mut self.free,
             CameraType::Orbit => &mut self.orbit,
@@ -3200,6 +3946,9 @@ impl ActiveCamera {
     }
 
     fn active_ref(&self) -> &dyn CameraController {
+        if let Some(character) = &self.character {
+            return character;
+        }
         match self.active {
             CameraType::Free => &self.free,
             CameraType::Orbit => &self.orbit,
@@ -3211,6 +3960,9 @@ impl CameraController for ActiveCamera {
     fn clear_input(&mut self) {
         self.free.clear_input();
         self.orbit.clear_input();
+        if let Some(character) = &mut self.character {
+            character.clear_input();
+        }
     }
 
     fn key_down(&mut self, code: String) {
@@ -3298,7 +4050,8 @@ mod tests {
     }
 }
 
-\n# File: src/input/camera.rs
+
+# File: src/input/camera.rs
 use glam::{Mat4, Vec3};
 use std::collections::HashSet;
 
@@ -3459,125 +4212,1004 @@ impl CameraController for Camera {
     }
 }
 
-\n# File: src/input/keyboard.rs
+
+# File: src/input/character.rs
+//! Native third-person movement and chase camera, independent of browser listeners.
+use super::camera::CameraController;
+use crate::scene::SceneManager;
+use glam::{Mat4, Vec3};
+use std::collections::HashSet;
+
+const DISTANCE: f32 = 7.0;
+const TARGET_HEIGHT: f32 = 1.2;
+const MAX_DT: f32 = 0.1;
+const SENSITIVITY: f32 = 0.002;
+const PHYSICS_STEP: f32 = 1.0 / 120.0;
+
+#[derive(Clone, Copy)]
+pub struct CharacterPhysics {
+    pub half_extents: Vec3,
+    pub gravity: f32,
+    pub jump_speed: f32,
+}
+impl CharacterPhysics {
+    fn valid(self) -> bool {
+        self.half_extents.is_finite()
+            && self.half_extents.min_element() > 0.0
+            && self.gravity.is_finite()
+            && self.gravity > 0.0
+            && self.jump_speed.is_finite()
+            && self.jump_speed > 0.0
+    }
+}
+
+pub struct CharacterController {
+    id: u32,
+    root: Vec3,
+    speed: f32,
+    run_speed: f32,
+    model_yaw: f32,
+    clips: [Option<usize>; 3],
+    animation_state: Option<usize>,
+    owned_playback: Option<(usize, u64)>,
+    yaw: f32,
+    pitch: f32,
+    aspect: f32,
+    pressed: HashSet<String>,
+    moving: bool,
+    running: bool,
+    physics: Option<CharacterPhysics>,
+    vertical_velocity: f32,
+    grounded: bool,
+    jump_requested: bool,
+    collision_candidates: usize,
+}
+
+impl CharacterController {
+    pub fn new(
+        id: u32,
+        position: Vec3,
+        speed: f32,
+        run_speed: f32,
+        model_yaw: f32,
+        clips: [Option<usize>; 3],
+        aspect: f32,
+    ) -> Option<Self> {
+        if !position.is_finite()
+            || !speed.is_finite()
+            || speed <= 0.0
+            || !run_speed.is_finite()
+            || run_speed <= 0.0
+            || !model_yaw.is_finite()
+        {
+            return None;
+        }
+        Some(Self {
+            id,
+            root: position,
+            speed,
+            run_speed,
+            model_yaw,
+            clips,
+            animation_state: None,
+            owned_playback: None,
+            yaw: 0.0,
+            pitch: 0.35,
+            aspect,
+            pressed: HashSet::new(),
+            moving: false,
+            running: false,
+            physics: None,
+            vertical_velocity: 0.0,
+            grounded: false,
+            jump_requested: false,
+            collision_candidates: 0,
+        })
+    }
+
+    pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
+    }
+
+    pub fn state(&self) -> (u32, Vec3, bool, bool) {
+        (self.id, self.root, self.moving, self.running)
+    }
+
+    pub fn set_physics(&mut self, physics: CharacterPhysics) -> bool {
+        if !physics.valid() {
+            return false;
+        }
+        self.physics = Some(physics);
+        self.vertical_velocity = 0.0;
+        self.grounded = false;
+        self.jump_requested = false;
+        true
+    }
+
+    pub fn physics_state(&self) -> (bool, f32, usize) {
+        (
+            self.grounded,
+            self.vertical_velocity,
+            self.collision_candidates,
+        )
+    }
+
+    /// False means the target was removed; the owner must detach and clear all inputs.
+    pub fn update_scene(&mut self, scene: &mut SceneManager, dt: f32) -> bool {
+        let Some(object) = scene.objects().get(&self.id) else {
+            self.clear_input();
+            return false;
+        };
+        let transform = object.transform;
+        if transform.position != self.root {
+            // Teleports are commands from the application, not accumulated physics.
+            self.vertical_velocity = 0.0;
+            self.grounded = false;
+            self.jump_requested = false;
+        }
+        // Scene commands remain authoritative, including teleports while paused.
+        self.root = transform.position;
+        if scene.paused {
+            self.clear_input();
+            // Pause suppresses movement and animation mutations, but still follows the root.
+            return true;
+        }
+        if !dt.is_finite() || dt < 0.0 {
+            return true;
+        }
+        let dt = dt.min(MAX_DT);
+        let axis = |positive: &str, negative: &str| {
+            i32::from(self.pressed.contains(positive)) as f32
+                - i32::from(self.pressed.contains(negative)) as f32
+        };
+        let forward = Vec3::new(self.yaw.sin(), 0.0, self.yaw.cos());
+        let right = Vec3::Y.cross(forward);
+        let direction =
+            (forward * axis("KeyW", "KeyS") + right * axis("KeyD", "KeyA")).normalize_or_zero();
+        self.moving = direction != Vec3::ZERO && dt > 0.0;
+        self.running = self.moving
+            && (self.pressed.contains("ShiftLeft") || self.pressed.contains("ShiftRight"));
+        let mut rotation = transform.rotation;
+        let mut position = self.root;
+        if self.moving {
+            let speed = if self.running {
+                self.run_speed
+            } else {
+                self.speed
+            };
+            if self.physics.is_none() {
+                position += direction * speed * dt;
+            }
+            rotation.y = direction.x.atan2(direction.z) + self.model_yaw;
+        }
+        if let Some(physics) = self.physics {
+            let world = scene.collision_world();
+            let support =
+                world.move_character(position, physics.half_extents, Vec3::ZERO, Some(self.id));
+            self.grounded = support.grounded;
+            self.collision_candidates = support.candidates;
+            if self.jump_requested && self.grounded && dt > 0.0 {
+                self.vertical_velocity = physics.jump_speed;
+                self.grounded = false;
+            }
+            if dt > 0.0 {
+                self.jump_requested = false;
+            }
+            let speed = if self.running {
+                self.run_speed
+            } else {
+                self.speed
+            };
+            let steps = (dt / PHYSICS_STEP).ceil() as usize;
+            let step = if steps > 0 { dt / steps as f32 } else { 0.0 };
+            for _ in 0..steps {
+                self.vertical_velocity -= physics.gravity * step;
+                let delta = direction * speed * step + Vec3::Y * self.vertical_velocity * step;
+                let motion =
+                    world.move_character(position, physics.half_extents, delta, Some(self.id));
+                position = motion.position;
+                self.grounded = motion.grounded;
+                self.collision_candidates = self.collision_candidates.max(motion.candidates);
+                if (motion.grounded && self.vertical_velocity < 0.0)
+                    || (motion.hit_ceiling && self.vertical_velocity > 0.0)
+                {
+                    self.vertical_velocity = 0.0;
+                }
+            }
+            self.moving = (position - self.root).with_y(0.0).length_squared() > 1e-10;
+            self.running &= self.moving;
+        }
+        // One mutation for position + facing; keep the authored scale and X/Z rotation.
+        if (position != transform.position || rotation != transform.rotation)
+            && !scene.set_object_transform(self.id, position, rotation, transform.scale)
+        {
+            self.clear_input();
+            return true;
+        }
+        self.root = position;
+        let state = if self.running {
+            2
+        } else if self.moving {
+            1
+        } else {
+            0
+        };
+        if self.animation_state != Some(state) {
+            if let Some(clip) = self.clips[state] {
+                // Optional clips may be absent/invalid; never retry/restart every frame.
+                if scene.play_model_animation(self.id, clip, true, 1.0).is_ok() {
+                    self.owned_playback = scene
+                        .model(self.id)
+                        .map(|model| (clip, model.playback_revision));
+                }
+            } else if self.owns_playback(scene) {
+                let _ = scene.stop_model_animation(self.id);
+                self.owned_playback = None;
+            }
+            self.animation_state = Some(state);
+        }
+        true
+    }
+
+    fn owns_playback(&self, scene: &SceneManager) -> bool {
+        self.owned_playback.is_some_and(|(clip, revision)| {
+            scene.model(self.id).is_some_and(|model| {
+                model.playback_revision == revision
+                    && model
+                        .playback
+                        .as_ref()
+                        .is_some_and(|playback| playback.clip == clip)
+            })
+        })
+    }
+
+    /// Consumed once after detaching. Missing/replaced playback is left alone.
+    /// While paused, freeze owned playback without changing the pose or scene revisions.
+    /// Otherwise select idle, or stop if idle is missing/invalid.
+    pub fn finish(self, scene: &mut SceneManager) {
+        if !self.owns_playback(scene) {
+            return;
+        }
+        if scene.paused {
+            let _ = scene.pause_model_animation(self.id, true);
+        } else if self.owned_playback.map(|(clip, _)| clip) != self.clips[0] {
+            if let Some(idle) = self.clips[0] {
+                if scene.play_model_animation(self.id, idle, true, 1.0).is_ok() {
+                    return;
+                }
+            }
+            let _ = scene.stop_model_animation(self.id);
+        }
+    }
+
+    fn target(&self) -> Vec3 {
+        self.root + Vec3::Y * TARGET_HEIGHT
+    }
+}
+
+impl CameraController for CharacterController {
+    fn key_down(&mut self, code: String) {
+        if code == "Space" && self.physics.is_some() {
+            if self.pressed.insert(code) {
+                self.jump_requested = true;
+            }
+            return;
+        }
+        if matches!(
+            code.as_str(),
+            "KeyW" | "KeyA" | "KeyS" | "KeyD" | "ShiftLeft" | "ShiftRight"
+        ) {
+            self.pressed.insert(code);
+        }
+    }
+
+    fn key_up(&mut self, code: String) {
+        self.pressed.remove(&code);
+    }
+
+    fn mouse_move(&mut self, dx: f32, dy: f32) {
+        if dx.is_finite() && dy.is_finite() {
+            self.yaw = (self.yaw + dx * SENSITIVITY).rem_euclid(std::f32::consts::TAU);
+            self.pitch = (self.pitch + dy * SENSITIVITY).clamp(0.08, 1.2);
+        }
+    }
+
+    fn clear_input(&mut self) {
+        self.pressed.clear();
+        self.moving = false;
+        self.running = false;
+        self.jump_requested = false;
+    }
+
+    fn update(&mut self, _dt: f32) {
+        // Movement requires SceneManager and is deliberately handled by update_scene only.
+    }
+
+    fn matrix(&self) -> Mat4 {
+        let view = glam::camera::lh::view::look_at_mat4(self.position(), self.target(), Vec3::Y);
+        let proj = glam::camera::lh::proj::directx::perspective(
+            std::f32::consts::FRAC_PI_4,
+            self.aspect,
+            0.1,
+            100.0,
+        );
+        proj * view
+    }
+
+    fn position(&self) -> Vec3 {
+        self.target()
+            + DISTANCE
+                * Vec3::new(
+                    -self.yaw.sin() * self.pitch.cos(),
+                    self.pitch.sin(),
+                    -self.yaw.cos() * self.pitch.cos(),
+                )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::input::active_camera::{ActiveCamera, CameraType};
+
+    fn setup() -> (SceneManager, ActiveCamera, u32) {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        let mut camera = ActiveCamera::new(1.0);
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [None; 3]));
+        (scene, camera, id)
+    }
+
+    #[test]
+    fn forward_is_positive_z_and_diagonals_have_equal_speed() {
+        let (mut scene, mut camera, id) = setup();
+        assert!(camera.position().z < 0.0);
+        camera.key_down("KeyW".into());
+        camera.update_scene(&mut scene, 0.1);
+        let straight = scene.objects()[&id].transform.position;
+        assert!((straight - Vec3::Z * 0.2).length() < 1e-6);
+        let (mut scene, mut camera, id) = setup();
+        camera.key_down("KeyW".into());
+        camera.key_down("KeyD".into());
+        camera.update_scene(&mut scene, 0.1);
+        let diagonal = scene.objects()[&id].transform.position;
+        assert!((diagonal.length() - straight.length()).abs() < 1e-6);
+        assert!((diagonal.x - diagonal.z).abs() < 1e-6 && diagonal.x > 0.0);
+        assert!(
+            (scene.objects()[&id].transform.rotation.y - std::f32::consts::FRAC_PI_4).abs() < 1e-6
+        );
+    }
+
+    #[test]
+    fn opposing_keys_cancel_and_shift_only_runs_when_moving() {
+        let (mut scene, mut camera, id) = setup();
+        camera.key_down("ShiftRight".into());
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(
+            camera.character_state(),
+            Some((id, Vec3::ZERO, false, false))
+        );
+        camera.key_down("KeyW".into());
+        camera.key_down("KeyS".into());
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(scene.objects()[&id].transform.position, Vec3::ZERO);
+        camera.key_up("KeyS".into());
+        camera.update_scene(&mut scene, 0.1);
+        assert!((scene.objects()[&id].transform.position.z - 0.6).abs() < 1e-6);
+        assert!(camera.character_state().unwrap().3);
+        camera.key_up("ShiftRight".into());
+        camera.update_scene(&mut scene, 0.1);
+        assert!((scene.objects()[&id].transform.position.z - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn blur_clear_stops_motion_and_update_alone_never_moves_root() {
+        let (mut scene, mut camera, id) = setup();
+        camera.key_down("KeyW".into());
+        camera.update(0.1);
+        assert_eq!(camera.character_state().unwrap().1, Vec3::ZERO);
+        camera.update_scene(&mut scene, 0.1);
+        let position = scene.objects()[&id].transform.position;
+        camera.clear_input();
+        let revision = scene.render_revision();
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(camera.character_state(), Some((id, position, false, false)));
+        assert_eq!(scene.render_revision(), revision);
+    }
+
+    #[test]
+    fn mouse_changes_camera_relative_movement_and_limits_pitch() {
+        let (mut scene, mut camera, id) = setup();
+        camera.mouse_move(std::f32::consts::FRAC_PI_2 / SENSITIVITY, 0.0);
+        assert!(camera.position().x < 0.0);
+        camera.key_down("KeyW".into());
+        camera.update_scene(&mut scene, 0.1);
+        assert!((scene.objects()[&id].transform.position - Vec3::X * 0.2).length() < 1e-6);
+        for dy in [1e6, -1e6] {
+            camera.mouse_move(0.0, dy);
+            assert!(camera.matrix().is_finite());
+            let root = camera.character_state().unwrap().1;
+            let target = root + Vec3::Y * TARGET_HEIGHT;
+            assert!(camera.position().y > target.y);
+            let clip = camera.matrix() * target.extend(1.0);
+            assert!(clip.x.abs() < 1e-5 && clip.y.abs() < 1e-5 && clip.w > 0.0);
+        }
+        let before = camera.matrix();
+        camera.mouse_move(f32::NAN, f32::INFINITY);
+        assert_eq!(camera.matrix(), before);
+    }
+
+    #[test]
+    fn pause_clears_keys_and_does_not_mutate_scene() {
+        let (mut scene, mut camera, id) = setup();
+        camera.key_down("KeyW".into());
+        camera.update_scene(&mut scene, 0.1);
+        let position = scene.objects()[&id].transform.position;
+        scene.paused = true;
+        let revision = scene.render_revision();
+        camera.update_scene(&mut scene, 0.1);
+        camera.key_down("KeyW".into());
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(scene.render_revision(), revision);
+        assert_eq!(camera.character_state(), Some((id, position, false, false)));
+        let teleported = Vec3::new(5.0, 2.0, -4.0);
+        assert!(scene.set_object_position(id, teleported));
+        let revision = scene.render_revision();
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(
+            camera.character_state(),
+            Some((id, teleported, false, false))
+        );
+        assert_eq!(scene.render_revision(), revision);
+        scene.paused = false;
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(scene.objects()[&id].transform.position, teleported);
+    }
+
+    #[test]
+    fn removal_or_clear_detaches_without_transferring_held_keys() {
+        for clear in [false, true] {
+            let (mut scene, mut camera, id) = setup();
+            camera.key_down("KeyW".into());
+            if clear {
+                scene.clear();
+            } else {
+                assert!(scene.remove_object(id));
+            }
+            camera.update_scene(&mut scene, 0.1);
+            assert!(camera.character_state().is_none());
+            let before = camera.position();
+            camera.update(0.1);
+            assert_eq!(camera.position(), before);
+            let replacement = scene.add_cube(Vec3::ZERO);
+            assert!(camera.follow_object(replacement, Vec3::ZERO, 2.0, 6.0, 0.0, [None; 3]));
+            camera.update_scene(&mut scene, 0.1);
+            assert_eq!(scene.objects()[&replacement].transform.position, Vec3::ZERO);
+        }
+    }
+
+    #[test]
+    fn scene_position_is_authoritative_and_movement_preserves_scale() {
+        let (mut scene, mut camera, id) = setup();
+        let rotation = Vec3::new(0.2, 0.0, -0.3);
+        let scale = Vec3::new(0.01, 0.02, 0.03);
+        let root = Vec3::new(4.0, 0.5, 3.0);
+        assert!(scene.set_object_transform(id, root, rotation, scale));
+        // An outdated initial camera position must never reposition the scene object.
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.4, [None; 3]));
+        let revision = scene.render_revision();
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(scene.objects()[&id].transform.position, root);
+        assert_eq!(camera.character_state().unwrap().1, root);
+        assert_eq!(scene.render_revision(), revision);
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(scene.render_revision(), revision);
+        camera.key_down("KeyD".into());
+        camera.update_scene(&mut scene, 0.1);
+        let transform = scene.objects()[&id].transform;
+        assert_eq!(transform.scale, scale);
+        assert_eq!(transform.rotation.x, rotation.x);
+        assert_eq!(transform.rotation.z, rotation.z);
+        assert!((transform.rotation.y - std::f32::consts::FRAC_PI_2 - 0.4).abs() < 1e-6);
+        camera.clear_input();
+        let external = Vec3::new(1.0, 2.0, 3.0);
+        assert!(scene.set_object_position(id, external));
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(camera.character_state().unwrap().1, external);
+    }
+
+    #[test]
+    fn suspended_tab_dt_is_clamped_and_invalid_dt_is_ignored() {
+        let (mut scene, mut camera, id) = setup();
+        camera.key_down("KeyW".into());
+        camera.update_scene(&mut scene, 60.0);
+        assert!((scene.objects()[&id].transform.position.z - 0.2).abs() < 1e-6);
+        let revision = scene.render_revision();
+        for dt in [f32::NAN, f32::INFINITY, -1.0] {
+            camera.update_scene(&mut scene, dt);
+        }
+        assert_eq!(scene.render_revision(), revision);
+    }
+
+    #[test]
+    fn invalid_options_preserve_controller_and_explicit_views_detach() {
+        let (mut scene, mut camera, id) = setup();
+        let before = camera.matrix();
+        assert!(!camera.follow_object(id, Vec3::splat(f32::NAN), 2.0, 6.0, 0.0, [None; 3]));
+        for bad in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+            assert!(!camera.follow_object(id, Vec3::ZERO, bad, 6.0, 0.0, [None; 3]));
+            assert!(!camera.follow_object(id, Vec3::ZERO, 2.0, bad, 0.0, [None; 3]));
+        }
+        assert!(!camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, f32::NAN, [None; 3]));
+        assert_eq!(camera.matrix(), before);
+        assert!(!camera.set_view(Vec3::ZERO, Vec3::ZERO));
+        assert!(camera.character_state().is_some());
+        camera.key_down("KeyW".into());
+        camera.set_type(CameraType::Free);
+        assert!(camera.character_state().is_none());
+        let free_position = camera.position();
+        camera.update(0.1);
+        assert_eq!(camera.position(), free_position);
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [None; 3]));
+        assert!(camera.set_view(Vec3::new(3.0, 2.0, -3.0), Vec3::ZERO));
+        assert!(camera.character_state().is_none());
+        let revision = scene.render_revision();
+        camera.update_scene(&mut scene, 0.1);
+        assert_eq!(scene.render_revision(), revision);
+    }
+
+    #[test]
+    fn animation_clips_change_only_on_idle_walk_run_transitions() {
+        use crate::gltf_model::AnimationClip;
+        let mut asset = crate::gltf_loader::parse_model(
+            include_bytes!("../../tests/fixtures/gltf/triangle.gltf"),
+            &[include_bytes!("../../tests/fixtures/gltf/triangle.bin").to_vec()],
+            &[],
+        )
+        .unwrap();
+        asset.animations = (0..3)
+            .map(|_| AnimationClip {
+                name: None,
+                channels: vec![],
+                duration: 2.0,
+            })
+            .collect();
+        let mut scene = SceneManager::default();
+        let id = scene.add_model(std::sync::Arc::new(asset)).unwrap();
+        let mut camera = ActiveCamera::new(1.0);
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [Some(0), Some(1), Some(2)]));
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(scene.model(id).unwrap().playback.as_ref().unwrap().clip, 0);
+        scene.update(0.05);
+        let revision = scene.render_revision();
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(scene.render_revision(), revision);
+        assert_eq!(
+            scene.model(id).unwrap().playback.as_ref().unwrap().time,
+            0.05
+        );
+        camera.key_down("KeyW".into());
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(scene.model(id).unwrap().playback.as_ref().unwrap().clip, 1);
+        scene.update(0.05);
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(
+            scene.model(id).unwrap().playback.as_ref().unwrap().time,
+            0.05
+        );
+        camera.key_down("ShiftLeft".into());
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(scene.model(id).unwrap().playback.as_ref().unwrap().clip, 2);
+        camera.clear_input();
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(scene.model(id).unwrap().playback.as_ref().unwrap().clip, 0);
+    }
+
+    fn fox_asset() -> std::sync::Arc<crate::gltf_model::ModelAsset> {
+        let asset = crate::gltf_loader::parse_model(
+            include_bytes!("../../assets/models/fox/Fox.glb"),
+            &[],
+            &[],
+        )
+        .unwrap();
+        let names: Vec<_> = asset
+            .animations
+            .iter()
+            .map(|clip| clip.name.as_deref())
+            .collect();
+        assert_eq!(names, vec![Some("Survey"), Some("Walk"), Some("Run")]);
+        std::sync::Arc::new(asset)
+    }
+
+    fn start_fox(
+        asset: std::sync::Arc<crate::gltf_model::ModelAsset>,
+        running: bool,
+        idle: Option<usize>,
+    ) -> (SceneManager, ActiveCamera, u32) {
+        let mut scene = SceneManager::default();
+        let id = scene.add_model(asset).unwrap();
+        let mut camera = ActiveCamera::new(1.0);
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [idle, Some(1), Some(2)]));
+        camera.key_down("KeyW".into());
+        if running {
+            camera.key_down("ShiftLeft".into());
+        }
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(
+            scene.model(id).unwrap().playback.as_ref().unwrap().clip,
+            if running { 2 } else { 1 }
+        );
+        (scene, camera, id)
+    }
+
+    #[test]
+    fn fox_detach_finishes_walk_run_once_for_mode_and_view_switches() {
+        let asset = fox_asset();
+        for running in [false, true] {
+            for view in [false, true] {
+                for idle in [Some(0), None, Some(usize::MAX)] {
+                    let (mut scene, mut camera, id) = start_fox(asset.clone(), running, idle);
+                    if view {
+                        assert!(camera.set_view(Vec3::new(3.0, 2.0, -3.0), Vec3::ZERO));
+                    } else {
+                        camera.set_type(CameraType::Orbit);
+                    }
+                    assert!(camera.character_state().is_none());
+                    camera.update_scene(&mut scene, 0.05);
+                    let model = scene.model(id).unwrap();
+                    if idle == Some(0) {
+                        assert_eq!(model.playback.as_ref().unwrap().clip, 0);
+                    } else {
+                        assert!(model.playback.is_none());
+                    }
+                    let revision = scene.render_revision();
+                    let model_revision = model.revision;
+                    for _ in 0..3 {
+                        camera.update_scene(&mut scene, 0.05);
+                    }
+                    assert_eq!(scene.render_revision(), revision);
+                    assert_eq!(scene.model(id).unwrap().revision, model_revision);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fox_repeated_switches_and_rebinds_finish_before_new_owner() {
+        let (mut scene, mut camera, id) = start_fox(fox_asset(), true, Some(0));
+        camera.set_type(CameraType::Free);
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [Some(0), Some(1), Some(2)]));
+        camera.set_type(CameraType::Orbit);
+        camera.set_type(CameraType::Free);
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [Some(0), Some(1), Some(2)]));
+        // Replacing a live controller also queues its completion, without dropping older work.
+        assert!(camera.follow_object(id, Vec3::ZERO, 2.0, 6.0, 0.0, [Some(0), Some(1), Some(2)]));
+        camera.key_down("KeyW".into());
+        camera.key_down("ShiftLeft".into());
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(scene.model(id).unwrap().playback.as_ref().unwrap().clip, 2);
+        scene.update(0.05);
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(
+            scene.model(id).unwrap().playback.as_ref().unwrap().time,
+            0.05
+        );
+    }
+
+    #[test]
+    fn fox_detach_while_paused_freezes_pose_and_never_resumes_stale_playback() {
+        let (mut scene, mut camera, id) = start_fox(fox_asset(), true, Some(0));
+        scene.update(0.05);
+        scene.paused = true;
+        camera.set_type(CameraType::Free);
+        let revision = scene.render_revision();
+        let model_revision = scene.model(id).unwrap().revision;
+        let transform = scene.objects()[&id].transform;
+        let time = scene.model(id).unwrap().playback.as_ref().unwrap().time;
+        camera.update_scene(&mut scene, 0.05);
+        assert!(!scene.model(id).unwrap().playback.as_ref().unwrap().playing);
+        assert_eq!(scene.render_revision(), revision);
+        assert_eq!(scene.model(id).unwrap().revision, model_revision);
+        assert_eq!(scene.objects()[&id].transform.position, transform.position);
+        assert_eq!(scene.objects()[&id].transform.rotation, transform.rotation);
+        scene.paused = false;
+        scene.update(0.05);
+        camera.update_scene(&mut scene, 0.05);
+        assert_eq!(
+            scene.model(id).unwrap().playback.as_ref().unwrap().time,
+            time
+        );
+        assert_eq!(scene.render_revision(), revision);
+    }
+
+    #[test]
+    fn fox_pending_finish_ignores_removed_target_and_external_playback() {
+        let asset = fox_asset();
+        for removed in [false, true] {
+            let (mut scene, mut camera, id) = start_fox(asset.clone(), true, Some(0));
+            camera.set_type(CameraType::Orbit);
+            if removed {
+                assert!(scene.remove_object(id));
+            } else {
+                // A scene command supersedes the clip last selected by this controller.
+                scene.play_model_animation(id, 1, true, 1.0).unwrap();
+            }
+            let revision = scene.render_revision();
+            camera.update_scene(&mut scene, 0.05);
+            assert_eq!(scene.render_revision(), revision);
+            if !removed {
+                assert_eq!(scene.model(id).unwrap().playback.as_ref().unwrap().clip, 1);
+            }
+        }
+    }
+
+    #[test]
+    fn fox_pending_finish_preserves_external_same_clip_speed() {
+        let (mut scene, mut camera, id) = start_fox(fox_asset(), true, Some(0));
+        camera.set_type(CameraType::Orbit);
+        scene.play_model_animation(id, 2, true, 0.5).unwrap();
+        let revision = scene.render_revision();
+        let playback_revision = scene.model(id).unwrap().playback_revision;
+        for _ in 0..2 {
+            camera.update_scene(&mut scene, 0.05);
+        }
+        let model = scene.model(id).unwrap();
+        let playback = model.playback.as_ref().unwrap();
+        assert_eq!(playback.clip, 2);
+        assert_eq!(playback.speed, 0.5);
+        assert!(playback.playing);
+        assert_eq!(model.playback_revision, playback_revision);
+        assert_eq!(scene.render_revision(), revision);
+    }
+
+    #[test]
+    fn fox_pending_finish_preserves_external_pause_command_authority() {
+        let asset = fox_asset();
+        for paused in [false, true] {
+            let (mut scene, mut camera, id) = start_fox(asset.clone(), true, Some(0));
+            scene.paused = true;
+            camera.set_type(CameraType::Free);
+            scene.pause_model_animation(id, paused).unwrap();
+            let revision = scene.render_revision();
+            let playback_revision = scene.model(id).unwrap().playback_revision;
+            camera.update_scene(&mut scene, 0.05);
+            let model = scene.model(id).unwrap();
+            let playback = model.playback.as_ref().unwrap();
+            assert_eq!(playback.clip, 2);
+            assert_eq!(playback.playing, !paused);
+            assert_eq!(model.playback_revision, playback_revision);
+            assert_eq!(scene.render_revision(), revision);
+            scene.paused = false;
+            camera.update_scene(&mut scene, 0.05);
+            assert_eq!(
+                scene.model(id).unwrap().playback_revision,
+                playback_revision
+            );
+            assert_eq!(scene.render_revision(), revision);
+        }
+    }
+
+    fn physics_setup() -> (SceneManager, ActiveCamera, u32, u32) {
+        let mut scene = SceneManager::default();
+        let floor = scene.add_cube(Vec3::new(0.0, -0.5, 0.0));
+        scene.set_object_scale(floor, Vec3::new(20.0, 1.0, 20.0));
+        scene.set_box_collider(floor, Vec3::splat(0.5), Vec3::ZERO);
+        let id = scene.add_cube(Vec3::ZERO);
+        let mut camera = ActiveCamera::new(1.0);
+        camera.follow_object(id, Vec3::ZERO, 2.5, 5.0, 0.0, [None; 3]);
+        assert!(camera.set_character_physics(CharacterPhysics {
+            half_extents: Vec3::new(0.4, 0.8, 0.8),
+            gravity: 18.0,
+            jump_speed: 7.0,
+        }));
+        (scene, camera, id, floor)
+    }
+
+    fn physics_tick(scene: &mut SceneManager, camera: &mut ActiveCamera, frames: usize) {
+        for _ in 0..frames {
+            camera.update_scene(scene, 1.0 / 60.0);
+        }
+    }
+
+    #[test]
+    fn physics_blocks_walk_then_jumps_and_lands_without_held_key_bouncing() {
+        let (mut scene, mut camera, id, _) = physics_setup();
+        let platform = scene.add_cube(Vec3::new(0.0, 0.3, 3.0));
+        scene.set_object_scale(platform, Vec3::new(2.6, 0.6, 2.0));
+        scene.set_box_collider(platform, Vec3::splat(0.5), Vec3::ZERO);
+        camera.key_down("KeyW".into());
+        physics_tick(&mut scene, &mut camera, 60);
+        assert!((scene.objects()[&id].transform.position.z - 1.2).abs() < 1e-4);
+        assert!(camera.character_physics_state().unwrap().0);
+        camera.key_down("Space".into());
+        physics_tick(&mut scene, &mut camera, 12);
+        assert!(scene.objects()[&id].transform.position.y > 0.5);
+        assert!(!camera.character_physics_state().unwrap().0);
+        physics_tick(&mut scene, &mut camera, 18);
+        camera.key_up("KeyW".into());
+        physics_tick(&mut scene, &mut camera, 60);
+        assert!((scene.objects()[&id].transform.position.y - 0.6).abs() < 1e-4);
+        camera.key_down("Space".into());
+        physics_tick(&mut scene, &mut camera, 30);
+        assert!((scene.objects()[&id].transform.position.y - 0.6).abs() < 1e-4);
+        assert!(camera.character_physics_state().unwrap().0);
+        camera.key_up("Space".into());
+        camera.key_down("Space".into());
+        physics_tick(&mut scene, &mut camera, 12);
+        assert!(scene.objects()[&id].transform.position.y > 1.1);
+    }
+
+    #[test]
+    fn physics_pause_teleport_and_removed_floor_do_not_keep_stale_motion_or_support() {
+        let (mut scene, mut camera, id, floor) = physics_setup();
+        physics_tick(&mut scene, &mut camera, 1);
+        camera.key_down("Space".into());
+        physics_tick(&mut scene, &mut camera, 12);
+        let before = camera.character_state();
+        let velocity = camera.character_physics_state().unwrap().1;
+        scene.paused = true;
+        physics_tick(&mut scene, &mut camera, 20);
+        assert_eq!(camera.character_state().unwrap().1, before.unwrap().1);
+        assert_eq!(camera.character_physics_state().unwrap().1, velocity);
+        scene.set_object_position(id, Vec3::ZERO);
+        scene.paused = false;
+        physics_tick(&mut scene, &mut camera, 1);
+        assert!(camera.character_physics_state().unwrap().0);
+        assert_eq!(camera.character_physics_state().unwrap().1, 0.0);
+        assert!(!camera.set_character_physics(CharacterPhysics {
+            half_extents: Vec3::ZERO,
+            gravity: 18.0,
+            jump_speed: 7.0,
+        }));
+        scene.remove_collider(floor);
+        physics_tick(&mut scene, &mut camera, 8);
+        assert!(scene.objects()[&id].transform.position.y < 0.0);
+        assert!(!camera.character_physics_state().unwrap().0);
+    }
+
+    #[test]
+    fn physics_zero_delta_does_not_consume_a_queued_jump() {
+        let (mut scene, mut camera, id, _) = physics_setup();
+        physics_tick(&mut scene, &mut camera, 1);
+        camera.key_down("Space".into());
+        camera.update_scene(&mut scene, 0.0);
+        assert_eq!(scene.objects()[&id].transform.position, Vec3::ZERO);
+        physics_tick(&mut scene, &mut camera, 1);
+        assert!(scene.objects()[&id].transform.position.y > 0.0);
+    }
+}
+
+
+# File: src/input/keyboard.rs
 #![cfg(target_arch = "wasm32")]
 
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::Window;
+use web_sys::{EventTarget, Window};
 
 use crate::input::camera::CameraController;
 
-pub fn attach<T>(window: &Window, cam: Rc<RefCell<T>>)
+pub struct Listener {
+    target: EventTarget,
+    name: &'static str,
+    callback: Closure<dyn FnMut(web_sys::Event)>,
+}
+impl Listener {
+    pub fn new(
+        target: &EventTarget,
+        name: &'static str,
+        callback: impl FnMut(web_sys::Event) + 'static,
+    ) -> Result<Self, wasm_bindgen::JsValue> {
+        let callback = Closure::wrap(Box::new(callback) as Box<dyn FnMut(web_sys::Event)>);
+        target.add_event_listener_with_callback(name, callback.as_ref().unchecked_ref())?;
+        Ok(Self {
+            target: target.clone(),
+            name,
+            callback,
+        })
+    }
+}
+impl Drop for Listener {
+    fn drop(&mut self) {
+        let _ = self
+            .target
+            .remove_event_listener_with_callback(self.name, self.callback.as_ref().unchecked_ref());
+    }
+}
+
+pub fn attach<T>(
+    window: &Window,
+    cam: Rc<RefCell<T>>,
+) -> Result<Vec<Listener>, wasm_bindgen::JsValue>
 where
     T: CameraController + 'static,
 {
-    let cam_down = cam.clone();
-    let key_down = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
-        cam_down.borrow_mut().key_down(e.code());
-    }) as Box<dyn FnMut(_)>);
-    window
-        .add_event_listener_with_callback("keydown", key_down.as_ref().unchecked_ref())
-        .unwrap();
-    key_down.forget();
-
-    let cam_up = cam.clone();
-    let key_up = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
-        cam_up.borrow_mut().key_up(e.code());
-    }) as Box<dyn FnMut(_)>);
-    window
-        .add_event_listener_with_callback("keyup", key_up.as_ref().unchecked_ref())
-        .unwrap();
-    key_up.forget();
-
-    let on_blur = Closure::wrap(Box::new(move || {
-        cam.borrow_mut().clear_input();
-    }) as Box<dyn FnMut()>);
-    window
-        .add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref())
-        .unwrap();
-    on_blur.forget();
+    let down = cam.clone();
+    let up = cam.clone();
+    Ok(vec![
+        Listener::new(window.as_ref(), "keydown", move |e| {
+            let event = e.unchecked_into::<web_sys::KeyboardEvent>();
+            // Jump is a fresh key press, never an auto-repeat after pause/blur.
+            if event.code() != "Space" || !event.repeat() {
+                down.borrow_mut().key_down(event.code());
+            }
+        })?,
+        Listener::new(window.as_ref(), "keyup", move |e| {
+            up.borrow_mut()
+                .key_up(e.unchecked_into::<web_sys::KeyboardEvent>().code())
+        })?,
+        Listener::new(window.as_ref(), "blur", move |_| {
+            cam.borrow_mut().clear_input()
+        })?,
+    ])
 }
 
-\n# File: src/input/mod.rs
+
+# File: src/input/mod.rs
 pub mod active_camera;
 pub mod camera;
+pub mod character;
 #[cfg(target_arch = "wasm32")]
 pub mod keyboard;
 #[cfg(target_arch = "wasm32")]
 pub mod mouse;
 pub mod orbit_camera;
 
-\n# File: src/input/mouse.rs
+
+# File: src/input/mouse.rs
 #![cfg(target_arch = "wasm32")]
 
 use std::{cell::RefCell, rc::Rc};
-use wasm_bindgen::{closure::Closure, JsCast};
-use web_sys::{HtmlCanvasElement, PointerEvent, Window};
+use wasm_bindgen::JsCast;
+use web_sys::{HtmlCanvasElement, MouseEvent, PointerEvent, Window};
 
 use crate::input::camera::CameraController;
 
-pub fn attach<T>(window: &Window, canvas: &HtmlCanvasElement, cam: Rc<RefCell<T>>)
+pub fn attach<T>(
+    window: &Window,
+    canvas: &HtmlCanvasElement,
+    cam: Rc<RefCell<T>>,
+) -> Result<Vec<super::keyboard::Listener>, wasm_bindgen::JsValue>
 where
     T: CameraController + 'static,
 {
+    use super::keyboard::Listener;
     let dragging = Rc::new(RefCell::new(false));
-
-    // Start dragging only when the left button is pressed on the canvas
-    {
-        let dragging = dragging.clone();
-        let canvas_clone = canvas.clone();
-        let on_down = Closure::wrap(Box::new(move |e: PointerEvent| {
-            if e.buttons() & 1 == 1 {
-                if let Some(target) = e.target() {
-                    if target
-                        == canvas_clone
-                            .clone()
-                            .dyn_into::<web_sys::EventTarget>()
-                            .unwrap()
-                    {
-                        *dragging.borrow_mut() = true;
-                    }
-                }
+    let down = dragging.clone();
+    let up = dragging.clone();
+    let target: web_sys::EventTarget = canvas.clone().into();
+    let movement_canvas = canvas.clone();
+    let document = window
+        .document()
+        .ok_or_else(|| wasm_bindgen::JsValue::from_str("Browser document unavailable"))?;
+    Ok(vec![
+        Listener::new(canvas.as_ref(), "pointerdown", move |e| {
+            let e = e.unchecked_into::<PointerEvent>();
+            if e.buttons() & 1 == 1 && e.target().as_ref() == Some(&target) {
+                *down.borrow_mut() = true;
             }
-        }) as Box<dyn FnMut(_)>);
-        canvas
-            .add_event_listener_with_callback("pointerdown", on_down.as_ref().unchecked_ref())
-            .unwrap();
-        on_down.forget();
-    }
-
-    // Stop dragging on mouseup anywhere in the window
-    {
-        let dragging = dragging.clone();
-        let on_up = Closure::wrap(Box::new(move |_e: PointerEvent| {
-            *dragging.borrow_mut() = false;
-        }) as Box<dyn FnMut(_)>);
-        window
-            .add_event_listener_with_callback("pointerup", on_up.as_ref().unchecked_ref())
-            .unwrap();
-        on_up.forget();
-    }
-
-    // Apply mouse movement only while dragging
-    {
-        let dragging = dragging.clone();
-        let cam_mouse = cam.clone();
-        let mouse_move = Closure::wrap(Box::new(move |e: PointerEvent| {
-            if *dragging.borrow() && e.buttons() & 1 == 1 {
-                cam_mouse
-                    .borrow_mut()
+        })?,
+        Listener::new(window.as_ref(), "pointerup", move |_| {
+            *up.borrow_mut() = false
+        })?,
+        Listener::new(window.as_ref(), "mousemove", move |e| {
+            let e = e.unchecked_into::<MouseEvent>();
+            let locked = document
+                .pointer_lock_element()
+                .as_ref()
+                .is_some_and(|element| {
+                    element == movement_canvas.unchecked_ref::<web_sys::Element>()
+                });
+            if locked || (*dragging.borrow() && e.buttons() & 1 == 1) {
+                cam.borrow_mut()
                     .mouse_move(e.movement_x() as f32, e.movement_y() as f32);
             }
-        }) as Box<dyn FnMut(_)>);
-        window
-            .add_event_listener_with_callback("pointermove", mouse_move.as_ref().unchecked_ref())
-            .unwrap();
-        mouse_move.forget();
-    }
+        })?,
+    ])
 }
 
-\n# File: src/input/orbit_camera.rs
+
+# File: src/input/orbit_camera.rs
 use glam::{Mat4, Vec3};
 use std::collections::HashSet;
 
@@ -3711,7 +5343,10 @@ impl CameraController for OrbitCamera {
     }
 }
 
-\n# File: src/lib.rs
+
+# File: src/lib.rs
+pub mod collision;
+pub mod debug_overlay;
 pub mod frame_metrics;
 pub mod gltf_animation;
 pub mod gltf_loader;
@@ -3721,6 +5356,7 @@ pub mod input;
 pub mod render;
 pub mod render_math;
 pub mod scene;
+mod spatial;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
@@ -3739,7 +5375,8 @@ mod render_target_tests;
 #[cfg(test)]
 mod test_scenes;
 
-\n# File: src/render/data.rs
+
+# File: src/render/data.rs
 use wgpu::VertexBufferLayout;
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -4238,7 +5875,8 @@ impl Default for EffectsUniforms {
     }
 }
 
-\n# File: src/render/depth.rs
+
+# File: src/render/depth.rs
 #![cfg(target_arch = "wasm32")]
 
 use wgpu::{Device, Texture, TextureFormat, TextureView};
@@ -4262,7 +5900,8 @@ pub fn create(device: &Device, w: u32, h: u32, format: TextureFormat) -> (Textur
     (texture, view)
 }
 
-\n# File: src/render/effects.rs
+
+# File: src/render/effects.rs
 //! Persistent pass resources, scheduling and dirty keys, independent of canvas/DOM.
 use super::target::{RenderTarget, RenderView};
 use super::{
@@ -4686,7 +6325,8 @@ impl Effects {
     }
 }
 
-\n# File: src/render/gltf_gpu.rs
+
+# File: src/render/gltf_gpu.rs
 //! Portable glTF rendering: deformation is computed in Rust once per changed pose,
 //! and the same world-space vertex buffers serve main/reflection/shadow passes.
 use super::data::as_bytes;
@@ -5593,7 +7233,8 @@ fn indices(p: &ModelPrimitive) -> (Vec<u32>, wgpu::PrimitiveTopology) {
     }
 }
 
-\n# File: src/render/gltf_pbr.wgsl
+
+# File: src/render/gltf_pbr.wgsl
 struct Light {
     position: vec3<f32>,
     _pad_p: f32,
@@ -5726,7 +7367,140 @@ struct PostSurface { @location(0) color:vec4<f32>, @location(1) depth:vec4<f32> 
 @fragment fn fs_postprocess(v:Output,@builtin(front_facing) front:bool)->PostSurface { var o:PostSurface; let c=surface(v,front); o.color=vec4(c.rgb,material.options.x); var e=fract(min(v.pos.z,0.9999999)*vec3(1.0,255.0,65025.0)); e-=e.yzz*vec3(1.0/255.0,1.0/255.0,0.0); o.depth=vec4(e,1.0); return o; }
 @fragment fn fs_shadow(v:Output) { alpha_test(base_color(v).a); if(material.extra.y==2.0 && base_color(v).a<0.5) { discard; } }
 
-\n# File: src/render/mod.rs
+
+# File: src/render/hud.rs
+//! Optional final-output pass. No resources exist until first enabled.
+use super::target::RenderTarget;
+use crate::debug_overlay::HudRect;
+
+#[derive(Default)]
+pub struct DebugHud {
+    pipeline: Option<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
+    buffer: Option<wgpu::Buffer>,
+    capacity: usize,
+    count: u32,
+    size: (u32, u32),
+    elapsed: f32,
+    pub frames: u64,
+    pub refreshes: u64,
+}
+impl DebugHud {
+    pub fn invalidate(&mut self) {
+        self.size = (0, 0);
+    }
+    pub fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: &RenderTarget<'_>,
+        dt: f32,
+        lines: impl FnOnce() -> Vec<String>,
+    ) -> usize {
+        self.elapsed += dt.clamp(0.0, 0.25);
+        let mut uploaded = 0;
+        if self.size != (target.width, target.height) || self.elapsed >= 0.25 {
+            let rects = crate::debug_overlay::geometry(&lines(), target.width, target.height);
+            if rects.len() > self.capacity {
+                self.capacity = rects.len().next_power_of_two();
+                self.buffer = Some(device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("debug HUD pixels"),
+                    size: (self.capacity * std::mem::size_of::<HudRect>()) as u64,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }));
+            }
+            let bytes = bytemuck::cast_slice(&rects);
+            queue.write_buffer(self.buffer.as_ref().unwrap(), 0, bytes);
+            uploaded = bytes.len();
+            self.count = rects.len() as u32;
+            self.size = (target.width, target.height);
+            self.elapsed = 0.0;
+            self.refreshes += 1;
+        }
+        if self.pipeline.as_ref().map(|p| p.0) != Some(target.color_format) {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("hud.wgsl"));
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("debug HUD layout"),
+                bind_group_layouts: &[],
+                immediate_size: 0,
+            });
+            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("debug HUD"),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<HudRect>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![0 => Float32x4, 1 => Float32x4],
+                    })],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: target.color_format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: Default::default(),
+                depth_stencil: None,
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            });
+            self.pipeline = Some((target.color_format, pipeline));
+        }
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("debug HUD"),
+        });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("debug HUD"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.pipeline.as_ref().unwrap().1);
+            pass.set_vertex_buffer(0, self.buffer.as_ref().unwrap().slice(..));
+            pass.draw(0..6, 0..self.count);
+        }
+        queue.submit(Some(encoder.finish()));
+        self.frames += 1;
+        uploaded
+    }
+}
+
+
+# File: src/render/hud.wgsl
+struct Output { @builtin(position) position: vec4<f32>, @location(0) color: vec4<f32> };
+@vertex fn vs(@builtin(vertex_index) vertex: u32,
+    @location(0) rect: vec4<f32>, @location(1) color: vec4<f32>) -> Output {
+    let corners = array<vec2<f32>, 6>(vec2(0.,0.), vec2(1.,0.), vec2(0.,1.),
+        vec2(0.,1.), vec2(1.,0.), vec2(1.,1.));
+    var out: Output;
+    out.position = vec4(rect.xy + corners[vertex] * rect.zw, 0., 1.);
+    out.color = color;
+    return out;
+}
+@fragment fn fs(input: Output) -> @location(0) vec4<f32> { return input.color; }
+
+
+# File: src/render/mod.rs
 #![cfg(target_arch = "wasm32")]
 
 pub mod data;
@@ -5742,9 +7516,11 @@ pub mod target;
 pub mod effects;
 pub mod textures;
 
+mod hud;
 pub mod postprocess;
 
-\n# File: src/render/output.rs
+
+# File: src/render/output.rs
 //! Browser presentation adapter. Only this module knows about canvas/surfaces.
 use super::{
     depth,
@@ -5778,7 +7554,9 @@ pub struct CanvasOutput {
 impl CanvasOutput {
     pub async fn new(
         canvas: &HtmlCanvasElement,
+        check_current: impl Fn() -> Result<(), JsValue>,
     ) -> Result<(Self, wgpu::Device, wgpu::Queue, String), JsValue> {
+        check_current()?;
         let instance_desc = wgpu::InstanceDescriptor {
             backends: if canvas.get_attribute("data-backend").as_deref() == Some("webgl") {
                 wgpu::Backends::GL
@@ -5788,12 +7566,14 @@ impl CanvasOutput {
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         };
         let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
+        check_current()?;
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        check_current()?;
         let backend = format!("{:?}", adapter.get_info().backend);
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
@@ -5807,6 +7587,7 @@ impl CanvasOutput {
             })
             .await
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        check_current()?;
         let caps = surface.get_capabilities(&adapter);
         let format = caps
             .formats
@@ -5830,6 +7611,7 @@ impl CanvasOutput {
             view_formats: vec![view_format],
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
+        check_current()?;
         canvas.set_width(config.width);
         canvas.set_height(config.height);
         surface.configure(&device, &config);
@@ -6069,7 +7851,8 @@ impl CanvasOutput {
     }
 }
 
-\n# File: src/render/pipeline.rs
+
+# File: src/render/pipeline.rs
 #![cfg(target_arch = "wasm32")]
 
 use crate::render::data::Vertex;
@@ -6244,7 +8027,8 @@ pub fn build_shadow(
     })
 }
 
-\n# File: src/render/postprocess.rs
+
+# File: src/render/postprocess.rs
 //! Depth-aware fragment postprocessing, independent of a browser or surface.
 use super::{
     data::as_bytes,
@@ -6900,7 +8684,8 @@ impl PostProcessor {
     }
 }
 
-\n# File: src/render/postprocess.wgsl
+
+# File: src/render/postprocess.wgsl
 struct Uniforms {
     inverse_view_projection: mat4x4<f32>,
     view_projection: mat4x4<f32>,
@@ -7093,7 +8878,8 @@ fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
     return vec4(god_rays(input.uv, source.rgb), select(source.a, 1.0, uniforms.params.y > 0.5));
 }
 
-\n# File: src/render/present.wgsl
+
+# File: src/render/present.wgsl
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 @group(0) @binding(1) var scene_sampler: sampler;
 struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
@@ -7109,7 +8895,8 @@ struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f3
     return textureSample(scene_texture, scene_sampler, input.uv);
 }
 
-\n# File: src/render/renderer.rs
+
+# File: src/render/renderer.rs
 use super::effects::Effects;
 use super::target::DepthRenderTarget;
 use crate::scene::{MeshKind, SceneManager};
@@ -7301,6 +9088,9 @@ pub struct SceneRenderer {
     pub frustum_culling: bool,
     pub upload_bytes: usize,
     pub prepare_ms: f64,
+    debug_enabled: bool,
+    cull_ms: f64,
+    cull_cached: bool,
     frame_metrics: crate::frame_metrics::FrameMetrics,
     last_lights: [Light; MAX_LIGHTS],
 }
@@ -7396,6 +9186,9 @@ impl SceneRenderer {
             frustum_culling: true,
             upload_bytes: 0,
             prepare_ms: 0.0,
+            debug_enabled: false,
+            cull_ms: 0.0,
+            cull_cached: true,
             frame_metrics: crate::frame_metrics::FrameMetrics::default(),
             last_lights: lights_array,
         }
@@ -7556,10 +9349,22 @@ impl SceneRenderer {
             self.frustum_culling,
         );
 
+        // No additional clock reads or BVH counters when diagnostics are off.
+        let clock = (self.debug_enabled && index == 0)
+            .then(|| web_sys::window().and_then(|w| w.performance()))
+            .flatten();
+        if index == 0 && self.debug_enabled {
+            self.cull_cached = cache.key == Some(key);
+            self.cull_ms = 0.0;
+        }
         if cache.key != Some(key) {
+            let start = clock.as_ref().map(|p| p.now());
             cache
                 .queue
                 .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
+            if let (Some(clock), Some(start)) = (clock, start) {
+                self.cull_ms = clock.now() - start;
+            }
             for (index, instances) in cache.queue.batches.iter().enumerate() {
                 if !instances
                     .iter()
@@ -7648,6 +9453,52 @@ impl SceneRenderer {
             self.prepare_ms,
             self.frame_metrics.fps,
             self.frame_metrics.frame_ms,
+        ]
+    }
+
+    pub fn set_debug_diagnostics(&mut self, enabled: bool) {
+        self.debug_enabled = enabled;
+        // Only the main-view HUD reports traversal; auxiliary passes need no counters.
+        self.passes[0].queue.collect_stats = enabled;
+        if !enabled {
+            self.passes[0].queue.culling_stats = Default::default();
+            self.cull_ms = 0.0;
+            self.cull_cached = true;
+        }
+    }
+    pub fn debug_values(&self) -> serde_json::Value {
+        let stats = self.render_stats();
+        let bvh = self.passes[0].queue.culling_stats;
+        serde_json::json!({
+            "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],
+            "cullMs": self.cull_ms, "cullCached": self.cull_cached,
+            "total": stats[0], "visible": stats[1], "culled": stats[2],
+            "bvhNodes": bvh.nodes_visited, "objectTests": bvh.object_tests,
+            "staticRebuilds": bvh.static_rebuilds, "dynamicRebuilds": bvh.dynamic_rebuilds,
+        })
+    }
+    pub fn debug_lines(&self) -> Vec<String> {
+        let q = &self.passes[0].queue;
+        vec![
+            format!(
+                "FPS {:.1} FRAME {:.2} MS",
+                self.frame_metrics.fps, self.frame_metrics.frame_ms
+            ),
+            if self.cull_cached {
+                format!("CPU {:.2} MS CULL CACHED", self.prepare_ms)
+            } else {
+                format!("CPU {:.2} MS CULL {:.2} MS", self.prepare_ms, self.cull_ms)
+            },
+            format!(
+                "FRUSTUM {}/{} CULLED {}",
+                q.visible,
+                q.total,
+                q.total.saturating_sub(q.visible)
+            ),
+            format!(
+                "BVH {} NODES TESTS {}",
+                q.culling_stats.nodes_visited, q.culling_stats.object_tests
+            ),
         ]
     }
 
@@ -8154,7 +10005,8 @@ impl SceneRenderer {
     }
 }
 
-\n# File: src/render/shadow.wgsl
+
+# File: src/render/shadow.wgsl
 @group(0) @binding(0) var<uniform> view_projection: mat4x4<f32>;
 struct Input {
     @location(0) position:vec3<f32>,
@@ -8166,7 +10018,8 @@ struct Input {
     return view_projection*model*vec4(input.position,1.0);
 }
 
-\n# File: src/render/state.rs
+
+# File: src/render/state.rs
 //! Browser host connecting the scene renderer to a canvas output.
 use super::{
     output::CanvasOutput, postprocess::PostProcessor, renderer::SceneRenderer, target::RenderView,
@@ -8184,6 +10037,9 @@ pub struct State {
     pub aspect: f32,
     view: RenderView,
     model_camera: Option<(u32, usize)>,
+    debug_enabled: bool,
+    debug_hud: Option<super::hud::DebugHud>,
+    frame_dt: f32,
 }
 impl Deref for State {
     type Target = SceneRenderer;
@@ -8197,8 +10053,12 @@ impl DerefMut for State {
     }
 }
 impl State {
-    pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
-        let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
+    pub async fn new(
+        canvas: &HtmlCanvasElement,
+        check_current: impl Fn() -> Result<(), JsValue>,
+    ) -> Result<Self, JsValue> {
+        let (output, device, queue, backend) = CanvasOutput::new(canvas, &check_current).await?;
+        check_current()?;
         let aspect = output.aspect();
         let renderer = SceneRenderer::new(device, queue);
         let mut postprocess = PostProcessor::new(&renderer.device, output.color_format());
@@ -8211,6 +10071,9 @@ impl State {
             backend,
             aspect,
             model_camera: None,
+            debug_enabled: false,
+            debug_hud: None,
+            frame_dt: 0.0,
             view: RenderView {
                 view_projection: Mat4::IDENTITY,
                 camera_position: Vec3::ZERO,
@@ -8257,6 +10120,7 @@ impl State {
         true
     }
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        self.frame_dt = dt;
         self.renderer.advance_scene(dt);
         self.view = RenderView {
             view_projection: camera_matrix,
@@ -8326,6 +10190,22 @@ impl State {
             camera_position: world.transform_point3(Vec3::ZERO),
         })
     }
+    pub fn set_debug_overlay(&mut self, enabled: bool) {
+        self.debug_enabled = enabled;
+        self.renderer.set_debug_diagnostics(enabled);
+        if enabled {
+            if let Some(hud) = &mut self.debug_hud {
+                hud.invalidate();
+            }
+        }
+    }
+    pub fn debug_stats(&self) -> String {
+        let mut value = self.renderer.debug_values();
+        value["enabled"] = self.debug_enabled.into();
+        value["hudFrames"] = self.debug_hud.as_ref().map_or(0, |h| h.frames).into();
+        value["hudRefreshes"] = self.debug_hud.as_ref().map_or(0, |h| h.refreshes).into();
+        value.to_string()
+    }
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
             return Ok(());
@@ -8370,13 +10250,25 @@ impl State {
                 .render_view(self.view, &target)
                 .map_err(|e| JsValue::from_str(&e))?;
         }
+        if self.debug_enabled {
+            let renderer = &self.renderer;
+            self.renderer.upload_bytes +=
+                self.debug_hud.get_or_insert_with(Default::default).render(
+                    &renderer.device,
+                    &renderer.queue,
+                    &target,
+                    self.frame_dt,
+                    || renderer.debug_lines(),
+                );
+        }
         self.output
             .present(frame, &self.renderer.device, &self.renderer.queue);
         Ok(())
     }
 }
 
-\n# File: src/render/target.rs
+
+# File: src/render/target.rs
 //! Render inputs independent of any browser canvas or surface.
 use glam::{Mat4, Vec3};
 
@@ -8500,7 +10392,8 @@ mod tests {
     }
 }
 
-\n# File: src/render/textures.rs
+
+# File: src/render/textures.rs
 //! Owned, reusable single-sample render attachments, independent of presentation.
 use super::target::{DepthRenderTarget, RenderTarget, Viewport};
 pub struct DepthTarget {
@@ -8609,7 +10502,8 @@ impl ColorTarget {
     }
 }
 
-\n# File: src/render_math.rs
+
+# File: src/render_math.rs
 //! View math shared by shadow/mirror passes and native tests.
 use glam::{Mat4, Vec3, Vec4};
 #[derive(Clone, Copy, Debug)]
@@ -8692,7 +10586,8 @@ mod tests {
     }
 }
 
-\n# File: src/scene.rs
+
+# File: src/scene.rs
 //! CPU scene state and simulation. No browser, JavaScript or GPU dependencies.
 use glam::{Mat4, Vec3};
 use std::collections::BTreeMap;
@@ -8808,6 +10703,12 @@ struct LightOrbit {
     color: Vec3,
 }
 
+#[derive(Clone, Copy)]
+struct BoxCollider {
+    half_extents: Vec3,
+    offset: Vec3,
+}
+
 #[derive(Default)]
 pub struct SceneManager {
     objects: BTreeMap<u32, SceneObject>,
@@ -8823,9 +10724,21 @@ pub struct SceneManager {
     time: f32,
     rotations: Vec<RotationAction>,
     removals: Vec<ScheduledRemoval>,
+    colliders: BTreeMap<u32, BoxCollider>,
+    collision_world: crate::collision::CollisionWorld,
+    collision_dirty: bool,
+    visibility_index: std::cell::RefCell<crate::visibility::VisibilityIndex>,
 }
 
 impl SceneManager {
+    pub(crate) fn visibility_index(
+        &self,
+        collect_stats: bool,
+    ) -> std::cell::RefMut<'_, crate::visibility::VisibilityIndex> {
+        let mut index = self.visibility_index.borrow_mut();
+        index.sync(self, collect_stats);
+        index
+    }
     pub fn configure_mirror(&mut self, id: u32) -> bool {
         if !self
             .objects
@@ -8859,6 +10772,9 @@ impl SceneManager {
         self.static_revision
     }
     fn changed(&mut self, id: u32) {
+        if self.colliders.contains_key(&id) {
+            self.collision_dirty = true;
+        }
         self.render_revision = self.render_revision.wrapping_add(1);
         if self
             .objects
@@ -8882,6 +10798,58 @@ impl SceneManager {
             self.static_revision = self.static_revision.wrapping_add(1);
         }
         true
+    }
+
+    /// Explicit local-space box, independent of render geometry or animation bounds.
+    pub fn set_box_collider(&mut self, id: u32, half_extents: Vec3, offset: Vec3) -> bool {
+        if !self.object_exists(id)
+            || !half_extents.is_finite()
+            || half_extents.min_element() <= 0.0
+            || !offset.is_finite()
+        {
+            return false;
+        }
+        self.colliders.insert(
+            id,
+            BoxCollider {
+                half_extents,
+                offset,
+            },
+        );
+        self.collision_dirty = true;
+        true
+    }
+
+    pub fn remove_collider(&mut self, id: u32) -> bool {
+        if !self.object_exists(id) {
+            return false;
+        }
+        self.collision_dirty |= self.colliders.remove(&id).is_some();
+        true
+    }
+
+    /// Cached BVH; movement of a non-solid character never rebuilds the world.
+    pub fn collision_world(&mut self) -> &crate::collision::CollisionWorld {
+        if self.collision_dirty {
+            let colliders = self
+                .colliders
+                .iter()
+                .filter_map(|(id, collider)| {
+                    let transform = self.objects.get(id)?.transform;
+                    let model = transform.model();
+                    let center = model.transform_point3(collider.offset);
+                    // Rotated authored boxes use conservative world-aligned bounds.
+                    let half = model.x_axis.truncate().abs() * collider.half_extents.x
+                        + model.y_axis.truncate().abs() * collider.half_extents.y
+                        + model.z_axis.truncate().abs() * collider.half_extents.z;
+                    crate::collision::Aabb::new(center - half, center + half)
+                        .map(|bounds| crate::collision::Collider { id: *id, bounds })
+                })
+                .collect();
+            self.collision_world.rebuild(colliders);
+            self.collision_dirty = false;
+        }
+        &self.collision_world
     }
     pub fn set_object_spin(&mut self, id: u32, radians_per_second: Vec3) -> bool {
         if !self.object_exists(id) || !radians_per_second.is_finite() {
@@ -8988,6 +10956,7 @@ impl SceneManager {
             .as_mut()
             .ok_or("Model has no active animation")?
             .playing = !paused;
+        model.playback_revision = model.playback_revision.wrapping_add(1);
         Ok(())
     }
     pub fn seek_model_animation(&mut self, id: u32, time: f32) -> Result<(), String> {
@@ -9067,6 +11036,8 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.colliders.clear();
+        self.collision_dirty = true;
         self.objects.clear();
         self.models.clear();
         self.mirror_object = None;
@@ -9096,6 +11067,7 @@ impl SceneManager {
         if self.objects.remove(&id).is_none() {
             return false;
         }
+        self.collision_dirty |= self.colliders.remove(&id).is_some();
         self.models.remove(&id);
         self.render_revision = self.render_revision.wrapping_add(1);
         if was_static {
@@ -9510,9 +11482,44 @@ mod tests {
         scene.update(1.0);
         assert!(!scene.light_exists(light));
     }
+
+    #[test]
+    fn collider_bvh_tracks_transform_removal_clear_and_only_solid_changes() {
+        let mut scene = SceneManager::default();
+        let cube = scene.add_cube(Vec3::ZERO);
+        let query = crate::collision::Aabb::new(-Vec3::ONE, Vec3::ONE).unwrap();
+        assert!(scene.collision_world().query(query, None).is_empty());
+        assert!(scene.set_box_collider(cube, Vec3::splat(0.5), Vec3::ZERO));
+        assert_eq!(scene.collision_world().query(query, None).len(), 1);
+        assert!(!scene.collision_dirty);
+        let player = scene.add_cube(Vec3::ZERO);
+        scene.set_object_position(player, Vec3::ONE);
+        assert!(
+            !scene.collision_dirty,
+            "Non-solid movement must preserve the cached BVH"
+        );
+        scene.set_object_transform(cube, Vec3::new(4.0, 0.0, 0.0), Vec3::ZERO, Vec3::splat(2.0));
+        assert!(scene.collision_dirty);
+        assert!(scene.collision_world().query(query, None).is_empty());
+        let far = crate::collision::Aabb::new(Vec3::new(3.5, -0.5, -0.5), Vec3::new(4.5, 0.5, 0.5))
+            .unwrap();
+        assert_eq!(scene.collision_world().query(far, None).len(), 1);
+        assert!(scene.remove_collider(cube));
+        assert!(scene.collision_world().query(far, None).is_empty());
+        scene.set_box_collider(cube, Vec3::splat(0.5), Vec3::ZERO);
+        scene.remove_object(cube);
+        assert!(scene.collision_world().query(far, None).is_empty());
+        scene.set_box_collider(player, Vec3::ONE, Vec3::ZERO);
+        scene.clear();
+        assert!(scene.collision_world().query(query, None).is_empty());
+        assert!(!scene.set_box_collider(player, Vec3::ONE, Vec3::ZERO));
+        let invalid = scene.add_cube(Vec3::ZERO);
+        assert!(!scene.set_box_collider(invalid, Vec3::ZERO, Vec3::ZERO));
+    }
 }
 
-\n# File: src/shader.wgsl
+
+# File: src/shader.wgsl
 struct Light {
     position: vec3<f32>,
     _pad_p: f32,
@@ -9684,7 +11691,216 @@ struct PostSurface {
     return output;
 }
 
-\n# File: src/test_scenes.rs
+
+# File: src/spatial.rs
+//! Geometry-only median BVH. Bounds may be planar or even points.
+use glam::Vec3;
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Bounds {
+    pub center: Vec3,
+    pub half_extent: Vec3,
+}
+impl Bounds {
+    fn union(self, other: Self) -> Self {
+        let min = (self.center - self.half_extent).min(other.center - other.half_extent);
+        let max = (self.center + self.half_extent).max(other.center + other.half_extent);
+        let center = (min + max) * 0.5;
+        let half_extent = (max - min) * 0.5;
+        // Parent bounds must not shrink due to floating-point reconstruction.
+        Self {
+            center,
+            half_extent: half_extent + (center.abs() + half_extent) * (2.0 * f32::EPSILON),
+        }
+    }
+}
+
+struct Node {
+    bounds: Bounds,
+    kind: NodeKind,
+}
+enum NodeKind {
+    Leaf(u32),
+    Branch(usize, usize),
+}
+
+#[derive(Default)]
+pub(crate) struct Bvh {
+    nodes: Vec<Node>,
+    ids: Vec<u32>,
+}
+impl Bvh {
+    /// IDs in input must be unique and ascending. Returns true for a topology rebuild;
+    /// unchanged membership only refits bounds, including all internal nodes.
+    pub fn update(&mut self, entries: &[(u32, Bounds)], force_rebuild: bool) -> bool {
+        let same_ids = self.ids.len() == entries.len()
+            && self
+                .ids
+                .iter()
+                .zip(entries)
+                .all(|(id, entry)| *id == entry.0);
+        if !force_rebuild && same_ids {
+            for index in (0..self.nodes.len()).rev() {
+                self.nodes[index].bounds = match self.nodes[index].kind {
+                    NodeKind::Leaf(id) => {
+                        entries[entries.binary_search_by_key(&id, |e| e.0).unwrap()].1
+                    }
+                    NodeKind::Branch(left, right) => {
+                        self.nodes[left].bounds.union(self.nodes[right].bounds)
+                    }
+                };
+            }
+            return false;
+        }
+        self.ids = entries.iter().map(|e| e.0).collect();
+        self.nodes.clear();
+        if !entries.is_empty() {
+            self.build(&mut entries.to_vec());
+        }
+        true
+    }
+    fn build(&mut self, entries: &mut [(u32, Bounds)]) -> usize {
+        let bounds = entries
+            .iter()
+            .skip(1)
+            .fold(entries[0].1, |b, e| b.union(e.1));
+        let index = self.nodes.len();
+        self.nodes.push(Node {
+            bounds,
+            kind: NodeKind::Leaf(entries[0].0),
+        });
+        if entries.len() > 1 {
+            let axis = if bounds.half_extent.x >= bounds.half_extent.y
+                && bounds.half_extent.x >= bounds.half_extent.z
+            {
+                0
+            } else if bounds.half_extent.y >= bounds.half_extent.z {
+                1
+            } else {
+                2
+            };
+            let middle = entries.len() / 2;
+            entries.select_nth_unstable_by(middle, |a, b| {
+                a.1.center[axis]
+                    .total_cmp(&b.1.center[axis])
+                    .then(a.0.cmp(&b.0))
+            });
+            let (left, right) = entries.split_at_mut(middle);
+            let left = self.build(left);
+            let right = self.build(right);
+            self.nodes[index].kind = NodeKind::Branch(left, right);
+        }
+        index
+    }
+    /// Internal bounds and eligible object bounds are counted separately.
+    pub fn query<const TRACK: bool>(
+        &self,
+        intersects: &impl Fn(Bounds) -> bool,
+        eligible: &impl Fn(u32) -> bool,
+        output: &mut Vec<u32>,
+        nodes_visited: &mut usize,
+        object_tests: &mut usize,
+    ) {
+        if !self.nodes.is_empty() {
+            self.query_node::<TRACK>(0, intersects, eligible, output, nodes_visited, object_tests);
+        }
+    }
+    fn query_node<const TRACK: bool>(
+        &self,
+        index: usize,
+        intersects: &impl Fn(Bounds) -> bool,
+        eligible: &impl Fn(u32) -> bool,
+        output: &mut Vec<u32>,
+        nodes_visited: &mut usize,
+        object_tests: &mut usize,
+    ) {
+        let node = &self.nodes[index];
+        if TRACK {
+            *nodes_visited += 1;
+        }
+        match node.kind {
+            NodeKind::Leaf(id) => {
+                if eligible(id) {
+                    if TRACK {
+                        *object_tests += 1;
+                    }
+                    if intersects(node.bounds) {
+                        output.push(id);
+                    }
+                }
+            }
+            NodeKind::Branch(left, right) => {
+                if intersects(node.bounds) {
+                    self.query_node::<TRACK>(
+                        left,
+                        intersects,
+                        eligible,
+                        output,
+                        nodes_visited,
+                        object_tests,
+                    );
+                    self.query_node::<TRACK>(
+                        right,
+                        intersects,
+                        eligible,
+                        output,
+                        nodes_visited,
+                        object_tests,
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn planar_and_point_bounds_survive_refit_and_membership_changes() {
+        let mut tree = Bvh::default();
+        let bounds = |x| Bounds {
+            center: Vec3::new(x, 0.0, 0.0),
+            half_extent: Vec3::ZERO,
+        };
+        let mut entries = [
+            (2, bounds(0.0)),
+            (
+                7,
+                Bounds {
+                    center: Vec3::new(10.0, 0.0, 0.0),
+                    half_extent: Vec3::new(1.0, 0.0, 1.0),
+                },
+            ),
+        ];
+        assert!(tree.update(&entries, false));
+        let query = |tree: &Bvh| {
+            let mut output = Vec::new();
+            let (mut nodes, mut objects) = (0, 0);
+            tree.query::<true>(
+                &|b| b.center.x - b.half_extent.x <= 1.0 && b.center.x + b.half_extent.x >= -1.0,
+                &|_| true,
+                &mut output,
+                &mut nodes,
+                &mut objects,
+            );
+            output.sort_unstable();
+            output
+        };
+        assert_eq!(query(&tree), vec![2]);
+        entries[0].1 = bounds(20.0);
+        entries[1].1.center.x = 0.0;
+        assert!(!tree.update(&entries, false));
+        assert_eq!(query(&tree), vec![7]);
+        assert!(tree.update(&entries[1..], false));
+        assert_eq!(query(&tree), vec![7]);
+        assert!(tree.update(&[], false));
+        assert!(query(&tree).is_empty());
+    }
+}
+
+
+# File: src/test_scenes.rs
 //! Native test fixtures only. Browser examples live in examples/<name>/scene.js.
 use crate::scene::{MeshKind, RenderOptions, SceneManager, Transform};
 use glam::Vec3;
@@ -9815,7 +12031,8 @@ impl SceneManager {
     }
 }
 
-\n# File: src/visibility.rs
+
+# File: src/visibility.rs
 //! CPU visibility and render extraction; shared by native tests and WASM.
 use crate::scene::{MeshKind, SceneManager, Transform};
 use glam::{Mat4, Vec3, Vec4};
@@ -9910,12 +12127,133 @@ impl RenderPassKind {
     }
 }
 
+/// Query work is per extraction; rebuild counters include only tracked synchronizations.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct CullingStats {
+    pub nodes_visited: usize,
+    pub object_tests: usize,
+    pub static_rebuilds: usize,
+    pub dynamic_rebuilds: usize,
+}
+
+#[derive(Default)]
+pub(crate) struct VisibilityIndex {
+    static_tree: crate::spatial::Bvh,
+    dynamic_tree: crate::spatial::Bvh,
+    static_revision: Option<u64>,
+    render_revision: Option<u64>,
+    totals: [usize; 4],
+    static_rebuilds: usize,
+    dynamic_rebuilds: usize,
+}
+impl VisibilityIndex {
+    pub(crate) fn sync(&mut self, scene: &SceneManager, collect_stats: bool) {
+        if self.render_revision == Some(scene.render_revision()) {
+            return;
+        }
+        let rebuild_static = self.static_revision != Some(scene.static_revision());
+        let mut statics = Vec::new();
+        let mut dynamics = Vec::new();
+        self.totals = [0; 4];
+        for (&id, object) in scene.objects() {
+            for pass in [
+                RenderPassKind::Main,
+                RenderPassKind::Reflection,
+                RenderPassKind::ShadowStatic,
+                RenderPassKind::ShadowDynamic,
+            ] {
+                self.totals[pass.index()] += usize::from(included(scene, id, object, pass));
+            }
+            let data = &object.render_data;
+            let entry = (
+                id,
+                crate::spatial::Bounds {
+                    center: data.center,
+                    half_extent: data.half_extent,
+                },
+            );
+            if object.render_options.is_static {
+                if rebuild_static {
+                    statics.push(entry);
+                }
+            } else {
+                dynamics.push(entry);
+            }
+        }
+        if rebuild_static {
+            self.static_tree.update(&statics, true);
+            if collect_stats {
+                self.static_rebuilds += 1;
+            }
+            self.static_revision = Some(scene.static_revision());
+        }
+        let rebuilt = self.dynamic_tree.update(&dynamics, false);
+        if collect_stats && rebuilt {
+            self.dynamic_rebuilds += 1;
+        }
+        self.render_revision = Some(scene.render_revision());
+    }
+    fn query<const TRACK: bool>(
+        &self,
+        scene: &SceneManager,
+        frustum: &Frustum,
+        pass: RenderPassKind,
+        output: &mut Vec<u32>,
+    ) -> CullingStats {
+        let mut stats = CullingStats {
+            static_rebuilds: self.static_rebuilds,
+            dynamic_rebuilds: self.dynamic_rebuilds,
+            ..Default::default()
+        };
+        let intersects =
+            |b: crate::spatial::Bounds| frustum.intersects_aabb(b.center, b.half_extent);
+        let eligible = |id| included(scene, id, &scene.objects()[&id], pass);
+        if pass != RenderPassKind::ShadowDynamic {
+            self.static_tree.query::<TRACK>(
+                &intersects,
+                &eligible,
+                output,
+                &mut stats.nodes_visited,
+                &mut stats.object_tests,
+            );
+        }
+        if pass != RenderPassKind::ShadowStatic {
+            self.dynamic_tree.query::<TRACK>(
+                &intersects,
+                &eligible,
+                output,
+                &mut stats.nodes_visited,
+                &mut stats.object_tests,
+            );
+        }
+        output.sort_unstable();
+        stats
+    }
+}
+
+fn included(
+    scene: &SceneManager,
+    id: u32,
+    object: &crate::scene::SceneObject,
+    pass: RenderPassKind,
+) -> bool {
+    let options = object.render_options;
+    match pass {
+        RenderPassKind::Main => true,
+        RenderPassKind::Reflection => Some(id) != scene.mirror_object,
+        RenderPassKind::ShadowStatic => options.casts_shadow && options.is_static,
+        RenderPassKind::ShadowDynamic => options.casts_shadow && !options.is_static,
+    }
+}
+
 #[derive(Default)]
 pub struct RenderQueue {
     pub batches: [Vec<InstanceData>; 3],
     pub imported: std::collections::BTreeMap<u32, Vec<InstanceData>>,
     pub total: usize,
     pub visible: usize,
+    pub culling_stats: CullingStats,
+    pub collect_stats: bool,
 }
 impl RenderQueue {
     pub fn extract(&mut self, scene: &SceneManager, view_projection: Mat4, culling: bool) {
@@ -9938,22 +12276,38 @@ impl RenderQueue {
         self.total = 0;
         self.visible = 0;
         let frustum = Frustum::from_view_projection(view_projection);
-        for (id, object) in scene.objects() {
-            let options = object.render_options;
-            let included = match pass {
-                RenderPassKind::Main => true,
-                RenderPassKind::Reflection => Some(*id) != scene.mirror_object,
-                RenderPassKind::ShadowStatic => options.casts_shadow && options.is_static,
-                RenderPassKind::ShadowDynamic => options.casts_shadow && !options.is_static,
+        let mut candidates = Vec::new();
+        self.culling_stats = CullingStats::default();
+        if culling {
+            let index = scene.visibility_index(self.collect_stats);
+            self.total = if pass == RenderPassKind::Reflection {
+                index.totals[RenderPassKind::Main.index()]
+                    - usize::from(
+                        scene
+                            .mirror_object
+                            .is_some_and(|id| scene.object_exists(id)),
+                    )
+            } else {
+                index.totals[pass.index()]
             };
-            if !included {
-                continue;
-            }
-            self.total += 1;
+            self.culling_stats = if self.collect_stats {
+                index.query::<true>(scene, &frustum, pass, &mut candidates)
+            } else {
+                index.query::<false>(scene, &frustum, pass, &mut candidates)
+            };
+        } else {
+            candidates.extend(
+                scene
+                    .objects()
+                    .iter()
+                    .filter_map(|(&id, object)| included(scene, id, object, pass).then_some(id)),
+            );
+            self.total = candidates.len();
+        }
+        for id in &candidates {
+            let object = &scene.objects()[id];
+            let options = object.render_options;
             let data = &object.render_data;
-            if culling && !frustum.intersects_aabb(data.center, data.half_extent) {
-                continue;
-            }
             let index = match object.mesh {
                 MeshKind::Cube => 0,
                 MeshKind::Plane => 1,
@@ -9995,6 +12349,279 @@ impl RenderQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn assert_brute_force(scene: &SceneManager, matrix: Mat4, pass: RenderPassKind, culling: bool) {
+        let frustum = Frustum::from_view_projection(matrix);
+        let mut expected = RenderQueue::default();
+        for (&id, object) in scene.objects() {
+            let options = object.render_options;
+            let eligible = match pass {
+                RenderPassKind::Main => true,
+                RenderPassKind::Reflection => Some(id) != scene.mirror_object,
+                RenderPassKind::ShadowStatic => options.is_static && options.casts_shadow,
+                RenderPassKind::ShadowDynamic => !options.is_static && options.casts_shadow,
+            };
+            if !eligible {
+                continue;
+            }
+            expected.total += 1;
+            if culling && !object.render_data.intersects(&frustum) {
+                continue;
+            }
+            expected.visible += 1;
+            let mut instance = object.render_data.instance;
+            let options = object.render_options;
+            instance.material = [
+                options.reflectivity,
+                if options.receives_shadow { 1.0 } else { 0.0 },
+                if Some(id) == scene.mirror_object {
+                    1.0
+                } else {
+                    0.0
+                },
+                0.0,
+            ];
+            match object.mesh {
+                MeshKind::Cube => expected.batches[0].push(instance),
+                MeshKind::Plane => expected.batches[1].push(instance),
+                MeshKind::Sphere => expected.batches[2].push(instance),
+                MeshKind::Imported(mesh) => {
+                    expected.imported.entry(mesh).or_default().push(instance)
+                }
+            }
+        }
+        for track in [false, true] {
+            let mut actual = RenderQueue {
+                collect_stats: track,
+                ..Default::default()
+            };
+            actual.extract_pass(scene, matrix, culling, pass);
+            assert_eq!(
+                (actual.total, actual.visible),
+                (expected.total, expected.visible)
+            );
+            for (a, b) in actual.batches.iter().zip(&expected.batches) {
+                assert_instances(a, b);
+            }
+            assert_eq!(
+                actual.imported.values().filter(|v| !v.is_empty()).count(),
+                expected.imported.len()
+            );
+            for (id, batch) in &expected.imported {
+                assert_instances(&actual.imported[id], batch);
+            }
+            if !track || !culling {
+                assert_eq!(
+                    (
+                        actual.culling_stats.nodes_visited,
+                        actual.culling_stats.object_tests
+                    ),
+                    (0, 0)
+                );
+            }
+        }
+    }
+    fn assert_instances(actual: &[InstanceData], expected: &[InstanceData]) {
+        assert_eq!(actual.len(), expected.len());
+        for (a, b) in actual.iter().zip(expected) {
+            assert_eq!(a.model, b.model);
+            assert_eq!(a.normal_matrix, b.normal_matrix);
+            assert_eq!(a.material, b.material);
+        }
+    }
+    fn compare_passes(scene: &SceneManager) {
+        let reflected_view = Mat4::from_scale(Vec3::new(1.0, -1.0, 1.0))
+            * Mat4::from_translation(Vec3::new(-2.0, -1.0, 0.0));
+        for matrix in [
+            camera(),
+            camera() * reflected_view,
+            crate::render_math::shadow_view_projection(Vec3::new(-3.0, 7.0, 4.0)),
+            camera() * Mat4::from_translation(Vec3::new(-200.0, 0.0, 0.0)),
+        ] {
+            for pass in [
+                RenderPassKind::Main,
+                RenderPassKind::Reflection,
+                RenderPassKind::ShadowStatic,
+                RenderPassKind::ShadowDynamic,
+            ] {
+                for culling in [false, true] {
+                    assert_brute_force(scene, matrix, pass, culling);
+                }
+            }
+        }
+    }
+    #[test]
+    fn bvh_matches_brute_force_across_passes_mutations_and_planar_imports() {
+        let mut scene = SceneManager::default();
+        let floor = scene.add_plane(Vec3::new(0.0, 0.0, 2.0));
+        scene.set_render_options(
+            floor,
+            crate::scene::RenderOptions {
+                reflectivity: 0.8,
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        scene.configure_mirror(floor);
+        for i in 0..180 {
+            let mesh = [MeshKind::Cube, MeshKind::Plane, MeshKind::Sphere][i % 3];
+            let id = scene.add_object(
+                mesh,
+                Transform::new(
+                    Vec3::new(
+                        (i % 19) as f32 - 9.0,
+                        (i % 7) as f32 - 3.0,
+                        (i % 23) as f32 - 5.0,
+                    ),
+                    Vec3::new(0.3, 0.7, -0.2),
+                    Vec3::new(-1.5, 0.2, 2.0),
+                ),
+            );
+            scene.set_render_options(
+                id,
+                crate::scene::RenderOptions {
+                    is_static: i % 2 == 0,
+                    casts_shadow: i % 5 != 0,
+                    receives_shadow: i % 3 == 0,
+                    reflectivity: 0.25,
+                },
+            );
+        }
+        let imported = scene.add_imported(Vec3::new(2.0, 0.0, 1.0), Vec3::new(4.0, 0.0, 3.0));
+        // Multiple object IDs share one imported batch; spatial traversal order
+        // must not reorder its instances or change mirrored winding matrices.
+        scene.add_object(
+            MeshKind::Imported(imported),
+            Transform::new(
+                Vec3::new(0.0, 0.0, 2.0),
+                Vec3::ZERO,
+                Vec3::new(-1.0, 1.0, 1.0),
+            ),
+        );
+        scene.add_object(
+            MeshKind::Imported(imported),
+            Transform::new(Vec3::new(1.0, 0.0, 3.0), Vec3::ZERO, Vec3::ONE),
+        );
+        scene.set_object_transform(
+            imported,
+            Vec3::new(-2.0, 0.0, 1.0),
+            Vec3::new(0.3, 0.2, 0.8),
+            Vec3::new(-2.0, 1.0, 0.5),
+        );
+        compare_passes(&scene);
+        scene.set_object_position(imported, Vec3::new(100.0, 0.0, 0.0));
+        compare_passes(&scene);
+        scene.set_render_options(
+            imported,
+            crate::scene::RenderOptions {
+                is_static: true,
+                casts_shadow: false,
+                receives_shadow: false,
+                reflectivity: 0.6,
+            },
+        );
+        compare_passes(&scene);
+        scene.set_render_options(imported, crate::scene::RenderOptions::default());
+        scene.mirror_object = None;
+        compare_passes(&scene);
+        scene.remove_object(imported);
+        scene.remove_object(floor);
+        compare_passes(&scene);
+        scene.clear_scene();
+        compare_passes(&scene);
+        scene.add_cube(Vec3::new(0.0, 0.0, 2.0));
+        compare_passes(&scene);
+    }
+    #[test]
+    fn sparse_bvh_prunes_objects_and_refits_without_static_rebuilds() {
+        let mut scene = SceneManager::default();
+        scene.load_culling_demo();
+        let static_id = *scene.objects().keys().next().unwrap();
+        scene.set_render_options(
+            static_id,
+            crate::scene::RenderOptions {
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        let dynamic_id = *scene.objects().keys().nth(1).unwrap();
+        let mut queue = RenderQueue {
+            collect_stats: true,
+            ..Default::default()
+        };
+        queue.extract(&scene, camera(), true);
+        let stats = queue.culling_stats;
+        assert!(stats.object_tests < 1000, "{:?}", stats);
+        assert!(stats.nodes_visited > 0);
+        for matrix in [
+            camera(),
+            camera() * Mat4::from_translation(Vec3::new(-100.0, 0.0, 0.0)),
+        ] {
+            queue.extract(&scene, matrix, true);
+            assert_eq!(queue.culling_stats.static_rebuilds, stats.static_rebuilds);
+            assert_eq!(queue.culling_stats.dynamic_rebuilds, stats.dynamic_rebuilds);
+        }
+        scene.set_object_position(dynamic_id, Vec3::new(0.0, 0.0, 2.0));
+        queue.extract(&scene, camera(), true);
+        assert_eq!(queue.culling_stats.static_rebuilds, stats.static_rebuilds);
+        assert_eq!(queue.culling_stats.dynamic_rebuilds, stats.dynamic_rebuilds);
+        assert_brute_force(&scene, camera(), RenderPassKind::Main, true);
+        scene.set_object_position(static_id, Vec3::new(0.0, 0.0, 2.0));
+        queue.extract(&scene, camera(), true);
+        assert_eq!(
+            queue.culling_stats.static_rebuilds,
+            stats.static_rebuilds + 1
+        );
+        scene.remove_object(dynamic_id);
+        queue.extract(&scene, camera(), true);
+        assert_eq!(
+            queue.culling_stats.dynamic_rebuilds,
+            stats.dynamic_rebuilds + 1
+        );
+        queue.extract(&scene, camera(), false);
+        assert_eq!((queue.total, queue.visible), (9999, 9999));
+        assert_eq!(
+            (
+                queue.culling_stats.nodes_visited,
+                queue.culling_stats.object_tests
+            ),
+            (0, 0)
+        );
+    }
+    #[test]
+    fn disabled_diagnostics_do_not_count_rebuilds_or_queries() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        scene.set_render_options(
+            id,
+            crate::scene::RenderOptions {
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, camera(), true);
+        scene.set_object_position(id, Vec3::X);
+        queue.extract(&scene, camera(), true);
+        {
+            let index = scene.visibility_index(false);
+            assert_eq!((index.static_rebuilds, index.dynamic_rebuilds), (0, 0));
+        }
+        assert_eq!(
+            (
+                queue.culling_stats.nodes_visited,
+                queue.culling_stats.object_tests
+            ),
+            (0, 0)
+        );
+        queue.collect_stats = true;
+        scene.set_object_position(id, Vec3::ZERO);
+        queue.extract(&scene, camera(), true);
+        assert_eq!(queue.culling_stats.static_rebuilds, 1);
+        queue.collect_stats = false;
+        scene.set_object_position(id, Vec3::X);
+        queue.extract(&scene, camera(), true);
+        assert_eq!(scene.visibility_index(false).static_rebuilds, 1);
+    }
     fn camera() -> Mat4 {
         glam::camera::lh::proj::directx::perspective(1.0, 1.0, 0.1, 10.0)
     }
@@ -10230,7 +12857,8 @@ mod tests {
     }
 }
 
-\n# File: src/web.rs
+
+# File: src/web.rs
 #![cfg(target_arch = "wasm32")]
 
 use std::{cell::RefCell, rc::Rc};
@@ -10246,9 +12874,36 @@ type ImportedResources = (Vec<Vec<u8>>, Vec<Vec<u8>>);
 type AnimationFrameCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
 
 thread_local! {
+    static RUNTIME: RefCell<Option<Runtime>> = const { RefCell::new(None) };
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
-    static STARTING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+    static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = const { RefCell::new(None) };
+}
+
+struct Runtime {
+    window: web_sys::Window,
+    frame: Rc<std::cell::Cell<Option<i32>>>,
+    _callback: AnimationFrameCallback,
+    _listeners: Vec<keyboard::Listener>,
+}
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        if let Some(id) = self.frame.take() {
+            let _ = self.window.cancel_animation_frame(id);
+        }
+        self._callback.borrow_mut().take();
+    }
+}
+
+/// Release the frame loop, input listeners, camera and GPU scene resources.
+#[wasm_bindgen]
+pub fn dispose() {
+    GENERATION.with(|generation| generation.set(generation.get().wrapping_add(1)));
+    STARTING.with(|starting| starting.set(None));
+    RUNTIME.with(|runtime| runtime.borrow_mut().take());
+    CAMERA.with(|camera| camera.borrow_mut().take());
+    STATE.with(|state| state.borrow_mut().take());
 }
 
 #[wasm_bindgen]
@@ -10586,6 +13241,26 @@ pub fn renderer_stats() -> js_sys::Float64Array {
 }
 
 #[wasm_bindgen]
+pub fn set_debug_overlay(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_debug_overlay(enabled);
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn debug_stats() -> String {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|state| state.borrow().debug_stats())
+            .unwrap_or_else(|| "{}".into())
+    })
+}
+
+#[wasm_bindgen]
 pub fn renderer_backend() -> String {
     STATE.with(|state| {
         state
@@ -10737,6 +13412,117 @@ pub fn set_camera_mode(mode: &str) {
             }
         }
     });
+}
+
+/// Attach input and a chase camera to an existing glTF root, never spawn a scene.
+#[wasm_bindgen]
+pub fn control_character(
+    id: u32,
+    speed: f32,
+    run_speed: f32,
+    model_yaw: f32,
+    idle: i32,
+    walk: i32,
+    run: i32,
+) -> bool {
+    STATE.with(|state| {
+        let state = state.borrow();
+        let Some(state) = state.as_ref() else {
+            return false;
+        };
+        let mut state = state.borrow_mut();
+        let Some(model) = state.scene.model(id) else {
+            return false;
+        };
+        let indices = [idle, walk, run];
+        if indices.iter().any(|index| {
+            *index < -1 || (*index >= 0 && *index as usize >= model.asset.animations.len())
+        }) {
+            return false;
+        }
+        let Some(object) = state.scene.objects().get(&id) else {
+            return false;
+        };
+        let position = object.transform.position;
+        let clips = indices.map(|index| (index >= 0).then_some(index as usize));
+        let accepted = CAMERA.with(|camera| {
+            camera.borrow().as_ref().is_some_and(|camera| {
+                camera
+                    .borrow_mut()
+                    .follow_object(id, position, speed, run_speed, model_yaw, clips)
+            })
+        });
+        if accepted {
+            state.clear_model_camera();
+        }
+        accepted
+    })
+}
+
+#[wasm_bindgen]
+pub fn character_state() -> String {
+    CAMERA.with(|camera| {
+        camera
+            .borrow()
+            .as_ref()
+            .and_then(|camera| {
+                let camera = camera.borrow();
+                camera.character_state().map(|state| (state, camera.character_physics_state()))
+            })
+            .map(|((id, position, moving, running), physics)| {
+                let (grounded, vertical_velocity, candidates) = physics.unwrap_or((false, 0.0, 0));
+                serde_json::json!({
+                    "id": id, "position": position.to_array(), "moving": moving, "running": running,
+                    "grounded": grounded, "verticalVelocity": vertical_velocity, "collisionCandidates": candidates
+                })
+                .to_string()
+            })
+            .unwrap_or_else(|| "null".into())
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_box_collider(id: u32, hx: f32, hy: f32, hz: f32, ox: f32, oy: f32, oz: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().scene.set_box_collider(
+                id,
+                glam::Vec3::new(hx, hy, hz),
+                glam::Vec3::new(ox, oy, oz),
+            )
+        })
+    })
+}
+
+#[wasm_bindgen]
+pub fn remove_collider(id: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.remove_collider(id))
+    })
+}
+
+#[wasm_bindgen]
+pub fn configure_character_physics(
+    hx: f32,
+    hy: f32,
+    hz: f32,
+    gravity: f32,
+    jump_speed: f32,
+) -> bool {
+    let physics = crate::input::character::CharacterPhysics {
+        half_extents: glam::Vec3::new(hx, hy, hz),
+        gravity,
+        jump_speed,
+    };
+    CAMERA.with(|camera| {
+        camera
+            .borrow()
+            .as_ref()
+            .is_some_and(|camera| camera.borrow_mut().set_character_physics(physics))
+    })
 }
 
 #[wasm_bindgen]
@@ -10995,22 +13781,54 @@ pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> boo
 }
 
 #[wasm_bindgen]
-pub async fn start() -> Result<(), JsValue> {
+pub fn start() -> js_sys::Promise {
     if STATE.with(|state| state.borrow().is_some()) {
-        return Ok(());
+        return js_sys::Promise::resolve(&JsValue::UNDEFINED);
     }
-    if STARTING.with(|flag| flag.replace(true)) {
-        return Err(JsValue::from_str(
+    let generation = GENERATION.with(|generation| generation.get());
+    if STARTING.with(|flag| {
+        if flag.get().is_some() {
+            true
+        } else {
+            flag.set(Some(generation));
+            false
+        }
+    }) {
+        return js_sys::Promise::reject(&JsValue::from_str(
             "Engine initialization already in progress",
         ));
     }
-    struct StartingGuard;
+    // Reserve ownership before the first asynchronous poll, so synchronous dispose
+    // also invalidates a just-returned start promise.
+    wasm_bindgen_futures::future_to_promise(async move {
+        start_runtime(generation).await?;
+        Ok(JsValue::UNDEFINED)
+    })
+}
+
+fn check_start_generation(generation: u64) -> Result<(), JsValue> {
+    if GENERATION.with(|current| current.get()) != generation {
+        Err(JsValue::from_str(
+            "Engine initialization canceled by dispose",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+async fn start_runtime(generation: u64) -> Result<(), JsValue> {
+    struct StartingGuard(u64);
     impl Drop for StartingGuard {
         fn drop(&mut self) {
-            STARTING.with(|flag| flag.set(false));
+            STARTING.with(|flag| {
+                if flag.get() == Some(self.0) {
+                    flag.set(None);
+                }
+            });
         }
     }
-    let _guard = StartingGuard;
+    let _guard = StartingGuard(generation);
+    check_start_generation(generation)?;
     console_error_panic_hook::set_once();
     let window =
         web_sys::window().ok_or_else(|| JsValue::from_str("Browser window unavailable"))?;
@@ -11025,18 +13843,22 @@ pub async fn start() -> Result<(), JsValue> {
         .ok_or_else(|| JsValue::from_str("Canvas gpu-canvas not found"))?
         .dyn_into::<web_sys::HtmlCanvasElement>()?;
 
-    let state = Rc::new(RefCell::new(State::new(&canvas).await?));
-    STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
+    let state = Rc::new(RefCell::new(
+        State::new(&canvas, || check_start_generation(generation)).await?,
+    ));
+    check_start_generation(generation)?;
     let aspect = state.borrow().aspect;
     let camera = Rc::new(RefCell::new(ActiveCamera::new(aspect)));
-    CAMERA.with(|c| *c.borrow_mut() = Some(camera.clone()));
 
-    keyboard::attach(&window, camera.clone());
-    mouse::attach(&window, &canvas, camera.clone());
+    let mut listeners = keyboard::attach(&window, camera.clone())?;
+    listeners.extend(mouse::attach(&window, &canvas, camera.clone())?);
 
     let prev_time = Rc::new(RefCell::new(performance.now()));
     let f: AnimationFrameCallback = Rc::new(RefCell::new(None));
     let g = f.clone();
+    let weak = Rc::downgrade(&f);
+    let frame = Rc::new(std::cell::Cell::new(None));
+    let frame_c = frame.clone();
     let window_c = window.clone();
     let perf_c = performance.clone();
     let camera_c = camera.clone();
@@ -11044,16 +13866,18 @@ pub async fn start() -> Result<(), JsValue> {
     let prev_time_c = prev_time.clone();
 
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+        frame_c.set(None);
         let now = perf_c.now();
         let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
         *prev_time_c.borrow_mut() = now;
         {
             let mut cam = camera_c.borrow_mut();
-            cam.update(dt);
-            let cam_pos = cam.position();
-            let cam_matrix = cam.matrix();
             let mut st = state_c.borrow_mut();
             let prepare_start = perf_c.now();
+            cam.update(dt);
+            cam.update_scene(&mut st.scene, dt);
+            let cam_pos = cam.position();
+            let cam_matrix = cam.matrix();
             st.update(dt, cam_matrix, cam_pos);
 
             if let Err(error) = st.render() {
@@ -11068,12 +13892,29 @@ pub async fn start() -> Result<(), JsValue> {
             }
             st.prepare_ms = perf_c.now() - prepare_start;
         }
-        window_c
-            .request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref())
-            .unwrap();
+        if let Some(callback) = weak.upgrade() {
+            if let Ok(id) = window_c.request_animation_frame(
+                callback.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+            ) {
+                frame_c.set(Some(id));
+            }
+        }
     }) as Box<dyn FnMut()>));
 
-    window.request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())?;
+    check_start_generation(generation)?;
+    frame.set(Some(window.request_animation_frame(
+        g.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+    )?));
+    STATE.with(|s| *s.borrow_mut() = Some(state));
+    CAMERA.with(|c| *c.borrow_mut() = Some(camera));
+    RUNTIME.with(|runtime| {
+        *runtime.borrow_mut() = Some(Runtime {
+            window,
+            frame,
+            _callback: g,
+            _listeners: listeners,
+        })
+    });
     Ok(())
 }
 

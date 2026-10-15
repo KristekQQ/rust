@@ -1,3 +1,5 @@
+pub mod collision;
+pub mod debug_overlay;
 pub mod frame_metrics;
 pub mod gltf_animation;
 pub mod gltf_loader;
@@ -7,6 +9,7 @@ pub mod input;
 pub mod render;
 pub mod render_math;
 pub mod scene;
+mod spatial;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;

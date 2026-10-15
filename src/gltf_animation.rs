@@ -287,6 +287,7 @@ impl ModelInstance {
             asset,
             pose,
             playback: None,
+            playback_revision: 0,
             scene,
             revision: 1,
             last_error: None,
@@ -306,12 +307,14 @@ impl ModelInstance {
             looping,
             playing: true,
         });
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.revision = self.revision.wrapping_add(1);
         Ok(())
     }
     pub fn stop(&mut self) -> Result<(), String> {
         let pose = default_pose(&self.asset, self.scene)?;
         self.playback = None;
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.pose = pose;
         self.morph_overrides.clear();
         self.revision = self.revision.wrapping_add(1);
@@ -330,6 +333,7 @@ impl ModelInstance {
         let clip = playback.clip;
         apply_clip(&self.asset, &mut self.pose, playback.clip, target)?;
         playback.time = target;
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.apply_morph_overrides(clip);
         self.revision = self.revision.wrapping_add(1);
         Ok(())
@@ -369,6 +373,7 @@ impl ModelInstance {
         self.pose = default_pose(&self.asset, scene)?;
         self.scene = scene;
         self.playback = None;
+        self.playback_revision = self.playback_revision.wrapping_add(1);
         self.morph_overrides.clear();
         self.revision = self.revision.wrapping_add(1);
         Ok(())

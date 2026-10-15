@@ -10,7 +10,8 @@ export function createScene(scene) {
         for (let y = 0; y < 25; y++) {
             for (let z = 0; z < 20; z++) {
                 const position = /** @type {Vector3} */ ([(x - 9.5) * 3, (y - 12) * 1.8, (z - 9.5) * 3]);
-                scene.createCube(position).setScale([0.65, 0.65, 0.65]);
+                scene.createCube(position).setScale([0.65, 0.65, 0.65])
+                    .setRenderOptions({ isStatic: true });
             }
         }
     }

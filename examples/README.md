@@ -9,13 +9,21 @@ Každý příklad je samostatná stránka:
 - `mirror/`: rozšíření ukázky stínů o render odrazu do textury.
 - `lights/`: světelné orbity počítané Rustem.
 - `postprocessing/`: texturovaná kaluž, SSR a god rays; vlastní volitelné UI.
-- `culling/`: 10 000 krychlí vytvořených jednou; Rust vybírá viditelné instance.
+- `culling/`: 10 000 statických krychlí; Rust vybírá viditelné instance přes BVH. F3 přepíná panel FPS/CPU/culling přímo v obrazu.
+- `fox-control/`: fullscreen a zachycená myš, WASD pohyb, Shift běh, mezerník skok, R návrat na start. Pevné plošiny a stěny, gravitace a kolize přes BVH jsou v Rustu; Escape hru pozastaví.
 
 Každá složka obsahuje `index.html`, `main.js` a `scene.js`.
+V `fox-control` také F3 přepíná Rust-renderovaný informační panel. Výchozí stav
+je vypnuto; panel bez zapnutí negeneruje text ani další GPU práci.
 `main.js` ukazuje po jednotlivých krocích skutečné importy, získání canvasu,
 await inicializaci enginu, nastavení výstupů, sestavení scény a resize.
 `scene.js` obsahuje objekty a příkazy pro animace. Rust drží jejich stav,
 počítá simulaci, kamery, culling, cache a rendering. Recept se neopakuje každý frame.
+Každý `main.js` obsahuje vlastní bootstrap, konfiguraci a přidání své scény.
+Můžeš tedy vzít jeden příklad jako samostatný základ a upravovat ho bez toho,
+aby závisel na jiném příkladu. Objekty, světla a animace definuje každý příklad
+ve vlastním `scene.js`; sdílené je jen volitelné obecné UI a CSS.
+Při kopírování uprav cesty k SDK, UI a případným modelům podle umístění své aplikace.
 
 ## Minimální vlastní aplikace
 

@@ -15,6 +15,9 @@ pub struct State {
     pub aspect: f32,
     view: RenderView,
     model_camera: Option<(u32, usize)>,
+    debug_enabled: bool,
+    debug_hud: Option<super::hud::DebugHud>,
+    frame_dt: f32,
 }
 impl Deref for State {
     type Target = SceneRenderer;
@@ -28,8 +31,12 @@ impl DerefMut for State {
     }
 }
 impl State {
-    pub async fn new(canvas: &HtmlCanvasElement) -> Result<Self, JsValue> {
-        let (output, device, queue, backend) = CanvasOutput::new(canvas).await?;
+    pub async fn new(
+        canvas: &HtmlCanvasElement,
+        check_current: impl Fn() -> Result<(), JsValue>,
+    ) -> Result<Self, JsValue> {
+        let (output, device, queue, backend) = CanvasOutput::new(canvas, &check_current).await?;
+        check_current()?;
         let aspect = output.aspect();
         let renderer = SceneRenderer::new(device, queue);
         let mut postprocess = PostProcessor::new(&renderer.device, output.color_format());
@@ -42,6 +49,9 @@ impl State {
             backend,
             aspect,
             model_camera: None,
+            debug_enabled: false,
+            debug_hud: None,
+            frame_dt: 0.0,
             view: RenderView {
                 view_projection: Mat4::IDENTITY,
                 camera_position: Vec3::ZERO,
@@ -88,6 +98,7 @@ impl State {
         true
     }
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        self.frame_dt = dt;
         self.renderer.advance_scene(dt);
         self.view = RenderView {
             view_projection: camera_matrix,
@@ -157,6 +168,22 @@ impl State {
             camera_position: world.transform_point3(Vec3::ZERO),
         })
     }
+    pub fn set_debug_overlay(&mut self, enabled: bool) {
+        self.debug_enabled = enabled;
+        self.renderer.set_debug_diagnostics(enabled);
+        if enabled {
+            if let Some(hud) = &mut self.debug_hud {
+                hud.invalidate();
+            }
+        }
+    }
+    pub fn debug_stats(&self) -> String {
+        let mut value = self.renderer.debug_values();
+        value["enabled"] = self.debug_enabled.into();
+        value["hudFrames"] = self.debug_hud.as_ref().map_or(0, |h| h.frames).into();
+        value["hudRefreshes"] = self.debug_hud.as_ref().map_or(0, |h| h.refreshes).into();
+        value.to_string()
+    }
     pub fn render(&mut self) -> Result<(), JsValue> {
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
             return Ok(());
@@ -200,6 +227,17 @@ impl State {
             self.renderer
                 .render_view(self.view, &target)
                 .map_err(|e| JsValue::from_str(&e))?;
+        }
+        if self.debug_enabled {
+            let renderer = &self.renderer;
+            self.renderer.upload_bytes +=
+                self.debug_hud.get_or_insert_with(Default::default).render(
+                    &renderer.device,
+                    &renderer.queue,
+                    &target,
+                    self.frame_dt,
+                    || renderer.debug_lines(),
+                );
         }
         self.output
             .present(frame, &self.renderer.device, &self.renderer.queue);

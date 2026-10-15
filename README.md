@@ -60,9 +60,9 @@ sample scene. No objects, lights, rotations, or removals are scheduled automatic
 
 `src/scene.rs` contains the Rust `SceneManager`: objects, lights, transforms,
 ID allocation, validation, animation scheduling, orbit calculations, removal,
-and the sample scene definition. It has no browser or GPU dependencies and is
-covered by native tests. `src/render/state.rs` owns GPU resources and renders
-that manager's state. `src/web.rs` forwards WASM commands and runs the Rust loop.
+and scheduled actions. It has no browser or GPU dependencies and is
+covered by native tests. `src/render/state.rs` connects the scene renderer,
+GPU output and postprocessing. `src/web.rs` forwards WASM commands and runs the Rust loop.
 
 JavaScript/TypeScript is a thin developer SDK. It stores handles (IDs), forwards
 commands, and connects browser UI. It has no scene-state copy, animation loop,
@@ -92,7 +92,21 @@ Absolute rotations use radians; `rotate()` deltas use degrees and timing uses
 seconds. The current bridge supports one `gpu-canvas` per page. `window.engine`
 is available for console use; the old `window.scene` low-level API remains.
 
+`engine.dispose()` cancels pending model transport, stops RAF, removes input
+listeners and releases the Rust/GPU runtime. It is idempotent. Reinitialize with
+`await initEngine(canvas, options)`; commands and handles from the disposed
+engine throw and cannot affect its replacement. Switching graphics backend
+may require a new canvas because a browser retains its canvas context type.
+The raw WASM `dispose()` also invalidates a pending `start()`; the canceled start
+cannot configure the canvas or revive a frame loop after a replacement starts.
+
 ### Verification
+
+The maintained harness is documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+After installing Rust/wasm-pack and `npm ci`, run `npm run verify` for native,
+WASM, SDK and real browser tests. `npm run verify:browser -- --page lifecycle`
+builds matching WASM and runs the lifecycle scenario on both backends. CI runs
+software WebGL separately from local hardware WebGPU verification.
 
 ```bash
 cargo test
@@ -129,18 +143,17 @@ headless Chromium instance.
 
 ### Capturing a screenshot
 
-This helper captures the independent JavaScript/WebGL `cube.html` demo. It
-does not test the Rust renderer or `index.html`:
+This helper checks and captures the actual Rust/WASM mirrored-transform scene:
 
 ```bash
-npm i
+npm run verify:browser -- --page render-mirrored
 node screenshot_render.js
 ```
 
-The script starts a temporary HTTP server, loads `cube.html` in headless
-Chromium and saves `render.png` in the repository root (the file is ignored by
-Git). The same image is also written to `render_base64.txt` for convenient
-copy‑paste.
+It rejects stale WASM and failed pixel assertions, starts a loopback HTTP server,
+and saves only the renderer canvas to `output/verification/render-mirrored-webgpu.png`.
+Use `--backend webgl` for the WebGL variant. The JSON report records the browser,
+backend and source/WASM hashes. Temporary pages, browser and server are closed.
 
 If Chromium fails to launch because of missing system libraries, install them
 with `apt` first. A minimal set of packages is:
@@ -242,8 +255,9 @@ runner binaries allow you to run the example without network access.
 
 Run `scripts/dump_sources.sh` to generate `all_sources.txt` containing all Rust
 sources, shader files and the `Cargo.toml`. This is convenient when sending the
-project to GPT or other tools. To run it automatically before each push, copy
-`scripts/pre-push` to `.git/hooks/pre-push` in your local clone.
+project to GPT or other tools. Install the maintained hook with
+`git config --local core.hooksPath scripts`; it runs `cargo test --locked` and
+blocks push if tests or atomic source generation fail.
 
 codex resume 019b6b22-2111-7001-88fb-070400b19da1
 # Výkon rendereru

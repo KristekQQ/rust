@@ -1,5 +1,6 @@
 pub mod active_camera;
 pub mod camera;
+pub mod character;
 #[cfg(target_arch = "wasm32")]
 pub mod keyboard;
 #[cfg(target_arch = "wasm32")]

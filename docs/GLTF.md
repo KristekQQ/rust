@@ -36,6 +36,54 @@ První portable implementace deformuje vrcholy v Rustu na CPU a uploaduje je jen
 
 `model.setMorphWeights(nodeIndex, weights)` nastaví váhy bez spuštění klipu. `model.selectScene(index)` přepne glTF scénu. `model.useCamera(nodeIndex)` explicitně zapne perspektivní nebo ortografickou kameru modelu (včetně perspektivy bez zfar). `engine.setCameraView()` nebo `set_camera_mode()` vrátí ovládání běžné kameře. Dostupné uzly, scény a klipy jsou v `model.info`.
 
+## Ovládání postavy
+
+[Samostatný příklad s liškou](../examples/fox-control/) ukazuje jednorázové
+nastavení vstupů a kamery za postavou:
+
+```js
+const { fox } = await createScene(engine.scene);
+engine.controlCharacter(fox, {
+    speed: 2.5,
+    runSpeed: 5,
+    animations: { idle: 'Survey', walk: 'Walk', run: 'Run' },
+    physics: { halfExtents: [0.4, 0.8, 0.8], gravity: 18, jumpSpeed: 7 },
+});
+```
+
+Rust počítá WASD pohyb po rovině XZ vůči směru kamery, natočení modelu,
+Shift pro běh a přepínání klipů. V příkladu kliknutí na canvas zapne fullscreen
+a zachytí kurzor; kameru pak otáčí samotný pohyb myši. Escape opustí hru
+a pozastaví pohyb, další kliknutí ovládání obnoví. Ostatní příklady bez
+zachycení kurzoru zachovávají tažení myší.
+Diagonální pohyb má stejnou rychlost; ztráta fokusu uvolní klávesy.
+Názvy klipů jsou volitelné, při zadání musí existovat. `modelForwardYaw`
+nastaví korekci natočení modelu v radiánech. `engine.characterState()` vrací
+aktuální ID, polohu a stav pohybu z Rustu, nebo `null` bez aktivní postavy.
+Přepnutí kamery a odstranění postavy ovládání odpojí.
+
+`physics` zapíná kolizní motor se vzpřímeným boxem: poloha modelu je poloha
+chodidel, tělo má výšku `2 * halfExtents[1]`. Rust řeší gravitaci, skok na
+mezerník pouze ze země, klouzání podél stěn a dopad na plošinu. Vynechání
+`physics` ponechá volný pohyb bez kolizí. `grounded`, `verticalVelocity`
+a `collisionCandidates` v `characterState()` ukazují skutečný stav motoru.
+
+Pevné objekty nastavuje aplikace výslovně:
+
+```js
+const block = scene.createCube([0, 0.3, 3]);
+block.setScale([2.6, 0.6, 2]);
+block.setCollider(); // Box se škáluje a posouvá spolu s objektem.
+```
+
+`setCollider({ halfExtents, offset })` určuje lokální box nezávisle na renderovací
+geometrii; `removeCollider()` ho odebere. Kolizní svět používá cachovaný BVH,
+obnovovaný při změně pevného objektu. Dotaz vybere okolní boxy a sweep zastaví
+pohyb na jejich hraně i při vysoké rychlosti. Příklad má čtyři plošiny a reset na R.
+Jde o boxové kolize, nikoli přesné trojúhelníkové kolize glTF; otočené boxy používají
+konzervativní světový AABB. Svahy, odtlačování dynamických těles, zotavení po
+teleportu dovnitř překážky a prolínání animací nejsou součástí tohoto motoru.
+
 ## Stíny, odrazy a průhlednost
 
 OPAQUE a MASK se vykreslují do hlavního obrazu, pomocné hloubky, odrazové textury a stínových map. MASK používá stejnou texturu a cutoff i ve stínu. BLEND se řadí od vzdálenějších primitiv, nezapisuje hloubku a nevrhá neprůhledné stíny. V hlavním pohledu se přidává po screen-space efektech; SSR a god rays tedy používají hloubku neprůhledné geometrie. Řazení průhledných trojúhelníků uvnitř jednoho primitiva není řešeno.

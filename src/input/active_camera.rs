@@ -1,4 +1,5 @@
 use crate::input::camera::{Camera, CameraController};
+use crate::input::character::CharacterController;
 use crate::input::orbit_camera::OrbitCamera;
 use glam::{Mat4, Vec3};
 
@@ -12,6 +13,9 @@ pub struct ActiveCamera {
     free: Camera,
     orbit: OrbitCamera,
     active: CameraType,
+    character: Option<CharacterController>,
+    pending_characters: Vec<CharacterController>,
+    aspect: f32,
 }
 
 impl ActiveCamera {
@@ -20,12 +24,22 @@ impl ActiveCamera {
             free: Camera::new(aspect),
             orbit: OrbitCamera::new(aspect),
             active: CameraType::Orbit,
+            character: None,
+            pending_characters: Vec::new(),
+            aspect,
         }
     }
 
     pub fn set_type(&mut self, ty: CameraType) {
         self.clear_input();
+        self.detach_character();
         self.active = ty;
+    }
+
+    fn detach_character(&mut self) {
+        if let Some(character) = self.character.take() {
+            self.pending_characters.push(character);
+        }
     }
 
     pub fn set_view(&mut self, position: Vec3, target: Vec3) -> bool {
@@ -37,11 +51,78 @@ impl ActiveCamera {
     }
 
     pub fn set_aspect(&mut self, aspect: f32) {
+        self.aspect = aspect;
         self.free.set_aspect(aspect);
         self.orbit.set_aspect(aspect);
+        if let Some(character) = &mut self.character {
+            character.set_aspect(aspect);
+        }
+    }
+
+    /// Clips are ordered idle, walk, run. Invalid options leave the current view intact.
+    pub fn follow_object(
+        &mut self,
+        id: u32,
+        position: Vec3,
+        speed: f32,
+        run_speed: f32,
+        model_yaw: f32,
+        clips: [Option<usize>; 3],
+    ) -> bool {
+        let Some(character) = CharacterController::new(
+            id,
+            position,
+            speed,
+            run_speed,
+            model_yaw,
+            clips,
+            self.aspect,
+        ) else {
+            return false;
+        };
+        self.clear_input();
+        self.detach_character();
+        self.character = Some(character);
+        true
+    }
+
+    /// Call before reading matrix() each frame; update() alone never moves a character.
+    pub fn update_scene(&mut self, scene: &mut crate::scene::SceneManager, dt: f32) {
+        // Complete old ownership first, so a rebind wins even within the same frame.
+        for character in self.pending_characters.drain(..) {
+            character.finish(scene);
+        }
+        if let Some(character) = &mut self.character {
+            if !character.update_scene(scene, dt) {
+                self.clear_input();
+                self.character = None;
+            }
+        }
+    }
+
+    pub fn character_state(&self) -> Option<(u32, Vec3, bool, bool)> {
+        self.character.as_ref().map(CharacterController::state)
+    }
+
+    pub fn set_character_physics(
+        &mut self,
+        physics: crate::input::character::CharacterPhysics,
+    ) -> bool {
+        self.character
+            .as_mut()
+            .is_some_and(|character| character.set_physics(physics))
+    }
+
+    pub fn character_physics_state(&self) -> Option<(bool, f32, usize)> {
+        self.character
+            .as_ref()
+            .map(CharacterController::physics_state)
     }
 
     fn active_mut(&mut self) -> &mut dyn CameraController {
+        if let Some(character) = &mut self.character {
+            return character;
+        }
         match self.active {
             CameraType::Free => &mut self.free,
             CameraType::Orbit => &mut self.orbit,
@@ -49,6 +130,9 @@ impl ActiveCamera {
     }
 
     fn active_ref(&self) -> &dyn CameraController {
+        if let Some(character) = &self.character {
+            return character;
+        }
         match self.active {
             CameraType::Free => &self.free,
             CameraType::Orbit => &self.orbit,
@@ -60,6 +144,9 @@ impl CameraController for ActiveCamera {
     fn clear_input(&mut self) {
         self.free.clear_input();
         self.orbit.clear_input();
+        if let Some(character) = &mut self.character {
+            character.clear_input();
+        }
     }
 
     fn key_down(&mut self, code: String) {

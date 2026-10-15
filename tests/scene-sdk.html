@@ -28,6 +28,7 @@ try {
     try { engine.setCameraView([5, 3, 5], [5, 3, 5]); } catch { cameraRejected = true; }
     assert(cameraRejected, 'Degenerate camera target rejected');
     engine.set_camera_mode('orbit');
+    document.documentElement.dataset.rendererBackend = engine.renderer_backend();
     const scene = engine.scene;
     assert(scene.objectCount === 0 && scene.lightCount === 0, "Engine must start empty");
     createScene(scene);
@@ -77,7 +78,7 @@ try {
     assert(engine.postprocessing.stats().passes === 2, 'Two postprocess passes');
     engine.postprocessing.disable('ssr'); engine.postprocessing.disable('godRays');
     assert(engine.postprocessing.stats().targets === 0, 'Postprocess targets released');
-    result.textContent = "PASS: Rust scene manager + JavaScript SDK\nSingle runtime initialization, detached canvas rejection, camera view, empty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.";
+    result.textContent = `PASS: ${engine.renderer_backend()} Rust scene manager + JavaScript SDK\nSingle runtime initialization, detached canvas rejection, camera view, empty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.`;
 } catch (error) {
     console.error(error);
     result.textContent = `FAIL: ${error.message}`;

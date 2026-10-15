@@ -14,9 +14,9 @@
   },
   "include": [
     "js/*.d.ts",
+    "js/engine.js",
     "examples/*.ts",
     "examples/*/scene.js",
-    "examples/shared/scene-helpers.js",
     "examples/*/main.js"
   ]
 }

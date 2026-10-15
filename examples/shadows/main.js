@@ -17,19 +17,16 @@ engine.set_light_helpers_visible(true);
 
 // 4. Jednou vytvoříme scénu přes SDK. Žádná vlastní requestAnimationFrame smyčka.
 createScene(engine.scene);
-
-// 5. Volitelný nástrojový panel. V hotové hře tento import a volání odstraníš.
 const tools = createTools(document.getElementById("tools"), engine, {
     title: "02 · Dva barevné stíny",
     defaults: {shadows: true, mirror: false, grid: false, helpers: true},
     onReset: () => createScene(engine.scene),
 });
-
-// 6. Rozměr canvasu sledujeme nezávisle na nástrojovém panelu.
 const fit = () => engine.resize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
 fit();
 window.addEventListener("resize", fit);
 window.addEventListener("pagehide", () => {
     tools.dispose();
+    engine.dispose();
     window.removeEventListener("resize", fit);
 }, { once: true });

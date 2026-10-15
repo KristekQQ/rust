@@ -43,7 +43,7 @@ function environment(t) {
 }
 
 function wasmMock(overrides = {}) {
-    return { default: async () => {}, start: async () => {}, clear_all() {},
+    return { default: async () => {}, start: async () => {}, clear_all() {}, scene_object_count: () => 0,
         gltf_resource_uris: () => JSON.stringify({ buffers: [], images: [] }),
         load_gltf_model: () => 1, ...overrides };
 }
@@ -52,6 +52,64 @@ function response(bytes = new Uint8Array([1]), url = '') {
         start(controller) { controller.enqueue(bytes); controller.close(); },
     }) };
 }
+
+test('character command resolves clip names, validates parameters and preserves runtime ownership', async t => {
+    const canvas = environment(t);
+    const calls = [];
+    globalThis.fetch = async () => response();
+    globalThis.__sdkImport = async () => wasmMock({
+        model_info: () => JSON.stringify({ animations: [{name:'Survey'}, {name:'Walk'}, {name:'Run'}] }),
+        control_character: (...args) => { calls.push(args); return true; },
+        configure_character_physics: (...args) => { calls.push(['physics', ...args]); return true; },
+        set_box_collider: (...args) => { calls.push(['collider', ...args]); return true; },
+        remove_collider: id => { calls.push(['remove-collider', id]); return true; },
+        character_state: () => JSON.stringify({id:1, position:[0,0,0], moving:false, running:false}),
+        dispose() {},
+    });
+    const { initEngine } = await sdk();
+    const engine = await initEngine(canvas);
+    const fox = await engine.scene.loadModel('fox.glb');
+    engine.controlCharacter(fox, {speed:2, runSpeed:4, animations:{idle:'Survey', walk:'Walk', run:'Run'}});
+    assert.deepEqual(calls, [[1,2,4,0,0,1,2]]);
+    assert.deepEqual(engine.characterState().position, [0,0,0]);
+    assert.throws(() => engine.controlCharacter(fox, {speed:NaN}), /Rychlosti/);
+    assert.throws(() => engine.controlCharacter(fox, {runSpeed:0}), /Rychlosti/);
+    assert.throws(() => engine.controlCharacter(fox, {animations:{walk:'Missing'}}), /Missing/);
+    assert.equal(calls.length, 1);
+    assert.throws(() => engine.controlCharacter(fox, {physics:{gravity:0}}), /Rozměry/);
+    assert.throws(() => engine.controlCharacter(fox, {physics:{halfExtents:[0,1,1]}}), /Rozměry/);
+    assert.throws(() => engine.controlCharacter(fox, {physics:{jumpSpeed:Infinity}}), /Rozměry/);
+    assert.equal(calls.length, 1, 'Invalid physics cannot replace an active controller');
+    engine.controlCharacter(fox, {physics:{halfExtents:[0.4,0.8,0.8],gravity:18,jumpSpeed:7}});
+    assert.deepEqual(calls.at(-1), ['physics',0.4,0.8,0.8,18,7]);
+    fox.setCollider({halfExtents:[0.5,0.2,0.5],offset:[0,-0.2,0]}).removeCollider();
+    assert.deepEqual(calls.slice(-2), [['collider',1,0.5,0.2,0.5,0,-0.2,0],['remove-collider',1]]);
+    engine.dispose();
+    const replacement = await initEngine(canvas);
+    assert.throws(() => replacement.controlCharacter(fox), /tohoto enginu/);
+    assert.throws(() => engine.characterState(), /ukončen/);
+    replacement.dispose();
+});
+
+test('HUD is opt-in and only forwards commands and explicit diagnostic queries', async t => {
+    const canvas = environment(t);
+    const calls = [];
+    globalThis.__sdkImport = async () => wasmMock({
+        set_debug_overlay: enabled => calls.push(enabled),
+        debug_stats: () => '{"enabled":false,"hudFrames":0}',
+        dispose() {},
+    });
+    const { initEngine } = await sdk();
+    const engine = await initEngine(canvas);
+    assert.deepEqual(calls, []);
+    assert.equal(engine.debugStats().hudFrames, 0);
+    engine.setDebugOverlay(true);
+    engine.setDebugOverlay(false);
+    assert.deepEqual(calls, [true, false]);
+    engine.dispose();
+    assert.throws(() => engine.setDebugOverlay(true), /ukončen/);
+    assert.throws(() => engine.debugStats(), /ukončen/);
+});
 
 test('concurrent/repeated init and cache-busted SDK imports start one runtime', async t => {
     const canvas = environment(t);
@@ -202,4 +260,49 @@ test('stream failure preserves original error when cancellation fails and releas
     const scene = new (await sdk()).Scene(wasmMock());
     await assert.rejects(scene.loadModel('bad.glb'), error => error === original);
     assert.equal(releases, 1);
+});
+
+test('dispose aborts transport, releases ownership, and rejects every old command after reinit', async t => {
+    const canvas = environment(t);
+    let disposals = 0, positions = 0, starts = 0;
+    globalThis.__sdkImport = async () => wasmMock({
+        start: async () => { starts++; }, dispose: () => { disposals++; },
+        add_cube: () => 1, object_exists: () => true,
+        set_object_position: () => { positions++; return true; },
+        set_postprocess: () => true, resize() {},
+    });
+    const { initEngine } = await sdk();
+    const old = await initEngine(canvas);
+    const handle = old.scene.createCube();
+    let canceled = false;
+    const reading = deferred();
+    globalThis.fetch = async () => ({ ok: true, headers: new Headers(), body: new ReadableStream({
+        pull() { reading.resolve(); }, cancel() { canceled = true; },
+    }) });
+    const load = old.scene.loadModel('/pending.glb');
+    const rejection = assert.rejects(load, /zrušeno/);
+    await reading.promise;
+    old.dispose(); old.dispose();
+    await rejection;
+    assert.equal(canceled, true);
+    assert.equal(disposals, 1);
+    assert.equal(globalThis[key], undefined);
+    const replacement = await initEngine(canvas);
+    assert.notEqual(old, replacement);
+    assert.equal(starts, 2);
+    const next = replacement.scene.createCube();
+    for (const command of [() => handle.setPosition([1, 2, 3]), () => handle.exists,
+        () => old.scene.createCube(), () => old.add_cube(0, 0, 0), () => old.resize(10, 10),
+        () => old.postprocessing.enable('ssr')]) {
+        assert.throws(command, /ukončen/);
+    }
+    next.setPosition([1, 2, 3]);
+    assert.equal(positions, 1);
+    assert.throws(() => replacement.scene.setMirror(handle), /odmítl/);
+    await assert.rejects(old.scene.loadModel('/never-fetch.glb'), /ukončen/);
+    old.dispose();
+    assert.equal(disposals, 1, 'Old dispose must not release the replacement');
+    assert.equal(await initEngine(canvas), replacement);
+    replacement.dispose();
+    assert.equal(disposals, 2);
 });

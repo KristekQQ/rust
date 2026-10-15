@@ -113,6 +113,12 @@ struct LightOrbit {
     color: Vec3,
 }
 
+#[derive(Clone, Copy)]
+struct BoxCollider {
+    half_extents: Vec3,
+    offset: Vec3,
+}
+
 #[derive(Default)]
 pub struct SceneManager {
     objects: BTreeMap<u32, SceneObject>,
@@ -128,9 +134,21 @@ pub struct SceneManager {
     time: f32,
     rotations: Vec<RotationAction>,
     removals: Vec<ScheduledRemoval>,
+    colliders: BTreeMap<u32, BoxCollider>,
+    collision_world: crate::collision::CollisionWorld,
+    collision_dirty: bool,
+    visibility_index: std::cell::RefCell<crate::visibility::VisibilityIndex>,
 }
 
 impl SceneManager {
+    pub(crate) fn visibility_index(
+        &self,
+        collect_stats: bool,
+    ) -> std::cell::RefMut<'_, crate::visibility::VisibilityIndex> {
+        let mut index = self.visibility_index.borrow_mut();
+        index.sync(self, collect_stats);
+        index
+    }
     pub fn configure_mirror(&mut self, id: u32) -> bool {
         if !self
             .objects
@@ -164,6 +182,9 @@ impl SceneManager {
         self.static_revision
     }
     fn changed(&mut self, id: u32) {
+        if self.colliders.contains_key(&id) {
+            self.collision_dirty = true;
+        }
         self.render_revision = self.render_revision.wrapping_add(1);
         if self
             .objects
@@ -187,6 +208,58 @@ impl SceneManager {
             self.static_revision = self.static_revision.wrapping_add(1);
         }
         true
+    }
+
+    /// Explicit local-space box, independent of render geometry or animation bounds.
+    pub fn set_box_collider(&mut self, id: u32, half_extents: Vec3, offset: Vec3) -> bool {
+        if !self.object_exists(id)
+            || !half_extents.is_finite()
+            || half_extents.min_element() <= 0.0
+            || !offset.is_finite()
+        {
+            return false;
+        }
+        self.colliders.insert(
+            id,
+            BoxCollider {
+                half_extents,
+                offset,
+            },
+        );
+        self.collision_dirty = true;
+        true
+    }
+
+    pub fn remove_collider(&mut self, id: u32) -> bool {
+        if !self.object_exists(id) {
+            return false;
+        }
+        self.collision_dirty |= self.colliders.remove(&id).is_some();
+        true
+    }
+
+    /// Cached BVH; movement of a non-solid character never rebuilds the world.
+    pub fn collision_world(&mut self) -> &crate::collision::CollisionWorld {
+        if self.collision_dirty {
+            let colliders = self
+                .colliders
+                .iter()
+                .filter_map(|(id, collider)| {
+                    let transform = self.objects.get(id)?.transform;
+                    let model = transform.model();
+                    let center = model.transform_point3(collider.offset);
+                    // Rotated authored boxes use conservative world-aligned bounds.
+                    let half = model.x_axis.truncate().abs() * collider.half_extents.x
+                        + model.y_axis.truncate().abs() * collider.half_extents.y
+                        + model.z_axis.truncate().abs() * collider.half_extents.z;
+                    crate::collision::Aabb::new(center - half, center + half)
+                        .map(|bounds| crate::collision::Collider { id: *id, bounds })
+                })
+                .collect();
+            self.collision_world.rebuild(colliders);
+            self.collision_dirty = false;
+        }
+        &self.collision_world
     }
     pub fn set_object_spin(&mut self, id: u32, radians_per_second: Vec3) -> bool {
         if !self.object_exists(id) || !radians_per_second.is_finite() {
@@ -293,6 +366,7 @@ impl SceneManager {
             .as_mut()
             .ok_or("Model has no active animation")?
             .playing = !paused;
+        model.playback_revision = model.playback_revision.wrapping_add(1);
         Ok(())
     }
     pub fn seek_model_animation(&mut self, id: u32, time: f32) -> Result<(), String> {
@@ -372,6 +446,8 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.colliders.clear();
+        self.collision_dirty = true;
         self.objects.clear();
         self.models.clear();
         self.mirror_object = None;
@@ -401,6 +477,7 @@ impl SceneManager {
         if self.objects.remove(&id).is_none() {
             return false;
         }
+        self.collision_dirty |= self.colliders.remove(&id).is_some();
         self.models.remove(&id);
         self.render_revision = self.render_revision.wrapping_add(1);
         if was_static {
@@ -814,5 +891,39 @@ mod tests {
         assert!((scene.lights()[&light].position.x - 2.0_f32 * 1.0_f32.cos()).abs() < 1e-5);
         scene.update(1.0);
         assert!(!scene.light_exists(light));
+    }
+
+    #[test]
+    fn collider_bvh_tracks_transform_removal_clear_and_only_solid_changes() {
+        let mut scene = SceneManager::default();
+        let cube = scene.add_cube(Vec3::ZERO);
+        let query = crate::collision::Aabb::new(-Vec3::ONE, Vec3::ONE).unwrap();
+        assert!(scene.collision_world().query(query, None).is_empty());
+        assert!(scene.set_box_collider(cube, Vec3::splat(0.5), Vec3::ZERO));
+        assert_eq!(scene.collision_world().query(query, None).len(), 1);
+        assert!(!scene.collision_dirty);
+        let player = scene.add_cube(Vec3::ZERO);
+        scene.set_object_position(player, Vec3::ONE);
+        assert!(
+            !scene.collision_dirty,
+            "Non-solid movement must preserve the cached BVH"
+        );
+        scene.set_object_transform(cube, Vec3::new(4.0, 0.0, 0.0), Vec3::ZERO, Vec3::splat(2.0));
+        assert!(scene.collision_dirty);
+        assert!(scene.collision_world().query(query, None).is_empty());
+        let far = crate::collision::Aabb::new(Vec3::new(3.5, -0.5, -0.5), Vec3::new(4.5, 0.5, 0.5))
+            .unwrap();
+        assert_eq!(scene.collision_world().query(far, None).len(), 1);
+        assert!(scene.remove_collider(cube));
+        assert!(scene.collision_world().query(far, None).is_empty());
+        scene.set_box_collider(cube, Vec3::splat(0.5), Vec3::ZERO);
+        scene.remove_object(cube);
+        assert!(scene.collision_world().query(far, None).is_empty());
+        scene.set_box_collider(player, Vec3::ONE, Vec3::ZERO);
+        scene.clear();
+        assert!(scene.collision_world().query(query, None).is_empty());
+        assert!(!scene.set_box_collider(player, Vec3::ONE, Vec3::ZERO));
+        let invalid = scene.add_cube(Vec3::ZERO);
+        assert!(!scene.set_box_collider(invalid, Vec3::ZERO, Vec3::ZERO));
     }
 }

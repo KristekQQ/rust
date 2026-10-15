@@ -4,11 +4,13 @@
 <button id="morph-zero">Morph 0</button><button id="morph-one">Morph 1</button>
 <script type="module">
 import {initEngine} from '../js/engine.js';
+import {capturePixels, assertForeground, assertChanged} from './pixels.js';
 const status=document.getElementById('result');
 const assert=(x,m)=>{if(!x)throw new Error(m)};
 const frames=async(n=8)=>{while(n--)await new Promise(requestAnimationFrame)};
 try {
  const engine=await initEngine(document.getElementById('gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ const canvas=document.getElementById('gpu-canvas');engine.resize(640,360);
  engine.set_camera_mode('free');engine.setCameraView([0,3,12],[0,1,0]);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
  engine.scene.createLight({position:[0,5,5],color:[20,20,20]});
  const fixture=await engine.scene.loadModel(new URL('fixtures/gltf/full/full.gltf',location.href));
@@ -20,17 +22,37 @@ try {
  fixture.selectScene(0);fixture.stopAnimation().setMorphWeights(1,[0.75]);
  let rejected=false;try{fixture.setMorphWeights(1,[NaN])}catch{rejected=true}assert(rejected,'Invalid morph weights rejected');
  fixture.useCamera(3);await frames();engine.setCameraView([0,3,12],[0,1,0]);
+ fixture.stopAnimation();for(let i=0;i<3;i++)fixture.setMorphWeights(i,[0]);
+ const unmorphed=await capturePixels(canvas);assertForeground(unmorphed,'Textured glTF fixture');
+ let warm=0,cool=0;
+ for(let i=0;i<unmorphed.data.length;i+=4){const [r,g,b]=unmorphed.data.subarray(i,i+3);if(r>30&&r>1.4*b)warm++;if(b>30&&b>1.4*r)cool++;}
+ assert(warm>50&&cool>50,'Rendered PNG checker colors must appear');
+ for(let i=0;i<3;i++)fixture.setMorphWeights(i,[1]);
+ assertChanged(unmorphed,await capturePixels(canvas),'Morph deformation');
+ fixture.remove();
  const fox=await engine.scene.loadModel(new URL('../assets/models/fox/Fox.glb',location.href));
  assert(fox.info.skins===1 && fox.info.animations.length===3,'Real skinned Fox model');
- fox.setScale([.025,.025,.025]).setPosition([0,0,-3]).playAnimation('Walk');await frames(24);
+ engine.setCameraView([3,2,5],[0,1,0]);
+ fox.setScale([.025,.025,.025]).playAnimation('Walk').pauseAnimation().seekAnimation(0);
+ const foxFirst=await capturePixels(canvas);assertForeground(foxFirst,'Skinned Fox');
+ fox.seekAnimation(.3);const foxSecond=await capturePixels(canvas);
+ assertChanged(foxFirst,foxSecond,'Fox skinning between two fixed poses');
+ fox.pauseAnimation(false);await frames(24);
  assert(fox.info.playback.time>0,'Rust advances animation');
  fox.pauseAnimation();const time=fox.info.playback.time;await frames();assert(fox.info.playback.time===time,'Pause freezes playback');
  fox.seekAnimation(.3).pauseAnimation(false);await frames();fox.stopAnimation();assert(fox.info.playback===null,'Stop restores asset pose');
  fox.remove();await frames();assert(!fox.exists,'Animated model removal');
  const helmet=await engine.scene.loadModel(new URL('../assets/models/damaged-helmet/DamagedHelmet.glb',location.href));
- assert(helmet.info.textures===5 && helmet.info.materials===1,'Five PBR maps with JPEG/PNG decoding');helmet.remove();
- document.getElementById('morph-zero').onclick=()=>{fixture.stopAnimation();for(let i=0;i<3;i++)fixture.setMorphWeights(i,[0]);};
- document.getElementById('morph-one').onclick=()=>{fixture.stopAnimation();for(let i=0;i<3;i++)fixture.setMorphWeights(i,[1]);};
- await frames();status.textContent=`PASS: ${engine.renderer_backend()} · external PNG, PBR maps, MASK/BLEND, UV1, scenes, cameras, morph weights, Fox skin/animations, pause/seek/stop/remove.`;
+ assert(helmet.info.textures===5 && helmet.info.materials===1,'Five PBR maps with JPEG/PNG decoding');
+ engine.setCameraView([0,0,4],[0,0,0]);
+ const litHelmet=await capturePixels(canvas);assertForeground(litHelmet,'PBR helmet');
+ engine.clear_lights();
+ assertChanged(litHelmet,await capturePixels(canvas),'PBR lighting changes actual pixels');helmet.remove();
+ // Restore the interactive morph fixture after isolated pixel assertions.
+ const interactive=await engine.scene.loadModel(new URL('fixtures/gltf/full/full.gltf',location.href));
+ engine.scene.createLight({position:[0,5,5],color:[20,20,20]});engine.setCameraView([0,3,12],[0,1,0]);
+ document.getElementById('morph-zero').onclick=()=>{interactive.stopAnimation();for(let i=0;i<3;i++)interactive.setMorphWeights(i,[0]);};
+ document.getElementById('morph-one').onclick=()=>{interactive.stopAnimation();for(let i=0;i<3;i++)interactive.setMorphWeights(i,[1]);};
+ await frames();status.textContent=`PASS: ${engine.renderer_backend()} · actual PNG colors, morph pixels, Fox skin poses, PBR lighting pixels; scenes, cameras, pause/seek/stop/remove.`;
 } catch(error){status.textContent=`FAIL: ${error.message??error}`;console.error(error);}
 </script></html>

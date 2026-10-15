@@ -1,6 +1,24 @@
 import type * as wasm from "../pkg/webgpu_wasm.js";
 
 export type Vector3 = readonly [number, number, number];
+export interface CharacterOptions {
+    speed?: number;
+    runSpeed?: number;
+    /** Rotation offset in radians for a model whose forward axis is not +Z. */
+    modelForwardYaw?: number;
+    animations?: { idle?: string; walk?: string; run?: string };
+    /** Opt-in upright box motor, gravity and Space jump. Omit for unconstrained movement. */
+    physics?: { halfExtents?: Vector3; gravity?: number; jumpSpeed?: number };
+}
+export interface CharacterState {
+    id: number;
+    position: Vector3;
+    moving: boolean;
+    running: boolean;
+    grounded: boolean;
+    verticalVelocity: number;
+    collisionCandidates: number;
+}
 export interface RotationOptions { delay?: number; duration?: number }
 export interface LightOptions { position?: Vector3; color?: Vector3 }
 export interface OrbitOptions {
@@ -16,6 +34,9 @@ export class SceneObject {
     /** Absolute rotation in radians. */
     setRotation(radians: Vector3): this;
     setScale(scale: Vector3): this;
+    /** Local-space solid box. Defaults match a unit cube, then follow its root transform. */
+    setCollider(options?: {halfExtents?: Vector3; offset?: Vector3}): this;
+    removeCollider(): this;
     /** Delta rotation in degrees; timing in seconds. Calculated by Rust. */
     rotate(degrees: Vector3, options?: RotationOptions): this;
     setRenderOptions(options?: {isStatic?: boolean; castsShadow?: boolean; receivesShadow?: boolean; reflectivity?: number}): this;
@@ -91,6 +112,15 @@ export interface EffectStats {
     staticVisible:number; dynamicVisible:number; reflectionVisible:number;
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
+export interface DebugStats {
+    enabled: boolean; fps: number; frameMs: number; cpuMs: number;
+    /** Main-view extraction only, not GPU execution. Cached frames do not run culling. */
+    cullMs: number; cullCached: boolean;
+    total: number; visible: number; culled: number;
+    bvhNodes: number; objectTests: number; staticRebuilds: number; dynamicRebuilds: number;
+    /** Cumulative counters, unchanged while the HUD is disabled. */
+    hudFrames: number; hudRefreshes: number;
+}
 export type PostEffectName = "ssr" | "godRays";
 export interface PostProcessing {
     /** Strength 0..1. Unknown effects and invalid values throw. Computed in Rust/WGSL. */
@@ -102,6 +132,6 @@ export interface PostProcessing {
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
     stats(): { passes: number; width: number; height: number; targets: number; frames: number };
 }
-export type Engine = Readonly<RawEngine & { readonly scene: Scene; readonly postprocessing: PostProcessing; setCameraView(position: Vector3, target: Vector3): void; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+export type Engine = Readonly<RawEngine & { readonly scene: Scene; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;
