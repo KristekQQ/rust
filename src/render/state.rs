@@ -18,6 +18,11 @@ pub struct State {
     debug_enabled: bool,
     debug_hud: Option<super::hud::DebugHud>,
     frame_dt: f32,
+    cutting_compute: Option<super::cutting_compute::ComputeCutter>,
+    resident_cutter: Option<super::cutting_resident::ResidentCutter>,
+    resident_sources:
+        std::collections::BTreeMap<u32, std::rc::Rc<super::cutting_resident::ResidentSource>>,
+    pub cutting_busy: std::rc::Rc<std::cell::Cell<bool>>,
 }
 impl Deref for State {
     type Target = SceneRenderer;
@@ -52,6 +57,10 @@ impl State {
             debug_enabled: false,
             debug_hud: None,
             frame_dt: 0.0,
+            cutting_compute: None,
+            resident_cutter: None,
+            resident_sources: Default::default(),
+            cutting_busy: Default::default(),
             view: RenderView {
                 view_projection: Mat4::IDENTITY,
                 camera_position: Vec3::ZERO,
@@ -61,6 +70,81 @@ impl State {
     pub fn resize(&mut self, width: u32, height: u32) {
         self.output.resize(&self.renderer.device, width, height);
         self.aspect = self.output.aspect();
+    }
+    pub fn dispatch_cut_geometry(
+        &mut self,
+        inputs: &[crate::cutting::CutGeometryInput],
+    ) -> super::cutting_compute::PendingCutGeometry {
+        let renderer = &self.renderer;
+        self.cutting_compute
+            .get_or_insert_with(|| super::cutting_compute::ComputeCutter::new(&renderer.device))
+            .dispatch(&renderer.device, &renderer.queue, inputs)
+    }
+    pub fn resident_devices(&self) -> (wgpu::Device, wgpu::Queue) {
+        (self.renderer.device.clone(), self.renderer.queue.clone())
+    }
+    pub fn dispatch_resident(
+        &mut self,
+        candidate: &crate::scene::ResidentCandidate,
+    ) -> Result<super::cutting_resident::PendingResidentCut, String> {
+        use super::cutting_resident::*;
+        use wgpu::util::DeviceExt;
+        let renderer = &self.renderer;
+        if let std::collections::btree_map::Entry::Vacant(entry) =
+            self.resident_sources.entry(candidate.id)
+        {
+            let mesh = candidate.mesh.cpu()?;
+            if !mesh.resident_eligible() {
+                return Err("Resident cutting requires one connected genus-zero solid".into());
+            }
+            let vertices: Vec<_> = mesh
+                .render_mesh()
+                .vertices
+                .iter()
+                .map(|v| ResidentVertex {
+                    position: [v.position[0], v.position[1], v.position[2], 0.],
+                    normal: [v.normal[0], v.normal[1], v.normal[2], 0.],
+                    color: [v.color[0], v.color[1], v.color[2], 0.],
+                })
+                .collect();
+            let buffer = renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("resident original soup"),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
+                });
+            entry.insert(std::rc::Rc::new(ResidentSource {
+                vertices: buffer,
+                vertex_count: vertices.len() as u32,
+            }));
+        }
+        let params = ResidentCutParams {
+            a: candidate.a,
+            b: candidate.b,
+            motion: candidate.motion,
+            cap_color: candidate.color,
+            source_volume: candidate.mesh.volume() as f32,
+            support_dirs: candidate.support_dirs(),
+        };
+        self.resident_cutter
+            .get_or_insert_with(|| ResidentCutter::new(&renderer.device))
+            .dispatch(
+                &renderer.device,
+                &renderer.queue,
+                &self.resident_sources[&candidate.id],
+                &params,
+            )
+    }
+    pub fn install_resident(&mut self, id: u32, piece: super::cutting_resident::ResidentPiece) {
+        let source = self.renderer.install_resident(id, piece);
+        self.resident_sources.insert(id, std::rc::Rc::new(source));
+    }
+    pub fn resident_source(
+        &self,
+        id: u32,
+    ) -> Option<std::rc::Rc<super::cutting_resident::ResidentSource>> {
+        self.resident_sources.get(&id).cloned()
     }
     pub fn configure_god_rays(&mut self, density: f32, exposure: f32) -> bool {
         self.postprocess.configure_volume(density, exposure)
@@ -114,6 +198,18 @@ impl State {
     }
     pub fn clear_model_camera(&mut self) {
         self.model_camera = None;
+    }
+    pub fn screen_to_plane(&self, u: f32, v: f32, height: f32) -> Option<Vec3> {
+        crate::render_math::screen_to_horizontal_plane(self.view.view_projection, u, v, height)
+    }
+    pub fn world_to_screen(&self, point: Vec3) -> Option<[f32; 2]> {
+        let p = self.view.view_projection * point.extend(1.0);
+        if !p.is_finite() || p.w <= 0.0 {
+            return None;
+        }
+        let p = p.truncate() / p.w;
+        (p.x.abs() <= 1.0 && p.y.abs() <= 1.0 && (0.0..=1.0).contains(&p.z))
+            .then_some([(p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5])
     }
     pub fn use_model_camera(&mut self, id: u32, node: usize) -> bool {
         if self.imported_camera_view(id, node).is_none() {
@@ -189,6 +285,13 @@ impl State {
             return Ok(());
         };
         self.output.ensure_target(&self.renderer.device);
+        if let Some(compute) = &mut self.cutting_compute {
+            compute.retain(|id| self.renderer.scene.triangle_meshes().contains_key(&id));
+        }
+        self.resident_sources
+            .retain(|id, _| self.renderer.scene.object_exists(*id));
+        self.renderer.draw_calls = 0;
+        self.renderer.main_draw_calls = 0;
         let target = self.output.target(&frame);
         if self.postprocess.enabled() {
             self.postprocess
@@ -205,7 +308,7 @@ impl State {
             let (position, color) = light
                 .map(|l| (l.position, l.color))
                 .unwrap_or((Vec3::ZERO, Vec3::ZERO));
-            self.postprocess.render(
+            self.renderer.draw_calls += self.postprocess.render(
                 &self.renderer.device,
                 &self.renderer.queue,
                 self.view,
@@ -228,6 +331,9 @@ impl State {
                 .render_view(self.view, &target)
                 .map_err(|e| JsValue::from_str(&e))?;
         }
+        // Include the imminent HUD and final texture blit in the displayed total.
+        self.renderer.draw_calls +=
+            usize::from(self.debug_enabled) + usize::from(self.output.offscreen);
         if self.debug_enabled {
             let renderer = &self.renderer;
             self.renderer.upload_bytes +=

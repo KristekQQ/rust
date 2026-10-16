@@ -47,6 +47,70 @@ function wasmMock(overrides = {}) {
         gltf_resource_uris: () => JSON.stringify({ buffers: [], images: [] }),
         load_gltf_model: () => 1, ...overrides };
 }
+
+test('cutting commands preserve handle ownership, typed buffers and Rust piece IDs', async () => {
+    const {Scene, SceneObject} = await sdk();
+    const calls = [];
+    const wasm = {
+        add_triangle_mesh(positions, indices, ...color) { calls.push(['mesh', positions, indices, color]); return 10; },
+        set_cuttable(...args) { calls.push(['cuttable', ...args]); },
+        set_cutter(...args) { calls.push(['cutter', ...args]); },
+        triangle_mesh_info: () => JSON.stringify({triangles: 12, volume: 8, closed: true, cuttable: true}),
+        triangle_mesh_gpu_snapshot: async id => {calls.push(['gpuSnapshot',id]);return JSON.stringify({positions:[[1,2,3]],normals:[[0,1,0]],colors:[[1,0,0]]});},
+        cut_with(...args) { calls.push(['cut', ...args]); return JSON.stringify({removed:[10],pieces:[12,13],objectCandidates:1,bvhNodes:9,triangleTests:8}); },
+        cut_with_scatter(...args) { calls.push(['scatter', ...args]); return JSON.stringify({removed:[10],pieces:[14,15]}); },
+        object_exists: id => id !== 10,
+        aim_cutter(...args) {calls.push(['aim',...args]);return new Float32Array([0,-3,0]);},
+        add_colored_triangle_mesh(...args) {calls.push(['colored',...args]);return 16;},
+        scene_object_count:()=>2,
+        async cut_with_async(...args) {calls.push(['async',...args]);return JSON.stringify({removed:[10],pieces:[18,19],execution:'webgpu-compute',gpuMeshes:1,totalMs:2,computeMs:1,cpuMs:1,fallbackReason:null});},
+    };
+    const scene = new Scene(wasm);
+    const mesh = scene.createMesh({positions:[0,0,0,1,0,0,0,1,0,0,0,1],indices:[0,1,2]});
+    mesh.setCuttable(true, {capColor:[1,.2,.1]});
+    const blade = new SceneObject(wasm, 11).setCutter({base:[0,0,-1],tip:[0,0,1]});
+    const result = scene.cutWith(blade, {motion:[0,-3,0]});
+    assert(calls[0][1] instanceof Float32Array); assert(calls[0][2] instanceof Uint32Array);
+    assert.equal(calls[0][3].at(-1),false,'Meshes default to flat shading');
+    assert.deepEqual(calls[1], ['cuttable',10,true,1,.2,.1]);
+    assert.deepEqual(Array.from(calls[2][3]), [0,0,-1,0,0,1]);
+    assert.deepEqual(calls[3], ['cut',11,0,-3,0,.12]);
+    assert.deepEqual(result.pieces.map(p => p.id), [12,13]);
+    assert(result.pieces.every(p => p instanceof SceneObject && p.exists));
+    assert.equal(result.pieces[0].meshInfo.closed, true);
+    assert.deepEqual((await result.pieces[0].gpuMeshSnapshot()).positions,[[1,2,3]]);
+    assert.deepEqual(calls.at(-1),['gpuSnapshot',12]);
+    const animated=scene.cutWith(blade,{motion:[0,-3,0],scatter:{floorY:.2}});
+    assert.deepEqual(animated.pieces.map(p=>p.id),[14,15]);
+    assert.deepEqual(calls.at(-1),['scatter',11,new Float32Array([0,-3,0]),.12,.2,.8,.6]);
+    assert.throws(() => scene.cutWith(new SceneObject({}, 11), {motion:[1,0,0]}), /Čepel/);
+    for (const indices of [[-1,0,1],[.5,0,1],[NaN,0,1],[4294967296,0,1]]) {
+        assert.throws(() => scene.createMesh({positions:[0,0,0], indices}), /indexy/);
+    }
+    blade.setCutter(null);
+    assert.deepEqual(calls.at(-1), ['cutter',11,false,new Float32Array()]);
+    const guide=new SceneObject(wasm,17);
+    assert.deepEqual(scene.aimCutter(blade,{center:[1,1.15,2],guides:[guide]}),[0,-3,0]);
+    assert.deepEqual(Array.from(calls.at(-1)[2]),[17]);
+    assert.throws(()=>scene.aimCutter(blade,{center:[0,0,0],guides:[new SceneObject({},17)]}),/scéně/);
+    scene.createMesh({positions:[0,0,0,1,0,0,0,1,0,0,0,1],indices:[0,1,2],triangleColors:[1,0,0],smooth:true});
+    assert.equal(calls.at(-1).at(-1),true,'Smooth normals are explicitly requested from Rust');
+    assert(calls.at(-1)[3] instanceof Float32Array);
+    assert.throws(()=>scene.createMesh({positions:[0,0,0],indices:[0,1,2],triangleColors:[1]}),/RGB/);
+    const computed=await scene.cutWithAsync(blade,{motion:[0,-3,0],execution:'gpu',scatter:{floorY:.2}});
+    assert.deepEqual(calls.at(-1),['async',11,new Float32Array([0,-3,0]),.12,new Float32Array([.2,.8,.6]),'gpu']);
+    assert.equal(computed.execution,'webgpu-compute');assert.deepEqual(computed.pieces.map(p=>p.id),[18,19]);
+    await assert.rejects(()=>scene.cutWithAsync(new SceneObject({},11),{motion:[0,-3,0]}),/Čepel/);
+});
+
+test('orbit and world/screen commands forward to Rust, including lifecycle guards',async t=>{
+    const canvas=environment(t),calls=[];
+    globalThis.__sdkImport=async()=>wasmMock({set_orbit_view:(...p)=>{calls.push(p);return true;},adjust_orbit:(...p)=>{calls.push(p);return true;},camera_view_state:()=>JSON.stringify({position:[1,2,3],orbitTarget:[0,0,0]}),world_to_screen:()=>new Float32Array([.25,.75]),dispose(){}});
+    const {initEngine}=await sdk();const engine=await initEngine(canvas);
+    engine.setOrbitView([1,2,3],[0,0,0]);engine.adjustOrbit(10,-5,20);
+    assert.deepEqual(calls,[[1,2,3,0,0,0],[10,-5,20]]);assert.deepEqual(engine.worldToScreen([0,0,0]),[.25,.75]);assert.deepEqual(engine.cameraViewState().position,[1,2,3]);
+    engine.dispose();assert.throws(()=>engine.adjustOrbit(0,0,1));assert.throws(()=>engine.worldToScreen([0,0,0]));
+});
 function response(bytes = new Uint8Array([1]), url = '') {
     return { ok: true, url, headers: new Headers(), body: new ReadableStream({
         start(controller) { controller.enqueue(bytes); controller.close(); },

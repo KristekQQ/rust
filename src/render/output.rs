@@ -56,8 +56,12 @@ impl CanvasOutput {
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
                 required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
-                    .using_resolution(adapter.limits()),
+                required_limits: (if backend == "BrowserWebGpu" {
+                    wgpu::Limits::default()
+                } else {
+                    wgpu::Limits::downlevel_webgl2_defaults()
+                })
+                .using_resolution(adapter.limits()),
                 memory_hints: wgpu::MemoryHints::default(),
                 trace: wgpu::Trace::default(),
                 ..Default::default()

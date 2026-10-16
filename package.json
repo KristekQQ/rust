@@ -13,6 +13,7 @@
     "verify:fast": "npm run typecheck && npm run test:sdk && npm run test:harness",
     "test:browser": "node scripts/test-browser.mjs",
     "verify": "bash scripts/verify.sh all",
+    "verify:push": "bash scripts/pre-push",
     "verify:native": "bash scripts/verify.sh native",
     "verify:browser": "bash scripts/verify.sh browser"
   }

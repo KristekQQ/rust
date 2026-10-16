@@ -10,6 +10,9 @@ concurrency:
 jobs:
   software-webgl:
     runs-on: ubuntu-latest
+    # Trusted loopback fixtures only; the disposable runner is the isolation boundary.
+    env:
+      BROWSER_CI_NO_SANDBOX: '1'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

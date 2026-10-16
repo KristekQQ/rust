@@ -1,4 +1,9 @@
 pub mod collision;
+pub mod cutting;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod cutting_bench;
+pub mod cutting_mesh;
+pub mod cutting_tool;
 pub mod debug_overlay;
 pub mod frame_metrics;
 pub mod gltf_animation;

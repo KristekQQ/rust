@@ -56,9 +56,13 @@ try {
             engine.set_grid_visible(true);engine.set_light_helpers_visible(true);await frames();
             const helpers=engine.effects_stats();
             assert(helpers.staticUpdates===paused.staticUpdates && helpers.dynamicUpdates===paused.dynamicUpdates && helpers.reflectionUpdates===paused.reflectionUpdates,'Pomůcky změnily stíny nebo odraz');
-            applyHelpers();
+            applyHelpers();await frames();
             assert(paused.passes===1,'Statický snímek musí vykreslit jen hlavní průchod');
+            const cachedDraws=engine.debugStats();
+            assert(cachedDraws.drawCalls===cachedDraws.mainDrawCalls && cachedDraws.mainDrawCalls===engine.renderer_stats().drawCalls,'Draw calls musí počítat jen skutečně vykreslený průchod, ne cachované stíny/odraz');
             engine.set_simulation_paused(false);await frames();const moving=engine.effects_stats();
+            const movingDraws=engine.debugStats();
+            assert(movingDraws.drawCalls>movingDraws.mainDrawCalls,'Draw calls nezahrnují dynamické stíny a odraz');
             assert(moving.dynamicUpdatesByLight.slice(0,2).every((n,i)=>n>paused.dynamicUpdatesByLight[i]),'Pohyb neobnovil stín obou světel');
             assert(moving.staticUpdates===paused.staticUpdates,'Pohyb obnovil statickou mapu');
             assert(moving.dynamicUpdates>paused.dynamicUpdates && moving.reflectionUpdates>paused.reflectionUpdates,'Pohyb neobnovil dynamické výstupy');
@@ -67,7 +71,11 @@ try {
             engine.set_render_effects(true,true);await frames();
             engine.resize(800,450);await frames();
             const resized=engine.effects_stats();assert(resized.reflectionWidth===400 && resized.reflectionHeight===225,'Odraz nereaguje na resize');
-            engine.set_output_mode('texture');await frames();engine.set_output_mode('canvas');
+            engine.set_simulation_paused(true);await frames();
+            const canvasDraws=engine.debugStats().drawCalls;
+            engine.set_output_mode('texture');await frames();
+            assert(engine.debugStats().drawCalls===canvasDraws+1,'Texturová prezentace musí přidat právě jeden draw call');
+            engine.set_output_mode('canvas');engine.set_simulation_paused(false);
             engine.resize(innerWidth,innerHeight);await frames();
             message='PASS: stíny obou světel, zrcadlené měřítko, cache, pomůcky bez odrazu, pohyb, resize, textura';
         }catch(error){message=`FAIL: ${error.message}`;console.error(error);}

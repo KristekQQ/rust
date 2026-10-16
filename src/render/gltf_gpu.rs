@@ -790,11 +790,11 @@ impl GltfGpu {
         key: PipelineKey,
         blend: bool,
         camera_pos: Vec3,
-    ) {
+    ) -> usize {
         if key.shadow {
             pass.set_bind_group(1, &self.empty_bind, &[]);
         }
-        self.draw_many(pass, std::iter::once(model), key, blend, camera_pos);
+        self.draw_many(pass, std::iter::once(model), key, blend, camera_pos)
     }
     /// Sort transparent primitives across all visible model roots.
     pub fn draw_many<'a>(
@@ -804,7 +804,7 @@ impl GltfGpu {
         key: PipelineKey,
         blend: bool,
         camera_pos: Vec3,
-    ) {
+    ) -> usize {
         if key.shadow {
             pass.set_bind_group(1, &self.empty_bind, &[]);
         }
@@ -830,6 +830,7 @@ impl GltfGpu {
                     .total_cmp(&a.center.distance_squared(camera_pos))
             });
         }
+        let mut submitted = 0;
         for (model, draw) in draws {
             let material = &model.materials[draw.material];
             let variant = Variant {
@@ -848,7 +849,9 @@ impl GltfGpu {
             pass.set_vertex_buffer(0, draw.vertex.slice(..));
             pass.set_index_buffer(draw.index.slice(..), wgpu::IndexFormat::Uint32);
             pass.draw_indexed(0..draw.count, 0, 0..1);
+            submitted += 1;
         }
+        submitted
     }
 }
 pub fn draw_count(model: &GpuModel, blend: bool) -> usize {

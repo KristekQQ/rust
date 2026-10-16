@@ -1,0 +1,98 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>GPU resident cutting</title>
+<style>body{background:#202329;color:#eee;font:14px monospace}canvas{width:640px;height:360px}pre{white-space:pre-wrap}</style>
+<pre id="result">Probíhá ověření skutečné GPU geometrie…</pre><canvas id="gpu-canvas" width="640" height="360"></canvas>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {appleGeometry} from '../examples/cutting/scene.js';
+const output=document.querySelector('#result'),assert=(ok,message)=>{if(!ok)throw new Error(message);};
+const median=a=>[...a].sort((a,b)=>a-b)[Math.floor(a.length/2)];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+try{
+ const engine=await initEngine(document.querySelector('canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ const gpu=engine.renderer_backend()==='BrowserWebGpu';document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.setCameraView([6,5,9],[0,1,0]);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+ const motion=[.37,-4,.19];
+ const setup=(geometry=appleGeometry(),mirror=false)=>{
+  engine.scene.clear();engine.scene.createLight({position:[3,6,7],color:[1,1,1]});
+  const apple=engine.scene.createMesh(geometry).setCuttable(true,{capColor:[1,.8,.5]});if(mirror)apple.setScale([-1.1,.85,.9]);
+  const n=[24,1.688,-11.2],length=Math.hypot(...n);let x=.173;
+  for(let attempt=0;attempt<2000;attempt++,x+=.00137){let safe=true;for(let i=0;i<geometry.positions.length;i+=3){const px=geometry.positions[i]*(mirror?-1.1:1),py=geometry.positions[i+1]*(mirror?.85:1),pz=geometry.positions[i+2]*(mirror?.9:1);if(Math.abs(n[0]*(px-x)+n[1]*(py-3.6)+n[2]*(pz-.071))/length<.0002){safe=false;break;}}if(safe)break;}
+  const sword=engine.scene.createCube([x,3.6,.071]).setCutter({base:[-1.4,0,-3],tip:[1.4,0,3]});return {apple,sword};
+ };
+ // Validate actual GPU triangle soup, not a lazy CPU replay. A position key
+ // welds shared vertices exactly as the GPU boundary hash does.
+ const validate=async (piece,reference=null)=>{
+  let info=piece.meshInfo;assert(info.resident&&!info.cpuMaterialized,'GPU piece must not have CPU geometry');
+  const data=await piece.gpuMeshSnapshot(),edges=new Map();let volume=0,cap=0;
+  const corners=reference?reference.triangles.flatMap((triangle,i)=>triangle.map((index,j)=>({position:reference.positions[index],normal:reference.normals[i*3+j],color:reference.colors[i*3+j]}))):null;
+  const sub=(a,b)=>a.map((v,i)=>v-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
+  const key=p=>p.map(x=>Object.is(x,-0)?0:x).join(',');
+  assert(data.positions.length===info.triangles*3,'Actual GPU triangle count');
+  for(let i=0;i<data.positions.length;i+=3){
+   const [a,b,c]=data.positions.slice(i,i+3),normal=cross(sub(b,a),sub(c,a));assert(Math.hypot(...normal)>1e-10,'No degenerate GPU triangles');volume+=dot(a,cross(b,c))/6;
+   for(const [x,y] of [[a,b],[b,c],[c,a]]){const kx=key(x),ky=key(y),forward=kx<ky,k=forward?`${kx}|${ky}`:`${ky}|${kx}`;const old=edges.get(k)??[0,0];old[0]++;old[1]+=forward?1:-1;edges.set(k,old);}
+   const colors=data.colors.slice(i,i+3);if(colors.every(c=>c.every((v,j)=>Math.abs(v-[1,.8,.5][j])<1e-6))){cap++;for(let j=0;j<3;j++)assert(dot(normal,data.normals[i+j])>0,'Cap normal matches outward winding');}
+   for(let j=0;j<3;j++){
+    assert(data.normals[i+j].every(Number.isFinite)&&Math.hypot(...data.normals[i+j])>.1,'Finite nonzero skin/cap normals');
+    if(corners&&!colors[j].every((v,k)=>Math.abs(v-[1,.8,.5][k])<1e-6))assert(corners.some(c=>c.position.every((v,k)=>Math.abs(v-data.positions[i+j][k])<.00005)&&c.normal.every((v,k)=>Math.abs(v-data.normals[i+j][k])<.00005)),'Actual GPU skin interpolated normals match CPU');
+   }
+  }
+  assert([...edges.values()].every(([count,balance])=>count===2&&balance===0),'Actual GPU mesh is watertight and oriented');
+  assert(Math.abs(volume-info.volume)<info.volume*.0001,'Actual GPU volume agrees with metadata');assert(cap>=3,'Visible flat flesh caps');
+  info=piece.meshInfo;assert(!info.cpuMaterialized,'Explicit GPU diagnostics must not replay CPU cutting');return {volume,bottom:info.bottom};
+ };
+ const timings=[];
+ if(gpu){
+  for(const mirror of [false,true]){
+   let {sword}=setup(appleGeometry(),mirror);const cpu=await engine.scene.cutWithAsync(sword,{motion,execution:'cpu',separation:.04});const expected=cpu.pieces.map(p=>({volume:p.meshInfo.volume,data:p.meshSnapshot}));
+   ({sword}=setup(appleGeometry(),mirror));engine.scene.createCube([9,3,0]).spin([0,1,0]);
+   const result=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident',separation:.04});
+   assert(result.execution==='webgpu-resident'&&result.gpuMeshes===1,`Resident result, not CPU fallback: ${result.fallbackReason}`);
+   assert(result.geometryReadbackBytes===0&&result.metadataReadbackBytes===640,'Only 640B metadata per source');
+   const values=await Promise.all(result.pieces.map((p,i)=>validate(p,expected[i].data)));assert(values.every((v,i)=>Math.abs(v.volume-expected[i].volume)<expected[i].volume*.0001),'CPU/GPU piece volume parity');
+   // A second oblique cut reuses resident source buffers without CPU replay.
+   sword.setPosition([.113,3.6,.031]).setRotation([0,.8,0]);
+   const again=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident',separation:.04});assert(again.execution==='webgpu-resident'&&again.pieces.length>=2,`Repeated resident cut: ${again.fallbackReason}`);
+   await Promise.all(again.pieces.map(p=>validate(p)));
+   again.pieces[0].setRotation([.31,.22,.17]).setScale([-1.2,.8,1.1]);assert(!again.pieces[0].meshInfo.cpuMaterialized,'Arbitrary transforms plus metadata query never replay CPU cuts');
+  }
+  let {sword}=setup();const animated=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident',separation:.04,scatter:{floorY:.2,distance:.6,duration:.25}});
+  assert(animated.execution==='webgpu-resident',`Scatter resident: ${animated.fallbackReason}`);await sleep(650);
+  for(const piece of animated.pieces){const info=piece.meshInfo;assert(!info.cpuMaterialized&&Math.abs(info.bottom-.2)<.003,'Metadata-only scatter settles on board');await validate(piece);
+   const data=await piece.gpuMeshSnapshot(),[rx,,rz]=info.rotation;
+   const bottom=Math.min(...data.positions.map(([x,y,z])=>info.position[1]+Math.cos(rx)*(Math.sin(rz)*x+Math.cos(rz)*y)-Math.sin(rx)*z));
+   assert(Math.abs(bottom-.2)<.003,'Actual transformed GPU geometry, not just support metadata, lands on board');
+  }
+  // CPU fallback can replay a resident history, but ordinary metadata must not.
+  ({sword}=setup());const first=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'});const originalVolume=first.pieces.reduce((s,p)=>s+p.meshInfo.volume,0);
+  sword.setPosition([.113,3.6,.031]).setRotation([0,.8,0]);const cpuAgain=await engine.scene.cutWithAsync(sword,{motion,execution:'cpu'});assert(cpuAgain.pieces.length>=2&&cpuAgain.pieces.every(p=>p.meshInfo.closed),'Explicit CPU continuation after GPU residency');
+  assert(Math.abs([...first.pieces.filter(p=>p.exists),...cpuAgain.pieces].reduce((s,p)=>s+p.meshInfo.volume,0)-originalVolume)<originalVolume*.0001,'CPU fallback replay conserves resident volume');
+  const base=appleGeometry(),positions=[],indices=[];for(const offset of [-2.1,2.1]){const start=positions.length/3;for(let i=0;i<base.positions.length;i+=3)positions.push(base.positions[i],base.positions[i+1],base.positions[i+2]+offset);indices.push(...Array.from(base.indices,i=>i+start));}
+  ({sword}=setup({...base,positions,indices}));sword.setPosition([.173,3.6,0]).setCutter({base:[0,0,-6],tip:[0,0,6]});
+  const unsupported=await engine.scene.cutWithAsync(sword,{motion:[0,-4,0],execution:'gpu-resident'});assert(unsupported.execution==='cpu'&&unsupported.fallbackReason&&unsupported.pieces.length===4,'Unsupported disconnected solid has explicit atomic CPU fallback');
+  ({sword}=setup());sword.setPosition([0,3.6,0]).setCutter({base:[0,0,-3],tip:[0,0,3]});const pole=await engine.scene.cutWithAsync(sword,{motion:[0,-4,0],execution:'gpu-resident'});assert(pole.pieces.length===2&&pole.pieces.every(p=>p.meshInfo.closed),'Exact poles either stay resident or explicitly use equivalent CPU fallback');
+  ({sword}=setup());let pending=engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'}).then(()=>null,e=>e);await Promise.resolve();engine.scene.clear();assert(await pending,'Clear cancels resident commit');assert(engine.scene.objectCount===0,'No late GPU respawn');
+  ({sword}=setup());const active=engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'});await Promise.resolve();let rejected=false;try{await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'});}catch{rejected=true;}assert(rejected,'Concurrent resident cuts rejected');await active;
+  const target=setup();pending=engine.scene.cutWithAsync(target.sword,{motion,execution:'gpu-resident'}).then(()=>null,e=>e);await Promise.resolve();target.apple.setPosition([1,0,0]);assert(await pending,'Target mutation cancels resident transaction');assert(target.apple.exists,'Cancellation preserves source');
+  // Optimized-WASM benchmark; first sample warms pipeline and source paths.
+  for(const [segments,rings] of [[32,18],[96,64]]){
+   const geometry=appleGeometry(segments,rings),cpu=[],resident=[],animated=[];
+   for(let i=0;i<5;i++){
+    ({sword}=setup(geometry));let r=await engine.scene.cutWithAsync(sword,{motion,execution:'cpu'});if(i)cpu.push(r.totalMs);
+    ({sword}=setup(geometry));r=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'});assert(r.execution==='webgpu-resident',`Benchmark must not silently fallback: ${r.fallbackReason}`);if(i)resident.push(r.totalMs);
+    ({sword}=setup(geometry));r=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident',scatter:{floorY:.2,distance:.8,duration:.25}});assert(r.execution==='webgpu-resident',`Animated benchmark fallback: ${r.fallbackReason}`);if(i)animated.push(r.totalMs);
+   }
+   timings.push({triangles:geometry.indices.length/3,cpuMedianMs:median(cpu),residentMedianMs:median(resident),residentScatterMedianMs:median(animated)});
+  }
+  // Keep an opened/scattered fruit visible for screenshot inspection.
+  ({sword}=setup());pending=engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'}).then(()=>null,e=>e);await Promise.resolve();engine.dispose();assert(await pending,'Disposal cancels resident transaction');
+  // Reinitialize after disposal and render a final opened fruit.
+  const restarted=await initEngine(document.querySelector('canvas'));document.documentElement.dataset.rendererBackend=restarted.renderer_backend();
+  restarted.setCameraView([6,5,9],[0,1,0]);restarted.set_grid_visible(false);restarted.set_light_helpers_visible(false);restarted.scene.createLight({position:[3,6,7],color:[1,1,1]});restarted.scene.createMesh(appleGeometry()).setCuttable(true,{capColor:[1,.8,.5]});
+  const blade=restarted.scene.createCube([.173,3.6,.071]).setCutter({base:[-1.4,0,-3],tip:[1.4,0,3]});await restarted.scene.cutWithAsync(blade,{motion,execution:'gpu-resident',scatter:{floorY:.2,distance:.8,duration:.25}});await sleep(650);
+ }else{
+  const {sword}=setup();let rejected=false;try{await engine.scene.cutWithAsync(sword,{motion,execution:'gpu-resident'});}catch{rejected=true;}assert(rejected,'WebGL cannot claim GPU residency');const result=await engine.scene.cutWithAsync(sword,{motion});assert(result.execution==='cpu'&&result.pieces.length===2,'WebGL retains equivalent CPU cutting');
+ }
+ output.textContent=`PASS: ${gpu?'actual GPU resident topology/caps/normals, repeated cuts, mirrored scale, metadata-only scatter, cancellation':'WebGL CPU fallback'}; timings ${JSON.stringify(timings)}`;
+}catch(error){output.textContent=`FAIL: ${error.message??error}`;console.error(error);}
+</script></html>

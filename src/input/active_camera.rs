@@ -50,6 +50,26 @@ impl ActiveCamera {
         true
     }
 
+    pub fn set_orbit_view(&mut self, position: Vec3, target: Vec3) -> bool {
+        if !self.orbit.set_view(position, target) {
+            return false;
+        }
+        self.set_type(CameraType::Orbit);
+        true
+    }
+
+    pub fn adjust_orbit(&mut self, dx: f32, dy: f32, zoom: f32) -> bool {
+        if !matches!(self.active, CameraType::Orbit) || self.character.is_some() {
+            return false;
+        }
+        self.orbit.adjust(dx, dy, zoom)
+    }
+
+    pub fn orbit_target(&self) -> Option<Vec3> {
+        (matches!(self.active, CameraType::Orbit) && self.character.is_none())
+            .then(|| self.orbit.target())
+    }
+
     pub fn set_aspect(&mut self, aspect: f32) {
         self.aspect = aspect;
         self.free.set_aspect(aspect);
@@ -231,5 +251,27 @@ mod tests {
         let target = camera.matrix().project_point3(Vec3::ZERO);
         assert!(target.x.abs() < 1e-5 && target.y.abs() < 1e-5);
         assert!((0.0..1.0).contains(&target.z));
+    }
+
+    #[test]
+    fn orbit_commands_seed_switch_and_reject_other_modes() {
+        let mut camera = ActiveCamera::new(1.0);
+        camera.set_type(CameraType::Free);
+        assert!(!camera.adjust_orbit(1.0, 1.0, 0.0));
+        assert_eq!(camera.orbit_target(), None);
+        let position = Vec3::new(10.0, 5.0, 3.0);
+        let target = Vec3::new(1.0, 1.0, -2.0);
+        assert!(camera.set_orbit_view(position, target));
+        assert!(camera.position().distance(position) < 1e-5);
+        assert_eq!(camera.orbit_target(), Some(target));
+        camera.key_down("KeyW".into());
+        assert!(camera.set_orbit_view(position, target));
+        let stopped = camera.position();
+        camera.update(1.0);
+        assert_eq!(camera.position(), stopped);
+        assert!(camera.adjust_orbit(20.0, 0.0, 0.0));
+        camera.set_type(CameraType::Free);
+        assert_eq!(camera.orbit_target(), None);
+        assert!(!camera.adjust_orbit(0.0, 0.0, 0.0));
     }
 }

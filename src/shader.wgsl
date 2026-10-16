@@ -12,6 +12,9 @@ struct SceneUniforms {
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, LIGHT_COUNT>,
+    guide_plane: vec4<f32>,
+    guide_origin: vec4<f32>,
+    guide_axis: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -143,6 +146,17 @@ fn shade_surface(input: VertexOutput) -> vec4<f32> {
         if(reflected.w>0.0 && all(uv>=vec2(0.0)) && all(uv<=vec2(1.0))) {
             result=mix(result,textureSampleLevel(reflection_texture,reflection_sampler,uv,0.0).rgb,input.material.x);
         }
+    }
+    // Intersect the same finite blade sweep with actual visible cuttable surfaces.
+    // Regular depth testing keeps hidden fruit hidden; no duplicate contour mesh.
+    let along = dot(input.world_pos - scene.guide_origin.xyz, scene.guide_axis.xyz);
+    let distance = abs(dot(vec4(input.world_pos, 1.0), scene.guide_plane));
+    if (input.material.w > 0.5 && scene.guide_axis.w > 0.0
+        && abs(along) <= scene.guide_axis.w
+        && input.world_pos.y >= scene.guide_origin.w
+        && input.world_pos.y <= scene.guide_origin.y) {
+        let band = 1.0 - smoothstep(0.022, 0.042, distance);
+        result = mix(result, vec3<f32>(0.08, 1.0, 0.025), band);
     }
     return vec4<f32>(result, input.material.x);
 }

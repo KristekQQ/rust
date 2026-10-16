@@ -17,6 +17,23 @@ export class SceneObject {
     /** @param {Wasm} wasm @param {number} id */
     constructor(wasm, id) { this.#wasm = wasm; handleBindings.set(this, wasm); this.id = id; Object.freeze(this); }
     get exists() { return this.#wasm.object_exists(this.id); }
+    /** @param {boolean} [enabled] @param {{capColor?: Vector3}} [options] */
+    setCuttable(enabled = true, {capColor = [1, 0.3, 0.12]} = {}) {
+        this.#wasm.set_cuttable(this.id, enabled, ...capColor); return this;
+    }
+    /** Endpoints in this object's local coordinates, transformed by Rust at sweep time.
+     * @param {{base: Vector3, tip: Vector3}|null} blade */
+    setCutter(blade) {
+        this.#wasm.set_cutter(this.id, blade !== null, new Float32Array(blade ? [...blade.base, ...blade.tip] : [])); return this;
+    }
+    /** @returns {import('./engine.d.ts').TriangleMeshInfo} */
+    get meshInfo() { return JSON.parse(this.#wasm.triangle_mesh_info(this.id)); }
+    /** Explicit CPU diagnostic snapshot; not intended for per-frame polling.
+     * @returns {import('./engine.d.ts').TriangleMeshSnapshot} */
+    get meshSnapshot() { return JSON.parse(this.#wasm.triangle_mesh_snapshot(this.id)); }
+    /** Explicit actual GPU vertex readback for diagnostics, not the render loop.
+     * @returns {Promise<import('./engine.d.ts').GpuMeshSnapshot>} */
+    async gpuMeshSnapshot() { return JSON.parse(await this.#wasm.triangle_mesh_gpu_snapshot(this.id)); }
     /** @param {Vector3} position */
     setPosition(position) { accepted(this.#wasm.set_object_position(this.id, ...position)); return this; }
     /** @param {Vector3} radians */
@@ -100,6 +117,44 @@ export class Scene {
     createPlane(position = [0, 0, 0]) { return this.#create(this.#wasm.add_plane(...position)); }
     /** @param {Vector3} [position] */
     createSphere(position = [0, 0, 0]) { return this.#create(this.#wasm.add_sphere(...position)); }
+    /** Closed indexed triangle solid. Parsing, geometry, BVH and GPU upload are Rust.
+     * @param {import('./engine.d.ts').TriangleMeshOptions} options */
+    createMesh({positions, indices, color = [0.18, 0.65, 0.85], triangleColors, smooth = false}) {
+        if (indices.length > 60000 || positions.length > 180000 || !Array.from(indices).every(i => Number.isInteger(i) && i >= 0 && i <= 0xffffffff)) {
+            throw new Error('Neplatné indexy nebo překročený limit meshe.');
+        }
+        if (triangleColors && triangleColors.length !== indices.length) throw new Error('Každý trojúhelník potřebuje RGB barvu.');
+        return this.#create(triangleColors
+            ? this.#wasm.add_colored_triangle_mesh(new Float32Array(positions),new Uint32Array(indices),new Float32Array(triangleColors),smooth)
+            : this.#wasm.add_triangle_mesh(new Float32Array(positions), new Uint32Array(indices), ...color,smooth));
+    }
+    /** @param {SceneObject} cutter @param {import('./engine.d.ts').CutterAimOptions} options @returns {Vector3} */
+    aimCutter(cutter,{center,yaw=0,tilt=0,height=3.6,floorY=0.2,guides=[]}) {
+        if(handleBindings.get(cutter)!==this.#wasm || guides.some(g=>handleBindings.get(g)!==this.#wasm))throw new Error('Čepel i vodítka musí patřit této scéně.');
+        const p=this.#wasm.aim_cutter(cutter.id,new Uint32Array(guides.map(g=>g.id)),new Float32Array(center),new Float32Array([yaw,tilt,height,floorY]));
+        return [p[0],p[1],p[2]];
+    }
+    /** Straight finite blade sweep. Rust moves the sword and replaces hit solids.
+     * @param {SceneObject} cutter @param {{motion: Vector3, separation?: number, scatter?: import('./engine.d.ts').CutScatterOptions}} options
+     * @returns {import('./engine.d.ts').CutResult} */
+    cutWith(cutter, {motion, separation = 0.12, scatter}) {
+        if (handleBindings.get(cutter) !== this.#wasm) throw new Error('Čepel musí patřit této scéně.');
+        const result = JSON.parse(scatter
+            ? this.#wasm.cut_with_scatter(cutter.id, new Float32Array(motion), separation, scatter.floorY, scatter.distance ?? 0.8, scatter.duration ?? 0.6)
+            : this.#wasm.cut_with(cutter.id, ...motion, separation));
+        return {...result, pieces: result.pieces.map((/** @type {number} */ id) => this.#create(id))};
+    }
+    /** Hybrid compute preparation + identical Rust topology; WebGL uses CPU.
+     * @param {SceneObject} cutter @param {import('./engine.d.ts').AsyncCutOptions} options
+     * @returns {Promise<import('./engine.d.ts').AsyncCutResult>} */
+    async cutWithAsync(cutter,{motion,separation=.12,scatter,execution='auto'}) {
+        if(handleBindings.get(cutter)!==this.#wasm)throw new Error('Čepel musí patřit této scéně.');
+        const epoch=this.#loadEpoch;
+        const result=JSON.parse(await this.#wasm.cut_with_async(cutter.id,new Float32Array(motion),separation,new Float32Array(scatter?[scatter.floorY,scatter.distance??.8,scatter.duration??.6]:[]),execution));
+        this.#wasm.scene_object_count();
+        if(epoch!==this.#loadEpoch)throw new Error('Řez zrušen vymazáním scény');
+        return {...result,pieces:result.pieces.map((/** @type {number} */ id)=>this.#create(id))};
+    }
     /** @param {number} id */
     #create(id) {
         accepted(id !== 0xffffffff);
@@ -305,6 +360,19 @@ async function initializeEngine(canvas, backend, initialization) {
         set_camera_mode: wasm.set_camera_mode,
         /** @param {Vector3} position @param {Vector3} target */
         setCameraView(position, target) { accepted(wasm.set_camera_view(...position, ...target)); },
+        /** @param {Vector3} position @param {Vector3} target */
+        setOrbitView(position,target) {accepted(wasm.set_orbit_view(...position,...target));},
+        /** @param {number} dx @param {number} dy @param {number} [zoom] */
+        adjustOrbit(dx,dy,zoom=0) {accepted(wasm.adjust_orbit(dx,dy,zoom));},
+        /** @returns {import('./engine.d.ts').CameraViewState} */
+        cameraViewState() {return JSON.parse(wasm.camera_view_state());},
+        /** @param {Vector3} point @returns {readonly [number,number]|null} */
+        worldToScreen(point) {const p=wasm.world_to_screen(...point);return p.length===2?[p[0],p[1]]:null;},
+        /** @param {readonly [number,number]} point @param {number} [height] @returns {Vector3} */
+        screenToPlane(point, height = 0) {
+            const p = wasm.screen_to_plane(...point, height);
+            return [p[0], p[1], p[2]];
+        },
         /** @param {ModelObject} model @param {import('./engine.d.ts').CharacterOptions} [options] */
         controlCharacter(model, { speed = 2.5, runSpeed = 5, modelForwardYaw = 0, animations = {}, physics } = {}) {
             if (!(model instanceof ModelObject) || handleBindings.get(model) !== wasm) {

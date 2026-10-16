@@ -533,6 +533,71 @@ pub fn set_camera_view(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> 
 }
 
 #[wasm_bindgen]
+pub fn screen_to_plane(u: f32, v: f32, height: f32) -> Result<Vec<f32>, JsValue> {
+    STATE.with(|state| {
+        let state = state.borrow();
+        let engine = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine is not initialized"))?;
+        let result = engine
+            .borrow()
+            .screen_to_plane(u, v, height)
+            .map(|p| p.to_array().to_vec())
+            .ok_or_else(|| JsValue::from_str("Pointer ray does not intersect plane"));
+        result
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_orbit_view(px: f32, py: f32, pz: f32, tx: f32, ty: f32, tz: f32) -> bool {
+    let ok = CAMERA.with(|camera| {
+        camera.borrow().as_ref().is_some_and(|c| {
+            c.borrow_mut()
+                .set_orbit_view(glam::Vec3::new(px, py, pz), glam::Vec3::new(tx, ty, tz))
+        })
+    });
+    if ok {
+        STATE.with(|state| {
+            if let Some(state) = state.borrow().as_ref() {
+                state.borrow_mut().clear_model_camera();
+            }
+        });
+    }
+    ok
+}
+#[wasm_bindgen]
+pub fn world_to_screen(x: f32, y: f32, z: f32) -> Result<Vec<f32>, JsValue> {
+    STATE.with(|state| {
+        let state = state.borrow();
+        let engine = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
+        let result = engine
+            .borrow()
+            .world_to_screen(glam::Vec3::new(x, y, z))
+            .map(|p| p.to_vec())
+            .unwrap_or_default();
+        Ok(result)
+    })
+}
+#[wasm_bindgen]
+pub fn adjust_orbit(dx: f32, dy: f32, zoom: f32) -> bool {
+    CAMERA.with(|camera| {
+        camera
+            .borrow()
+            .as_ref()
+            .is_some_and(|c| c.borrow_mut().adjust_orbit(dx, dy, zoom))
+    })
+}
+#[wasm_bindgen]
+pub fn camera_view_state() -> Result<String, JsValue> {
+    CAMERA.with(|camera| {
+        let camera=camera.borrow();let camera=camera.as_ref().ok_or_else(||JsValue::from_str("Camera unavailable"))?.borrow();
+        Ok(serde_json::json!({"position":camera.position().to_array(),"orbitTarget":camera.orbit_target().map(|p|p.to_array())}).to_string())
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_camera_mode(mode: &str) {
     if mode == "free" || mode == "orbit" {
         STATE.with(|s| {
@@ -703,6 +768,469 @@ pub fn add_cube(x: f32, y: f32, z: f32) -> u32 {
         }
     });
     id
+}
+
+fn cutting_command<T>(
+    command: impl FnOnce(&mut crate::scene::SceneManager) -> Result<T, String>,
+) -> Result<T, JsValue> {
+    STATE.with(|state| {
+        let state = state.borrow();
+        let engine = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let result = command(&mut engine.borrow_mut().scene).map_err(|e| JsValue::from_str(&e));
+        result
+    })
+}
+
+#[wasm_bindgen]
+pub fn add_triangle_mesh(
+    positions: &[f32],
+    indices: &[u32],
+    r: f32,
+    g: f32,
+    b: f32,
+    smooth: bool,
+) -> Result<u32, JsValue> {
+    if !positions.len().is_multiple_of(3)
+        || positions.len() > crate::cutting::MAX_TRIANGLES * 9
+        || indices.len() > crate::cutting::MAX_TRIANGLES * 3
+    {
+        return Err(JsValue::from_str("Invalid triangle mesh buffers"));
+    }
+    let positions = positions
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|&p| glam::Vec3::from_array(p))
+        .collect();
+    let mut mesh = crate::cutting::CutMesh::new(positions, indices, glam::Vec3::new(r, g, b))
+        .map_err(|e| JsValue::from_str(&e))?;
+    if smooth {
+        mesh.smooth_normals();
+    }
+    cutting_command(|scene| scene.add_triangle_mesh(mesh))
+}
+
+#[wasm_bindgen]
+pub fn set_cuttable(id: u32, enabled: bool, r: f32, g: f32, b: f32) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_cuttable(id, enabled, glam::Vec3::new(r, g, b)))
+}
+
+#[wasm_bindgen]
+pub fn add_colored_triangle_mesh(
+    positions: &[f32],
+    indices: &[u32],
+    colors: &[f32],
+    smooth: bool,
+) -> Result<u32, JsValue> {
+    if positions.len() > crate::cutting::MAX_TRIANGLES * 9
+        || !positions.len().is_multiple_of(3)
+        || indices.len() > crate::cutting::MAX_TRIANGLES * 3
+        || colors.len() != indices.len()
+        || colors
+            .iter()
+            .any(|c| !c.is_finite() || !(0.0..=1.0).contains(c))
+    {
+        return Err(JsValue::from_str("Invalid triangle colors or mesh budget"));
+    }
+    let positions = positions
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|&p| glam::Vec3::from_array(p))
+        .collect();
+    let mut mesh = crate::cutting::CutMesh::new(positions, indices, glam::Vec3::ONE)
+        .map_err(|e| JsValue::from_str(&e))?;
+    for (triangle, &color) in mesh.triangles.iter_mut().zip(colors.as_chunks::<3>().0) {
+        triangle.color = glam::Vec3::from_array(color);
+    }
+    if smooth {
+        mesh.smooth_normals();
+    }
+    cutting_command(|scene| scene.add_triangle_mesh(mesh))
+}
+
+#[wasm_bindgen]
+pub fn aim_cutter(
+    id: u32,
+    guides: &[u32],
+    center: &[f32],
+    settings: &[f32],
+) -> Result<Vec<f32>, JsValue> {
+    if center.len() != 3 || settings.len() != 4 {
+        return Err(JsValue::from_str("Invalid cutting aim arguments"));
+    }
+    cutting_command(|scene| {
+        scene
+            .aim_cutter(
+                id,
+                guides,
+                crate::cutting_tool::ToolAim {
+                    center: glam::Vec3::from_slice(center),
+                    yaw: settings[0],
+                    tilt: settings[1],
+                    height: settings[2],
+                    floor: settings[3],
+                },
+            )
+            .map(|p| p.to_array().to_vec())
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_cutter(id: u32, enabled: bool, endpoints: &[f32]) -> Result<(), JsValue> {
+    let blade = if enabled {
+        if endpoints.len() != 6 {
+            return Err(JsValue::from_str("Cutter requires two local endpoints"));
+        }
+        Some([
+            glam::Vec3::from_slice(&endpoints[..3]),
+            glam::Vec3::from_slice(&endpoints[3..]),
+        ])
+    } else {
+        None
+    };
+    cutting_command(|scene| scene.set_cutter(id, blade))
+}
+
+#[wasm_bindgen]
+pub fn cut_with(id: u32, x: f32, y: f32, z: f32, separation: f32) -> Result<String, JsValue> {
+    cutting_command(|scene| {
+        let report = scene.cut_with(id, glam::Vec3::new(x, y, z), separation)?;
+        Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests}).to_string())
+    })
+}
+
+#[wasm_bindgen]
+pub fn cut_with_scatter(
+    id: u32,
+    motion: &[f32],
+    separation: f32,
+    floor_y: f32,
+    distance: f32,
+    duration: f32,
+) -> Result<String, JsValue> {
+    if motion.len() != 3 {
+        return Err(JsValue::from_str("Invalid cutting motion"));
+    }
+    cutting_command(|scene| {
+        let report = scene.cut_with_scatter(
+            id,
+            glam::Vec3::from_slice(motion),
+            separation,
+            floor_y,
+            distance,
+            duration,
+        )?;
+        Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests}).to_string())
+    })
+}
+
+#[wasm_bindgen]
+pub fn triangle_mesh_info(id: u32) -> Result<String, JsValue> {
+    cutting_command(|scene| {
+        let object = scene
+            .triangle_meshes()
+            .get(&id)
+            .ok_or("Triangle mesh no longer exists")?;
+        let transform = scene.objects()[&id].transform;
+        let bottom = object.mesh.bottom(transform)?;
+        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom}).to_string())
+    })
+}
+/// Explicit diagnostic snapshot, never fetched by the render loop.
+#[wasm_bindgen]
+pub fn triangle_mesh_snapshot(id: u32) -> Result<String, JsValue> {
+    cutting_command(|scene| {
+        let mesh = &scene
+            .triangle_meshes()
+            .get(&id)
+            .ok_or("Triangle mesh no longer exists")?
+            .mesh;
+        let mesh = mesh.cpu()?;
+        let rendered = mesh.render_mesh();
+        Ok(serde_json::json!({"positions":mesh.positions.iter().map(|p| p.to_array()).collect::<Vec<_>>(),
+            "triangles":mesh.triangles.iter().map(|t| t.indices).collect::<Vec<_>>(),
+            "normals":rendered.vertices.iter().map(|v| v.normal).collect::<Vec<_>>(),
+            "colors":rendered.vertices.iter().map(|v| v.color).collect::<Vec<_>>()}).to_string())
+    })
+}
+
+/// Reads actual GPU vertices for explicit verification, never during a normal cut.
+#[wasm_bindgen]
+pub async fn triangle_mesh_gpu_snapshot(id: u32) -> Result<String, JsValue> {
+    let state = STATE
+        .with(|s| s.borrow().clone())
+        .ok_or_else(|| JsValue::from_str("Engine disposed"))?;
+    let (source, device, queue) = {
+        let st = state.borrow();
+        let (device, queue) = st.resident_devices();
+        (
+            st.resident_source(id)
+                .ok_or_else(|| JsValue::from_str("Mesh is not GPU resident"))?,
+            device,
+            queue,
+        )
+    };
+    let vertices = source
+        .read_vertices(&device, &queue)
+        .await
+        .map_err(|e| JsValue::from_str(&e))?;
+    Ok(serde_json::json!({"positions":vertices.iter().map(|v|&v.position[..3]).collect::<Vec<_>>(),
+        "normals":vertices.iter().map(|v|&v.normal[..3]).collect::<Vec<_>>(),
+        "colors":vertices.iter().map(|v|&v.color[..3]).collect::<Vec<_>>()}).to_string())
+}
+
+async fn cut_resident_async(
+    state: Rc<RefCell<State>>,
+    generation: u64,
+    id: u32,
+    motion: glam::Vec3,
+    separation: f32,
+    scatter: Vec<f32>,
+    timing: (web_sys::Performance, f64),
+) -> Result<String, JsValue> {
+    let (clock, start) = timing;
+    use crate::{
+        cutting_mesh::{MeshData, MeshStats, SplitRecipe, SupportCurve},
+        render::cutting_resident::{ResidentOutcome, RESIDENT_METADATA_BYTES},
+    };
+    let fail = |e: String| JsValue::from_str(&e);
+    let scatter = if scatter.is_empty() {
+        None
+    } else {
+        Some([scatter[0], scatter[1], scatter[2]])
+    };
+    let (snapshot, candidates) = {
+        let st = state.borrow();
+        (
+            st.scene.cut_snapshot(id).map_err(fail)?,
+            st.scene
+                .resident_candidates(id, motion, separation, scatter)
+                .map_err(fail)?,
+        )
+    };
+    let count = candidates.len();
+    let mut staged = Vec::new();
+    let mut gpu_buffers = Vec::new();
+    let mut fallback = None;
+    let mut readback_bytes = 0;
+    let gpu_start = clock.now();
+    let (device, queue) = state.borrow().resident_devices();
+    for candidate in candidates {
+        let pending = match state.borrow_mut().dispatch_resident(&candidate) {
+            Ok(p) => p,
+            Err(e) => {
+                fallback = Some(e);
+                break;
+            }
+        };
+        let outcome = pending.read(&device, &queue).await.map_err(fail)?;
+        readback_bytes += RESIDENT_METADATA_BYTES;
+        match outcome {
+            ResidentOutcome::Miss => {}
+            ResidentOutcome::Unsupported(reason) => {
+                fallback = Some(reason);
+                break;
+            }
+            ResidentOutcome::Pieces(pieces) => {
+                let pieces = *pieces;
+                let recipe = SplitRecipe::new(
+                    candidate.mesh.clone(),
+                    candidate.a,
+                    candidate.b,
+                    candidate.motion,
+                    candidate.color,
+                );
+                let data = std::array::from_fn(|side| {
+                    let p = &pieces[side];
+                    let stats = MeshStats {
+                        min: p.bounds_min,
+                        max: p.bounds_max,
+                        triangles: p.vertex_count as usize / 3,
+                        vertices: p.vertex_count as usize,
+                        volume: p.volume as f64,
+                    };
+                    let radius = (p.bounds_min.abs().max(p.bounds_max.abs())
+                        * candidate.transform.scale.abs())
+                    .length();
+                    let support = SupportCurve {
+                        rotation: candidate.transform.rotation,
+                        angular: candidate.angular[side],
+                        scale: candidate.transform.scale,
+                        samples: p.support,
+                        second_bound: radius * candidate.angular[side].abs().element_sum().powi(2),
+                    };
+                    MeshData::resident(stats, recipe.clone(), side, support)
+                });
+                staged.push((candidate, data));
+                gpu_buffers.extend(pieces);
+            }
+        }
+    }
+    let compute_ms = clock.now() - gpu_start;
+    if GENERATION.with(|g| g.get()) != generation {
+        return Err(fail("Cut canceled by engine disposal".into()));
+    }
+    let mut st = state.borrow_mut();
+    if st.scene.cut_snapshot(id).ok().as_ref() != Some(&snapshot) {
+        return Err(fail(
+            "Cut canceled because the scene changed during compute".into(),
+        ));
+    }
+    let gpu_meshes = staged.len();
+    let report = if fallback.is_some() {
+        if let Some([floor, distance, duration]) = scatter {
+            st.scene
+                .cut_with_scatter(id, motion, separation, floor, distance, duration)
+        } else {
+            st.scene.cut_with(id, motion, separation)
+        }
+    } else {
+        st.scene
+            .commit_resident(id, motion, separation, scatter, staged, count)
+    }
+    .map_err(fail)?;
+    if fallback.is_none() {
+        for (&piece_id, piece) in report.pieces.iter().zip(gpu_buffers) {
+            st.install_resident(piece_id, piece);
+        }
+    }
+    let total_ms = clock.now() - start;
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,
+        "execution":if fallback.is_none(){"webgpu-resident"}else{"cpu"},"gpuMeshes":if fallback.is_none(){gpu_meshes}else{0},"fallbackReason":fallback,
+        "metadataReadbackBytes":readback_bytes,"geometryReadbackBytes":0,"totalMs":total_ms,"computeMs":compute_ms,"cpuMs":(total_ms-compute_ms).max(0.)}).to_string())
+}
+
+/// No RefCell borrow survives the asynchronous GPU readback. A scene revision
+/// and engine generation guard prevent late results from replacing newer data.
+#[wasm_bindgen]
+pub async fn cut_with_async(
+    id: u32,
+    motion: Vec<f32>,
+    separation: f32,
+    scatter: Vec<f32>,
+    execution: String,
+) -> Result<String, JsValue> {
+    let fail = |message: &str| JsValue::from_str(message);
+    if motion.len() != 3
+        || (!scatter.is_empty() && scatter.len() != 3)
+        || !["auto", "cpu", "gpu", "gpu-resident"].contains(&execution.as_str())
+        || !separation.is_finite()
+        || !(0.0..=2.0).contains(&separation)
+    {
+        return Err(fail("Invalid asynchronous cutting options"));
+    }
+    let state = STATE
+        .with(|s| s.borrow().clone())
+        .ok_or_else(|| fail("Engine disposed"))?;
+    let generation = GENERATION.with(|g| g.get());
+    let busy = state.borrow().cutting_busy.clone();
+    if busy.replace(true) {
+        return Err(fail("A cutting request is already pending"));
+    }
+    struct Busy(std::rc::Rc<std::cell::Cell<bool>>);
+    impl Drop for Busy {
+        fn drop(&mut self) {
+            self.0.set(false);
+        }
+    }
+    let _busy = Busy(busy);
+    let clock = web_sys::window()
+        .and_then(|w| w.performance())
+        .ok_or_else(|| fail("Performance clock unavailable"))?;
+    let start = clock.now();
+    let motion = glam::Vec3::from_slice(&motion);
+    let gpu_supported = state.borrow().backend == "BrowserWebGpu";
+    if (execution == "gpu" || execution == "gpu-resident") && !gpu_supported {
+        return Err(fail("Compute cutting requires WebGPU"));
+    }
+    if execution == "gpu-resident" {
+        return cut_resident_async(
+            state,
+            generation,
+            id,
+            motion,
+            separation,
+            scatter,
+            (clock, start),
+        )
+        .await;
+    }
+    // Measured hybrid readback is slower for current meshes. Auto deliberately
+    // stays on the optimized CPU path; forced GPU is explicit and testable.
+    let use_gpu = gpu_supported && execution == "gpu";
+    let (snapshot, inputs) = if use_gpu {
+        let st = state.borrow();
+        (
+            Some(st.scene.cut_snapshot(id).map_err(|e| fail(&e))?),
+            st.scene
+                .cut_geometry_inputs(id, motion)
+                .map_err(|e| fail(&e))?,
+        )
+    } else {
+        (None, Vec::new())
+    };
+    let mut geometries = std::collections::BTreeMap::new();
+    let mut compute_ms = 0.;
+    let mut fallback_reason = None;
+    if use_gpu && !inputs.is_empty() {
+        let gpu_start = clock.now();
+        let pending = state.borrow_mut().dispatch_cut_geometry(&inputs);
+        match pending.read().await {
+            Ok(rows) => {
+                if rows.len() != inputs.len() {
+                    return Err(fail("Invalid compute result count"));
+                }
+                for (input, rows) in inputs.iter().zip(&rows) {
+                    match input.decode(rows).map_err(|e| fail(&e))? {
+                        Some(geometry) => {
+                            geometries.insert(input.id, geometry);
+                        }
+                        None => {
+                            fallback_reason = Some("near-plane precision");
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                if execution == "gpu" {
+                    return Err(fail(&error));
+                }
+                fallback_reason = Some("compute readback failed");
+            }
+        }
+        compute_ms = clock.now() - gpu_start;
+    }
+    if GENERATION.with(|g| g.get()) != generation {
+        return Err(fail("Cut canceled by engine disposal"));
+    }
+    let mut st = state.borrow_mut();
+    if snapshot.is_some_and(|snapshot| st.scene.cut_snapshot(id).ok().as_ref() != Some(&snapshot)) {
+        return Err(fail(
+            "Cut canceled because the scene changed during compute",
+        ));
+    }
+    let report = if scatter.is_empty() {
+        st.scene
+            .cut_with_geometry(id, motion, separation, Some(&geometries))
+    } else {
+        st.scene.cut_with_scatter_geometry(
+            id,
+            motion,
+            separation,
+            [scatter[0], scatter[1], scatter[2]],
+            Some(&geometries),
+        )
+    }
+    .map_err(|e| fail(&e))?;
+    let total_ms = clock.now() - start;
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,
+        "objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,
+        "execution":if geometries.is_empty() {"cpu"} else {"webgpu-compute"},
+        "gpuMeshes":geometries.len(),"fallbackReason":fallback_reason,
+        "totalMs":total_ms,"computeMs":compute_ms,"cpuMs":(total_ms-compute_ms).max(0.)}).to_string())
 }
 
 #[wasm_bindgen]

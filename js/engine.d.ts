@@ -1,6 +1,33 @@
 import type * as wasm from "../pkg/webgpu_wasm.js";
 
 export type Vector3 = readonly [number, number, number];
+export interface TriangleMeshOptions {
+    /** Flat xyz buffer; indexed watertight, outward oriented, non-self-intersecting solid. */
+    positions: readonly number[] | Float32Array;
+    indices: readonly number[] | Uint32Array;
+    color?: Vector3;
+    /** Flat RGB per triangle. Omit for uniform color. */
+    triangleColors?: readonly number[] | Float32Array;
+    /** Area-weighted shared-vertex skin normals; newly cut caps remain flat. Default false. */
+    smooth?: boolean;
+}
+export interface CutterAimOptions {center:Vector3;yaw?:number;tilt?:number;height?:number;floorY?:number;guides?:readonly SceneObject[]}
+export interface CameraViewState {position:Vector3;orbitTarget:Vector3|null}
+export interface TriangleMeshInfo {
+    triangles: number; vertices: number; volume: number; closed: boolean; cuttable: boolean;
+    resident: boolean; cpuMaterialized: boolean;
+    /** GPU residents return conservative support (bounds outside the sampled animation path). */
+    position: Vector3; rotation: Vector3; bottom: number;
+}
+export interface TriangleMeshSnapshot {positions:Vector3[];triangles:[number,number,number][];normals:Vector3[];colors:Vector3[]}
+export interface GpuMeshSnapshot {positions:Vector3[];normals:Vector3[];colors:Vector3[]}
+export interface CutScatterOptions {floorY:number; distance?:number; duration?:number}
+export interface CutResult {
+    removed: number[]; pieces: SceneObject[];
+    objectCandidates: number; bvhNodes: number; triangleTests: number;
+}
+export interface AsyncCutOptions {motion:Vector3;separation?:number;scatter?:CutScatterOptions;execution?:'auto'|'cpu'|'gpu'|'gpu-resident'}
+export interface AsyncCutResult extends CutResult {execution:'cpu'|'webgpu-compute'|'webgpu-resident';gpuMeshes:number;fallbackReason:string|null;totalMs:number;computeMs:number;cpuMs:number;metadataReadbackBytes?:number;geometryReadbackBytes?:number}
 export interface CharacterOptions {
     speed?: number;
     runSpeed?: number;
@@ -30,6 +57,11 @@ export class SceneObject {
     protected constructor();
     readonly id: number;
     readonly exists: boolean;
+    setCuttable(enabled?: boolean, options?: {capColor?: Vector3}): this;
+    setCutter(blade: {base: Vector3; tip: Vector3} | null): this;
+    readonly meshInfo: TriangleMeshInfo;
+    readonly meshSnapshot: TriangleMeshSnapshot;
+    gpuMeshSnapshot(): Promise<GpuMeshSnapshot>;
     setPosition(position: Vector3): this;
     /** Absolute rotation in radians. */
     setRotation(radians: Vector3): this;
@@ -83,6 +115,10 @@ export class Scene {
     createCube(position?: Vector3): SceneObject;
     createPlane(position?: Vector3): SceneObject;
     createSphere(position?: Vector3): SceneObject;
+    createMesh(options: TriangleMeshOptions): SceneObject;
+    cutWithAsync(cutter:SceneObject,options:AsyncCutOptions):Promise<AsyncCutResult>;
+    aimCutter(cutter:SceneObject,options:CutterAimOptions):Vector3;
+    cutWith(cutter: SceneObject, options: {motion: Vector3; separation?: number; scatter?:CutScatterOptions}): CutResult;
     /** glTF2/GLB asset; decoding, PBR, hierarchy and animation are owned by Rust. */
     loadModel(url: string | URL): Promise<ModelObject>;
     createLight(options?: LightOptions): SceneLight;
@@ -94,7 +130,7 @@ export type RawEngine = Pick<typeof wasm,
     "set_object_transform" | "set_cube_transform" | "add_light" | "remove_light" |
     "clear_lights" | "set_light" | "set_light_orbit" | "clear_light_orbit" |
     "schedule_rotate" | "schedule_remove_object" | "schedule_remove_light" |
-    "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused">;
+    "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused"> & {screenToPlane(point:readonly [number,number],height?:number):Vector3;worldToScreen(point:Vector3):readonly[number,number]|null;setOrbitView(position:Vector3,target:Vector3):void;adjustOrbit(dx:number,dy:number,zoom?:number):void;cameraViewState():CameraViewState};
 export interface RenderStats {
     total: number; visible: number; culled: number;
     /** Object batches only, excludes optional debug lines. */
@@ -117,6 +153,10 @@ export interface DebugStats {
     /** Main-view extraction only, not GPU execution. Cached frames do not run culling. */
     cullMs: number; cullCached: boolean;
     total: number; visible: number; culled: number;
+    /** Actual commands this frame, including shadows/reflection/postprocessing/HUD/presentation. */
+    drawCalls: number;
+    /** Main-view geometry, transparency and grid/light helpers; excludes HUD/postprocessing. */
+    mainDrawCalls: number;
     bvhNodes: number; objectTests: number; staticRebuilds: number; dynamicRebuilds: number;
     /** Cumulative counters, unchanged while the HUD is disabled. */
     hudFrames: number; hudRefreshes: number;

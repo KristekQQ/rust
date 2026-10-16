@@ -1,0 +1,100 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Cutting compute parity and timing</title>
+<style>body{background:#202329;color:#eee;font:14px monospace}canvas{width:640px;height:360px}pre{white-space:pre-wrap}</style>
+<pre id="result">Probíhá CPU/WebGPU test…</pre><canvas id="gpu-canvas" width="640" height="360"></canvas>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {appleGeometry} from '../examples/cutting/scene.js';
+const output=document.querySelector('#result');
+const assert=(ok,message)=>{if(!ok)throw new Error(message);};
+const median=xs=>[...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)];
+try{
+ const engine=await initEngine(document.querySelector('canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ engine.setCameraView([6,5,9],[0,1,0]);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+ const gpu=engine.renderer_backend()==='BrowserWebGpu';
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ const motion=[.37,-4,.19];
+ const setup=(geometry,mirror=false)=>{
+   engine.scene.clear();engine.scene.createLight({position:[3,6,7],color:[1,1,1]});
+   const apple=engine.scene.createMesh(geometry).setCuttable(true,{capColor:[1,.8,.5]});
+   if(mirror)apple.setScale([-1.1,.85,.9]);
+   // Keep parity samples away from the deliberately conservative CPU precision
+   // fallback. Near-plane fallback is tested independently below.
+   const n=[24,1.688,-11.2],length=Math.hypot(...n);let x=.173;
+   for(let attempt=0;attempt<2000;attempt++,x+=.00137){let safe=true;
+     for(let i=0;i<geometry.positions.length;i+=3){
+       const px=geometry.positions[i]*(mirror?-1.1:1),py=geometry.positions[i+1]*(mirror?.85:1),pz=geometry.positions[i+2]*(mirror?.9:1);
+       if(Math.abs(n[0]*(px-x)+n[1]*(py-3.6)+n[2]*(pz-.071))/length<.0002){safe=false;break;}
+     }
+     if(safe)break;
+   }
+   const sword=engine.scene.createCube([x,3.6,.071]).setCutter({base:[-1.4,0,-3],tip:[1.4,0,3]});
+   return {apple,sword};
+ };
+ const snapshot=report=>report.pieces.map(p=>({info:p.meshInfo,data:p.meshSnapshot}));
+ const compare=(a,b)=>{
+   assert(a.length===b.length,'Same piece count');
+   for(let k=0;k<a.length;k++){
+     assert(a[k].info.closed&&b[k].info.closed,'Watertight CPU/GPU caps');
+     assert(Math.abs(a[k].info.volume-b[k].info.volume)<a[k].info.volume*.0001,'Per-piece volume parity');
+     assert(JSON.stringify(a[k].data.triangles)===JSON.stringify(b[k].data.triangles),'Same indexed topology');
+     for(const field of ['positions','normals','colors']){
+       const left=a[k].data[field].flat(),right=b[k].data[field].flat();assert(left.length===right.length,`${field} length`);
+       assert(left.every((v,i)=>Math.abs(v-right[i])<.00005),`${field} CPU/GPU parity`);
+     }
+   }
+ };
+ const timings=[];
+ for(const [segments,rings] of [[32,18],[96,64]]){
+   const geometry=appleGeometry(segments,rings),cpu=[],hybrid=[];
+   for(let sample=0;sample<5;sample++){
+     let {sword}=setup(geometry,sample===0);
+     const reference=await engine.scene.cutWithAsync(sword,{motion,execution:'cpu',separation:.04});
+     if(sample>0)cpu.push(reference.totalMs);
+     const expected=sample===0?snapshot(reference):null;
+     if(gpu){
+       ({sword}=setup(geometry,sample===0));
+       if(sample===0)engine.scene.createCube([9,3,0]).spin([0,1,0]);
+       const computed=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu',separation:.04});
+       assert(computed.execution==='webgpu-compute'&&computed.gpuMeshes>0,`Real compute result consumed (${segments}/${sample}: ${computed.execution}, ${computed.fallbackReason})`);
+       if(sample>0)hybrid.push(computed.totalMs);
+       if(expected)compare(expected,snapshot(computed));
+       // Repeated cut through an already cut and transformed smooth skin/cap.
+       if(sample===0){sword.setPosition([.113,3.6,.031]).setRotation([0,.8,0]);
+         const again=await engine.scene.cutWithAsync(sword,{motion,execution:'gpu',separation:.04});
+         assert(again.pieces.length>0&&again.pieces.every(p=>p.meshInfo.closed),'Repeated compute cut caps');}
+     }else{
+       ({sword}=setup(geometry));
+       const automatic=await engine.scene.cutWithAsync(sword,{motion});assert(automatic.execution==='cpu','WebGL automatic CPU fallback');
+       ({sword}=setup(geometry));let rejected=false;try{await engine.scene.cutWithAsync(sword,{motion,execution:'gpu'});}catch{rejected=true;}assert(rejected,'Forced compute cannot silently fall back on WebGL');
+     }
+   }
+   timings.push({triangles:geometry.indices.length/3,cpuMedianMs:median(cpu),computeMedianMs:hybrid.length?median(hybrid):null});
+ }
+ if(gpu){
+   // Exact pole/vertex cuts repair only ambiguous distances/incident edges on
+   // CPU; the remainder still consumes real compute output.
+   let exact=setup(appleGeometry());exact.sword.setPosition([0,3.6,0]).setCutter({base:[0,0,-3],tip:[0,0,3]});
+   const exactCpu=await engine.scene.cutWithAsync(exact.sword,{motion:[0,-4,0],execution:'cpu'});const exactReference=snapshot(exactCpu);
+   exact=setup(appleGeometry());exact.sword.setPosition([0,3.6,0]).setCutter({base:[0,0,-3],tip:[0,0,3]});
+   const exactGpu=await engine.scene.cutWithAsync(exact.sword,{motion:[0,-4,0],execution:'gpu'});
+   assert(exactGpu.execution==='webgpu-compute','Near-plane repair must not substitute whole mesh');compare(exactReference,snapshot(exactGpu));
+   let {sword}=setup(appleGeometry());
+   const pending=engine.scene.cutWithAsync(sword,{motion,execution:'gpu'}).then(()=>null,error=>error);
+   await Promise.resolve();engine.scene.clear();assert(await pending,'Clear cancels stale compute');assert(engine.scene.objectCount===0,'Late result cannot respawn cleared fruit');
+   ({sword}=setup(appleGeometry()));
+   const active=engine.scene.cutWithAsync(sword,{motion,execution:'gpu'}).then(()=>null,error=>error);
+   await Promise.resolve();sword.setCutter({base:[0,0,-3],tip:[0,0,3]});assert(await active,'Changing blade invalidates pending geometry');
+   const target=setup(appleGeometry());
+   const moving=engine.scene.cutWithAsync(target.sword,{motion,execution:'gpu'}).then(()=>null,error=>error);
+   await Promise.resolve();target.apple.setPosition([1,0,0]);assert(await moving,'Moving a target cancels stale geometry');assert(target.apple.exists,'Canceled result leaves source intact');
+   ({sword}=setup(appleGeometry()));
+   const one=engine.scene.cutWithAsync(sword,{motion,execution:'gpu'});await Promise.resolve();
+   let concurrent=false;try{await engine.scene.cutWithAsync(sword,{motion,execution:'gpu'});}catch{concurrent=true;}assert(concurrent,'Concurrent requests cannot share staging or overwrite each other');await one;
+   ({sword}=setup(appleGeometry()));
+   const last=engine.scene.cutWithAsync(sword,{motion,execution:'gpu'}).then(()=>null,error=>error);
+   await Promise.resolve();engine.dispose();assert(await last,'Disposal cancels pending compute');
+ }else engine.dispose();
+ output.textContent=`PASS: ${gpu?'WebGPU compute':'WebGL CPU fallback'} geometry/topology/normals/caps parity, repeated cuts, cancellation; timings ${JSON.stringify(timings)}`;
+ console.log('CUTTING_BENCHMARK',JSON.stringify(timings));
+}catch(error){output.textContent=`FAIL: ${error.message??error}`;console.error(error);}
+</script></html>

@@ -1,5 +1,30 @@
 //! View math shared by shadow/mirror passes and native tests.
 use glam::{Mat4, Vec3, Vec4};
+
+/// Normalized DOM coordinates (left/top=0) projected onto world horizontal plane.
+pub fn screen_to_horizontal_plane(matrix: Mat4, u: f32, v: f32, height: f32) -> Option<Vec3> {
+    if !u.is_finite()
+        || !v.is_finite()
+        || !height.is_finite()
+        || !(0.0..=1.0).contains(&u)
+        || !(0.0..=1.0).contains(&v)
+    {
+        return None;
+    }
+    let inverse = matrix.inverse();
+    if !inverse.is_finite() {
+        return None;
+    }
+    let near = inverse.project_point3(Vec3::new(u * 2.0 - 1.0, 1.0 - v * 2.0, 0.0));
+    let far = inverse.project_point3(Vec3::new(u * 2.0 - 1.0, 1.0 - v * 2.0, 1.0));
+    let direction = far - near;
+    if !near.is_finite() || !direction.is_finite() || direction.y.abs() < 1e-6 {
+        return None;
+    }
+    let t = (height - near.y) / direction.y;
+    let point = near + direction * t;
+    (t >= 0.0 && point.is_finite()).then_some(point)
+}
 #[derive(Clone, Copy, Debug)]
 pub struct MirrorPlane {
     pub normal: Vec3,
@@ -53,6 +78,20 @@ pub fn shadow_view_projection(position: Vec3) -> Mat4 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pointer_projection_matches_visible_camera_and_rejects_invalid_rays() {
+        let mut camera = crate::input::camera::Camera::new(1.5);
+        assert!(camera.set_view(Vec3::new(5., 6., 7.), Vec3::new(0., 1., 0.)));
+        let matrix = camera.matrix();
+        let p = screen_to_horizontal_plane(matrix, 0.5, 0.5, 1.0).unwrap();
+        assert!(p.length().is_finite());
+        assert!(p.distance(Vec3::Y) < 1e-3);
+        let visible = matrix.project_point3(p);
+        assert!(visible.x.abs() < 1e-4 && visible.y.abs() < 1e-4);
+        assert!(screen_to_horizontal_plane(matrix, -0.1, 0.5, 0.).is_none());
+        assert!(screen_to_horizontal_plane(Mat4::ZERO, 0.5, 0.5, 0.).is_none());
+        assert!(screen_to_horizontal_plane(Mat4::IDENTITY, 0.5, 0.5, 0.).is_none());
+    }
     #[test]
     fn mirror_reflects_camera_and_preserves_surface_points() {
         let p = MirrorPlane::new(Vec3::Z * 2.0, 6.0).unwrap();

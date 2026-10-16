@@ -137,6 +137,7 @@ fn build_uniform(
         camera_pos: camera_pos.into(),
         _pad0: 0.0,
         lights,
+        cutting_guide: [[0.0; 4]; 3],
     }
 }
 
@@ -189,6 +190,9 @@ pub struct SceneRenderer {
     pub frustum_culling: bool,
     pub upload_bytes: usize,
     pub prepare_ms: f64,
+    /// Actual draw/draw_indexed commands in the current/last submitted frame.
+    pub draw_calls: usize,
+    pub main_draw_calls: usize,
     debug_enabled: bool,
     cull_ms: f64,
     cull_cached: bool,
@@ -287,6 +291,8 @@ impl SceneRenderer {
             frustum_culling: true,
             upload_bytes: 0,
             prepare_ms: 0.0,
+            draw_calls: 0,
+            main_draw_calls: 0,
             debug_enabled: false,
             cull_ms: 0.0,
             cull_cached: true,
@@ -326,6 +332,22 @@ impl SceneRenderer {
     }
 
     /// Advance simulation once per frame, independently of the number of views.
+    pub fn install_resident(
+        &mut self,
+        id: u32,
+        piece: super::cutting_resident::ResidentPiece,
+    ) -> super::cutting_resident::ResidentSource {
+        self.imported_meshes.insert(
+            id,
+            Mesh {
+                vertex_buffer: piece.render_vertices,
+                index_buffer: piece.indices,
+                index_count: piece.vertex_count,
+                index_format: wgpu::IndexFormat::Uint32,
+            },
+        );
+        piece.source
+    }
     pub fn import_model(
         &mut self,
         model: &crate::gltf_loader::ImportedMesh,
@@ -349,6 +371,20 @@ impl SceneRenderer {
         self.upload_bytes = 0;
         self.frame_metrics.record(dt);
         self.scene.update(dt);
+        // New meshes are immutable per stable ID. Upload only once; all passes share
+        // the same existing imported-mesh path, bounds and cache invalidation.
+        for (&id, object) in self.scene.triangle_meshes() {
+            self.imported_meshes.entry(id).or_insert_with(|| {
+                Mesh::imported(
+                    &self.device,
+                    &object
+                        .mesh
+                        .ready_cpu()
+                        .expect("Resident buffers installed before rendering")
+                        .render_mesh(),
+                )
+            });
+        }
         self.gltf_models
             .retain(|id, _| self.scene.object_exists(*id));
         for (id, gpu) in &mut self.gltf_models {
@@ -498,7 +534,11 @@ impl SceneRenderer {
             }
             cache.key = Some(key);
         }
-        let grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
+        let mut grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
+        // Surface-only preview in the main color pass, never shadows/reflections.
+        if pass == RenderPassKind::Main {
+            grid_uniform.cutting_guide = self.scene.cutting_guide_uniforms();
+        }
         self.queue.write_buffer(
             &self.grid_uniform_buffer,
             0,
@@ -574,6 +614,7 @@ impl SceneRenderer {
             "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],
             "cullMs": self.cull_ms, "cullCached": self.cull_cached,
             "total": stats[0], "visible": stats[1], "culled": stats[2],
+            "drawCalls": self.draw_calls, "mainDrawCalls": self.main_draw_calls,
             "bvhNodes": bvh.nodes_visited, "objectTests": bvh.object_tests,
             "staticRebuilds": bvh.static_rebuilds, "dynamicRebuilds": bvh.dynamic_rebuilds,
         })
@@ -600,6 +641,7 @@ impl SceneRenderer {
                 "BVH {} NODES TESTS {}",
                 q.culling_stats.nodes_visited, q.culling_stats.object_tests
             ),
+            format!("DRAWS {} MAIN {}", self.draw_calls, self.main_draw_calls),
         ]
     }
 
@@ -682,6 +724,7 @@ impl SceneRenderer {
         }
         let pipeline = &self.shadow_pipelines[&target.format];
         let cache = &self.passes[self.active_cache];
+        let mut draws = 0;
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -733,6 +776,7 @@ impl SceneRenderer {
                     pass.set_vertex_buffer(1, batch.buffer.slice(..));
                     pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                     pass.draw_indexed(0..mesh.index_count, 0, 0..count);
+                    draws += 1;
                 }
             }
             for (id, instances) in &cache.queue.imported {
@@ -746,15 +790,22 @@ impl SceneRenderer {
                 pass.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 pass.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
+                draws += 1;
             }
             for id in cache.queue.imported.keys() {
                 if let Some(model) = self.gltf_models.get(id) {
-                    self.gltf_gpu
-                        .draw(&mut pass, model, gltf_key, false, cache.camera_position);
+                    draws += self.gltf_gpu.draw(
+                        &mut pass,
+                        model,
+                        gltf_key,
+                        false,
+                        cache.camera_position,
+                    );
                 }
             }
         }
         self.queue.submit(Some(encoder.finish()));
+        self.draw_calls += draws;
         Ok(())
     }
     /// Draw developer overlays after postprocessing; exclude them from reflection/depth inputs.
@@ -808,10 +859,14 @@ impl SceneRenderer {
             if self.draw_grid {
                 pass.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                 pass.draw(0..self.grid_vertex_count, 0..1);
+                self.draw_calls += 1;
+                self.main_draw_calls += 1;
             }
             if self.draw_light_helpers {
                 pass.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
                 pass.draw(0..self.light_vertex_count, 0..1);
+                self.draw_calls += 1;
+                self.main_draw_calls += 1;
             }
         }
         self.queue.submit(Some(encoder.finish()));
@@ -823,6 +878,7 @@ impl SceneRenderer {
         reflected: bool,
     ) -> Result<(), String> {
         target.validate()?;
+        let mut draws = 0;
         let key = (
             target.color_format,
             target.depth_format,
@@ -960,6 +1016,7 @@ impl SceneRenderer {
                     rp.set_vertex_buffer(1, batch.buffer.slice(..));
                     rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                     rp.draw_indexed(0..mesh.index_count, 0, 0..count);
+                    draws += 1;
                 }
             }
             for (id, instances) in &cache.queue.imported {
@@ -980,15 +1037,17 @@ impl SceneRenderer {
                 rp.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
                 rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                 rp.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
+                draws += 1;
             }
             for id in cache.queue.imported.keys() {
                 if let Some(model) = self.gltf_models.get(id) {
-                    self.gltf_gpu
-                        .draw(&mut rp, model, gltf_key, false, cache.camera_position);
+                    draws +=
+                        self.gltf_gpu
+                            .draw(&mut rp, model, gltf_key, false, cache.camera_position);
                 }
             }
             if reflected || target.auxiliary.is_none() {
-                self.gltf_gpu.draw_many(
+                draws += self.gltf_gpu.draw_many(
                     &mut rp,
                     cache
                         .queue
@@ -1009,14 +1068,20 @@ impl SceneRenderer {
                 if target.auxiliary.is_none() && self.draw_grid {
                     rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                     rp.draw(0..self.grid_vertex_count, 0..1);
+                    draws += 1;
                 }
                 if target.auxiliary.is_none() && self.draw_light_helpers {
                     rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
                     rp.draw(0..self.light_vertex_count, 0..1);
+                    draws += 1;
                 }
             }
         }
         self.queue.submit(Some(encoder.finish()));
+        self.draw_calls += draws;
+        if !reflected {
+            self.main_draw_calls += draws;
+        }
         Ok(())
     }
     /// Transparent materials use opaque depth after screen-space effects.
@@ -1089,7 +1154,7 @@ impl SceneRenderer {
             );
             pass.set_bind_group(0, &self.grid_bind_group, &[]);
             pass.set_bind_group(1, &effects.scene_group, &[]);
-            self.gltf_gpu.draw_many(
+            let draws = self.gltf_gpu.draw_many(
                 &mut pass,
                 cache
                     .queue
@@ -1100,6 +1165,8 @@ impl SceneRenderer {
                 true,
                 cache.camera_position,
             );
+            self.draw_calls += draws;
+            self.main_draw_calls += draws;
         }
         self.queue.submit(Some(encoder.finish()));
         Ok(())

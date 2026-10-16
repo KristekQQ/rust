@@ -78,6 +78,7 @@ fn glyph(ch: char) -> [u8; 7] {
         'T' => [31, 4, 4, 4, 4, 4, 4],
         'U' => [17, 17, 17, 17, 17, 17, 14],
         'V' => [17, 17, 17, 17, 17, 10, 4],
+        'W' => [17, 17, 17, 21, 21, 21, 10],
         '.' => [0, 0, 0, 0, 0, 6, 6],
         '/' => [1, 1, 2, 4, 8, 16, 16],
         '-' => [0, 0, 0, 31, 0, 0, 0],
@@ -97,7 +98,7 @@ mod tests {
     }
     #[test]
     fn all_metric_letters_have_glyphs() {
-        for c in "FPSFRAMECPUMSCULLACHEDFRUSTMBVHNODETESTS0123456789./".chars() {
+        for c in "FPSFRAMECPUMSCULLACHEDFRUSTMBVHNODETESTSDRAWSMAIN0123456789./".chars() {
             assert_ne!(glyph(c), [0; 7], "{c}");
         }
     }

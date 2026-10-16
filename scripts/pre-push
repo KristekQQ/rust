@@ -2,5 +2,5 @@
 # Install with: git config --local core.hooksPath scripts
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
-cargo test --locked
+npm run verify
 scripts/dump_sources.sh

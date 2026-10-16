@@ -1,4 +1,5 @@
 // Capture only the renderer canvas, after its frame, never text/UI around it.
+/** @param {HTMLCanvasElement} canvas @returns {Promise<ImageData>} */
 export async function capturePixels(canvas) {
     for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame);
     return new Promise((resolve, reject) => requestAnimationFrame(() => {
@@ -13,6 +14,7 @@ export async function capturePixels(canvas) {
     }));
 }
 
+/** @param {ImageData} image @param {string} label */
 export function assertForeground(image, label, minimum = 100) {
     const data = image.data;
     let foreground = 0;
@@ -23,6 +25,7 @@ export function assertForeground(image, label, minimum = 100) {
     return foreground;
 }
 
+/** @param {ImageData} before @param {ImageData} after @param {string} label */
 export function assertChanged(before, after, label, minimum = 50) {
     if (before.width !== after.width || before.height !== after.height) throw new Error(`${label}: capture dimensions differ`);
     let changed = 0;

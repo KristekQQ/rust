@@ -78,7 +78,13 @@ binding zatím nejsou implementovány.
 vypnuto. Ukázky `fox-control` a `culling` používají F3. Rust/WGSL jej kreslí až
 za scénou a postprocessingem, nikoliv do stínů nebo zrcadla. Zobrazuje FPS,
 interval RAF, CPU čas přípravy, čas hlavního cullingu, viditelné/vyřazené objekty
-a práci BVH. `CULL CACHED` znamená, že tento snímek nepotřeboval nový výběr.
+a práci BVH. Řádek `DRAWS <celkem> MAIN <hlavní pohled>` počítá skutečné
+GPU příkazy `draw`/`draw_indexed`, ne objekty: instanční dávka je jeden příkaz.
+Celkem zahrnuje vykreslené stíny, odraz, postprocessing, HUD a případný finální
+blit; cachované/vynechané průchody nic nepřidávají. MAIN zahrnuje geometrii,
+průhlednost a pomocnou mřížku/světla, nikoliv HUD/postprocessing. Stejné hodnoty
+vrací `debugStats().drawCalls` a `mainDrawCalls` za poslední snímek.
+`CULL CACHED` znamená, že tento snímek nepotřeboval nový výběr.
 Nejde o GPU timestampy ani occlusion culling.
 
 Text a instance bitmapových znaků se obnovují nejvýše 4× za sekundu (navíc po

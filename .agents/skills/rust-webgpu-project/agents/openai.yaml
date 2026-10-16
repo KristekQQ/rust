@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust WebGPU projekt"
+  short_description: "Vývoj a ověřování místní Rust/WASM 3D scény"
+  default_prompt: "Použij $rust-webgpu-project k úpravě a ověření 3D scény tohoto repozitáře."

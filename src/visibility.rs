@@ -288,7 +288,7 @@ impl RenderQueue {
                 } else {
                     0.0
                 },
-                0.0,
+                if scene.is_cuttable(*id) { 1.0 } else { 0.0 },
             ];
             if let MeshKind::Imported(mesh_id) = object.mesh {
                 self.imported.entry(mesh_id).or_default().push(instance);

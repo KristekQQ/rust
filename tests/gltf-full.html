@@ -24,6 +24,8 @@ try {
  fixture.useCamera(3);await frames();engine.setCameraView([0,3,12],[0,1,0]);
  fixture.stopAnimation();for(let i=0;i<3;i++)fixture.setMorphWeights(i,[0]);
  const unmorphed=await capturePixels(canvas);assertForeground(unmorphed,'Textured glTF fixture');
+ const fixtureDraws=engine.debugStats();
+ assert(fixtureDraws.mainDrawCalls===3&&fixtureDraws.drawCalls===3,'Three glTF OPAQUE/MASK/BLEND primitives must issue exactly three draws');
  let warm=0,cool=0;
  for(let i=0;i<unmorphed.data.length;i+=4){const [r,g,b]=unmorphed.data.subarray(i,i+3);if(r>30&&r>1.4*b)warm++;if(b>30&&b>1.4*r)cool++;}
  assert(warm>50&&cool>50,'Rendered PNG checker colors must appear');

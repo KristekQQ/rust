@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer';
+import { verifyCutting } from '../tests/cutting-browser.mjs';
+import { browserArgs } from './browser-options.mjs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, readFile, readdir, realpath } from 'node:fs/promises';
@@ -18,6 +20,9 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'cutting', path: 'examples/cutting/', interaction: 'cutting' },
+    { name: 'cutting-compute', path: 'tests/cutting-compute.html', status: '#result' },
+    { name: 'cutting-resident', path: 'tests/cutting-resident.html', status: '#result' },
     { name: 'scene-sdk', path: 'tests/scene-sdk.html', status: '#result' },
     { name: 'lifecycle', path: 'tests/lifecycle.html', status: '#result' },
     { name: 'gltf-sdk', path: 'tests/gltf-sdk.html', status: '#result' },
@@ -54,7 +59,7 @@ for (let i = 2; i < process.argv.length; i++) {
 
 let browser, server;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function verifyHud(page) {
+async function verifyHud(page, simpleScene = false) {
     const stats = () => page.evaluate(async () => (await import('./main.js')).engine.debugStats());
     const initial = await stats();
     if (initial.enabled || initial.hudFrames || initial.hudRefreshes) throw new Error('HUD must start disabled without work');
@@ -76,18 +81,29 @@ async function verifyHud(page) {
     const visible = await corner();
     if (visible < 150 || visible <= before + 100) throw new Error(`Rust HUD glyph pixels missing: ${before} -> ${visible}`);
     const first = await stats();
+    if (!Number.isInteger(first.drawCalls) || first.mainDrawCalls < 1 || first.drawCalls < first.mainDrawCalls + 1) throw new Error('Actual draw counters missing from HUD stats');
+    if (simpleScene && (first.mainDrawCalls !== 1 || first.drawCalls !== 2)) throw new Error(`Instanced cubes + HUD should be 1 + 1 draws: ${JSON.stringify(first)}`);
+    const drawRow = await page.evaluate(async () => {
+        const { capturePixels } = await import('../../tests/pixels.js');
+        const image = await capturePixels(document.querySelector('#gpu-canvas'));let bright = 0;
+        for(let y=92;y<109;y++)for(let x=12;x<320;x++){const i=(y*image.width+x)*4;if(image.data[i]>190&&image.data[i+1]>210&&image.data[i+2]>220)bright++;}
+        return bright;
+    });
+    if(drawRow<100)throw new Error('Draw-call HUD row has no glyph pixels');
     await delay(800);
     const second = await stats();
     if (second.hudFrames <= first.hudFrames || second.hudRefreshes - first.hudRefreshes > 4
         || second.hudRefreshes >= second.hudFrames) throw new Error('HUD text must be cached between refreshes');
     await page.evaluate(async () => (await import('./main.js')).engine.set_output_mode('texture'));
     if (await corner() < 150) throw new Error('HUD missing from texture output');
+    if(simpleScene && (await stats()).drawCalls !== 3)throw new Error('Texture presentation must add exactly one draw');
     await page.evaluate(async () => {
         const { engine } = await import('./main.js');
         engine.resize(420, 300);
         engine.postprocessing.enable('godRays', { strength: 0.1 });
     });
     if (await corner() < 150) throw new Error('HUD missing after resize/postprocessing');
+    if(simpleScene && (await stats()).drawCalls !== 4)throw new Error('One postprocessing effect must add exactly one draw');
     await page.evaluate(async () => {
         const { engine } = await import('./main.js');
         engine.postprocessing.disable('godRays');
@@ -110,7 +126,7 @@ async function verifyCulling(page) {
         document.documentElement.dataset.rendererBackend = engine.renderer_backend();
         engine.setCameraView([0, 0, 0], [0, 0, -1]);
     });
-    await verifyHud(page);
+    await verifyHud(page, true);
     const bvh = await page.evaluate(async () => {
         const { engine } = await import('./main.js');
         engine.setDebugOverlay(true);
@@ -316,7 +332,7 @@ async function applicationFingerprint() {
         for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
             const relative = path.join(directory, entry.name);
             if (entry.isDirectory()) await visit(relative);
-            else if (/\.(js|html|ts)$/.test(entry.name)) hash.update(relative).update('\0').update(await readFile(path.join(root, relative))).update('\0');
+            else if (/\.(m?js|html|ts)$/.test(entry.name)) hash.update(relative).update('\0').update(await readFile(path.join(root, relative))).update('\0');
         }
     }
     for (const directory of ['js', 'tests', 'examples']) await visit(directory);
@@ -351,9 +367,8 @@ try {
     report.application = await applicationFingerprint();
     await mkdir(output, { recursive: true });
     const baseUrl = await startServer();
-    const args = ['--enable-unsafe-webgpu'];
-    if (software) args.push('--use-angle=swiftshader', '--enable-unsafe-swiftshader');
-    if (process.platform === 'linux' && process.getuid?.() === 0) args.push('--no-sandbox');
+    const args = browserArgs({ software });
+    report.sandboxDisabled = args.includes('--no-sandbox');
     report.browserExecutable = process.env.BROWSER_EXECUTABLE || localOption('verification.browser') || await puppeteer.executablePath();
     browser = await puppeteer.launch({ headless: !headed, args, executablePath: report.browserExecutable, timeout: 30000, protocolTimeout: timeout, dumpio: process.env.DEBUG_BROWSER_STARTUP === '1' });
     report.browser = await browser.version();
@@ -388,7 +403,8 @@ try {
                 const failure = await page.$eval(suite.status, node => /FAIL/.test(node.textContent || ''));
                 if (!failure) await page.click(suite.button);
             }
-            if (suite.interaction === 'fox') result.text = await verifyFox(page);
+            if (suite.interaction === 'cutting') result.text = await verifyCutting(page);
+            else if (suite.interaction === 'fox') result.text = await verifyFox(page);
             else if (suite.interaction === 'culling') result.text = await verifyCulling(page);
             else {
                 await page.waitForFunction(selector => /^(PASS|FAIL):/.test(document.querySelector(selector)?.textContent?.trim() || ''), { polling: 100 }, suite.status);

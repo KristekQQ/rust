@@ -5,6 +5,67 @@ use std::collections::BTreeMap;
 pub const MAX_LIGHTS: usize = 4;
 pub const INVALID_ID: u32 = u32::MAX;
 
+pub struct TriangleObject {
+    pub mesh: crate::cutting_mesh::MeshData,
+    pub cuttable: bool,
+    pub cap_color: Vec3,
+}
+#[derive(Default)]
+pub struct CutReport {
+    pub removed: Vec<u32>,
+    pub pieces: Vec<u32>,
+    pub object_candidates: usize,
+    pub bvh_nodes: usize,
+    pub triangle_tests: usize,
+    piece_directions: Vec<Vec3>,
+}
+#[derive(PartialEq)]
+pub struct CutSnapshot {
+    cutter: (u32, [Vec3; 2], Mat4),
+    targets: Vec<(u32, Mat4, Vec3)>,
+}
+/// Owned immutable inputs; safe to retain while the GPU request is pending.
+pub struct ResidentCandidate {
+    pub id: u32,
+    pub mesh: crate::cutting_mesh::MeshData,
+    pub a: Vec3,
+    pub b: Vec3,
+    pub motion: Vec3,
+    pub color: Vec3,
+    pub transform: Transform,
+    pub options: RenderOptions,
+    pub direction: Vec3,
+    pub angular: [Vec3; 2],
+}
+impl ResidentCandidate {
+    pub fn support_dirs(&self) -> [[f32; 4]; 128] {
+        std::array::from_fn(|i| {
+            let matrix = Transform::new(
+                Vec3::ZERO,
+                self.transform.rotation + self.angular[i / 64] * ((i % 64) as f32 / 63.),
+                self.transform.scale,
+            )
+            .model();
+            matrix
+                .transpose()
+                .transform_vector3(Vec3::Y)
+                .extend(0.)
+                .to_array()
+        })
+    }
+}
+
+struct CutScatter {
+    start: Transform,
+    pivot: Vec3,
+    direction: Vec3,
+    angular: Vec3,
+    floor_y: f32,
+    distance: f32,
+    duration: f32,
+    elapsed: f32,
+}
+
 /// World-space normals must remain perpendicular to transformed tangents.
 pub(crate) fn normal_matrix(model: Mat4) -> Mat4 {
     model.inverse().transpose()
@@ -122,6 +183,13 @@ struct BoxCollider {
 #[derive(Default)]
 pub struct SceneManager {
     objects: BTreeMap<u32, SceneObject>,
+    triangle_meshes: BTreeMap<u32, TriangleObject>,
+    cutters: BTreeMap<u32, [Vec3; 2]>,
+    cutting_index: crate::spatial::Bvh,
+    cutting_swings: BTreeMap<u32, (Vec3, Vec3, f32)>,
+    cutting_scatter: BTreeMap<u32, CutScatter>,
+    // Current preview: cutter, first dashed-line handle, plane/origin/finite axis.
+    cutting_guide: Option<(u32, u32, [[f32; 4]; 3])>,
     models: BTreeMap<u32, crate::gltf_model::ModelInstance>,
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
@@ -427,6 +495,632 @@ impl SceneManager {
         }
         id
     }
+    pub fn triangle_meshes(&self) -> &BTreeMap<u32, TriangleObject> {
+        &self.triangle_meshes
+    }
+    pub fn add_triangle_mesh(&mut self, mesh: crate::cutting::CutMesh) -> Result<u32, String> {
+        self.add_mesh_data(mesh.into())
+    }
+    fn add_mesh_data(&mut self, mesh: crate::cutting_mesh::MeshData) -> Result<u32, String> {
+        let total: usize = self
+            .triangle_meshes
+            .values()
+            .map(|o| o.mesh.triangle_count())
+            .sum();
+        if total + mesh.triangle_count() > 200_000 {
+            return Err("Scene cutting triangle budget exceeded".into());
+        }
+        let (min, max) = mesh.bounds();
+        let id = self.add_imported(min, max);
+        if id == INVALID_ID {
+            return Err("Object IDs exhausted".into());
+        }
+        self.triangle_meshes.insert(
+            id,
+            TriangleObject {
+                mesh,
+                cuttable: false,
+                cap_color: Vec3::new(1., 0.3, 0.12),
+            },
+        );
+        Ok(id)
+    }
+    pub fn set_cuttable(&mut self, id: u32, enabled: bool, cap_color: Vec3) -> Result<(), String> {
+        if !cap_color.is_finite() || cap_color.min_element() < 0. || cap_color.max_element() > 1. {
+            return Err("Invalid cap color".into());
+        }
+        if enabled && self.cutters.contains_key(&id) {
+            return Err("Cutter cannot also be cuttable".into());
+        }
+        let object = self
+            .triangle_meshes
+            .get_mut(&id)
+            .ok_or("Cuttable requires a custom triangle mesh")?;
+        object.cuttable = enabled;
+        object.cap_color = cap_color;
+        self.render_revision = self.render_revision.wrapping_add(1);
+        Ok(())
+    }
+    pub fn is_cuttable(&self, id: u32) -> bool {
+        self.triangle_meshes.get(&id).is_some_and(|o| o.cuttable)
+    }
+    pub fn cutting_guide_uniforms(&self) -> [[f32; 4]; 3] {
+        self.cutting_guide
+            .filter(|(cutter, guide, _)| {
+                self.cutters.contains_key(cutter)
+                    && self
+                        .objects
+                        .get(guide)
+                        .is_some_and(|o| o.transform.scale.abs().min_element() > 0.0001)
+            })
+            .map_or([[0.0; 4]; 3], |(_, _, uniforms)| uniforms)
+    }
+    pub fn aim_cutter(
+        &mut self,
+        id: u32,
+        guides: &[u32],
+        aim: crate::cutting_tool::ToolAim,
+    ) -> Result<Vec3, String> {
+        let blade = *self
+            .cutters
+            .get(&id)
+            .ok_or("Object is not a registered cutter")?;
+        let object = self.objects.get(&id).ok_or("Cutter no longer exists")?;
+        if guides.len() > 64
+            || guides.iter().any(|&guide| {
+                guide == id
+                    || !self.object_exists(guide)
+                    || self.triangle_meshes.get(&guide).is_some_and(|o| o.cuttable)
+            })
+        {
+            return Err("Invalid cutting guide objects".into());
+        }
+        let pose = aim.pose(blade, object.transform.scale)?;
+        let model = Transform::new(pose.position, pose.rotation, object.transform.scale).model();
+        let middle = model.transform_point3((blade[0] + blade[1]) * 0.5);
+        let normal = pose.direction.cross(pose.motion).normalize();
+        self.cutting_guide = guides.first().map(|&guide| {
+            (
+                id,
+                guide,
+                [
+                    normal.extend(-normal.dot(middle)).to_array(),
+                    middle.extend(aim.floor).to_array(),
+                    pose.direction.extend(pose.length * 0.5).to_array(),
+                ],
+            )
+        });
+        self.set_object_position(id, pose.position);
+        self.set_object_rotation(id, pose.rotation);
+        let spacing = pose.length / (guides.len().max(1) as f32);
+        for (i, &guide) in guides.iter().enumerate() {
+            let along = (i as f32 + 0.5) * spacing - pose.length * 0.5;
+            self.set_object_transform(
+                guide,
+                pose.guide_center + pose.direction * along,
+                pose.rotation,
+                Vec3::new(0.035, 0.008, spacing * 0.32),
+            );
+        }
+        Ok(pose.motion)
+    }
+    pub fn set_cutter(&mut self, id: u32, blade: Option<[Vec3; 2]>) -> Result<(), String> {
+        if !self.object_exists(id) {
+            return Err("Cutter object does not exist".into());
+        }
+        if let Some([a, b]) = blade {
+            if !a.is_finite()
+                || !b.is_finite()
+                || a.abs().max_element() > 10_000.
+                || b.abs().max_element() > 10_000.
+                || a.distance(b) < 1e-4
+            {
+                return Err("Invalid local blade endpoints".into());
+            }
+            if self.triangle_meshes.get(&id).is_some_and(|o| o.cuttable) {
+                return Err("Cuttable object cannot also be cutter".into());
+            }
+            self.cutters.insert(id, [a, b]);
+        } else {
+            self.cutters.remove(&id);
+        }
+        self.render_revision = self.render_revision.wrapping_add(1);
+        Ok(())
+    }
+    /// Explicit straight sweep command. Geometry and new object ownership stay in Rust.
+    /// All cuts are prepared first: a topology error never removes any source object.
+    pub fn cut_with(
+        &mut self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+    ) -> Result<CutReport, String> {
+        self.cut_with_geometry(cutter, motion, separation, None)
+    }
+    pub fn cut_geometry_inputs(
+        &self,
+        cutter: u32,
+        motion: Vec3,
+    ) -> Result<Vec<crate::cutting::CutGeometryInput>, String> {
+        if !motion.is_finite() || motion.abs().max_element() > 1000. {
+            return Err("Invalid cutting sweep".into());
+        }
+        let blade = self
+            .cutters
+            .get(&cutter)
+            .ok_or("Object is not a registered cutter")?;
+        let model = self
+            .objects
+            .get(&cutter)
+            .ok_or("Cutter no longer exists")?
+            .transform
+            .model();
+        let [a, b] = blade.map(|p| model.transform_point3(p));
+        let normal = (b - a).cross(motion).normalize_or_zero();
+        if normal.length_squared() < 0.5 {
+            return Err("Invalid cutting sweep".into());
+        }
+        let min = a.min(b).min(a + motion).min(b + motion) - Vec3::splat(1e-4);
+        let max = a.max(b).max(a + motion).max(b + motion) + Vec3::splat(1e-4);
+        let mut inputs = Vec::new();
+        for (&id, source) in &self.triangle_meshes {
+            if !source.cuttable {
+                continue;
+            }
+            let model = self.objects[&id].transform.model();
+            let (lo, hi) = source.mesh.bounds();
+            let center = model.transform_point3((lo + hi) * 0.5);
+            let half = (hi - lo) * 0.5;
+            let radius = model.x_axis.truncate().abs() * half.x
+                + model.y_axis.truncate().abs() * half.y
+                + model.z_axis.truncate().abs() * half.z;
+            if (center + radius).cmpge(min).all()
+                && (center - radius).cmple(max).all()
+                && normal.dot(center - a).abs() <= normal.abs().dot(radius) + 1e-4
+            {
+                let inverse = model.inverse();
+                if !inverse.is_finite() {
+                    return Err("Noninvertible cutting transform".into());
+                }
+                inputs.push(source.mesh.cpu()?.geometry_input(
+                    id,
+                    inverse.transform_point3(a),
+                    inverse.transform_point3(b),
+                    inverse.transform_vector3(motion),
+                )?);
+            }
+        }
+        Ok(inputs)
+    }
+    pub fn cut_snapshot(&self, cutter: u32) -> Result<CutSnapshot, String> {
+        let blade = *self
+            .cutters
+            .get(&cutter)
+            .ok_or("Cutter no longer registered")?;
+        let model = self
+            .objects
+            .get(&cutter)
+            .ok_or("Cutter no longer exists")?
+            .transform
+            .model();
+        Ok(CutSnapshot {
+            cutter: (cutter, blade, model),
+            targets: self
+                .triangle_meshes
+                .iter()
+                .filter(|(_, o)| o.cuttable)
+                .map(|(&id, o)| (id, self.objects[&id].transform.model(), o.cap_color))
+                .collect(),
+        })
+    }
+    pub fn resident_candidates(
+        &self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+        scatter: Option<[f32; 3]>,
+    ) -> Result<Vec<ResidentCandidate>, String> {
+        if !separation.is_finite()
+            || !(0.0..=2.0).contains(&separation)
+            || !motion.is_finite()
+            || motion.abs().max_element() > 1000.
+        {
+            return Err("Invalid cutting sweep".into());
+        }
+        let blade = self.cutters.get(&cutter).ok_or("Object is not a cutter")?;
+        let matrix = self
+            .objects
+            .get(&cutter)
+            .ok_or("Cutter no longer exists")?
+            .transform
+            .model();
+        let [a, b] = blade.map(|p| matrix.transform_point3(p));
+        let normal = (b - a).cross(motion).normalize_or_zero();
+        if normal.length_squared() < 0.5 {
+            return Err("Cut motion must cross blade".into());
+        }
+        if let Some([floor, distance, duration]) = scatter {
+            if !floor.is_finite()
+                || floor.abs() > 10_000.
+                || !distance.is_finite()
+                || !(0.0..=3.0).contains(&distance)
+                || !duration.is_finite()
+                || !(0.05..=3.0).contains(&duration)
+                || Vec3::new(normal.x, 0., normal.z).length_squared() < 0.5e-6
+            {
+                return Err("Invalid fragment animation options".into());
+            }
+        }
+        let min = a.min(b).min(a + motion).min(b + motion) - Vec3::splat(1e-4);
+        let max = a.max(b).max(a + motion).max(b + motion) + Vec3::splat(1e-4);
+        let mut candidates = Vec::new();
+        for (&id, source) in &self.triangle_meshes {
+            if !source.cuttable {
+                continue;
+            }
+            let object = &self.objects[&id];
+            let model = object.transform.model();
+            let (lo, hi) = source.mesh.bounds();
+            let center = model.transform_point3((lo + hi) * 0.5);
+            let half = (hi - lo) * 0.5;
+            let radius = model.x_axis.truncate().abs() * half.x
+                + model.y_axis.truncate().abs() * half.y
+                + model.z_axis.truncate().abs() * half.z;
+            if (center + radius).cmpge(min).all()
+                && (center - radius).cmple(max).all()
+                && normal.dot(center - a).abs() <= normal.abs().dot(radius) + 1e-4
+            {
+                let inverse = model.inverse();
+                if !inverse.is_finite() {
+                    return Err("Noninvertible cutting transform".into());
+                }
+                let direction = normal * model.determinant().signum();
+                let angular = std::array::from_fn(|side| {
+                    if scatter.is_none() {
+                        return Vec3::ZERO;
+                    }
+                    let dir = if side == 0 { direction } else { -direction };
+                    let dir = Vec3::new(dir.x, 0., dir.z).normalize();
+                    let sign = if dir.x + dir.z >= 0. { 1. } else { -1. };
+                    Vec3::new(dir.z * 1.15, sign * 0.12, -dir.x * 1.15)
+                });
+                candidates.push(ResidentCandidate {
+                    id,
+                    mesh: source.mesh.clone(),
+                    a: inverse.transform_point3(a),
+                    b: inverse.transform_point3(b),
+                    motion: inverse.transform_vector3(motion),
+                    color: source.cap_color,
+                    transform: object.transform,
+                    options: object.render_options,
+                    direction,
+                    angular,
+                });
+            }
+        }
+        Ok(candidates)
+    }
+    /// Atomic scene replacement after every GPU result has been validated.
+    pub fn commit_resident(
+        &mut self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+        scatter: Option<[f32; 3]>,
+        mut pending: Vec<(ResidentCandidate, [crate::cutting_mesh::MeshData; 2])>,
+        candidate_count: usize,
+    ) -> Result<CutReport, String> {
+        let removed: Vec<_> = pending.iter().map(|(c, _)| c.id).collect();
+        let retained: usize = self
+            .triangle_meshes
+            .iter()
+            .filter(|(id, _)| !removed.contains(id))
+            .map(|(_, o)| o.mesh.triangle_count())
+            .sum();
+        let total: usize = pending
+            .iter()
+            .flat_map(|(_, pieces)| pieces)
+            .map(|m| m.triangle_count())
+            .sum();
+        if retained + total > 200_000 {
+            return Err("Scene cutting triangle budget exceeded".into());
+        }
+        if self
+            .next_id
+            .checked_add((pending.len() * 2) as u32)
+            .is_none_or(|id| id == INVALID_ID)
+        {
+            return Err("Object IDs exhausted".into());
+        }
+        let cutter_start = self
+            .objects
+            .get(&cutter)
+            .ok_or("Cutter no longer exists")?
+            .transform
+            .position;
+        for (candidate, _) in &mut pending {
+            candidate.options = self
+                .objects
+                .get(&candidate.id)
+                .ok_or("Cut target no longer exists")?
+                .render_options;
+        }
+        for &id in &removed {
+            self.remove_object(id);
+        }
+        let mut report = CutReport {
+            removed,
+            object_candidates: candidate_count,
+            ..Default::default()
+        };
+        for (candidate, pieces) in pending {
+            for (side, piece) in pieces.into_iter().enumerate() {
+                let direction = if side == 0 {
+                    candidate.direction
+                } else {
+                    -candidate.direction
+                };
+                let mut transform = candidate.transform;
+                transform.position += direction * separation * 0.5;
+                let id = self.add_mesh_data(piece)?;
+                self.set_object_transform(
+                    id,
+                    transform.position,
+                    transform.rotation,
+                    transform.scale,
+                );
+                self.set_render_options(id, candidate.options);
+                self.set_cuttable(id, true, candidate.color)?;
+                report.pieces.push(id);
+                report.piece_directions.push(direction);
+            }
+        }
+        if let Some([floor, distance, duration]) = scatter {
+            self.scatter_cut_pieces(
+                &report.pieces,
+                &report.piece_directions,
+                floor,
+                distance,
+                duration,
+            );
+        }
+        self.cutting_swings
+            .insert(cutter, (cutter_start, cutter_start + motion, 0.));
+        Ok(report)
+    }
+    pub fn cut_with_geometry(
+        &mut self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+        geometry: Option<&BTreeMap<u32, crate::cutting::CutGeometry>>,
+    ) -> Result<CutReport, String> {
+        if !motion.is_finite()
+            || motion.abs().max_element() > 1000.
+            || !separation.is_finite()
+            || !(0.0..=2.0).contains(&separation)
+        {
+            return Err("Invalid cutting sweep".into());
+        }
+        let blade = *self
+            .cutters
+            .get(&cutter)
+            .ok_or("Object is not a registered cutter")?;
+        let transform = self
+            .objects
+            .get(&cutter)
+            .ok_or("Cutter no longer exists")?
+            .transform;
+        let [a, b] = blade.map(|p| transform.model().transform_point3(p));
+        let normal = (b - a).cross(motion).normalize_or_zero();
+        if normal.length_squared() < 0.5 {
+            return Err("Cut motion must cross the blade direction".into());
+        }
+        let min = a.min(b).min(a + motion).min(b + motion) - Vec3::splat(1e-4);
+        let max = a.max(b).max(a + motion).max(b + motion) + Vec3::splat(1e-4);
+        let entries: Vec<_> = self
+            .triangle_meshes
+            .iter()
+            .filter(|(_, o)| o.cuttable)
+            .map(|(&id, o)| {
+                let (min, max) = o.mesh.bounds();
+                let model = self.objects[&id].transform.model();
+                let center = model.transform_point3((min + max) * 0.5);
+                let half = (max - min) * 0.5;
+                let half_extent = model.x_axis.truncate().abs() * half.x
+                    + model.y_axis.truncate().abs() * half.y
+                    + model.z_axis.truncate().abs() * half.z;
+                (
+                    id,
+                    crate::spatial::Bounds {
+                        center,
+                        half_extent,
+                    },
+                )
+            })
+            .collect();
+        self.cutting_index.update(&entries, false);
+        let mut report = CutReport::default();
+        let mut candidates = vec![];
+        let mut object_tests = 0;
+        self.cutting_index.query::<true>(
+            &|bounds| {
+                (bounds.center + bounds.half_extent).cmpge(min).all()
+                    && (bounds.center - bounds.half_extent).cmple(max).all()
+            },
+            &|_| true,
+            &mut candidates,
+            &mut report.bvh_nodes,
+            &mut object_tests,
+        );
+        report.object_candidates = candidates.len();
+        let mut pending = vec![];
+        for id in candidates {
+            let source = &self.triangle_meshes[&id];
+            let object = &self.objects[&id];
+            let inverse = object.transform.model().inverse();
+            if !inverse.is_finite() {
+                return Err("Noninvertible cutting transform".into());
+            }
+            if let Some(slice) = source.mesh.cpu()?.slice_prepared(
+                inverse.transform_point3(a),
+                inverse.transform_point3(b),
+                inverse.transform_vector3(motion),
+                source.cap_color,
+                geometry.and_then(|g| g.get(&id)),
+            )? {
+                report.bvh_nodes += slice.stats.nodes;
+                report.triangle_tests += slice.stats.triangle_tests;
+                for piece in slice.pieces {
+                    // A box center may be outside its component. A real vertex
+                    // furthest from the plane identifies the correct halfspace.
+                    let model = object.transform.model();
+                    let distance = piece
+                        .positions
+                        .iter()
+                        .map(|&p| normal.dot(model.transform_point3(p) - a))
+                        .max_by(|a, b| a.abs().total_cmp(&b.abs()))
+                        .ok_or("Empty cut piece")?;
+                    let world_sign = distance.signum();
+                    let mut transform = object.transform;
+                    transform.position += normal * world_sign * separation * 0.5;
+                    pending.push((
+                        id,
+                        piece,
+                        transform,
+                        object.render_options,
+                        source.cap_color,
+                        normal * world_sign,
+                    ));
+                }
+                report.removed.push(id);
+            }
+        }
+        if self
+            .next_id
+            .checked_add(pending.len() as u32)
+            .is_none_or(|id| id == INVALID_ID)
+        {
+            return Err("Object IDs exhausted".into());
+        }
+        let retained: usize = self
+            .triangle_meshes
+            .iter()
+            .filter(|(id, _)| !report.removed.contains(id))
+            .map(|(_, o)| o.mesh.triangle_count())
+            .sum();
+        if retained + pending.iter().map(|p| p.1.triangles.len()).sum::<usize>() > 200_000 {
+            return Err("Scene cutting triangle budget exceeded".into());
+        }
+        for &id in &report.removed {
+            self.remove_object(id);
+        }
+        for (_, piece, transform, options, cap_color, direction) in pending {
+            let id = self.add_triangle_mesh(piece)?;
+            self.set_object_transform(id, transform.position, transform.rotation, transform.scale);
+            self.set_render_options(id, options);
+            self.set_cuttable(id, true, cap_color)?;
+            report.pieces.push(id);
+            report.piece_directions.push(direction);
+        }
+        self.cutting_swings.insert(
+            cutter,
+            (transform.position, transform.position + motion, 0.0),
+        );
+        Ok(report)
+    }
+    /// Presentation animation for already cut solids, not a rigid-body solver.
+    /// Directions come from the actual split halfspaces, not bounding-box centers.
+    fn scatter_cut_pieces(
+        &mut self,
+        ids: &[u32],
+        directions: &[Vec3],
+        floor_y: f32,
+        distance: f32,
+        duration: f32,
+    ) {
+        for (&id, &normal) in ids.iter().zip(directions) {
+            let object = &self.objects[&id];
+            let (min, max) = self.triangle_meshes[&id].mesh.bounds();
+            let pivot = (min + max) * 0.5;
+            let direction = Vec3::new(normal.x, 0.0, normal.z).normalize();
+            let sign = if direction.x + direction.z >= 0.0 {
+                1.0
+            } else {
+                -1.0
+            };
+            self.cutting_scatter.insert(
+                id,
+                CutScatter {
+                    start: object.transform,
+                    pivot,
+                    direction,
+                    angular: Vec3::new(direction.z * 1.15, sign * 0.12, -direction.x * 1.15),
+                    floor_y,
+                    distance,
+                    duration,
+                    elapsed: -0.075,
+                },
+            );
+        }
+    }
+    pub fn cut_with_scatter(
+        &mut self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+        floor_y: f32,
+        distance: f32,
+        duration: f32,
+    ) -> Result<CutReport, String> {
+        self.cut_with_scatter_geometry(
+            cutter,
+            motion,
+            separation,
+            [floor_y, distance, duration],
+            None,
+        )
+    }
+    pub fn cut_with_scatter_geometry(
+        &mut self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+        scatter: [f32; 3],
+        geometry: Option<&BTreeMap<u32, crate::cutting::CutGeometry>>,
+    ) -> Result<CutReport, String> {
+        let [floor_y, distance, duration] = scatter;
+        if !floor_y.is_finite()
+            || floor_y.abs() > 10_000.0
+            || !distance.is_finite()
+            || !(0.0..=3.0).contains(&distance)
+            || !duration.is_finite()
+            || !(0.05..=3.0).contains(&duration)
+        {
+            return Err("Invalid fragment animation options".into());
+        }
+        let blade = self.cutters.get(&cutter).ok_or("Object is not a cutter")?;
+        let model = self
+            .objects
+            .get(&cutter)
+            .ok_or("Cutter no longer exists")?
+            .transform
+            .model();
+        let normal = model.transform_vector3(blade[1] - blade[0]).cross(motion);
+        let axis = Vec3::new(normal.x, 0.0, normal.z).normalize_or_zero();
+        if !axis.is_finite() || axis.length_squared() < 0.5 {
+            return Err("Scatter requires a cut with a horizontal normal".into());
+        }
+        let report = self.cut_with_geometry(cutter, motion, separation, geometry)?;
+        self.scatter_cut_pieces(
+            &report.pieces,
+            &report.piece_directions,
+            floor_y,
+            distance,
+            duration,
+        );
+        Ok(report)
+    }
     pub fn add_cube(&mut self, position: Vec3) -> u32 {
         self.add_object(
             MeshKind::Cube,
@@ -446,6 +1140,12 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.triangle_meshes.clear();
+        self.cutters.clear();
+        self.cutting_swings.clear();
+        self.cutting_scatter.clear();
+        self.cutting_guide = None;
+        self.cutting_index = crate::spatial::Bvh::default();
         self.colliders.clear();
         self.collision_dirty = true;
         self.objects.clear();
@@ -479,6 +1179,16 @@ impl SceneManager {
         }
         self.collision_dirty |= self.colliders.remove(&id).is_some();
         self.models.remove(&id);
+        self.triangle_meshes.remove(&id);
+        self.cutters.remove(&id);
+        self.cutting_swings.remove(&id);
+        self.cutting_scatter.remove(&id);
+        if self
+            .cutting_guide
+            .is_some_and(|(cutter, guide, _)| cutter == id || guide == id)
+        {
+            self.cutting_guide = None;
+        }
         self.render_revision = self.render_revision.wrapping_add(1);
         if was_static {
             self.static_revision = self.static_revision.wrapping_add(1);
@@ -508,6 +1218,8 @@ impl SceneManager {
         };
         object.transform = transform;
         object.refresh_render_data();
+        self.cutting_swings.remove(&id);
+        self.cutting_scatter.remove(&id);
         self.changed(id);
         true
     }
@@ -520,6 +1232,8 @@ impl SceneManager {
         };
         object.transform.position = position;
         object.refresh_render_data();
+        self.cutting_swings.remove(&id);
+        self.cutting_scatter.remove(&id);
         self.changed(id);
         true
     }
@@ -532,6 +1246,7 @@ impl SceneManager {
         };
         object.transform.rotation = rotation;
         object.refresh_render_data();
+        self.cutting_scatter.remove(&id);
         self.changed(id);
         true
     }
@@ -544,6 +1259,7 @@ impl SceneManager {
         };
         object.transform.scale = scale;
         object.refresh_render_data();
+        self.cutting_scatter.remove(&id);
         self.changed(id);
         true
     }
@@ -710,6 +1426,57 @@ impl SceneManager {
                 }
             }
         }
+        self.cutting_swings.retain(|id, (start, end, elapsed)| {
+            let Some(object) = self.objects.get_mut(id) else {
+                return false;
+            };
+            *elapsed += dt;
+            let t = (*elapsed / 0.24).min(1.0);
+            object.transform.position = start.lerp(*end, t * t * (3.0 - 2.0 * t));
+            object.refresh_render_data();
+            self.collision_dirty |= self.colliders.contains_key(id);
+            self.render_revision = self.render_revision.wrapping_add(1);
+            if object.render_options.is_static {
+                self.static_revision = self.static_revision.wrapping_add(1);
+            }
+            t < 1.0
+        });
+        self.cutting_scatter.retain(|id, action| {
+            let Some(object) = self.objects.get_mut(id) else {
+                return false;
+            };
+            let Some(geometry) = self.triangle_meshes.get(id) else {
+                return false;
+            };
+            action.elapsed += dt;
+            if action.elapsed < 0.0 {
+                return true;
+            }
+            let t = (action.elapsed / action.duration).min(1.0);
+            let eased = 1.0 - (1.0 - t).powi(3);
+            let mut transform = action.start;
+            transform.rotation += action.angular * eased;
+            transform.position = Vec3::ZERO;
+            let pivot = action.start.model().transform_point3(action.pivot);
+            transform.position = pivot + action.direction * action.distance * eased
+                - transform.model().transform_point3(action.pivot);
+            // Support every vertex on the board after rotation; a small hop settles
+            // to exactly floor_y. Pivot rotation does not orbit around the old root.
+            let bottom = geometry
+                .mesh
+                .bottom(transform)
+                .expect("Validated cutting support");
+            transform.position.y +=
+                action.floor_y - bottom + (std::f32::consts::PI * t).sin() * 0.18 * (1.0 - t);
+            object.transform = transform;
+            object.refresh_render_data();
+            self.render_revision = self.render_revision.wrapping_add(1);
+            if object.render_options.is_static {
+                self.static_revision = self.static_revision.wrapping_add(1);
+            }
+            self.collision_dirty |= self.colliders.contains_key(id);
+            t < 1.0
+        });
         self.rotations.retain_mut(|rotation| {
             let Some(object) = self.objects.get_mut(&rotation.id) else {
                 return false;

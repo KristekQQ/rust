@@ -5,6 +5,7 @@ Rozcestník je statické HTML bez canvasu, importů enginu a GPU práce.
 Každý příklad je samostatná stránka:
 
 - `basic/`: první scéna, základní importy a inicializace.
+- `cutting/`: pět jablek, režim meče v ruce/plánování, zelená stopa řezu a volně ovladatelná kamera (pravé tažení, kolečko, WASD). Levý klik seká shora dolů; kusy lze řezat znovu. Volitelný hybrid WebGPU compute + CPU; Auto používá naměřenou rychlejší CPU cestu. [Ovládání, API, měření a omezení](../docs/CUTTING.md).
 - `shadows/`: dva stíny, statické objekty a Rust animace.
 - `mirror/`: rozšíření ukázky stínů o render odrazu do textury.
 - `lights/`: světelné orbity počítané Rustem.

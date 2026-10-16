@@ -115,8 +115,11 @@ RUSTFLAGS=--cfg=web_sys_unstable_apis cargo check --target wasm32-unknown-unknow
 
 Native tests cover the scene manager, simulation, camera input and projection. Renderer modules compile only
 for WASM, so also rebuild `pkg/` and verify the main page, console, animation,
-controls, and resize in a real browser. Before committing or pushing, run
-`cargo test`, then `scripts/pre-push`.
+controls, and resize in a real browser. During iteration use only affected checks.
+Before a requested commit/push run `npm run verify:push` once, commit its source
+dump, then push; the hook reuses a matching content-bound PASS receipt. No second
+full run is needed unless tested inputs changed. See the verification guide for
+`VERIFY_FORCE=1` and the separate software-WebGL CI environment.
 
 The integration page tests the real WASM SDK (including Rust-timed removal):
 `http://127.0.0.1:8000/tests/scene-sdk.html`, also with `?backend=webgl`.
@@ -256,8 +259,9 @@ runner binaries allow you to run the example without network access.
 Run `scripts/dump_sources.sh` to generate `all_sources.txt` containing all Rust
 sources, shader files and the `Cargo.toml`. This is convenient when sending the
 project to GPT or other tools. Install the maintained hook with
-`git config --local core.hooksPath scripts`; it runs `cargo test --locked` and
-blocks push if tests or atomic source generation fail.
+`git config --local core.hooksPath scripts`; it requires the full verification
+gate (reusing a matching PASS) and blocks push on failure. Run
+`npm run verify:push` before committing to include the regenerated dump.
 
 codex resume 019b6b22-2111-7001-88fb-070400b19da1
 # Výkon rendereru

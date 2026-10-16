@@ -202,6 +202,7 @@ pub struct SceneUniforms {
     pub camera_pos: [f32; 3],
     pub _pad0: f32,
     pub lights: [Light; MAX_LIGHTS],
+    pub cutting_guide: [[f32; 4]; 3],
 }
 
 pub fn grid_vertices(size: i32) -> Vec<Vertex> {
@@ -459,7 +460,8 @@ mod tests {
     fn uniform_offsets_match_wgsl_alignment() {
         assert_eq!(std::mem::offset_of!(SceneUniforms, camera_pos), 64);
         assert_eq!(std::mem::offset_of!(SceneUniforms, lights), 80);
-        assert_eq!(std::mem::size_of::<SceneUniforms>(), 208);
+        assert_eq!(std::mem::offset_of!(SceneUniforms, cutting_guide), 208);
+        assert_eq!(std::mem::size_of::<SceneUniforms>(), 256);
     }
 }
 

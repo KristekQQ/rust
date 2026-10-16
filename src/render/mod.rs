@@ -1,5 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
+pub mod cutting_compute;
+pub mod cutting_resident;
 pub mod data;
 pub mod depth;
 pub mod pipeline;

@@ -567,14 +567,14 @@ impl PostProcessor {
         light_color: Vec3,
         output: &wgpu::TextureView,
         shadows_enabled: bool,
-    ) {
+    ) -> usize {
         // new() has no queue; initialize its white fallback once, before sampling.
         if self.reflection_mask.needs_white_upload {
             self.reflection_mask.upload(queue, 1, 1, &[255]);
             self.reflection_mask.needs_white_upload = false;
         }
         let Some(targets) = &self.targets else {
-            return;
+            return 0;
         };
         let active: Vec<_> = self
             .effects
@@ -583,7 +583,7 @@ impl PostProcessor {
             .filter(|(_, effect)| effect.enabled && effect.strength > 0.0)
             .collect();
         if active.is_empty() {
-            return;
+            return 0;
         }
         let shadow_matrix = crate::render_math::shadow_view_projection(light_position);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -650,5 +650,6 @@ impl PostProcessor {
         queue.submit(Some(encoder.finish()));
         self.last_pass_count = active.len();
         self.submitted_frames = self.submitted_frames.saturating_add(1);
+        active.len()
     }
 }
