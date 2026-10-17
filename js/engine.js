@@ -55,6 +55,8 @@ export class SceneObject {
     }
     /** @param {Vector3} radiansPerSecond */
     spin(radiansPerSecond) { accepted(this.#wasm.set_object_spin(this.id,...radiansPerSecond)); return this; }
+    /** @param {Vector3} velocity @param {{gravity?:number,bounce?:number}} [options] */
+    projectile(velocity, {gravity = 9.81, bounce = 0.45} = {}) { accepted(this.#wasm.set_projectile(this.id,...velocity,gravity,bounce)); return this; }
     /** @param {number} seconds */
     removeAfter(seconds) { accepted(this.#wasm.schedule_remove_object(this.id, seconds)); return this; }
     remove() { accepted(this.#wasm.remove_object(this.id)); }
@@ -357,6 +359,7 @@ async function initializeEngine(canvas, backend, initialization) {
         schedule_rotate: wasm.schedule_rotate,
         schedule_remove_object: wasm.schedule_remove_object,
         schedule_remove_light: wasm.schedule_remove_light,
+        set_projectile: wasm.set_projectile,
         set_camera_mode: wasm.set_camera_mode,
         /** @param {Vector3} position @param {Vector3} target */
         setCameraView(position, target) { accepted(wasm.set_camera_view(...position, ...target)); },
@@ -421,6 +424,7 @@ async function initializeEngine(canvas, backend, initialization) {
         /** @param {boolean} enabled */
         setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },
         debugStats() { return JSON.parse(wasm.debug_stats()); },
+        projectileContacts() { return wasm.projectile_contacts(); },
         renderer_stats() {
             const [total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs] = wasm.renderer_stats();
             return {total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs};

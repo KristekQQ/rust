@@ -197,6 +197,11 @@ pub struct SceneManager {
     render_revision: u64,
     static_revision: u64,
     spins: BTreeMap<u32, Vec3>,
+    projectiles: BTreeMap<u32, (Vec3, f32, f32)>,
+    projectile_scratch: Vec<crate::projectile::Body>,
+    projectile_order: Vec<usize>,
+    projectile_pairs: Vec<(usize, usize)>,
+    pub projectile_contacts: u32,
     pub paused: bool,
     pub mirror_object: Option<u32>,
     time: f32,
@@ -339,6 +344,61 @@ impl SceneManager {
             self.spins.insert(id, radians_per_second);
         }
         true
+    }
+    pub fn set_projectile(&mut self, id: u32, velocity: Vec3, gravity: f32, bounce: f32) -> bool {
+        if !self.object_exists(id)
+            || !velocity.is_finite()
+            || !gravity.is_finite()
+            || !bounce.is_finite()
+            || gravity < 0.0
+            || !(0.0..=1.0).contains(&bounce)
+        {
+            return false;
+        }
+        if gravity == 0.0 && velocity == Vec3::ZERO {
+            self.projectiles.remove(&id);
+        } else {
+            self.projectiles.insert(id, (velocity, gravity, bounce));
+        }
+        true
+    }
+    fn update_projectiles(&mut self, dt: f32) {
+        if self.projectiles.is_empty() {
+            return;
+        }
+        let mut bodies = std::mem::take(&mut self.projectile_scratch);
+        bodies.clear();
+        for (&id, &(velocity, gravity, bounce)) in &self.projectiles {
+            if let Some(object) = self.objects.get(&id) {
+                bodies.push(crate::projectile::Body {
+                    id,
+                    velocity,
+                    gravity,
+                    bounce,
+                    position: object.transform.position,
+                    radius: object.transform.scale.abs().max_element() * 1.15,
+                });
+            }
+        }
+        let contacts = crate::projectile::simulate(
+            &mut bodies,
+            &mut self.projectile_order,
+            &mut self.projectile_pairs,
+            dt,
+        );
+        self.projectile_contacts = self.projectile_contacts.saturating_add(contacts);
+        for body in &bodies {
+            self.projectiles.get_mut(&body.id).unwrap().0 = body.velocity;
+            let object = self.objects.get_mut(&body.id).unwrap();
+            object.transform.position = body.position;
+            object.refresh_render_data();
+            self.collision_dirty |= self.colliders.contains_key(&body.id);
+            self.render_revision = self.render_revision.wrapping_add(1);
+            if object.render_options.is_static {
+                self.static_revision = self.static_revision.wrapping_add(1);
+            }
+        }
+        self.projectile_scratch = bodies;
     }
     pub fn render_revision(&self) -> u64 {
         self.render_revision
@@ -1140,6 +1200,11 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.projectiles.clear();
+        self.projectile_scratch.clear();
+        self.projectile_order.clear();
+        self.projectile_pairs.clear();
+        self.projectile_contacts = 0;
         self.triangle_meshes.clear();
         self.cutters.clear();
         self.cutting_swings.clear();
@@ -1167,6 +1232,7 @@ impl SceneManager {
     pub fn clear(&mut self) {
         self.clear_scene();
         self.clear_lights();
+        self.projectiles.clear();
         self.paused = false;
     }
     pub fn remove_object(&mut self, id: u32) -> bool {
@@ -1197,6 +1263,7 @@ impl SceneManager {
             self.mirror_object = None;
         }
         self.spins.remove(&id);
+        self.projectiles.remove(&id);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -1498,6 +1565,10 @@ impl SceneManager {
         for (id, velocity) in &self.spins {
             if let Some(object) = self.objects.get_mut(id) {
                 object.transform.rotation += *velocity * dt;
+                // Active projectiles refresh once after both rotation and motion.
+                if self.projectiles.contains_key(id) {
+                    continue;
+                }
                 object.refresh_render_data();
                 self.render_revision = self.render_revision.wrapping_add(1);
                 if object.render_options.is_static {
@@ -1505,6 +1576,7 @@ impl SceneManager {
                 }
             }
         }
+        self.update_projectiles(dt);
         for (id, orbit) in &self.light_orbits {
             if let Some(light) = self.lights.get_mut(id) {
                 let angle = now * orbit.speed + orbit.phase;
@@ -1523,6 +1595,84 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn clearing_scene_and_parking_release_projectile_work() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        let id = scene.add_sphere(Vec3::ZERO);
+        assert!(scene.set_projectile(id, Vec3::Y, 12.0, 0.0));
+        assert!(scene.set_projectile(id, Vec3::ZERO, 0.0, 0.0));
+        assert!(scene.projectiles.is_empty());
+        assert!(scene.object_exists(id));
+        scene.set_projectile(id, Vec3::Y, 12.0, 0.0);
+        scene.update(1.0 / 60.0);
+        scene.clear_scene();
+        assert!(scene.projectiles.is_empty());
+        assert!(scene.projectile_scratch.is_empty());
+    }
+    #[test]
+    #[ignore = "manual release performance comparison"]
+    fn benchmark_projectile_solver() {
+        use super::*;
+        for count in [8, 48, 256] {
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let mut scene = SceneManager::default();
+                for i in 0..count {
+                    let id = scene.add_sphere(Vec3::new(
+                        (i % 16) as f32 * 1.3,
+                        6.0 + (i / 16) as f32 * 1.1,
+                        0.0,
+                    ));
+                    scene.set_object_scale(id, Vec3::splat(0.38));
+                    scene.set_projectile(
+                        id,
+                        Vec3::new(if i % 2 == 0 { 0.3 } else { -0.3 }, 3.0, 0.0),
+                        12.0,
+                        0.5,
+                    );
+                }
+                scene.update_projectiles(1.0 / 60.0);
+                let start = std::time::Instant::now();
+                for _ in 0..240 {
+                    scene.update_projectiles(1.0 / 60.0);
+                }
+                samples.push(start.elapsed().as_secs_f64() * 1e6 / 240.0);
+                std::hint::black_box(scene.projectile_contacts);
+            }
+            samples.sort_by(f64::total_cmp);
+            eprintln!("projectiles={count} median_us_per_frame={:.3}", samples[2]);
+        }
+    }
+    #[test]
+    fn projectile_collision_stops_fast_crossing_and_separates_overlap() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        let a = scene.add_sphere(Vec3::new(-1.0, 4.0, 0.0));
+        let b = scene.add_sphere(Vec3::new(1.0, 4.0, 0.0));
+        scene.set_object_scale(a, Vec3::splat(0.38));
+        scene.set_object_scale(b, Vec3::splat(0.38));
+        scene.set_projectile(a, Vec3::X * 25.0, 0.0, 0.0);
+        scene.set_projectile(b, -Vec3::X * 25.0, 0.0, 0.0);
+        scene.update(0.1);
+        assert!(scene.projectiles[&a].0.x < 0.0);
+        assert!(scene.projectiles[&b].0.x > 0.0);
+        assert!(scene.projectile_contacts > 0);
+        assert!(scene.objects[&a].transform.position.x < scene.objects[&b].transform.position.x);
+        assert!(
+            (scene.objects[&a].transform.position - scene.objects[&b].transform.position).length()
+                >= 0.874 - 1e-4
+        );
+        scene.set_object_position(a, Vec3::new(0.0, 4.0, 0.0));
+        scene.set_object_position(b, Vec3::new(0.0, 4.0, 0.0));
+        scene.set_projectile(a, Vec3::ZERO, 12.0, 0.0);
+        scene.set_projectile(b, Vec3::ZERO, 12.0, 0.0);
+        scene.update(1.0 / 60.0);
+        assert!(
+            (scene.objects[&a].transform.position - scene.objects[&b].transform.position).length()
+                >= 0.874 - 1e-4
+        );
+    }
     #[test]
     fn static_revision_invalidates_only_when_static_geometry_changes() {
         use super::*;

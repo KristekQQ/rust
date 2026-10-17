@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Střílení jablek</title>
+<style>
+*{box-sizing:border-box}body{margin:0;overflow:hidden;font:14px system-ui}main{position:relative}
+canvas{width:100vw;height:100dvh;display:block;touch-action:none}
+aside{position:absolute;right:16px;top:16px;width:255px;padding:14px;background:#fff4dded;color:#372317;border-radius:14px}
+p{font-size:12px;line-height:1.4;margin:8px 0}button{padding:9px;background:#a93220;color:white;border:0;border-radius:8px;cursor:pointer;margin:3px 2px}
+#status,.contacts{font-size:12px;margin-top:8px}a{color:#713d24}:focus-visible{outline:3px solid #e9a33b}
+@media(max-width:700px){html[data-debug-overlay=true] aside{display:none}aside{width:220px}}
+</style>
+<main>
+<canvas id="gpu-canvas" tabindex="0" aria-label="Fyzikální simulace střílení jablek"></canvas>
+<aside><strong>Jablka ve vzduchu</strong>
+<p>Dvě odpalovací místa. Nepravidelné salvy a vzájemné srážky.</p>
+<button id="shoot">Vystřelit jablko</button><button id="reset">Reset</button>
+<button id="collision-test">Otestovat srážku</button>
+<div id="status">Připravuji scénu…</div>
+<div class="contacts">Srážky jablek: <strong id="contacts">0</strong> · F3 informace</div>
+<p><a href="../">← Všechny ukázky</a></p></aside>
+</main><script type="module" src="main.js"></script></html>

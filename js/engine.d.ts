@@ -73,6 +73,8 @@ export class SceneObject {
     rotate(degrees: Vector3, options?: RotationOptions): this;
     setRenderOptions(options?: {isStatic?: boolean; castsShadow?: boolean; receivesShadow?: boolean; reflectivity?: number}): this;
     spin(radiansPerSecond: Vector3): this;
+    /** Rust-owned ballistic motion with ground bounce. */
+    projectile(velocity: Vector3, options?: {gravity?: number; bounce?: number}): this;
     removeAfter(seconds: number): this;
     remove(): void;
 }
@@ -130,6 +132,7 @@ export type RawEngine = Pick<typeof wasm,
     "set_object_transform" | "set_cube_transform" | "add_light" | "remove_light" |
     "clear_lights" | "set_light" | "set_light_orbit" | "clear_light_orbit" |
     "schedule_rotate" | "schedule_remove_object" | "schedule_remove_light" |
+    "set_projectile" |
     "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused"> & {screenToPlane(point:readonly [number,number],height?:number):Vector3;worldToScreen(point:Vector3):readonly[number,number]|null;setOrbitView(position:Vector3,target:Vector3):void;adjustOrbit(dx:number,dy:number,zoom?:number):void;cameraViewState():CameraViewState};
 export interface RenderStats {
     total: number; visible: number; culled: number;
@@ -172,6 +175,6 @@ export interface PostProcessing {
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
     stats(): { passes: number; width: number; height: number; targets: number; frames: number };
 }
-export type Engine = Readonly<RawEngine & { readonly scene: Scene; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+export type Engine = Readonly<RawEngine & { readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;

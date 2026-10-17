@@ -7614,6 +7614,7 @@ pub mod gltf_animation;
 pub mod gltf_loader;
 pub mod gltf_model;
 pub mod input;
+mod projectile;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod render_math;
@@ -7636,6 +7637,173 @@ mod render_target_tests;
 
 #[cfg(test)]
 mod test_scenes;
+
+
+# File: src/projectile.rs
+//! CPU sphere proxies. Scratch storage is retained between frames.
+use glam::Vec3;
+
+#[derive(Clone, Copy)]
+pub(crate) struct Body {
+    pub id: u32,
+    pub position: Vec3,
+    pub velocity: Vec3,
+    pub gravity: f32,
+    pub bounce: f32,
+    pub radius: f32,
+}
+
+fn collide(a: &mut Body, b: &mut Body) -> (u32, bool) {
+    let delta = b.position - a.position;
+    let radii = a.radius + b.radius;
+    let squared = delta.length_squared();
+    if squared >= radii * radii {
+        return (0, false);
+    }
+    let distance = squared.sqrt();
+    let normal = if distance > 1e-6 {
+        delta / distance
+    } else {
+        Vec3::X
+    };
+    let correction = normal * ((radii - distance) * 0.5 + 1e-5);
+    a.position -= correction;
+    b.position += correction;
+    let closing_speed = (b.velocity - a.velocity).dot(normal);
+    if closing_speed >= 0.0 {
+        return (0, true);
+    }
+    let impulse = normal * (-(1.0 + 0.75) * closing_speed * 0.5);
+    a.velocity -= impulse;
+    b.velocity += impulse;
+    (1, true)
+}
+
+pub(crate) fn simulate(
+    bodies: &mut [Body],
+    order: &mut Vec<usize>,
+    pairs: &mut Vec<(usize, usize)>,
+    dt: f32,
+) -> u32 {
+    if bodies.is_empty() {
+        return 0;
+    }
+    let duration = dt.min(0.25);
+    let steps = (duration / (1.0 / 240.0)).ceil().max(1.0) as u32;
+    let step = duration / steps as f32;
+    let friction = (-0.9 * step).exp();
+    let max_radius = bodies.iter().map(|b| b.radius).fold(0.0, f32::max);
+    let mut contacts: u32 = 0;
+    order.clear();
+    order.extend(0..bodies.len());
+    for _ in 0..steps {
+        for body in bodies.iter_mut() {
+            body.velocity.y -= body.gravity * step;
+            body.position += body.velocity * step;
+            if body.position.y < body.radius {
+                body.position.y = body.radius;
+                if body.velocity.y < 0.0 {
+                    body.velocity.y = -body.velocity.y * body.bounce;
+                }
+                body.velocity.x *= friction;
+                body.velocity.z *= friction;
+            }
+        }
+        // Corrections can create secondary contacts; rebuild the broad phase.
+        for _ in 0..4 {
+            let mut corrected = false;
+            if bodies.len() <= 16 {
+                // Tiny groups are cheaper without sorting or a spatial index.
+                for i in 0..bodies.len() {
+                    let (before, after) = bodies.split_at_mut(i + 1);
+                    for b in after {
+                        let (hits, moved) = collide(&mut before[i], b);
+                        contacts = contacts.saturating_add(hits);
+                        corrected |= moved;
+                    }
+                }
+            } else {
+                // Sweep sorted X bounds; build candidates before any contact correction.
+                order.sort_unstable_by(|&a, &b| {
+                    bodies[a].position.x.total_cmp(&bodies[b].position.x)
+                });
+                pairs.clear();
+                for (offset, &a) in order.iter().enumerate() {
+                    for &b in &order[offset + 1..] {
+                        let delta = bodies[b].position - bodies[a].position;
+                        if delta.x > bodies[a].radius + max_radius {
+                            break;
+                        }
+                        let reach = bodies[a].radius + bodies[b].radius;
+                        if delta.x > reach || delta.y.abs() > reach || delta.z.abs() > reach {
+                            continue;
+                        }
+                        pairs.push((a.min(b), a.max(b)));
+                    }
+                }
+                // Stable ID order keeps collision results independent of sorting ties.
+                pairs.sort_unstable();
+                for &(a, b) in pairs.iter() {
+                    let (before, after) = bodies.split_at_mut(b);
+                    let (hits, moved) = collide(&mut before[a], &mut after[0]);
+                    contacts = contacts.saturating_add(hits);
+                    corrected |= moved;
+                }
+            }
+            if !corrected {
+                break;
+            }
+        }
+    }
+    contacts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn sweep_rebuilds_after_correction_creates_secondary_contact() {
+        let mut bodies: Vec<_> = (0..17)
+            .map(|id| Body {
+                id,
+                position: Vec3::new(
+                    match id {
+                        0 => 0.0,
+                        1 => 1.0,
+                        2 => 3.1,
+                        _ => id as f32 * 10.0,
+                    },
+                    4.0,
+                    0.0,
+                ),
+                velocity: Vec3::ZERO,
+                gravity: 0.0,
+                bounce: 0.0,
+                radius: 1.0,
+            })
+            .collect();
+        simulate(&mut bodies, &mut Vec::new(), &mut Vec::new(), 1.0 / 240.0);
+        assert!((bodies[2].position - bodies[1].position).length() >= 2.0 - 1e-4);
+    }
+    #[test]
+    fn sweep_keeps_contacts_across_mixed_radii_and_equal_x() {
+        let mut bodies: Vec<_> = (0..40)
+            .map(|i| Body {
+                id: i,
+                position: Vec3::new((i / 2) as f32 * 4.0, 4.0 + (i % 2) as f32 * 0.4, 0.0),
+                velocity: if i % 2 == 0 { Vec3::Y } else { -Vec3::Y },
+                radius: if i % 2 == 0 { 0.2 } else { 0.5 },
+                gravity: 0.0,
+                bounce: 0.0,
+            })
+            .collect();
+        let contacts = simulate(&mut bodies, &mut Vec::new(), &mut Vec::new(), 1.0 / 240.0);
+        assert_eq!(contacts, 20);
+        for pair in bodies.as_chunks::<2>().0 {
+            assert!((pair[1].position - pair[0].position).length() >= 0.7 - 1e-5);
+        }
+    }
+}
 
 
 # File: src/render/cutting_compute.rs
@@ -14489,6 +14657,11 @@ pub struct SceneManager {
     render_revision: u64,
     static_revision: u64,
     spins: BTreeMap<u32, Vec3>,
+    projectiles: BTreeMap<u32, (Vec3, f32, f32)>,
+    projectile_scratch: Vec<crate::projectile::Body>,
+    projectile_order: Vec<usize>,
+    projectile_pairs: Vec<(usize, usize)>,
+    pub projectile_contacts: u32,
     pub paused: bool,
     pub mirror_object: Option<u32>,
     time: f32,
@@ -14631,6 +14804,61 @@ impl SceneManager {
             self.spins.insert(id, radians_per_second);
         }
         true
+    }
+    pub fn set_projectile(&mut self, id: u32, velocity: Vec3, gravity: f32, bounce: f32) -> bool {
+        if !self.object_exists(id)
+            || !velocity.is_finite()
+            || !gravity.is_finite()
+            || !bounce.is_finite()
+            || gravity < 0.0
+            || !(0.0..=1.0).contains(&bounce)
+        {
+            return false;
+        }
+        if gravity == 0.0 && velocity == Vec3::ZERO {
+            self.projectiles.remove(&id);
+        } else {
+            self.projectiles.insert(id, (velocity, gravity, bounce));
+        }
+        true
+    }
+    fn update_projectiles(&mut self, dt: f32) {
+        if self.projectiles.is_empty() {
+            return;
+        }
+        let mut bodies = std::mem::take(&mut self.projectile_scratch);
+        bodies.clear();
+        for (&id, &(velocity, gravity, bounce)) in &self.projectiles {
+            if let Some(object) = self.objects.get(&id) {
+                bodies.push(crate::projectile::Body {
+                    id,
+                    velocity,
+                    gravity,
+                    bounce,
+                    position: object.transform.position,
+                    radius: object.transform.scale.abs().max_element() * 1.15,
+                });
+            }
+        }
+        let contacts = crate::projectile::simulate(
+            &mut bodies,
+            &mut self.projectile_order,
+            &mut self.projectile_pairs,
+            dt,
+        );
+        self.projectile_contacts = self.projectile_contacts.saturating_add(contacts);
+        for body in &bodies {
+            self.projectiles.get_mut(&body.id).unwrap().0 = body.velocity;
+            let object = self.objects.get_mut(&body.id).unwrap();
+            object.transform.position = body.position;
+            object.refresh_render_data();
+            self.collision_dirty |= self.colliders.contains_key(&body.id);
+            self.render_revision = self.render_revision.wrapping_add(1);
+            if object.render_options.is_static {
+                self.static_revision = self.static_revision.wrapping_add(1);
+            }
+        }
+        self.projectile_scratch = bodies;
     }
     pub fn render_revision(&self) -> u64 {
         self.render_revision
@@ -15432,6 +15660,11 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.projectiles.clear();
+        self.projectile_scratch.clear();
+        self.projectile_order.clear();
+        self.projectile_pairs.clear();
+        self.projectile_contacts = 0;
         self.triangle_meshes.clear();
         self.cutters.clear();
         self.cutting_swings.clear();
@@ -15459,6 +15692,7 @@ impl SceneManager {
     pub fn clear(&mut self) {
         self.clear_scene();
         self.clear_lights();
+        self.projectiles.clear();
         self.paused = false;
     }
     pub fn remove_object(&mut self, id: u32) -> bool {
@@ -15489,6 +15723,7 @@ impl SceneManager {
             self.mirror_object = None;
         }
         self.spins.remove(&id);
+        self.projectiles.remove(&id);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -15790,6 +16025,10 @@ impl SceneManager {
         for (id, velocity) in &self.spins {
             if let Some(object) = self.objects.get_mut(id) {
                 object.transform.rotation += *velocity * dt;
+                // Active projectiles refresh once after both rotation and motion.
+                if self.projectiles.contains_key(id) {
+                    continue;
+                }
                 object.refresh_render_data();
                 self.render_revision = self.render_revision.wrapping_add(1);
                 if object.render_options.is_static {
@@ -15797,6 +16036,7 @@ impl SceneManager {
                 }
             }
         }
+        self.update_projectiles(dt);
         for (id, orbit) in &self.light_orbits {
             if let Some(light) = self.lights.get_mut(id) {
                 let angle = now * orbit.speed + orbit.phase;
@@ -15815,6 +16055,84 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn clearing_scene_and_parking_release_projectile_work() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        let id = scene.add_sphere(Vec3::ZERO);
+        assert!(scene.set_projectile(id, Vec3::Y, 12.0, 0.0));
+        assert!(scene.set_projectile(id, Vec3::ZERO, 0.0, 0.0));
+        assert!(scene.projectiles.is_empty());
+        assert!(scene.object_exists(id));
+        scene.set_projectile(id, Vec3::Y, 12.0, 0.0);
+        scene.update(1.0 / 60.0);
+        scene.clear_scene();
+        assert!(scene.projectiles.is_empty());
+        assert!(scene.projectile_scratch.is_empty());
+    }
+    #[test]
+    #[ignore = "manual release performance comparison"]
+    fn benchmark_projectile_solver() {
+        use super::*;
+        for count in [8, 48, 256] {
+            let mut samples = Vec::new();
+            for _ in 0..5 {
+                let mut scene = SceneManager::default();
+                for i in 0..count {
+                    let id = scene.add_sphere(Vec3::new(
+                        (i % 16) as f32 * 1.3,
+                        6.0 + (i / 16) as f32 * 1.1,
+                        0.0,
+                    ));
+                    scene.set_object_scale(id, Vec3::splat(0.38));
+                    scene.set_projectile(
+                        id,
+                        Vec3::new(if i % 2 == 0 { 0.3 } else { -0.3 }, 3.0, 0.0),
+                        12.0,
+                        0.5,
+                    );
+                }
+                scene.update_projectiles(1.0 / 60.0);
+                let start = std::time::Instant::now();
+                for _ in 0..240 {
+                    scene.update_projectiles(1.0 / 60.0);
+                }
+                samples.push(start.elapsed().as_secs_f64() * 1e6 / 240.0);
+                std::hint::black_box(scene.projectile_contacts);
+            }
+            samples.sort_by(f64::total_cmp);
+            eprintln!("projectiles={count} median_us_per_frame={:.3}", samples[2]);
+        }
+    }
+    #[test]
+    fn projectile_collision_stops_fast_crossing_and_separates_overlap() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        let a = scene.add_sphere(Vec3::new(-1.0, 4.0, 0.0));
+        let b = scene.add_sphere(Vec3::new(1.0, 4.0, 0.0));
+        scene.set_object_scale(a, Vec3::splat(0.38));
+        scene.set_object_scale(b, Vec3::splat(0.38));
+        scene.set_projectile(a, Vec3::X * 25.0, 0.0, 0.0);
+        scene.set_projectile(b, -Vec3::X * 25.0, 0.0, 0.0);
+        scene.update(0.1);
+        assert!(scene.projectiles[&a].0.x < 0.0);
+        assert!(scene.projectiles[&b].0.x > 0.0);
+        assert!(scene.projectile_contacts > 0);
+        assert!(scene.objects[&a].transform.position.x < scene.objects[&b].transform.position.x);
+        assert!(
+            (scene.objects[&a].transform.position - scene.objects[&b].transform.position).length()
+                >= 0.874 - 1e-4
+        );
+        scene.set_object_position(a, Vec3::new(0.0, 4.0, 0.0));
+        scene.set_object_position(b, Vec3::new(0.0, 4.0, 0.0));
+        scene.set_projectile(a, Vec3::ZERO, 12.0, 0.0);
+        scene.set_projectile(b, Vec3::ZERO, 12.0, 0.0);
+        scene.update(1.0 / 60.0);
+        assert!(
+            (scene.objects[&a].transform.position - scene.objects[&b].transform.position).length()
+                >= 0.874 - 1e-4
+        );
+    }
     #[test]
     fn static_revision_invalidates_only_when_static_geometry_changes() {
         use super::*;
@@ -17688,6 +18006,29 @@ pub fn set_object_spin(id: u32, x: f32, y: f32, z: f32) -> bool {
                 .scene
                 .set_object_spin(id, glam::Vec3::new(x, y, z))
         })
+    })
+}
+#[wasm_bindgen]
+pub fn set_projectile(id: u32, vx: f32, vy: f32, vz: f32, gravity: f32, bounce: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().scene.set_projectile(
+                id,
+                glam::Vec3::new(vx, vy, vz),
+                gravity,
+                bounce,
+            )
+        })
+    })
+}
+
+#[wasm_bindgen]
+pub fn projectile_contacts() -> u32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map_or(0, |state| state.borrow().scene.projectile_contacts)
     })
 }
 

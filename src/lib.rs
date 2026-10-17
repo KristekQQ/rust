@@ -10,6 +10,7 @@ pub mod gltf_animation;
 pub mod gltf_loader;
 pub mod gltf_model;
 pub mod input;
+mod projectile;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod render_math;

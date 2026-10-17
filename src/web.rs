@@ -346,6 +346,29 @@ pub fn set_object_spin(id: u32, x: f32, y: f32, z: f32) -> bool {
         })
     })
 }
+#[wasm_bindgen]
+pub fn set_projectile(id: u32, vx: f32, vy: f32, vz: f32, gravity: f32, bounce: f32) -> bool {
+    STATE.with(|state| {
+        state.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().scene.set_projectile(
+                id,
+                glam::Vec3::new(vx, vy, vz),
+                gravity,
+                bounce,
+            )
+        })
+    })
+}
+
+#[wasm_bindgen]
+pub fn projectile_contacts() -> u32 {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map_or(0, |state| state.borrow().scene.projectile_contacts)
+    })
+}
 
 /// Select browser presentation; scene rendering itself accepts GPU attachments.
 #[wasm_bindgen]

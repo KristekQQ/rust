@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { verifyCutting } from '../tests/cutting-browser.mjs';
+import { verifyProjectiles } from '../tests/projectiles-browser.mjs';
 import { browserArgs } from './browser-options.mjs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
@@ -20,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'projectiles', path: 'examples/projectiles/', interaction: 'projectiles' },
     { name: 'cutting', path: 'examples/cutting/', interaction: 'cutting' },
     { name: 'cutting-compute', path: 'tests/cutting-compute.html', status: '#result' },
     { name: 'cutting-resident', path: 'tests/cutting-resident.html', status: '#result' },
@@ -404,6 +406,7 @@ try {
                 if (!failure) await page.click(suite.button);
             }
             if (suite.interaction === 'cutting') result.text = await verifyCutting(page);
+            else if (suite.interaction === 'projectiles') result.text = await verifyProjectiles(page);
             else if (suite.interaction === 'fox') result.text = await verifyFox(page);
             else if (suite.interaction === 'culling') result.text = await verifyCulling(page);
             else {
