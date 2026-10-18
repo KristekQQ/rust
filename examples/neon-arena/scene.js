@@ -63,11 +63,12 @@ export function launchApple(scene, fruit, side) {
         .spin([.5,1.2,.3]).removeAfter(2.4);
 }
 
-/** Saturated visible flesh; exterior holes stay transparent.
- * @param {ReturnType<typeof fruitGeometries>[number]} fruit
+/** Neon fruit has no visible cut filling. The existing .25 color cutout
+ * discards these caps before color/depth writes; CPU physics keeps a closed solid.
+ * @param {ReturnType<typeof fruitGeometries>[number]} _fruit
  * @returns {import('../../js/engine.d.ts').Vector3} */
-export function cutFaceColor(fruit) {
-    return [fruit.capColor[0]*.45,fruit.capColor[1]*.45,fruit.capColor[2]*.45];
+export function cutFaceColor(_fruit) {
+    return [0,0,0];
 }
 
 /** A real desktop mesh split, using the same fruit and presentation as XR.

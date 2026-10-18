@@ -188,7 +188,7 @@ const report=await run.execute(async test=>{
         test.assert(hit.pieces.length===expectedPieces && hit.info.every(p=>p.closed),`${hand} cut creates closed components of ${batchFruits[i].name}`);
         test.assert(hit.pieces.every(piece=>!piece.exists||!piece.meshInfo.cuttable),'finished fruit pieces are decorative halves, never re-cut in the same stroke');
         const flesh=cutFaceColor(batchFruits[i]);
-        test.assert(hit.colors.some(colors=>colors.some(color=>color.every((c,j)=>Math.abs(c-flesh[j])<1e-5))),'actual fruit fragments contain visible colored closed cut faces');
+        test.assert(hit.colors.some(colors=>colors.some(color=>color.every((c,j)=>Math.abs(c-flesh[j])<1e-5))),'actual fruit fragments retain dark physics caps discarded by neon color cutout');
         test.assert(Math.abs(hit.info.reduce((sum,p)=>sum+p.volume,0)-volumes[i])<volumes[i]*.0001,`${hand} cut conserves volume`);
     }
     }

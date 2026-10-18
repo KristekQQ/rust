@@ -1,11 +1,42 @@
 #!/usr/bin/env python3
 """Static development server with revalidated module responses."""
 import argparse
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from threading import Lock
 import ssl
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 
+diagnostic_lock = Lock()
+
+
 class DevelopmentHandler(SimpleHTTPRequestHandler):
+    def do_POST(self):
+        if self.path != '/__diagnostics':
+            self.send_error(404)
+            return
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+            if not 0 < length <= 32768:
+                self.send_error(413)
+                return
+            record = json.loads(self.rfile.read(length))
+            if not isinstance(record, dict):
+                raise ValueError('Expected diagnostic object')
+            record['received'] = datetime.now(timezone.utc).isoformat()
+            destination = Path('output/diagnostics/browser.jsonl')
+            with diagnostic_lock:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with destination.open('a', encoding='utf-8') as log:
+                    log.write(json.dumps(record, ensure_ascii=False) + '\n')
+        except (ValueError, UnicodeError):
+            self.send_error(400)
+            return
+        self.send_response(204)
+        self.end_headers()
+
     def do_GET(self):
         if self.path.split('?', 1)[0] == '/favicon.ico':
             self.send_response(204)

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { root, assertFreshBuild } from './build-fingerprint.mjs';
 
-const inputs = ['src', 'js', 'examples', 'tests', 'scripts', 'assets', '.github',
+const inputs = ['src', 'third_party', 'js', 'examples', 'tests', 'scripts', 'assets', '.github',
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml',
     'package.json', 'package-lock.json', 'tsconfig.json'];
 const localOption = key => {

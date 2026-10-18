@@ -1,4 +1,4 @@
-# Current project map — 2026-10-13
+# Current project map — 2026-10-19
 
 Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current code before relying on this dated map. Read only the relevant source/doc; historical evidence is in [the archive](docs/history/MEMORY-2026-10-13.md), not required context.
 
@@ -19,3 +19,8 @@ Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current co
 - Approved cathedral view `[6,2.5,2]` toward `[-12,8,0]`, first light `[-19,12,0.2]`. Keep this placement unless asked to change it. 72,513 triangles; glass faces omitted to expose window apertures. Stone metallic=0/roughness=.95; asset CC BY-NC. Light is point/perspective, not directional sun.
 - God-ray example density=.055, exposure=40, strength=.8; engine defaults .035/2.5. Helpers stay outside reflection/postprocess depth. Server sends no-store to avoid mismatched cached modules.
 - Engine review milestone `c1b3ef00`: 59 native tests; detailed dated evidence is in `docs/CODE_REVIEW.md`. New harness entry points and runtime dispose/reinit contracts are in `docs/DEVELOPMENT.md` and README. Use a current verification report rather than historical counts as proof for changes.
+
+## Current Quest / neon decisions — 2026-10-19
+
+- User confirmed direct WebGPU VR works on Quest 3 / Browser 149.1 after WebXR Experiments was enabled and opaque color texture metadata was handled. Route new XR renderer/support work through [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md); details and limits: [WEBXR.md](docs/WEBXR.md). No headset FPS or WebGPU/WebGL color parity measurement was made.
+- `examples/neon-arena` keeps sliced wire/neon fruit visually open: black cap color + `.25` color cutout discard the filling from color/depth. CPU pieces remain closed for physics; ordinary cuttable objects retain their filled-cap behavior. Pixel checks cover an object visible behind the real cut half.

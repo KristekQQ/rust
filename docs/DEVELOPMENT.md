@@ -49,6 +49,7 @@ Následující matice určuje pokrytí pro závěrečnou kontrolu. Při iteraci 
 |---|---|
 | CPU state/camera/visibility/loader | `cargo test`; actual browser/input workflow when visible behavior changes |
 | Triangle cutting / sword sweep | `cargo test cutting` (caps, volume, concavity, repeated cuts, transforms, BVH, opt-in, atomic errors); matching WASM and `test:browser -- --page cutting,cutting-compute,cutting-resident,scene-sdk` on WebGPU + WebGL (actual controls/cap pixels, CPU-compute parity, actual resident GPU topology, readback-inclusive timings and stale-request cancellation); lifecycle after async/initialization changes; [API/limits](CUTTING.md) |
+| Přímý WebGPU XR | `cargo test xr_ --lib`; matching WASM a `webxr-webgpu` na WebGPU (skutečné color/depth GPU array slices, stereo pixely, projekce, lifecycle), `webxr` + `neon-arena` na obou backendech a `neon-arena-xr` na WebGL. Simulátor nenahrazuje Quest. |
 | Renderer/WGSL/web exports | wasm32 check, WASM build, affected Rust page and console; WebGPU + WebGL for shared rendering paths |
 | SDK/types/callers | Build matching `pkg/`, `npm run typecheck`, `tests/scene-sdk.html` on affected backends |
 | Canvas/output/targets | `tests/render-target.html` and its verify button on WebGPU + WebGL |

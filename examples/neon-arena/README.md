@@ -19,8 +19,10 @@ Při odchodu z XR se výstřely zastaví a náhledové ovoce se vrátí.
 Ovoce má skutečně průhledné mezery mezi neonovými hranami. Příkaz
 `setColorCutout(.25)` zahodí tmavé plochy před zápisem hloubky; světlé hrany
 se kreslí z obou stran. Nejde o černou výplň ani o celoplošný postprocessing.
-Uzavřený objem pro fyziku a řezy zůstává zachovaný. Skutečné půlky ukazují
-barevné uzavřené řezné plochy; vnější neonový plášť zachovává průhledné mezery.
+Uzavřený objem pro fyziku a řezy zůstává zachovaný. Řezné plochy mají barvu
+`[0,0,0]`, takže je stejný cutout úplně zahodí i ze zápisu hloubky: půlky
+neonového ovoce jsou vizuálně otevřené, bez výplně. Vnější neonový plášť
+zachovává průhledné mezery.
 
 Barvy jsou zapečené do trojúhelníků při vytvoření geometrie: třešně mají
 červený/růžový plod a plné zelené neonové stopky, ostatní plody vlastní prostorové
@@ -70,7 +72,7 @@ celoplošného rozmazání, bloom, SSR nebo dalších světel.
 ## Spuštění a kontroly
 
 - Náhled: `/examples/neon-arena/`, automatický WebGPU.
-- Quest: `/examples/neon-arena/?backend=webgl` na důvěryhodném HTTPS; [připojení](../../docs/WEBXR.md).
+- Quest: `/examples/neon-arena/?backend=auto` pro experimentální přímý WebGPU XR; při nedostupném `XRGPUBinding` použij `?backend=webgl`. Obojí na důvěryhodném HTTPS; [připojení](../../docs/WEBXR.md).
 - `VERIFY_WASM_PROFILE=release node scripts/test-browser.mjs --page neon-arena,neon-arena-xr,neon-arena-profile --backend all --capture`
 - Profil používá skutečnou aplikaci a stereo renderer1024×1024 na oko s odečtem
   pixelů; jde o desktopový diagnostický test, nikoli výkon skutečného Questu.

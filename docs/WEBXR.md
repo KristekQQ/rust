@@ -103,15 +103,41 @@ JS platformový adaptér předává XR matice do WASM a obraz canvasu do
 `XRWebGLLayer`. Rust převádí rozsah hloubky OpenGL na wgpu, počítá pohled,
 culling, scénu i simulaci. Simulace postupuje jednou za XR snímek.
 
-Aktuální cesta vyžaduje `webgl`: každé oko se vyrenderuje přes stávající Rust/wgpu
-renderer a zkopíruje přes canvas do druhého WebGL kontextu XR kompozitoru.
-Každé oko znovu používá vlastní přenosovou texturu: `texImage2D(..., null)`
-vyhradí úložiště jen při prvním přenosu nebo změně rozměrů canvasu a
-[`texSubImage2D`](https://registry.khronos.org/webgl/specs/latest/1.0/#TEXSUBIMAGE2D)
-aktualizuje obsah bez opětovné definice úložiště. Rozdílné rozměry očí tak
-nevyvolávají realokaci při každém přepnutí oka. JS nečte pixely zpět na CPU;
-interní kopie a synchronizace mezi kontexty ale zůstávají závislé na prohlížeči.
-Nejde o přímý multiview výstup; přenos má náklady a výkon na Questu je nutné změřit.
+## Přímé WebGPU XR a kompatibilní WebGL
+
+Neon aréna na `/examples/neon-arena/?backend=auto` umí přímý WebGPU výstup,
+pokud prohlížeč poskytuje `XRGPUBinding`. Meta uvádí experimentální WebGPU XR
+od [Browser 146.0](https://developers.meta.com/vr/downloads/package/browser/146.0/).
+Pokud XR adaptér není dostupný, desktopový náhled použije běžný adaptér a
+VR nabídne cestu WebGL. Dostupnost závisí na konkrétním headsetu a prohlížeči; existence desktopového
+WebGPU sama o sobě nestačí. Při chybě použij odkaz `?backend=webgl`.
+
+SDK před inicializací označí canvas pro XR, Rust požádá o adaptér s
+`xrCompatible: true` a použije stejné GPU zařízení pro renderer i XR binding.
+Relace vyžaduje feature `webgpu`. Rust vykresluje každé oko přímo do příslušného
+2D řezu browserových color/depth texture arrays; canvas se pro oči nezvětšuje,
+neprobíhá upload canvasu, blit ani CPU readback. WebGPU projekce už používá
+hloubku 0..1, proto se znovu nepřevádí z OpenGL. Cizí textury se drží jen při
+vykreslení oka, engine je neničí. Zatím podporujeme celé samostatné řezy očí,
+`rgba8unorm`/`bgra8unorm` a `depth32float`, bez postprocessingu (aréně je vypnutý).
+Jiný viewport nebo zapnutý postprocessing vyvolá explicitní chybu.
+
+`wgpu 30.0.1` nemá volbu `xrCompatible` ve veřejném request API. Proto je
+v `third_party/wgpu` lokální kopie se dvěma úzkými změnami popsanými v
+[PATCH.md](../third_party/wgpu/PATCH.md); běžný konstruktor zůstává stejný.
+Otisk buildu zahrnuje i tuto závislost.
+
+Při `backend=webgl` zůstává původní cesta: každé oko se vykreslí přes Rust/wgpu
+a zkopíruje přes canvas do WebGL kontextu XR kompozitoru. Každé oko má vlastní
+přenosovou texturu, jejíž úložiště se mění jen při změně rozměrů. JS nečte
+pixely zpět na CPU. Přímé WebGPU odstraňuje tyto přenosy, ale skutečný přínos FPS
+je nutné změřit na headsetu; desktopová simulace to nedokazuje.
+
+Ověření: `VERIFY_WASM_PROFILE=release node scripts/test-browser.mjs --page webxr-webgpu --backend webgpu --capture`
+používá simulovaný XR runtime a skutečné GPU textury/Rust renderer. Kontroluje
+oba řezy očí, rozdílný stereo obraz, near clipping, adaptér, velikost canvasu,
+GPU validační chyby, exit/reentry a disposal. Skutečný Quest tím ověřen není.
+
 Výchozí rozlišení vrstvy je 75 % doporučeného. Grip ovladače a trigger jsou
 podporované. Ruce bez ovladačů, teleportace a AR/passthrough nejsou součástí ukázky.
 Desktopový test s náhradou XR rozhraní ověřuje stereo pixely a životní cyklus,
@@ -296,3 +322,40 @@ limit 64 živých objektů a předměty se automaticky registrují při vybaven�
 Neon aréna vybavuje své meče v `examples/neon-arena/main.js`; základní hráč nemá
 žádné znalosti o ovoci nebo zbraních. Hand tracking prstů ani fyzický avatar těla
 zatím nejsou součástí této abstrakce.
+
+## Potvrzený postup a diagnostika na Questu
+
+Uživatel 2026-10-18 potvrdil skutečné WebGPU VR v neon aréně na Questu 3
+s Browser 149.1. V lokálním logu po opravě následovaly `xr-start` a
+`xr-first-frame` s `renderer:BrowserWebGpu`. Nejde o měření FPS ani barevné shody.
+
+V tomto buildu byl nutný **WebXR Experiments** v `chrome://flags` a restart
+prohlížeče. Před zapnutím nebyl `XRGPUBinding` dostupný, přestože běžné WebGPU,
+VR i projekční vrstvy fungovaly. Názvy dalších přepínačů Layers se liší mezi
+buildy; samotná aktualizace, seznam flagů ani existence bindingu nejsou zárukou
+funkční relace. Starší Browser 144.2 vracel na povinnou feature `webgpu`
+`NotSupportedError`. Feature se nesmí odebrat jen proto, aby požadavek prošel.
+[Meta dokumentuje WebXR Experiments pro experimentální WebGPU vrstvy](https://developers.meta.com/vr/downloads/package/browser/152.1/?view=full_width);
+tento návod pro novější build není automaticky popisem každé starší verze.
+
+Volitelná diagnostika arény zapisuje přes místní `scripts/serve-local.py` do
+ignorovaného `output/diagnostics/browser.jsonl`. `xr-capabilities` oddělí chybějící
+API od nedostupného immersive VR; `xr-enter`/`xr-frame` obsahují chybu a při
+selhání importu i metadata obou příloh. `xr-start` znamená vytvořenou relaci,
+`xr-first-frame` úspěšně odeslaný první stereo snímek. **Diagnostika WebGPU VR**
+zkusí nativní relaci a projekční vrstvu nezávisle na enginu a relaci pak ukončí.
+Odmítnutí oprávnění zůstává opakovatelné, nepodporovaná GPU relace se v dané
+instanci dál nenabízí.
+
+### Quest 149: nulová metadata barevné projekční textury
+
+Na skutečném Questu 3 / Browser 149.1 po zapnutí WebXR Experiments vznikla
+GPU relace, ale první snímek selhal na `Invalid XR projection attachment`.
+Barevná textura měla platné rozměry 1260×1320×2 a formát `rgba8unorm`, ale
+`mipLevelCount=0`, `sampleCount=0`, `usage=0`. Hloubková textura vracela 1/1/16.
+Adaptér proto pouze u barevné XR textury s touto přesnou trojicí nahradí
+nuly vlastnostmi explicitně vytvořené projekční vrstvy: jeden mip, jeden sample,
+RENDER_ATTACHMENT. Ostatní kontroly i hloubková textura zůstávají přísné.
+Browser test `webxr-webgpu` simuluje stejné nulové gettery na skutečné GPU
+textuře a čte oba vykreslené řezy. Po této opravě uživatel potvrdil funkční obraz na Questu;
+změny rendereru vyžadují vlastní následné ověření.

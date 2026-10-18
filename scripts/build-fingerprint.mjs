@@ -31,7 +31,7 @@ async function sources(directory) {
     return files.flat();
 }
 export async function fingerprint() {
-    const files = [...await sources('src'), 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml'].sort();
+    const files = [...await sources('src'), ...await sources('third_party/wgpu'), 'third_party/wgpu/Cargo.toml', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml'].sort();
     const hash = createHash('sha256');
     for (const file of files) hash.update(file).update('\0').update(await readFile(path.join(root, file))).update('\0');
     const wasm = createHash('sha256').update(await readFile(path.join(root, 'pkg/webgpu_wasm_bg.wasm'))).digest('hex');

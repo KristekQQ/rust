@@ -492,6 +492,77 @@ impl State {
         result
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
+        self.render_to(None)
+    }
+    pub fn xr_gpu_supported(&self) -> bool {
+        self.output.xr_compatible && !self.postprocess.enabled()
+    }
+    pub fn xr_device(&self) -> Result<JsValue, JsValue> {
+        if !self.output.xr_compatible {
+            return Err(JsValue::from_str(
+                "XR-compatible WebGPU adapter unavailable; use WebGL",
+            ));
+        }
+        if self.postprocess.enabled() {
+            return Err(JsValue::from_str(
+                "Direct WebGPU XR requires postprocessing disabled",
+            ));
+        }
+        self.renderer
+            .device
+            .as_webgpu()
+            .map(|device| device.clone().into())
+            .ok_or_else(|| JsValue::from_str("WebGPU device unavailable"))
+    }
+    pub fn xr_color_format(&self) -> String {
+        match self.output.color_format().remove_srgb_suffix() {
+            wgpu::TextureFormat::Rgba8Unorm => "rgba8unorm",
+            wgpu::TextureFormat::Bgra8Unorm => "bgra8unorm",
+            _ => "unsupported",
+        }
+        .into()
+    }
+    pub fn render_xr_gpu_image(
+        &mut self,
+        matrix: Mat4,
+        position: Vec3,
+        image: &JsValue,
+    ) -> Result<(), JsValue> {
+        let attachments = super::xr_output::XrAttachments::new(&self.renderer.device, image)?;
+        self.render_xr_gpu_eye(matrix, position, &attachments.target())
+    }
+    pub fn render_xr_gpu_eye(
+        &mut self,
+        matrix: Mat4,
+        position: Vec3,
+        target: &super::target::RenderTarget<'_>,
+    ) -> Result<(), JsValue> {
+        if target.color_format != self.output.color_format().remove_srgb_suffix() {
+            return Err(JsValue::from_str(
+                "XR layer format must match xr_gpu_color_format",
+            ));
+        }
+        if self.postprocess.enabled() {
+            return Err(JsValue::from_str(
+                "Direct WebGPU XR requires postprocessing disabled",
+            ));
+        }
+        let saved = self.view;
+        let saved_xr = self.xr_rendering;
+        self.xr_rendering = true;
+        self.view = RenderView {
+            view_projection: matrix,
+            camera_position: position,
+        };
+        let result = self.render_to(Some(target));
+        self.view = saved;
+        self.xr_rendering = saved_xr;
+        result
+    }
+    fn render_to(
+        &mut self,
+        external: Option<&super::target::RenderTarget<'_>>,
+    ) -> Result<(), JsValue> {
         self.refresh_info_panels(0.0);
         self.renderer.draw_calls = 0;
         self.renderer.main_draw_calls = 0;
@@ -500,17 +571,26 @@ impl State {
                 .update(&mut self.renderer)
                 .map_err(|e| JsValue::from_str(&e))?;
         }
-        let Some(frame) = self.output.acquire(&self.renderer.device)? else {
-            return Ok(());
+        let frame = if external.is_none() {
+            let Some(frame) = self.output.acquire(&self.renderer.device)? else {
+                return Ok(());
+            };
+            self.output.ensure_target(&self.renderer.device);
+            Some(frame)
+        } else {
+            None
         };
-        self.output.ensure_target(&self.renderer.device);
         if let Some(compute) = &mut self.cutting_compute {
             compute.retain(|id| self.renderer.scene.triangle_meshes().contains_key(&id));
         }
         self.resident_sources
             .retain(|id, _| self.renderer.scene.object_exists(*id));
-        let mut target = self.output.target(&frame);
-        target.color_load = wgpu::LoadOp::Clear(self.background);
+        let canvas_target = frame.as_ref().map(|frame| self.output.target(frame));
+        let target = external.or(canvas_target.as_ref()).expect("render target");
+        let target = super::target::RenderTarget {
+            color_load: wgpu::LoadOp::Clear(self.background),
+            ..*target
+        };
         if self.postprocess.enabled() {
             self.postprocess
                 .ensure_size(&self.renderer.device, target.width, target.height);
@@ -554,7 +634,7 @@ impl State {
         }
         // Include the imminent HUD and final texture blit in the displayed total.
         self.renderer.draw_calls +=
-            usize::from(self.debug_enabled) + usize::from(self.output.offscreen);
+            usize::from(self.debug_enabled) + usize::from(frame.is_some() && self.output.offscreen);
         if self.debug_enabled {
             let renderer = &self.renderer;
             let xr = self.xr_rendering;
@@ -583,8 +663,10 @@ impl State {
                 );
             self.xr_hud_pending = false;
         }
-        self.output
-            .present(frame, &self.renderer.device, &self.renderer.queue);
+        if let Some(frame) = frame {
+            self.output
+                .present(frame, &self.renderer.device, &self.renderer.queue);
+        }
         Ok(())
     }
 }

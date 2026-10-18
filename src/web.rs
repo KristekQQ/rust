@@ -1909,9 +1909,6 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
         let state = state
             .as_ref()
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
-        if active && state.borrow().backend != "Gl" {
-            return Err(JsValue::from_str("WebXR requires backend: webgl"));
-        }
         if !active {
             let mut state = state.borrow_mut();
             XR_PLAYER.with(|player| player.borrow_mut().reset_tracking(&mut state.scene));
@@ -1919,6 +1916,58 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
         XR_ACTIVE.with(|flag| flag.set(active));
         RESET_FRAME_CLOCK.with(|reset| reset.set(true));
         Ok(())
+    })
+}
+
+#[wasm_bindgen]
+pub fn xr_gpu_supported() -> bool {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow().xr_gpu_supported())
+    })
+}
+/// Same device used by the Rust renderer; required for XRGPUBinding.
+#[wasm_bindgen]
+pub fn xr_gpu_device() -> Result<JsValue, JsValue> {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow()
+            .xr_device()
+    })
+}
+#[wasm_bindgen]
+pub fn xr_gpu_color_format() -> Result<String, JsValue> {
+    STATE.with(|slot| {
+        Ok(slot
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow()
+            .xr_color_format())
+    })
+}
+/// Render into the browser-owned projection texture. No canvas transfer/readback.
+#[wasm_bindgen]
+pub fn xr_render_gpu_eye(
+    projection: &[f32],
+    world: &[f32],
+    sub_image: JsValue,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    let (matrix, position) = crate::render_math::xr_gpu_view(projection, world)
+        .ok_or_else(|| JsValue::from_str("Invalid XR matrices"))?;
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let mut state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow_mut();
+        state.render_xr_gpu_image(matrix, position, &sub_image)
     })
 }
 

@@ -20,3 +20,5 @@ mod hud;
 pub mod postprocess;
 
 pub mod environment;
+
+pub mod xr_output;

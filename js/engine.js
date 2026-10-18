@@ -332,6 +332,8 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
 /** @param {HTMLCanvasElement} canvas @param {"auto"|"webgl"} backend @param {Initialization} initialization */
 async function initializeEngine(canvas, backend, initialization) {
     canvas.dataset.backend = backend;
+    // wgpu must request an XR-compatible adapter before the GPUDevice exists.
+    canvas.dataset.xrWebgpu = String(backend !== 'webgl' && typeof Reflect.get(globalThis, 'XRGPUBinding') === 'function');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 

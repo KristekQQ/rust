@@ -28,6 +28,7 @@ const suites = [
     { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true },
     { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },
     { name: 'webxr', path: 'tests/webxr.html', status: '#result', xrReport: true },
+    { name: 'webxr-webgpu', path: 'tests/webxr-webgpu.html', status: '#result', backends: ['webgpu'], xrReport: true },
     { name: 'projectiles', path: 'examples/projectiles/', interaction: 'projectiles' },
     { name: 'cutting', path: 'examples/cutting/', interaction: 'cutting' },
     { name: 'cutting-compute', path: 'tests/cutting-compute.html', status: '#result' },

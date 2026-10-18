@@ -6,6 +6,8 @@ Project-owned skills live in versioned `.agents/skills/`, not personal `~/.codex
 
 For scene placement, rotations, scale and attached world-space labels, use [scene-object-layout](.agents/skills/scene-object-layout/SKILL.md); verify requested sides in XR coordinates, not only the desktop preview.
 
+For direct Quest WebGPU XR, runtime support, projection textures and headset diagnostics use [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md).
+
 For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-player-equipment/SKILL.md). For cut-impact visuals and speed tuning use [cut-feedback-tuning](.agents/skills/cut-feedback-tuning/SKILL.md); prefer existing configuration knobs for numeric iteration.
 
 Keep Rust/WGSL layouts and `src/web.rs` exports consistent with `js/engine.js`, types and callers. Rebuild ignored `pkg/` when WASM/export changes need browser verification. Test the affected Rust page; `cube.html` and JS graphics demos do not verify this renderer.

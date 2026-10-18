@@ -97,9 +97,9 @@ esac
 test('browser verification rejects missing builds, changed sources and replaced WASM/bindings', async t => {
     const root = await mkdtemp(path.join(tmpdir(), 'rust-build-marker-'));
     t.after(() => rm(root, { recursive: true, force: true }));
-    for (const directory of ['src', 'scripts', 'pkg', '.cargo']) await mkdir(path.join(root, directory));
+    for (const directory of ['src', 'scripts', 'pkg', '.cargo', 'third_party/wgpu/src']) await mkdir(path.join(root, directory), {recursive:true});
     await copyFile(new URL('../scripts/build-fingerprint.mjs', import.meta.url), path.join(root, 'scripts/build-fingerprint.mjs'));
-    const files = ['src/lib.rs', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm'];
+    const files = ['third_party/wgpu/src/lib.rs', 'third_party/wgpu/Cargo.toml', 'src/lib.rs', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm'];
     for (const file of files) await writeFile(path.join(root, file), `fixture: ${file}`);
     const { fingerprint, assertFreshBuild, buildConfiguration, wasmProfile } = await import(pathToFileURL(path.join(root, 'scripts/build-fingerprint.mjs')));
     await assert.rejects(assertFreshBuild(), /No verified WASM build/);
@@ -126,7 +126,7 @@ test('browser verification rejects missing builds, changed sources and replaced 
         else process.env.RUSTFLAGS = previousFlags;
     }
     assert.deepEqual(buildConfiguration({}), buildConfiguration({ RUSTFLAGS: '--cfg=web_sys_unstable_apis --cfg=web_sys_unstable_apis' }));
-    for (const file of ['src/lib.rs', 'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm']) {
+    for (const file of ['third_party/wgpu/src/lib.rs', 'third_party/wgpu/Cargo.toml', 'src/lib.rs', 'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm']) {
         await writeFile(path.join(root, file), 'replaced bytes');
         await assert.rejects(assertFreshBuild(), /changed since WASM build/);
         await writeFile(path.join(root, file), `fixture: ${file}`);

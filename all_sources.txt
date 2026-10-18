@@ -30,6 +30,9 @@ gltf = { version = "1.4", default-features = false, features = ["utils", "names"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde_json = "1.0"
 
+[patch.crates-io]
+wgpu = { path = "third_party/wgpu" }
+
 # File: src/blade_physics.rs
 //! Opt-in one-sided sharp edge and finite kinematic blade contacts.
 //! Fruit contacts use a cached actual-vertex sphere clipped by oriented mesh bounds;
@@ -14101,6 +14104,8 @@ pub mod postprocess;
 
 pub mod environment;
 
+pub mod xr_output;
+
 
 # File: src/render/output.rs
 //! Browser presentation adapter. Only this module knows about canvas/surfaces.
@@ -14131,6 +14136,7 @@ pub struct CanvasOutput {
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
     pub offscreen: bool,
+    pub xr_compatible: bool,
     texture_output: Option<TextureOutput>,
 }
 impl CanvasOutput {
@@ -14147,14 +14153,42 @@ impl CanvasOutput {
             },
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         };
-        let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
+        let xr_gpu = canvas.get_attribute("data-xr-webgpu").as_deref() == Some("true")
+            && canvas.get_attribute("data-backend").as_deref() != Some("webgl");
+        // A browser may expose XRGPUBinding but have no XR-compatible adapter.
+        // Preserve ordinary desktop auto selection in that case.
+        let (instance, xr_adapter) = if xr_gpu {
+            let instance = wgpu::Instance::new_webgpu_xr(wgpu::InstanceDescriptor {
+                backends: wgpu::Backends::BROWSER_WEBGPU,
+                ..wgpu::InstanceDescriptor::new_without_display_handle()
+            });
+            match instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+            {
+                Ok(adapter) => (instance, Some(adapter)),
+                Err(_) => (
+                    wgpu::util::new_instance_with_webgpu_detection(instance_desc).await,
+                    None,
+                ),
+            }
+        } else {
+            (
+                wgpu::util::new_instance_with_webgpu_detection(instance_desc).await,
+                None,
+            )
+        };
         check_current()?;
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
-            .await
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let xr_compatible = xr_adapter.is_some();
+        let adapter = match xr_adapter {
+            Some(adapter) => adapter,
+            None => wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
+                .await
+                .map_err(|e| JsValue::from_str(&e.to_string()))?,
+        };
         check_current()?;
         let backend = format!("{:?}", adapter.get_info().backend);
         let (device, queue) = adapter
@@ -14215,6 +14249,7 @@ impl CanvasOutput {
                 depth_texture,
                 depth_view,
                 offscreen: false,
+                xr_compatible,
                 texture_output: None,
             },
             device,
@@ -17755,6 +17790,77 @@ impl State {
         result
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
+        self.render_to(None)
+    }
+    pub fn xr_gpu_supported(&self) -> bool {
+        self.output.xr_compatible && !self.postprocess.enabled()
+    }
+    pub fn xr_device(&self) -> Result<JsValue, JsValue> {
+        if !self.output.xr_compatible {
+            return Err(JsValue::from_str(
+                "XR-compatible WebGPU adapter unavailable; use WebGL",
+            ));
+        }
+        if self.postprocess.enabled() {
+            return Err(JsValue::from_str(
+                "Direct WebGPU XR requires postprocessing disabled",
+            ));
+        }
+        self.renderer
+            .device
+            .as_webgpu()
+            .map(|device| device.clone().into())
+            .ok_or_else(|| JsValue::from_str("WebGPU device unavailable"))
+    }
+    pub fn xr_color_format(&self) -> String {
+        match self.output.color_format().remove_srgb_suffix() {
+            wgpu::TextureFormat::Rgba8Unorm => "rgba8unorm",
+            wgpu::TextureFormat::Bgra8Unorm => "bgra8unorm",
+            _ => "unsupported",
+        }
+        .into()
+    }
+    pub fn render_xr_gpu_image(
+        &mut self,
+        matrix: Mat4,
+        position: Vec3,
+        image: &JsValue,
+    ) -> Result<(), JsValue> {
+        let attachments = super::xr_output::XrAttachments::new(&self.renderer.device, image)?;
+        self.render_xr_gpu_eye(matrix, position, &attachments.target())
+    }
+    pub fn render_xr_gpu_eye(
+        &mut self,
+        matrix: Mat4,
+        position: Vec3,
+        target: &super::target::RenderTarget<'_>,
+    ) -> Result<(), JsValue> {
+        if target.color_format != self.output.color_format().remove_srgb_suffix() {
+            return Err(JsValue::from_str(
+                "XR layer format must match xr_gpu_color_format",
+            ));
+        }
+        if self.postprocess.enabled() {
+            return Err(JsValue::from_str(
+                "Direct WebGPU XR requires postprocessing disabled",
+            ));
+        }
+        let saved = self.view;
+        let saved_xr = self.xr_rendering;
+        self.xr_rendering = true;
+        self.view = RenderView {
+            view_projection: matrix,
+            camera_position: position,
+        };
+        let result = self.render_to(Some(target));
+        self.view = saved;
+        self.xr_rendering = saved_xr;
+        result
+    }
+    fn render_to(
+        &mut self,
+        external: Option<&super::target::RenderTarget<'_>>,
+    ) -> Result<(), JsValue> {
         self.refresh_info_panels(0.0);
         self.renderer.draw_calls = 0;
         self.renderer.main_draw_calls = 0;
@@ -17763,17 +17869,26 @@ impl State {
                 .update(&mut self.renderer)
                 .map_err(|e| JsValue::from_str(&e))?;
         }
-        let Some(frame) = self.output.acquire(&self.renderer.device)? else {
-            return Ok(());
+        let frame = if external.is_none() {
+            let Some(frame) = self.output.acquire(&self.renderer.device)? else {
+                return Ok(());
+            };
+            self.output.ensure_target(&self.renderer.device);
+            Some(frame)
+        } else {
+            None
         };
-        self.output.ensure_target(&self.renderer.device);
         if let Some(compute) = &mut self.cutting_compute {
             compute.retain(|id| self.renderer.scene.triangle_meshes().contains_key(&id));
         }
         self.resident_sources
             .retain(|id, _| self.renderer.scene.object_exists(*id));
-        let mut target = self.output.target(&frame);
-        target.color_load = wgpu::LoadOp::Clear(self.background);
+        let canvas_target = frame.as_ref().map(|frame| self.output.target(frame));
+        let target = external.or(canvas_target.as_ref()).expect("render target");
+        let target = super::target::RenderTarget {
+            color_load: wgpu::LoadOp::Clear(self.background),
+            ..*target
+        };
         if self.postprocess.enabled() {
             self.postprocess
                 .ensure_size(&self.renderer.device, target.width, target.height);
@@ -17817,7 +17932,7 @@ impl State {
         }
         // Include the imminent HUD and final texture blit in the displayed total.
         self.renderer.draw_calls +=
-            usize::from(self.debug_enabled) + usize::from(self.output.offscreen);
+            usize::from(self.debug_enabled) + usize::from(frame.is_some() && self.output.offscreen);
         if self.debug_enabled {
             let renderer = &self.renderer;
             let xr = self.xr_rendering;
@@ -17846,8 +17961,10 @@ impl State {
                 );
             self.xr_hud_pending = false;
         }
-        self.output
-            .present(frame, &self.renderer.device, &self.renderer.queue);
+        if let Some(frame) = frame {
+            self.output
+                .present(frame, &self.renderer.device, &self.renderer.queue);
+        }
         Ok(())
     }
 }
@@ -18088,6 +18205,158 @@ impl ColorTarget {
 }
 
 
+# File: src/render/xr_output.rs
+//! Frame-scoped wrappers of browser-owned XR projection attachments.
+//! Dropping a wgpu wrapper never destroys the compositor's GPUTexture.
+use super::target::{RenderTarget, Viewport};
+use wasm_bindgen::{JsCast, JsValue};
+
+fn property(object: &JsValue, key: &str) -> Result<JsValue, JsValue> {
+    js_sys::Reflect::get(object, &JsValue::from_str(key))
+}
+fn uint(object: &JsValue, key: &str) -> Result<u32, JsValue> {
+    let n = property(object, key)?
+        .as_f64()
+        .ok_or_else(|| JsValue::from_str("Invalid XR texture metadata"))?;
+    if !n.is_finite() || n < 0. || n > u32::MAX as f64 || n.fract() != 0. {
+        return Err(JsValue::from_str("Invalid XR texture dimensions"));
+    }
+    Ok(n as u32)
+}
+fn format(value: &JsValue) -> Result<wgpu::TextureFormat, JsValue> {
+    match property(value, "format")?.as_string().as_deref() {
+        Some("rgba8unorm") => Ok(wgpu::TextureFormat::Rgba8Unorm),
+        Some("rgba8unorm-srgb") => Ok(wgpu::TextureFormat::Rgba8UnormSrgb),
+        Some("bgra8unorm") => Ok(wgpu::TextureFormat::Bgra8Unorm),
+        Some("bgra8unorm-srgb") => Ok(wgpu::TextureFormat::Bgra8UnormSrgb),
+        Some("depth32float") => Ok(wgpu::TextureFormat::Depth32Float),
+        _ => Err(JsValue::from_str("Unsupported XR attachment format")),
+    }
+}
+fn wrap(
+    device: &wgpu::Device,
+    value: JsValue,
+    layer: u32,
+    opaque_color: bool,
+) -> Result<(wgpu::TextureView, wgpu::TextureFormat, u32, u32), JsValue> {
+    let width = uint(&value, "width")?;
+    let height = uint(&value, "height")?;
+    let layers = uint(&value, "depthOrArrayLayers")?;
+    let mut mip_levels = uint(&value, "mipLevelCount")?;
+    let mut samples = uint(&value, "sampleCount")?;
+    let mut usage = wgpu::TextureUsages::from_bits_truncate(uint(&value, "usage")?);
+    // Quest Browser 149 returns all three as zero for compositor-owned color
+    // textures. The projection layer is explicitly created single-sampled,
+    // single-mip, with RENDER_ATTACHMENT usage. Do not relax other metadata or
+    // apply this compatibility path to ordinary/depth textures.
+    if opaque_color && mip_levels == 0 && samples == 0 && usage.is_empty() {
+        mip_levels = 1;
+        samples = 1;
+        usage = wgpu::TextureUsages::RENDER_ATTACHMENT;
+    }
+    let format = format(&value)?;
+    if width == 0
+        || height == 0
+        || layer >= layers
+        || samples != 1
+        || mip_levels != 1
+        || property(&value, "dimension")?.as_string().as_deref() != Some("2d")
+        || !usage.contains(wgpu::TextureUsages::RENDER_ATTACHMENT)
+    {
+        return Err(JsValue::from_str("Invalid XR projection attachment"));
+    }
+    let texture = device.create_texture_from_webgpu_handle(
+        value.unchecked_into(),
+        &wgpu::TextureDescriptor {
+            label: Some("browser-owned XR attachment"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: layers,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage,
+            view_formats: &[],
+        },
+        None,
+    );
+    let view = texture.create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::D2),
+        base_array_layer: layer,
+        array_layer_count: Some(1),
+        ..Default::default()
+    });
+    Ok((view, format, width, height))
+}
+pub struct XrAttachments {
+    color: wgpu::TextureView,
+    depth: wgpu::TextureView,
+    format: wgpu::TextureFormat,
+    width: u32,
+    height: u32,
+}
+impl XrAttachments {
+    pub fn new(device: &wgpu::Device, image: &JsValue) -> Result<Self, JsValue> {
+        if device.as_webgpu().is_none() {
+            return Err(JsValue::from_str("XR projection requires WebGPU"));
+        }
+        let descriptor = property(image, "viewDescriptor")?;
+        let layer = uint(&descriptor, "baseArrayLayer")?;
+        if property(&descriptor, "dimension")?.as_string().as_deref() != Some("2d")
+            || uint(&descriptor, "arrayLayerCount")? != 1
+        {
+            return Err(JsValue::from_str("XR requires one 2d array layer per eye"));
+        }
+        let (color, format, width, height) =
+            wrap(device, property(image, "colorTexture")?, layer, true)?;
+        let (depth, depth_format, dw, dh) = wrap(
+            device,
+            property(image, "depthStencilTexture")?,
+            layer,
+            false,
+        )?;
+        let viewport = property(image, "viewport")?;
+        // Projection layers have an independent full-size array slice per eye.
+        // Reject an atlas explicitly: postprocessing must never overwrite the other eye.
+        if depth_format != wgpu::TextureFormat::Depth32Float
+            || (width, height) != (dw, dh)
+            || uint(&viewport, "x")? != 0
+            || uint(&viewport, "y")? != 0
+            || uint(&viewport, "width")? != width
+            || uint(&viewport, "height")? != height
+        {
+            return Err(JsValue::from_str(
+                "XR projection requires matching full-size color/depth slices",
+            ));
+        }
+        Ok(Self {
+            color,
+            depth,
+            format,
+            width,
+            height,
+        })
+    }
+    pub fn target(&self) -> RenderTarget<'_> {
+        RenderTarget {
+            color: &self.color,
+            depth: &self.depth,
+            auxiliary: None,
+            color_format: self.format,
+            depth_format: wgpu::TextureFormat::Depth32Float,
+            width: self.width,
+            height: self.height,
+            viewport: Viewport::full(self.width, self.height),
+            color_load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+            depth_load: wgpu::LoadOp::Clear(1.),
+        }
+    }
+}
+
+
 # File: src/render_math.rs
 //! View math shared by shadow/mirror passes and native tests.
 use glam::{Mat4, Vec3, Vec4};
@@ -18231,9 +18500,33 @@ pub fn xr_view(projection: &[f32], world: &[f32]) -> Option<(Mat4, Vec3)> {
     ))
 }
 
+/// WebGPU-compatible XR sessions already supply zero-to-one clip depth.
+pub fn xr_gpu_view(projection: &[f32], world: &[f32]) -> Option<(Mat4, Vec3)> {
+    let projection = Mat4::from_cols_array(projection.try_into().ok()?);
+    let world = Mat4::from_cols_array(world.try_into().ok()?);
+    if !projection.is_finite() || !world.is_finite() || world.determinant().abs() < 1e-8 {
+        return None;
+    }
+    Some((
+        projection * world.inverse(),
+        world.transform_point3(Vec3::ZERO),
+    ))
+}
+
 #[cfg(test)]
 mod xr_tests {
     use super::*;
+    #[test]
+    fn xr_gpu_preserves_zero_to_one_projection() {
+        let p = glam::camera::rh::proj::directx::perspective(1., 1., 0.1, 100.);
+        let world = Mat4::from_translation(Vec3::new(0.032, 1.6, 0.));
+        let (vp, eye) = xr_gpu_view(&p.to_cols_array(), &world.to_cols_array()).unwrap();
+        assert!(vp.project_point3(eye - Vec3::Z * 0.1).z.abs() < 1e-5);
+        assert!((vp.project_point3(eye - Vec3::Z * 100.).z - 1.).abs() < 1e-5);
+        assert!(xr_gpu_view(&[0.; 15], &[0.; 16]).is_none());
+        assert!(xr_gpu_view(&[f32::NAN; 16], &[0.; 16]).is_none());
+        assert!(xr_gpu_view(&p.to_cols_array(), &[0.; 16]).is_none());
+    }
     #[test]
     fn xr_eye_pose_and_depth_conversion() {
         let p = glam::camera::rh::proj::opengl::perspective(1.0, 1.0, 0.1, 100.0);
@@ -24686,9 +24979,6 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
         let state = state
             .as_ref()
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
-        if active && state.borrow().backend != "Gl" {
-            return Err(JsValue::from_str("WebXR requires backend: webgl"));
-        }
         if !active {
             let mut state = state.borrow_mut();
             XR_PLAYER.with(|player| player.borrow_mut().reset_tracking(&mut state.scene));
@@ -24696,6 +24986,58 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
         XR_ACTIVE.with(|flag| flag.set(active));
         RESET_FRAME_CLOCK.with(|reset| reset.set(true));
         Ok(())
+    })
+}
+
+#[wasm_bindgen]
+pub fn xr_gpu_supported() -> bool {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow().xr_gpu_supported())
+    })
+}
+/// Same device used by the Rust renderer; required for XRGPUBinding.
+#[wasm_bindgen]
+pub fn xr_gpu_device() -> Result<JsValue, JsValue> {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow()
+            .xr_device()
+    })
+}
+#[wasm_bindgen]
+pub fn xr_gpu_color_format() -> Result<String, JsValue> {
+    STATE.with(|slot| {
+        Ok(slot
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow()
+            .xr_color_format())
+    })
+}
+/// Render into the browser-owned projection texture. No canvas transfer/readback.
+#[wasm_bindgen]
+pub fn xr_render_gpu_eye(
+    projection: &[f32],
+    world: &[f32],
+    sub_image: JsValue,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    let (matrix, position) = crate::render_math::xr_gpu_view(projection, world)
+        .ok_or_else(|| JsValue::from_str("Invalid XR matrices"))?;
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let mut state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow_mut();
+        state.render_xr_gpu_image(matrix, position, &sub_image)
     })
 }
 

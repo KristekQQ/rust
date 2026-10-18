@@ -294,3 +294,28 @@ test('replay rejects mismatched rendering profile and floor mode before frames',
         await sim.replay(legacy);assert.equal(sim.time,2);
     } finally {sim.dispose();}
 }));
+
+test('WebGPU XR rejects unsupported session feature clearly, without caching permission denial',()=>environment(async navigator=>{
+    const restores=[];
+    for(const [key,value] of [['isSecureContext',true],['XRGPUBinding',class {}]]) {
+        const descriptor=Object.getOwnPropertyDescriptor(globalThis,key);
+        Object.defineProperty(globalThis,key,{configurable:true,value});
+        restores.push(()=>descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key]);
+    }
+    const engine={renderer_backend:()=> 'BrowserWebGpu',xr_gpu_supported:()=>true};
+    let requests=0,reason=new DOMException('permission denied','NotAllowedError');
+    Object.defineProperty(navigator,'xr',{configurable:true,value:{isSessionSupported:async()=>true,requestSession:async(mode,options)=>{
+        requests++;assert.deepEqual(options.requiredFeatures,['webgpu']);throw reason;
+    }}});
+    const host=new WebXRHost(engine,{width:320,height:240});
+    try {
+        assert.equal(await host.isSupported(),true);
+        await assert.rejects(host.enter(),error=>error===reason);
+        assert.equal(await host.isSupported(),true,'permission denial remains retryable');
+        reason=new DOMException('invalid requiredFeatures','NotSupportedError');
+        await assert.rejects(host.enter(),error=>error.name==='NotSupportedError'&&error.cause===reason&&/Aktualizujte Meta Quest Browser/.test(error.message)&&/WebGL/.test(error.message));
+        assert.equal(host.isPresenting,false);assert.equal(await host.isSupported(),false);
+        await assert.rejects(host.enter(),/WebGL/);
+        assert.equal(requests,2,'unsupported GPU session is not requested repeatedly');
+    } finally {host.dispose();for(const restore of restores.reverse())restore();}
+}));

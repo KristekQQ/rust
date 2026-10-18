@@ -1,3 +1,4 @@
+import {reportDiagnostic,probeWebGpuXR} from '../shared/diagnostics.js';
 import { initEngine } from '../../js/engine.js';
 import { createScene, launchApple, previewSlice, CUT_EFFECT_SIZE } from './scene.js';
 
@@ -10,6 +11,7 @@ if (!(canvas instanceof HTMLCanvasElement) || !status || !(enter instanceof HTML
 const backend = new URLSearchParams(location.search).get('backend') === 'webgl' ? 'webgl' : 'auto';
 export const engine = await initEngine(canvas, {backend});
 document.documentElement.dataset.rendererBackend = engine.renderer_backend();
+reportDiagnostic('engine-ready');
 engine.set_render_effects(false, false);
 engine.set_grid_visible(false);
 engine.setBackgroundColor([0,0,0]);
@@ -97,24 +99,41 @@ fit();
 window.addEventListener('resize', fit);
 const ready = async () => {
     try {
-        enter.disabled = backend !== 'webgl' || !(await engine.xr.isSupported());
+        enter.disabled = !(await engine.xr.isSupported());
+        const missingGpuBinding = engine.renderer_backend() === 'BrowserWebGpu' && typeof Reflect.get(globalThis,'XRGPUBinding') !== 'function';
         status.textContent = enter.disabled
-            ? (isSecureContext ? 'Náhled arény. Pro VR použij WebGL v Meta Quest Browser.' : 'Pro VR je potřeba důvěryhodné HTTPS nebo localhost přes USB/ADB.')
+            ? (!isSecureContext ? 'Pro VR je potřeba důvěryhodné HTTPS nebo localhost přes USB/ADB.'
+                : missingGpuBinding ? 'WebGPU náhled běží, ale prohlížeč neposkytuje WebGPU pro VR (XRGPUBinding). V about:flags zkontroluj WebXR/WebGPU Binding a případně WebXR Projection Layers, potom restartuj prohlížeč. Pokud tyto volby nejsou dostupné, použij WebGL / WebXR.'
+                : 'VR není pro tuto konfiguraci dostupné. Použij odkaz WebGL / WebXR.')
             : 'Připraveno. Sekej katanami v obou rukou. Neonové ovoce vystřeluje samo, informace o scéně vidíš i ve VR.';
     } catch (error) { status.textContent = String(error); }
 };
 enter.onclick = () => {
     enter.disabled = true;
-    void engine.xr.enter().catch(error => { status.textContent = String(error); enter.disabled = false; });
+    void engine.xr.enter().catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
 };
 exit.onclick = () => { void engine.xr.exit().catch(error => { status.textContent = String(error); }); };
-engine.xr.addEventListener('start', () => { setPanelFacing(true); exit.hidden = false; startRound(); });
+engine.xr.addEventListener('firstframe', () => reportDiagnostic('xr-first-frame'));
+engine.xr.addEventListener('start', () => { reportDiagnostic('xr-start'); setPanelFacing(true); exit.hidden = false; startRound(); });
 engine.xr.addEventListener('roundend', () => {
     stopLaunches();
     world.apples.forEach((fruit,i)=>fruit.setPosition(world.previewPositions[i]));
     status.textContent = `Konec kola — rozkrojeno ${cuts} plodů. Namiř na DALSI KOLO a stiskni trigger.`;
 });
-engine.xr.addEventListener('end', () => { setPanelFacing(false); stopLaunches(); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; enter.disabled = backend !== 'webgl'; home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
-engine.xr.addEventListener('error', () => { status.textContent = `VR se zastavilo: ${engine.xr.lastError}`; });
+engine.xr.addEventListener('end', () => { setPanelFacing(false); stopLaunches(); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
+engine.xr.addEventListener('error', () => { status.textContent = `VR se zastavilo: ${engine.xr.lastError}`; reportDiagnostic('xr-frame',engine.xr.lastError); });
 window.addEventListener('pagehide', () => { stopLaunches(); window.removeEventListener('resize', fit); engine.dispose(); }, { once: true });
 await ready();
+
+const diagnostics=document.getElementById('xr-diagnostics');
+if(diagnostics instanceof HTMLButtonElement)diagnostics.onclick=()=>{
+    if(engine.xr.isPresenting)return;
+    diagnostics.disabled=true;
+    status.textContent='Testuji nativní WebGPU VR relaci…';
+    void probeWebGpuXR().then(message=>{status.textContent=message;}).catch(error=>reportDiagnostic('xr-probe-request',error)).finally(()=>{diagnostics.disabled=false;});
+};
+const xrPlatform=Reflect.get(navigator,'xr');
+void Promise.resolve(xrPlatform?.isSessionSupported('immersive-vr')).then(supported=>{
+    reportDiagnostic('xr-capabilities',undefined,{immersiveVR:!!supported,interfaces:Object.getOwnPropertyNames(globalThis).filter(name=>/^XR.*(Binding|Layer)$/.test(name)),
+        gpuBindingVisible:typeof Reflect.get(globalThis,'XRGPUBinding')==='function',visibility:document.visibilityState});
+}).catch(error=>reportDiagnostic('xr-capabilities',error));

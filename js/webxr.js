@@ -36,6 +36,7 @@ export class WebXRHost extends EventTarget {
     #player;
     get player(){return this.#player;}
     #engine; #canvas; #session = null; #pending = false; #disposed = false;
+    #gpuBinding = null; #gpuLayer = null; #gpuSessionUnavailable = false;
     #gl; #program; #textures = []; #vao; #frame = null; #size; #previous = null;
     #pressed = [null, null];
     #sources = [null, null];
@@ -157,32 +158,52 @@ export class WebXRHost extends EventTarget {
         this.#roundEnded = false;
     }
     async isSupported() {
-        return !!globalThis.isSecureContext && !!navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
+        return !!globalThis.isSecureContext && !!navigator.xr && (this.#engine.renderer_backend() === 'Gl' || (!this.#gpuSessionUnavailable && typeof globalThis.XRGPUBinding === 'function' && this.#engine.xr_gpu_supported())) && await navigator.xr.isSessionSupported('immersive-vr');
     }
     async enter() {
         if (this.#disposed) throw new Error('WebXR byl ukončen.');
         if (this.#pending || this.#session) throw new Error('WebXR již běží nebo se spouští.');
         if (!globalThis.isSecureContext) throw new Error('WebXR potřebuje důvěryhodné HTTPS nebo localhost přes ADB.');
         if (!navigator.xr) throw new Error('Tento prohlížeč nemá WebXR. Otevřete stránku v Meta Quest Browser.');
-        if (this.#engine.renderer_backend() !== 'Gl') throw new Error('WebXR potřebuje initEngine(canvas, {backend: "webgl"}).');
+        const gpu = this.#engine.renderer_backend() === 'BrowserWebGpu';
+        if (gpu && typeof globalThis.XRGPUBinding !== 'function') throw new Error('Prohlížeč nemá WebGPU pro WebXR (XRGPUBinding). Použijte odkaz WebGL.');
+        if (gpu && this.#gpuSessionUnavailable) throw new Error('Tento prohlížeč odmítl WebGPU ve VR. Aktualizujte Meta Quest Browser, nebo použijte odkaz WebGL / WebXR.');
+        if (gpu && !this.#engine.xr_gpu_supported()) throw new Error('WebGPU XR vyžaduje kompatibilní adaptér a vypnutý postprocessing. Použijte WebGL.');
         this.lastError = undefined;
         this.#pending = true;
         let session;
         try {
             // Request immediately in the click gesture, before any asynchronous support probe.
-            session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
+            try {
+                session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'], ...(gpu ? {requiredFeatures:['webgpu']} : {}) });
+            } catch (error) {
+                if (gpu && error?.name === 'NotSupportedError') {
+                    this.#gpuSessionUnavailable = true;
+                    throw Object.assign(new Error('WebGPU náhled funguje, ale tento prohlížeč nepovoluje WebGPU ve VR. Aktualizujte Meta Quest Browser, nebo použijte odkaz WebGL / WebXR.', {cause:error}), {name:'NotSupportedError'});
+                }
+                throw error;
+            }
             if (this.#disposed) throw new Error('Spuštění WebXR bylo zrušeno.');
             this.#session = session;
             session.addEventListener('end', this.#onEnd);
             this.#size = [this.#canvas.width, this.#canvas.height];
-            const canvas = document.createElement('canvas');
-            const gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: false, antialias: false });
-            if (!gl) throw new Error('WebGL2 není dostupné.');
-            this.#gl = gl;
-            await gl.makeXRCompatible();
-            if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
-            const layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: 0.75 });
-            session.updateRenderState({ baseLayer: layer, depthNear: 0.05, depthFar: 100 });
+            let gl = null, layer = null;
+            if (gpu) {
+                this.#gpuBinding = new XRGPUBinding(session, this.#engine.xr_gpu_device());
+                this.#gpuLayer = this.#gpuBinding.createProjectionLayer({
+                    colorFormat:this.#engine.xr_gpu_color_format(), depthStencilFormat:'depth32float', textureUsage:GPUTextureUsage.RENDER_ATTACHMENT, scaleFactor:0.75,
+                });
+                session.updateRenderState({layers:[this.#gpuLayer],depthNear:0.05,depthFar:100});
+            } else {
+                const canvas = document.createElement('canvas');
+                gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: false, antialias: false });
+                if (!gl) throw new Error('WebGL2 není dostupné.');
+                this.#gl = gl;
+                await gl.makeXRCompatible();
+                if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
+                layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: 0.75 });
+                session.updateRenderState({ baseLayer: layer, depthNear: 0.05, depthFar: 100 });
+            }
             let space;
             try { space = await session.requestReferenceSpace('local-floor'); }
             catch {
@@ -193,9 +214,10 @@ export class WebXRHost extends EventTarget {
             this.#space = space;
             space.addEventListener?.('reset',this.#resetInputs);
             session.addEventListener('visibilitychange',this.#visibilityChanged);
-            this.#createBlit();
+            if (!gpu) this.#createBlit();
             this.#engine.xr_set_presenting(true);
             this.#trackingActive = true;
+            let firstFrame = true;
             const frame = (time, xrFrame) => {
                 this.#frame = null;
                 if (this.#session !== session) return;
@@ -211,18 +233,40 @@ export class WebXRHost extends EventTarget {
                     const tracked = !!pose && (!session.visibilityState || session.visibilityState === 'visible');
                     this.#engine.xr_update_head(tracked ? pose.transform.matrix : new Float32Array());
                     this.#updateControllers(session, xrFrame, space, !!pose && (!session.visibilityState || session.visibilityState === 'visible'));
-                    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
-                    gl.clearColor(0.1, 0.1, 0.3, 1);
-                    gl.clear(gl.COLOR_BUFFER_BIT);
-                    if (pose) for (const [index, view] of pose.views.entries()) {
-                        const viewport = layer.getViewport(view);
-                        if (!viewport) continue;
-                        this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
-                        this.#uploadCanvas(index);
-                        gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-                        gl.useProgram(this.#program);
-                        gl.bindVertexArray(this.#vao);
-                        gl.drawArrays(gl.TRIANGLES, 0, 3);
+                    if (gpu) {
+                        if (pose) for (const view of pose.views) {
+                            const image = this.#gpuBinding.getViewSubImage(this.#gpuLayer, view);
+                            const viewDescriptor=image.getViewDescriptor();
+                            try {
+                                this.#engine.xr_render_gpu_eye(view.projectionMatrix, view.transform.matrix, {
+                                    colorTexture:image.colorTexture, depthStencilTexture:image.depthStencilTexture,
+                                    viewDescriptor, viewport:image.viewport,
+                                });
+                            } catch(error) {
+                                const metadata=texture=>texture ? Object.fromEntries(['width','height','depthOrArrayLayers','mipLevelCount','sampleCount','dimension','format','usage'].map(key=>[key,texture[key]])) : null;
+                                const attachment={eye:view.eye,color:metadata(image.colorTexture),depth:metadata(image.depthStencilTexture),viewDescriptor,
+                                    viewport:{x:image.viewport.x,y:image.viewport.y,width:image.viewport.width,height:image.viewport.height}};
+                                throw new Error(`${error} · XR attachments: ${JSON.stringify(attachment)}`,{cause:error});
+                            }
+                        }
+                    } else {
+                        gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+                        gl.clearColor(0.1, 0.1, 0.3, 1);
+                        gl.clear(gl.COLOR_BUFFER_BIT);
+                        if (pose) for (const [index, view] of pose.views.entries()) {
+                            const viewport = layer.getViewport(view);
+                            if (!viewport) continue;
+                            this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
+                            this.#uploadCanvas(index);
+                            gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                            gl.useProgram(this.#program);
+                            gl.bindVertexArray(this.#vao);
+                            gl.drawArrays(gl.TRIANGLES, 0, 3);
+                        }
+                    }
+                    if (firstFrame && pose?.views.length) {
+                        firstFrame = false;
+                        this.dispatchEvent(new Event('firstframe'));
                     }
                     this.#frame = session.requestAnimationFrame(frame);
                 } catch (error) {
@@ -267,7 +311,7 @@ export class WebXRHost extends EventTarget {
         this.#buttonPoints = [undefined, undefined];
         try {
             this.#engine.xr_set_presenting(false);
-            if (this.#size) this.#engine.resize(...this.#size);
+            if (this.#size && !this.#gpuBinding) this.#engine.resize(...this.#size);
         } catch { /* Engine disposal can precede an asynchronous session end. */ }
         if (this.#gl) {
             for (const image of this.#textures) if (image) this.#gl.deleteTexture(image.texture);
@@ -275,6 +319,8 @@ export class WebXRHost extends EventTarget {
             this.#gl.deleteVertexArray(this.#vao);
             this.#gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
+        this.#gpuLayer?.destroy?.();
+        this.#gpuBinding = this.#gpuLayer = null;
         this.#textures = [];
         this.#gl = this.#program = this.#vao = null;
         this.dispatchEvent(new Event('end'));

@@ -1,0 +1,144 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Přímý WebGPU WebXR renderer</title>
+<canvas id="gpu-canvas" width="320" height="240"></canvas><canvas id="stereo"></canvas>
+<pre id="result" role="status">RUNNING…</pre><ul id="checks"></ul>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+import {assertForeground,capturePixels} from './pixels.js';
+
+const width=192,height=192,sim=installXRSimulator({clockTimers:false,profile:{eyeWidth:width,eyeHeight:height}});
+const run=new XRTestRun('webxr-webgpu',sim,publishXRReport),bindings=[],requests=[],validationErrors=[];
+const previousBinding=Object.getOwnPropertyDescriptor(globalThis,'XRGPUBinding');
+const adapterRequests=[],previousAdapter=Object.getOwnPropertyDescriptor(navigator.gpu,'requestAdapter');
+const requestAdapter=navigator.gpu.requestAdapter.bind(navigator.gpu);
+let denyXR=false,deniedXRAdapters=0,ordinaryFallbackAdapters=0;
+navigator.gpu.requestAdapter=options=>{
+    adapterRequests.push({...options});
+    if(denyXR&&options?.xrCompatible){deniedXRAdapters++;return Promise.resolve(null);}
+    if(denyXR)ordinaryFallbackAdapters++;
+    return requestAdapter(options);
+};
+const requestSession=navigator.xr.requestSession.bind(navigator.xr);
+navigator.xr.requestSession=(mode,options)=>{requests.push({mode,options});return requestSession(mode,options);};
+class SimulatedGPUBinding {
+    constructor(session,device) {
+        this.session=session;this.device=device;this.subimages=[];bindings.push(this);
+        device.addEventListener('uncapturederror',event=>validationErrors.push(String(event.error)));
+        device.pushErrorScope('validation');this.scopeOpen=true;
+        // The shared simulator emits OpenGL projections. The WebGPU XR runtime emits depth 0..1.
+        const schedule=session.requestAnimationFrame.bind(session);
+        session.requestAnimationFrame=callback=>schedule((time,frame)=>callback(time,{
+            session:frame.session,getPose:(...args)=>frame.getPose(...args),
+            getViewerPose:space=>{
+                const pose=frame.getViewerPose(space);if(!pose)return null;
+                return {...pose,views:pose.views.map(view=>{
+                    const projectionMatrix=view.projectionMatrix.slice();
+                    for(let column=0;column<4;column++)projectionMatrix[column*4+2]=(projectionMatrix[column*4+2]+projectionMatrix[column*4+3])/2;
+                    return {...view,projectionMatrix};
+                })};
+            }
+        }));
+    }
+    createProjectionLayer(options) {
+        if(!['rgba8unorm','bgra8unorm','rgba16float'].includes(options.colorFormat))throw new Error(`Unsupported XR projection color format: ${options.colorFormat}`);
+        this.options=options;
+        const texture=format=>this.device.createTexture({size:[width,height,2],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+        this.color=texture(options.colorFormat);this.depth=texture(options.depthStencilFormat);
+        // Quest 149 compositor color handles report these three getters as zero.
+        // Shadow only JS metadata; createView/readback still use the real GPUTexture.
+        this.opaqueMetadata=bindings.length===2;
+        if(this.opaqueMetadata)for(const name of ['mipLevelCount','sampleCount','usage'])Object.defineProperty(this.color,name,{configurable:true,value:0});
+        return this.layer={textureWidth:width,textureHeight:height,textureArrayLength:2};
+    }
+    getViewSubImage(layer,view) {
+        if(layer!==this.layer)throw new Error('Unknown GPU projection layer');
+        const index=view.eye==='right'?1:0;this.subimages.push(index);
+        return {colorTexture:this.color,depthStencilTexture:this.depth,
+            viewport:{x:0,y:0,width,height},
+            getViewDescriptor:()=>({dimension:'2d',baseArrayLayer:index,arrayLayerCount:1})};
+    }
+    async pixels(index) {
+        const bytesPerRow=Math.ceil(width*4/256)*256;
+        const buffer=this.device.createBuffer({size:bytesPerRow*height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+        try {
+            const encoder=this.device.createCommandEncoder();
+            encoder.copyTextureToBuffer({texture:this.color,origin:[0,0,index]},{buffer,bytesPerRow,rowsPerImage:height},[width,height,1]);
+            this.device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
+            const padded=new Uint8Array(buffer.getMappedRange()),data=new Uint8ClampedArray(width*height*4);
+            for(let y=0;y<height;y++)data.set(padded.subarray(y*bytesPerRow,y*bytesPerRow+width*4),y*width*4);
+            if(this.options.colorFormat.startsWith('bgra'))for(let i=0;i<data.length;i+=4)[data[i],data[i+2]]=[data[i+2],data[i]];
+            return new ImageData(data,width,height);
+        } finally {buffer.destroy();}
+    }
+    async checkValidation(test) {
+        if(this.scopeOpen){this.scopeOpen=false;const error=await this.device.popErrorScope();if(error)validationErrors.push(String(error));}
+        test.assert(validationErrors.length===0,'GPU rendering has no validation errors',validationErrors);
+    }
+    destroy(){this.color?.destroy();this.depth?.destroy();}
+}
+Object.defineProperty(globalThis,'XRGPUBinding',{configurable:true,writable:true,value:SimulatedGPUBinding});
+let engine;
+const report=await run.execute(async test=>{
+    const canvas=document.querySelector('#gpu-canvas');
+    engine=await initEngine(canvas,{backend:'auto'});
+    document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+    test.assert(engine.renderer_backend()==='BrowserWebGpu','real WebGPU engine selected');
+    test.assert(canvas.dataset.xrWebgpu==='true','XR-compatible device requested before engine initialization');
+    test.assert(adapterRequests.some(options=>options.xrCompatible===true),'real adapter request is XR compatible',adapterRequests);
+    engine.resize(320,240);engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_frustum_culling(false);
+    engine.setCameraView([0,1.6,0],[0,1.6,-2]);
+    engine.scene.createCube([-.25,1.6,-1.5]).setScale([.3,.4,.3]);
+    engine.scene.createSphere([.35,1.5,-2]).setScale([.2,.2,.2]);
+    engine.scene.createLight({position:[-2,4,0],color:[1,1,1]});
+    assertForeground(await capturePixels(canvas),'desktop WebGPU scene');
+    const size=[canvas.width,canvas.height];
+    let firstFrames=0;engine.xr.addEventListener('firstframe',()=>firstFrames++);
+    test.assert(await engine.xr.isSupported(),'WebGPU XR support with native binding');
+    const frame=()=>{sim.frame({head:{position:[0,1.6,0],orientation:[0,0,0,1]}});test.assert(!engine.xr.lastError,'XR frame completes',String(engine.xr.lastError));};
+    await engine.xr.enter();const binding=bindings.at(-1);
+    test.assert(requests.at(-1).options.requiredFeatures?.includes('webgpu'),'session requires webgpu feature');
+    test.assert(binding.options.depthStencilFormat==='depth32float'&&binding.options.scaleFactor===.75,'projection layer depth and scale');
+    test.assert(sim.session.renderState.layers?.[0]===binding.layer&&!sim.session.renderState.baseLayer,'GPU projection layer is installed');
+    frame();
+    const left=await binding.pixels(0),right=await binding.pixels(1);
+    assertForeground(left,'real GPU left array slice');assertForeground(right,'real GPU right array slice');
+    test.assert(binding.subimages.join(',')==='0,1','both native array slices rendered once');
+    test.assert(firstFrames===1,'first-frame diagnostic follows successful stereo submission');
+    test.assert(pixelDifference(left,right)>20,'GPU stereo eyes have distinct IPD geometry');
+    const preview=document.querySelector('#stereo');preview.width=width*2;preview.height=height;
+    preview.getContext('2d').putImageData(left,0,0);preview.getContext('2d').putImageData(right,width,0);
+    // Entire mesh lies before depthNear=.05. An erroneous second GL-to-GPU conversion exposes it.
+    const clipped=engine.scene.createCube([0,1.6,-.03]).setScale([.2,.2,.005]);frame();
+    test.assert(pixelDifference(left,await binding.pixels(0))===0,'GPU projection near clipping is not converted twice');clipped.remove();
+    test.assert(canvas.width===size[0]&&canvas.height===size[1],'direct XR rendering preserves desktop canvas size');
+    await binding.checkValidation(test);
+    const first=sim.session;await engine.xr.exit();
+    test.assert(first.ended&&first.pendingFrameCount===0&&!engine.xr.isPresenting,'exit ends session and cancels frames');
+    await engine.xr.enter();frame();const second=bindings.at(-1);
+    assertForeground(await second.pixels(0),'GPU reentry left eye');assertForeground(await second.pixels(1),'GPU reentry right eye');
+    test.assert(second!==binding&&sim.session!==first,'reentry creates fresh GPU binding and layer');
+    test.assert(firstFrames===2,'first-frame diagnostic resets on reentry');
+    test.assert(second.opaqueMetadata&&second.color.mipLevelCount===0&&second.color.sampleCount===0&&second.color.usage===0,'Quest opaque color metadata renders both real GPU eyes');
+    await second.checkValidation(test);
+    const active=sim.session;engine.dispose();
+    test.assert(!engine.xr.isPresenting&&active.pendingFrameCount===0,'dispose cancels active GPU XR');
+    denyXR=true;
+    engine=await initEngine(canvas,{backend:'auto'});
+    test.assert(engine.renderer_backend()==='BrowserWebGpu','ordinary WebGPU survives unavailable XR adapter');
+    test.assert(deniedXRAdapters>0&&ordinaryFallbackAdapters>0,'XR adapter denial retries ordinary adapter',{deniedXRAdapters,ordinaryFallbackAdapters});
+    engine.resize(320,240);engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+    engine.setCameraView([0,1.6,0],[0,1.6,-2]);
+    engine.scene.createCube([0,1.6,-2]);engine.scene.createLight({position:[-2,4,0],color:[1,1,1]});
+    test.assert(assertForeground(await capturePixels(canvas),'ordinary desktop GPU after XR adapter denial')>100,'ordinary fallback renders actual desktop geometry');
+    test.assert(!await engine.xr.isSupported(),'ordinary adapter does not advertise GPU XR support');
+    const requestCount=requests.length;let fallbackRejected=false;
+    try{await engine.xr.enter();}catch(error){fallbackRejected=/webgl/i.test(String(error));}
+    test.assert(fallbackRejected&&!engine.xr.isPresenting&&requests.length===requestCount,'ordinary adapter rejects XR with WebGL guidance before requesting session');
+    engine.dispose();
+});
+engine?.dispose();for(const binding of bindings)binding.destroy();sim.dispose();
+if(previousAdapter)Object.defineProperty(navigator.gpu,'requestAdapter',previousAdapter);else delete navigator.gpu.requestAdapter;
+if(previousBinding)Object.defineProperty(globalThis,'XRGPUBinding',previousBinding);else delete globalThis.XRGPUBinding;
+publishXRReport(report);
+</script></html>

@@ -20,7 +20,7 @@ const report=await run.execute(async test=>{
     try{Object.defineProperty(navigator,'xr',{configurable:true,value:undefined});test.assert(!await engine.xr.isSupported(),'missing WebXR is reported as unsupported');}
     finally{Object.defineProperty(navigator,'xr',xrDescriptor);}
     if(backend!=='webgl') {
-        let rejected=false;try{await engine.xr.enter();}catch(error){rejected=/webgl/i.test(String(error));}
+        let rejected=false;try{await engine.xr.enter();}catch(error){rejected=/webgl|XRGPUBinding/i.test(String(error));}
         test.assert(rejected&&!engine.xr.isPresenting,'WebGPU never masquerades as supported XR backend');
         return;
     }

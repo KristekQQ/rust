@@ -28,3 +28,6 @@ js-sys = "0.3"
 gltf = { version = "1.4", default-features = false, features = ["utils", "names", "extras"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde_json = "1.0"
+
+[patch.crates-io]
+wgpu = { path = "third_party/wgpu" }

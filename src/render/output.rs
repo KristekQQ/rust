@@ -26,6 +26,7 @@ pub struct CanvasOutput {
     depth_texture: wgpu::Texture,
     depth_view: wgpu::TextureView,
     pub offscreen: bool,
+    pub xr_compatible: bool,
     texture_output: Option<TextureOutput>,
 }
 impl CanvasOutput {
@@ -42,14 +43,42 @@ impl CanvasOutput {
             },
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         };
-        let instance = wgpu::util::new_instance_with_webgpu_detection(instance_desc).await;
+        let xr_gpu = canvas.get_attribute("data-xr-webgpu").as_deref() == Some("true")
+            && canvas.get_attribute("data-backend").as_deref() != Some("webgl");
+        // A browser may expose XRGPUBinding but have no XR-compatible adapter.
+        // Preserve ordinary desktop auto selection in that case.
+        let (instance, xr_adapter) = if xr_gpu {
+            let instance = wgpu::Instance::new_webgpu_xr(wgpu::InstanceDescriptor {
+                backends: wgpu::Backends::BROWSER_WEBGPU,
+                ..wgpu::InstanceDescriptor::new_without_display_handle()
+            });
+            match instance
+                .request_adapter(&wgpu::RequestAdapterOptions::default())
+                .await
+            {
+                Ok(adapter) => (instance, Some(adapter)),
+                Err(_) => (
+                    wgpu::util::new_instance_with_webgpu_detection(instance_desc).await,
+                    None,
+                ),
+            }
+        } else {
+            (
+                wgpu::util::new_instance_with_webgpu_detection(instance_desc).await,
+                None,
+            )
+        };
         check_current()?;
         let surface = instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
-            .await
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let xr_compatible = xr_adapter.is_some();
+        let adapter = match xr_adapter {
+            Some(adapter) => adapter,
+            None => wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
+                .await
+                .map_err(|e| JsValue::from_str(&e.to_string()))?,
+        };
         check_current()?;
         let backend = format!("{:?}", adapter.get_info().backend);
         let (device, queue) = adapter
@@ -110,6 +139,7 @@ impl CanvasOutput {
                 depth_texture,
                 depth_view,
                 offscreen: false,
+                xr_compatible,
                 texture_output: None,
             },
             device,

@@ -140,9 +140,33 @@ pub fn xr_view(projection: &[f32], world: &[f32]) -> Option<(Mat4, Vec3)> {
     ))
 }
 
+/// WebGPU-compatible XR sessions already supply zero-to-one clip depth.
+pub fn xr_gpu_view(projection: &[f32], world: &[f32]) -> Option<(Mat4, Vec3)> {
+    let projection = Mat4::from_cols_array(projection.try_into().ok()?);
+    let world = Mat4::from_cols_array(world.try_into().ok()?);
+    if !projection.is_finite() || !world.is_finite() || world.determinant().abs() < 1e-8 {
+        return None;
+    }
+    Some((
+        projection * world.inverse(),
+        world.transform_point3(Vec3::ZERO),
+    ))
+}
+
 #[cfg(test)]
 mod xr_tests {
     use super::*;
+    #[test]
+    fn xr_gpu_preserves_zero_to_one_projection() {
+        let p = glam::camera::rh::proj::directx::perspective(1., 1., 0.1, 100.);
+        let world = Mat4::from_translation(Vec3::new(0.032, 1.6, 0.));
+        let (vp, eye) = xr_gpu_view(&p.to_cols_array(), &world.to_cols_array()).unwrap();
+        assert!(vp.project_point3(eye - Vec3::Z * 0.1).z.abs() < 1e-5);
+        assert!((vp.project_point3(eye - Vec3::Z * 100.).z - 1.).abs() < 1e-5);
+        assert!(xr_gpu_view(&[0.; 15], &[0.; 16]).is_none());
+        assert!(xr_gpu_view(&[f32::NAN; 16], &[0.; 16]).is_none());
+        assert!(xr_gpu_view(&p.to_cols_array(), &[0.; 16]).is_none());
+    }
     #[test]
     fn xr_eye_pose_and_depth_conversion() {
         let p = glam::camera::rh::proj::opengl::perspective(1.0, 1.0, 0.1, 100.0);

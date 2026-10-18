@@ -48,6 +48,25 @@ export async function verifyArena(engine, world, canvas) {
         const effectPositions=demo.feedback.objects.map(object=>object.meshInfo.position);
         demo.feedback.objects.forEach(object=>object.setPosition([100,100,100]));await wait();
         assertChanged(hitFrame,await capturePixels(canvas),'real cut shockwave, sparks and bitmap hit popup',80);
+        // Look directly through the newly cut face: a solid blue marker behind
+        // the remaining half must reach the framebuffer, including its depth.
+        const halves=demo.report.pieces.map(piece=>({piece,position:piece.meshInfo.position}));
+        const openHalf=halves.reduce((a,b)=>a.position[0]<b.position[0]?a:b);
+        halves.filter(half=>half!==openHalf).forEach(half=>half.piece.setPosition([100,100,100]));
+        marker=engine.scene.createMesh({positions:geometry.positions,indices:geometry.indices,color:[0,0,1]}).setPosition([-.6,1.35,-1.15]).setScale([.2,.4,.4]).setEmission(2);
+        engine.setCameraView([1.2,1.35,-1.15],[0,1.35,-1.15]);await wait();
+        const openFace=await capturePixels(canvas);
+        let throughCut=0,totalCut=0;
+        const radius=Math.max(3,Math.floor(Math.min(openFace.width,openFace.height)*.01));
+        for(let y=Math.floor(openFace.height/2)-radius;y<=Math.floor(openFace.height/2)+radius;y++)
+            for(let x=Math.floor(openFace.width/2)-radius;x<=Math.floor(openFace.width/2)+radius;x++){
+                const i=(y*openFace.width+x)*4;totalCut++;
+                if(openFace.data[i+2]>80&&openFace.data[i+2]>openFace.data[i]*1.5+20&&openFace.data[i+2]>openFace.data[i+1]*1.4)throughCut++;
+            }
+        if(throughCut<totalCut*.7)throw new Error(`Cut face still occludes the object behind it (${throughCut}/${totalCut})`);
+        marker.remove();marker=undefined;
+        halves.forEach(half=>half.piece.setPosition(half.position));
+        engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         demo.feedback.objects.forEach((object,i)=>object.setPosition(effectPositions[i]));
         if(demo.report.pieces.length!==2||!demo.report.pieces.every(piece=>piece.meshInfo.closed))throw new Error('Preview must show two real closed fruit halves');
         // Changing a colored surface BEHIND the FX must change the composite,
