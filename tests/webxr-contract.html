@@ -1,0 +1,14 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Obecný VR tester</title>
+<style>
+body{margin:0;padding:22px;background:#101827;color:#eaf1ff;font:15px/1.5 system-ui}main{max-width:1100px;margin:auto}h1{font-size:26px}a{color:#aaccff}button,select{font:inherit;padding:8px;background:#244273;color:inherit;border:1px solid #85a8de;border-radius:5px}canvas{max-width:100%;height:auto;border:1px solid #425475}#gpu-canvas{width:420px;height:280px}pre{white-space:pre-wrap}li{font:13px/1.7 ui-monospace,monospace}.panel{display:flex;gap:14px;flex-wrap:wrap}.note{color:#aabbd4}
+</style>
+<main><h1>Obecný VR tester enginu</h1>
+<p>Headset a ovladače jsou simulované. Scéna, výpočty a vykreslování běží ve skutečném Rust/WASM enginu. Herní pravidla patří do samostatných scénářů.</p>
+<p><a href="webxr-contract.html?slow=1">Přehrát pomalu</a> · <a href="webxr-simulation.html?backend=webgl&slow=1">Herní scénář: jablka</a> · <a href="../docs/VR_TESTING.md">Přidání další hry</a></p>
+<div class="panel"><label>Virtuální profil <select id="profile"><option value="all">Všechny profily</option><option value="standing-72">Stojící · 72 Hz</option><option value="seated-90">Sedící · 90 Hz</option><option value="room-120">Prostor · 120 Hz</option></select></label><button id="run">Spustit znovu</button><button id="export">Stáhnout report + stopu</button></div>
+<p class="note">72/90/120 Hz jsou kroky simulace, nikoli naměřený výkon headsetu. Komfort, skutečný tracking a výkon se ověřují na zařízení.</p>
+<pre id="result" role="status">RUNNING: připravuji obecné kontroly…</pre>
+<div class="panel"><canvas id="gpu-canvas" width="420" height="280"></canvas><canvas id="stereo" width="384" height="192"></canvas></div>
+<ol id="checks"></ol></main>
+<script type="module" src="./xr/contract.js"></script></html>

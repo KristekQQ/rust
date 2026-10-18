@@ -1,0 +1,40 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>WebXR backend a životní cyklus</title>
+<canvas id="gpu-canvas" width="320" height="240"></canvas><pre id="result" role="status">RUNNING…</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport} from './xr/testkit.js';
+import {capturePixels,assertForeground} from './pixels.js';
+const sim=installXRSimulator(),run=new XRTestRun('webxr-backend',sim,publishXRReport);
+let engine;
+const report=await run.execute(async test=>{
+    const backend=new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto';
+    const canvas=document.querySelector('#gpu-canvas');
+    engine=await initEngine(canvas,{backend});
+    document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+    engine.resize(320,240);engine.setCameraView([0,1.6,0],[0,1.6,-2]);
+    engine.scene.createCube([0,1.6,-2]);engine.scene.createLight({position:[2,4,0],color:[1,1,1]});
+    assertForeground(await capturePixels(canvas),'actual desktop renderer');
+    test.assert(true,'actual desktop scene has geometry');
+    const xrDescriptor=Object.getOwnPropertyDescriptor(navigator,'xr');
+    try{Object.defineProperty(navigator,'xr',{configurable:true,value:undefined});test.assert(!await engine.xr.isSupported(),'missing WebXR is reported as unsupported');}
+    finally{Object.defineProperty(navigator,'xr',xrDescriptor);}
+    if(backend!=='webgl') {
+        let rejected=false;try{await engine.xr.enter();}catch(error){rejected=/webgl/i.test(String(error));}
+        test.assert(rejected&&!engine.xr.isPresenting,'WebGPU never masquerades as supported XR backend');
+        return;
+    }
+    await engine.xr.enter();sim.frame({head:{position:[0,1.6,0]}});
+    test.assert(!engine.xr.lastError,'actual XR rendering');assertForeground(sim.pixels(),'actual stereo framebuffer');
+    test.assert(true,'actual stereo geometry');
+    const session=sim.session;
+    engine.dispose();
+    test.assert(!engine.xr.isPresenting&&session.pendingFrameCount===0,'dispose cancels active XR');
+    engine=await initEngine(canvas,{backend:'webgl'});
+    const release=sim.deferNextRequest(),entering=engine.xr.enter();
+    engine.dispose();release();let canceled=false;
+    try{await entering;}catch{canceled=true;}
+    test.assert(canceled&&!engine.xr.isPresenting&&sim.session.ended,'dispose cancels a pending XR request and ends late session');
+});
+engine?.dispose();sim.dispose();publishXRReport(report);
+</script></html>

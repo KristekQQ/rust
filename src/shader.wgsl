@@ -114,6 +114,9 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
 
 fn shade_surface(input: VertexOutput) -> vec4<f32> {
     if (effects.params.z>0.5 && dot(effects.clip_plane,vec4(input.world_pos,1.0)) < -0.001) { discard; }
+    // World-space text keeps its palette and normal depth/clip behavior.
+    // Alpha is postprocessing metadata; zero excludes surface lighting effects.
+    if (input.material.w < -0.5) { return vec4<f32>(input.color, 0.0); }
     let normal = normalize(input.world_normal);
     let view_dir = normalize(scene.camera_pos - input.world_pos);
     var result = input.color * 0.1; // ambient

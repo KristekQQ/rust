@@ -13,7 +13,7 @@ const deferred = () => {
 
 async function sdk() {
     // Replace only the generated-WASM import: test production SDK with a mocked boundary.
-    const code = source.replace('await import(`../pkg/webgpu_wasm.js?v=${version}`)', 'await globalThis.__sdkImport()')
+    const code = source.replace("'./webxr.js'", JSON.stringify(new URL('../js/webxr.js', import.meta.url).href)).replace('await import(`../pkg/webgpu_wasm.js?v=${version}`)', 'await globalThis.__sdkImport()')
         .replaceAll('import.meta.url', JSON.stringify('https://example.test/js/engine.js'));
     assert.notEqual(code, source, 'The WASM import test seam must match');
     return import(`data:text/javascript;base64,${Buffer.from(`${code}\n// test module ${moduleId++}`).toString('base64')}`);
@@ -55,6 +55,7 @@ test('cutting commands preserve handle ownership, typed buffers and Rust piece I
         add_triangle_mesh(positions, indices, ...color) { calls.push(['mesh', positions, indices, color]); return 10; },
         set_cuttable(...args) { calls.push(['cuttable', ...args]); },
         set_cutter(...args) { calls.push(['cutter', ...args]); },
+        set_blade_physics(...args) { calls.push(['bladePhysics', ...args]); },
         triangle_mesh_info: () => JSON.stringify({triangles: 12, volume: 8, closed: true, cuttable: true}),
         triangle_mesh_gpu_snapshot: async id => {calls.push(['gpuSnapshot',id]);return JSON.stringify({positions:[[1,2,3]],normals:[[0,1,0]],colors:[[1,0,0]]});},
         cut_with(...args) { calls.push(['cut', ...args]); return JSON.stringify({removed:[10],pieces:[12,13],objectCandidates:1,bvhNodes:9,triangleTests:8}); },
@@ -101,6 +102,10 @@ test('cutting commands preserve handle ownership, typed buffers and Rust piece I
     assert.deepEqual(calls.at(-1),['async',11,new Float32Array([0,-3,0]),.12,new Float32Array([.2,.8,.6]),'gpu']);
     assert.equal(computed.execution,'webgpu-compute');assert.deepEqual(computed.pieces.map(p=>p.id),[18,19]);
     await assert.rejects(()=>scene.cutWithAsync(new SceneObject({},11),{motion:[0,-3,0]}),/Čepel/);
+    blade.setBladePhysics({edge:[0,-1,0]});
+    assert.deepEqual(calls.at(-1),['bladePhysics',11,new Float32Array([0,-1,0]),.0225,.004]);
+    blade.setBladePhysics(null);
+    assert.equal(calls.at(-1)[2].length,0);
 });
 
 test('orbit and world/screen commands forward to Rust, including lifecycle guards',async t=>{
@@ -369,4 +374,28 @@ test('dispose aborts transport, releases ownership, and rejects every old comman
     assert.equal(await initEngine(canvas), replacement);
     replacement.dispose();
     assert.equal(disposals, 2);
+});
+
+test('XR controller bindings enforce engine handle ownership and disposal', async t => {
+    const canvas = environment(t);
+    const calls = [];
+    globalThis.__sdkImport = async () => wasmMock({
+        add_cube: () => 42,
+        xr_bind_controller: (...args) => calls.push(args),
+        dispose() {},
+    });
+    const {initEngine, SceneObject} = await sdk();
+    const engine = await initEngine(canvas);
+    const sword = engine.scene.createCube();
+    engine.xr.bindController('right', sword, {cutting:true});
+    engine.xr.bindController('left', null);
+    assert.deepEqual(calls, [[1,42,true],[0,0xffffffff,false]]);
+    assert.throws(() => engine.xr.bindController('left', new SceneObject({},42)), /tohoto enginu/);
+    assert.throws(() => engine.xr.bindController('invalid', sword), /left\/right/);
+    engine.xr.bindButton(sword);
+    assert.throws(()=>engine.xr.bindButton(new SceneObject({},42)),/tomuto enginu/);
+    engine.xr.bindButton(null);
+    engine.dispose();
+    assert.throws(() => engine.xr.bindController('right', sword), /ukončen/);
+    assert.throws(()=>engine.xr.bindButton(sword),/tomuto enginu/);
 });

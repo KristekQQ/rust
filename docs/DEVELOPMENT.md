@@ -79,3 +79,19 @@ Source ownership: `renderer.rs` owns scene GPU resources and accepts views/targe
 Inspect Cargo sources before dependency/offline changes. The offline config uses `vendor/`; toolchain restoration in `offline.sh` assumes Linux x86_64 and needs review on Apple Silicon. Packaging/restoration details are in README; do not run them for ordinary development.
 
 Before requested commit/push use `npm run verify:push` once; do not separately repeat cargo/full/browser/hook checks. Commit only owned paths and the regenerated source dump. Reuse matching PASS receipts; invalidate only when their inputs change.
+
+## WebXR / Meta Quest 3
+
+Společný tester pro všechny VR hry: [VR_TESTING.md](VR_TESTING.md).
+Spuštění zařízení a limity: [WEBXR.md](WEBXR.md).
+
+`npm run verify:vr` spustí testy XR platformy, matching WASM a registrované
+obecné/herní VR scénáře. `webxr-contract` kontroluje společný kontrakt enginu
+ve třech virtuálních profilech, `webxr` backend a start/dispose, `webxr-simulation`
+je samostatný adaptér skutečné hry s jablky. Vše používá jednu platformu
+`tests/xr/simulator.js`; nekopíruj vlastní XR mock do další hry.
+
+Reporty a přehratelné stopy jsou v `output/verification/*-report.json` a
+`*-trace.json`. Pomalé přehrávání lze ověřit stejným runnerem přes `--xr-slow`.
+`webxr-preview` zůstává běžný WebGL náhled. Automatika nepotvrzuje skutečný
+Quest compositor, tracking, důvěru certifikátu, komfort ani výkon headsetu.

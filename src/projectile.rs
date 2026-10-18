@@ -4,6 +4,8 @@ use glam::Vec3;
 #[derive(Clone, Copy)]
 pub(crate) struct Body {
     pub id: u32,
+    /// Nonzero for pieces from the same solid; overlapping sphere proxies are false contacts.
+    pub family: u64,
     pub position: Vec3,
     pub velocity: Vec3,
     pub gravity: f32,
@@ -12,6 +14,9 @@ pub(crate) struct Body {
 }
 
 fn collide(a: &mut Body, b: &mut Body) -> (u32, bool) {
+    if a.family != 0 && a.family == b.family {
+        return (0, false);
+    }
     let delta = b.position - a.position;
     let radii = a.radius + b.radius;
     let squared = delta.length_squared();
@@ -120,10 +125,42 @@ pub(crate) fn simulate(
 mod tests {
     use super::*;
     #[test]
+    fn projectile_sibling_proxies_never_inject_a_false_impulse() {
+        let body = Body {
+            id: 1,
+            family: 42,
+            position: Vec3::Y * 3.,
+            velocity: Vec3::X * 0.1,
+            gravity: 0.,
+            bounce: 0.,
+            radius: 0.2,
+        };
+        let mut bodies = [
+            body,
+            Body {
+                id: 2,
+                velocity: -Vec3::X * 0.1,
+                ..body
+            },
+        ];
+        let contacts = simulate(&mut bodies, &mut Vec::new(), &mut Vec::new(), 1. / 90.);
+        assert_eq!(contacts, 0);
+        assert_eq!(bodies[0].velocity, body.velocity);
+        assert!(bodies[0].position.distance(bodies[1].position) < 0.003);
+        bodies[1].family = 43;
+        bodies[0].position.x = -0.02;
+        bodies[1].position.x = 0.02;
+        let contacts = simulate(&mut bodies, &mut Vec::new(), &mut Vec::new(), 1. / 90.);
+        assert!(contacts > 0);
+        assert!(bodies[0].position.distance(bodies[1].position) >= 0.4);
+    }
+
+    #[test]
     fn sweep_rebuilds_after_correction_creates_secondary_contact() {
         let mut bodies: Vec<_> = (0..17)
             .map(|id| Body {
                 id,
+                family: 0,
                 position: Vec3::new(
                     match id {
                         0 => 0.0,
@@ -148,6 +185,7 @@ mod tests {
         let mut bodies: Vec<_> = (0..40)
             .map(|i| Body {
                 id: i,
+                family: 0,
                 position: Vec3::new((i / 2) as f32 * 4.0, 4.0 + (i % 2) as f32 * 0.4, 0.0),
                 velocity: if i % 2 == 0 { Vec3::Y } else { -Vec3::Y },
                 radius: if i % 2 == 0 { 0.2 } else { 0.5 },

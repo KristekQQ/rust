@@ -367,24 +367,28 @@ impl SceneRenderer {
         self.imported_meshes.insert(id, mesh);
         Ok(id)
     }
-    pub fn advance_scene(&mut self, dt: f32) {
-        self.upload_bytes = 0;
-        self.frame_metrics.record(dt);
-        self.scene.update(dt);
-        // New meshes are immutable per stable ID. Upload only once; all passes share
-        // the same existing imported-mesh path, bounds and cache invalidation.
-        for (&id, object) in self.scene.triangle_meshes() {
-            self.imported_meshes.entry(id).or_insert_with(|| {
-                Mesh::imported(
-                    &self.device,
-                    &object
-                        .mesh
-                        .ready_cpu()
-                        .expect("Resident buffers installed before rendering")
-                        .render_mesh(),
-                )
-            });
+    /// Refresh only opt-in dynamic text meshes, before any render pass uses them.
+    fn refresh_info_panel_meshes(&mut self) {
+        for (&id, panel) in &mut self.scene.info_panels {
+            if panel.dirty {
+                self.imported_meshes
+                    .insert(id, Mesh::imported(&self.device, &panel.mesh));
+                self.upload_bytes += panel.mesh.vertices.len() * 36 + panel.mesh.indices.len() * 4;
+                panel.dirty = false;
+            }
         }
+    }
+    pub fn advance_scene(&mut self, dt: f32) {
+        self.advance_scene_timed(dt, dt);
+    }
+    pub fn advance_xr_scene(&mut self, elapsed: f32) {
+        self.advance_scene_timed(elapsed, elapsed.min(0.1));
+    }
+    fn advance_scene_timed(&mut self, elapsed: f32, simulation_dt: f32) {
+        self.upload_bytes = 0;
+        self.frame_metrics.record(elapsed);
+        self.scene.update(simulation_dt);
+        self.sync_triangle_meshes();
         self.gltf_models
             .retain(|id, _| self.scene.object_exists(*id));
         for (id, gpu) in &mut self.gltf_models {
@@ -417,6 +421,24 @@ impl SceneRenderer {
             .retain(|id, _| self.scene.object_exists(*id));
         for cache in &mut self.passes {
             cache.imported.retain(|id, _| self.scene.object_exists(*id));
+        }
+    }
+    /// Cuts can create meshes after simulation, before either XR eye is drawn.
+    /// Upload them without advancing time or resetting frame metrics.
+    pub fn sync_triangle_meshes(&mut self) {
+        // New meshes are immutable per stable ID. Upload only once; all passes share
+        // the same existing imported-mesh path, bounds and cache invalidation.
+        for (&id, object) in self.scene.triangle_meshes() {
+            self.imported_meshes.entry(id).or_insert_with(|| {
+                Mesh::imported(
+                    &self.device,
+                    &object
+                        .mesh
+                        .ready_cpu()
+                        .expect("Resident buffers installed before rendering")
+                        .render_mesh(),
+                )
+            });
         }
     }
     pub fn import_gltf_model(
@@ -598,6 +620,9 @@ impl SceneRenderer {
     }
 
     pub fn set_debug_diagnostics(&mut self, enabled: bool) {
+        if self.debug_enabled == enabled {
+            return;
+        }
         self.debug_enabled = enabled;
         // Only the main-view HUD reports traversal; auxiliary passes need no counters.
         self.passes[0].queue.collect_stats = enabled;
@@ -618,6 +643,26 @@ impl SceneRenderer {
             "bvhNodes": bvh.nodes_visited, "objectTests": bvh.object_tests,
             "staticRebuilds": bvh.static_rebuilds, "dynamicRebuilds": bvh.dynamic_rebuilds,
         })
+    }
+    pub fn xr_debug_content(
+        &self,
+        cuts: u64,
+        round: Option<crate::xr_round::RoundClock>,
+    ) -> crate::debug_overlay::XrHudContent {
+        crate::debug_overlay::XrHudContent {
+            scene: vec![
+                ("FPS", format!("{:.1}", self.frame_metrics.fps)),
+                ("FRAME MS", format!("{:.2}", self.frame_metrics.frame_ms)),
+                ("CPU MS", format!("{:.2}", self.prepare_ms)),
+                ("OBJEKTY", self.passes[0].queue.total.to_string()),
+                ("DRAWS", self.draw_calls.to_string()),
+            ],
+            cuts,
+            round: round.map(|round| crate::debug_overlay::XrRoundDisplay {
+                remaining: round.remaining,
+                finished: round.finished(),
+            }),
+        }
     }
     pub fn debug_lines(&self) -> Vec<String> {
         let q = &self.passes[0].queue;
@@ -686,6 +731,7 @@ impl SceneRenderer {
         target: &RenderTarget<'_>,
     ) -> Result<(), String> {
         target.validate()?;
+        self.refresh_info_panel_meshes();
         let mut effects = self.effects.take().unwrap();
         let result = effects.render(self, view, target);
         self.effects = Some(effects);
@@ -699,6 +745,7 @@ impl SceneRenderer {
         pass: RenderPassKind,
     ) -> Result<(), String> {
         target.validate()?;
+        self.refresh_info_panel_meshes();
         self.prepare_pass(view, pass);
         self.draw_depth(target)
     }

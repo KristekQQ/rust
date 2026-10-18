@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust WebXR · Meta Quest 3</title>
+<style>
+body{margin:0;background:#111827;color:#f3f4f6;font:16px system-ui}canvas{display:block;width:100vw;height:100vh}aside{position:fixed;left:1rem;top:1rem;max-width:30rem;padding:1rem;background:#111e;border-radius:12px}h1{font-size:1.2rem;margin:0 0 .6rem}button,a{font:inherit;color:inherit}button{padding:.7rem 1rem;background:#2454ad;border:1px solid #83b4ff;border-radius:8px;cursor:pointer}button:disabled{opacity:.5}a{display:inline-block;margin-top:.6rem}#status{line-height:1.5}
+</style>
+<canvas id="gpu-canvas"></canvas>
+<aside><h1>Rust engine · WebXR</h1><p id="status" role="status">Načítání scény…</p><button id="enter" disabled>Vstoupit do VR</button> <button id="exit" hidden>Ukončit VR</button><p>Kolo trvá 30 sekund. Jablka vyletují sama. Sekej katanami v obou rukou — triggery nemusíš držet. Řeže zlatá ostrá hrana. Na ploše můžeš ovoce podržet. Pro restart udeř mečem do bedny DALSI KOLO. Funguje také namíření a trigger. Levý trigger mimo tlačítko přidá jablko.</p><button id="shoot">Vystřelit jablko</button> · Řezy: <span id="cuts">0</span><br><br><a href="../../docs/WEBXR.md">Připojení Questu a HTTPS</a></aside>
+<script type="module" src="main.js"></script>
+</html>

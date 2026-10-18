@@ -29,6 +29,7 @@ if [[ "$mode" != browser ]]; then
     check rust-clippy cargo clippy --locked --all-targets -- -D warnings
     check sdk npm run test:sdk
     check harness npm run test:harness
+    check xr-platform npm run test:xr
 fi
 if [[ "$mode" != native ]]; then
     (

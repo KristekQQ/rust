@@ -18,6 +18,12 @@ pub struct State {
     debug_enabled: bool,
     debug_hud: Option<super::hud::DebugHud>,
     frame_dt: f32,
+    xr_rendering: bool,
+    xr_hud_pending: bool,
+    xr_cuts: u64,
+    info_panel_elapsed: f32,
+    info_round_dirty: bool,
+    xr_round: Option<crate::xr_round::RoundClock>,
     cutting_compute: Option<super::cutting_compute::ComputeCutter>,
     resident_cutter: Option<super::cutting_resident::ResidentCutter>,
     resident_sources:
@@ -57,6 +63,12 @@ impl State {
             debug_enabled: false,
             debug_hud: None,
             frame_dt: 0.0,
+            xr_rendering: false,
+            xr_hud_pending: false,
+            xr_cuts: 0,
+            info_panel_elapsed: 0.25,
+            info_round_dirty: true,
+            xr_round: None,
             cutting_compute: None,
             resident_cutter: None,
             resident_sources: Default::default(),
@@ -184,6 +196,7 @@ impl State {
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
         self.frame_dt = dt;
         self.renderer.advance_scene(dt);
+        self.refresh_info_panels(dt);
         self.view = RenderView {
             view_projection: camera_matrix,
             camera_position: camera_pos,
@@ -266,11 +279,67 @@ impl State {
     }
     pub fn set_debug_overlay(&mut self, enabled: bool) {
         self.debug_enabled = enabled;
-        self.renderer.set_debug_diagnostics(enabled);
+        self.sync_info_diagnostics();
         if enabled {
             if let Some(hud) = &mut self.debug_hud {
                 hud.invalidate();
             }
+        }
+    }
+    fn sync_info_diagnostics(&mut self) {
+        let scene_panel = self
+            .renderer
+            .scene
+            .info_panels
+            .values()
+            .any(|p| p.kind == crate::info_panel::PanelKind::Scene);
+        self.renderer
+            .set_debug_diagnostics(self.debug_enabled || scene_panel);
+    }
+    pub fn add_info_panel(&mut self, kind: &str, width: f32, height: f32) -> Result<u32, JsValue> {
+        let id = self
+            .renderer
+            .scene
+            .add_info_panel(kind, width, height)
+            .map_err(|e| JsValue::from_str(&e))?;
+        self.info_panel_elapsed = 0.25;
+        self.info_round_dirty = true;
+        self.sync_info_diagnostics();
+        self.refresh_info_panels(0.0);
+        Ok(id)
+    }
+    fn refresh_info_panels(&mut self, dt: f32) {
+        use crate::info_panel::PanelKind;
+        self.sync_info_diagnostics();
+        if self.renderer.scene.info_panels.is_empty() {
+            return;
+        }
+        if dt.is_finite() && dt > 0. {
+            self.info_panel_elapsed += dt;
+        }
+        if self.info_panel_elapsed >= 0.25 {
+            self.info_panel_elapsed = 0.;
+            let rows = self
+                .renderer
+                .xr_debug_content(self.xr_cuts, self.xr_round)
+                .scene;
+            self.renderer
+                .scene
+                .update_info_panels(PanelKind::Scene, &rows);
+        }
+        if self.info_round_dirty {
+            let mut rows = vec![("ROZKROJENO", self.xr_cuts.to_string())];
+            if let Some(round) = self.xr_round {
+                rows.push(("CAS", format!("{} S", round.remaining.ceil() as u32)));
+                rows.push((
+                    "STAV",
+                    if round.finished() { "HOTOVO" } else { "HRA" }.into(),
+                ));
+            }
+            self.renderer
+                .scene
+                .update_info_panels(PanelKind::Round, &rows);
+            self.info_round_dirty = false;
         }
     }
     pub fn debug_stats(&self) -> String {
@@ -278,9 +347,81 @@ impl State {
         value["enabled"] = self.debug_enabled.into();
         value["hudFrames"] = self.debug_hud.as_ref().map_or(0, |h| h.frames).into();
         value["hudRefreshes"] = self.debug_hud.as_ref().map_or(0, |h| h.refreshes).into();
+        value["xrCuts"] = self.xr_cuts.into();
+        value["xrRoundRemaining"] = self.xr_round.map(|r| r.remaining).into();
         value.to_string()
     }
+    pub fn xr_round_finished(&self) -> bool {
+        self.xr_round.is_some_and(|round| round.finished())
+    }
+    pub fn start_xr_round(&mut self, seconds: f32) -> Result<(), JsValue> {
+        let round = crate::xr_round::RoundClock::new(seconds)
+            .ok_or_else(|| JsValue::from_str("Round duration must be 1..3600 seconds"))?;
+        self.xr_round = Some(round);
+        self.xr_cuts = 0;
+        self.invalidate_xr_hud();
+        Ok(())
+    }
+    pub fn xr_round_state(&self) -> String {
+        self.xr_round
+            .map(|round| {
+                serde_json::json!({
+                    "duration": round.duration, "remaining": round.remaining,
+                    "finished": round.finished(), "cuts": self.xr_cuts,
+                })
+            })
+            .unwrap_or(serde_json::Value::Null)
+            .to_string()
+    }
+    fn invalidate_xr_hud(&mut self) {
+        self.info_round_dirty = true;
+        if let Some(hud) = &mut self.debug_hud {
+            hud.invalidate();
+        }
+    }
+    pub fn record_xr_cuts(&mut self, count: usize) {
+        if count > 0 {
+            // Controller input follows advance_xr; new halves must be visible in
+            // this same stereo frame instead of disappearing for one frame.
+            self.renderer.sync_triangle_meshes();
+        }
+        if count > 0 && !self.xr_round_finished() {
+            self.xr_cuts = self.xr_cuts.saturating_add(count as u64);
+            self.invalidate_xr_hud();
+        }
+    }
+    pub fn frame_dt(&self) -> f32 {
+        self.frame_dt
+    }
+    pub fn advance_xr(&mut self, dt: f32) {
+        self.frame_dt = dt;
+        self.xr_hud_pending = true;
+        if let Some(round) = &mut self.xr_round {
+            let before = round.remaining.ceil();
+            round.advance(dt);
+            if before != round.remaining.ceil() {
+                self.invalidate_xr_hud();
+            }
+        }
+        // FPS and the clock use elapsed time; only physics has a bounded step.
+        self.renderer.advance_xr_scene(dt);
+        self.refresh_info_panels(dt);
+    }
+    pub fn render_xr_eye(&mut self, matrix: Mat4, position: Vec3) -> Result<(), JsValue> {
+        let saved = self.view;
+        let saved_xr = self.xr_rendering;
+        self.xr_rendering = true;
+        self.view = RenderView {
+            view_projection: matrix,
+            camera_position: position,
+        };
+        let result = self.render();
+        self.view = saved;
+        self.xr_rendering = saved_xr;
+        result
+    }
     pub fn render(&mut self) -> Result<(), JsValue> {
+        self.refresh_info_panels(0.0);
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
             return Ok(());
         };
@@ -336,14 +477,31 @@ impl State {
             usize::from(self.debug_enabled) + usize::from(self.output.offscreen);
         if self.debug_enabled {
             let renderer = &self.renderer;
+            let xr = self.xr_rendering;
+            let cuts = self.xr_cuts;
+            let round = self.xr_round;
             self.renderer.upload_bytes +=
                 self.debug_hud.get_or_insert_with(Default::default).render(
                     &renderer.device,
                     &renderer.queue,
                     &target,
-                    self.frame_dt,
-                    || renderer.debug_lines(),
+                    if !self.xr_rendering || self.xr_hud_pending {
+                        self.frame_dt
+                    } else {
+                        0.0
+                    },
+                    self.xr_rendering,
+                    || {
+                        if xr {
+                            crate::debug_overlay::HudContent::Xr(
+                                renderer.xr_debug_content(cuts, round),
+                            )
+                        } else {
+                            crate::debug_overlay::HudContent::Desktop(renderer.debug_lines())
+                        }
+                    },
                 );
+            self.xr_hud_pending = false;
         }
         self.output
             .present(frame, &self.renderer.device, &self.renderer.queue);

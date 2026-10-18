@@ -118,3 +118,41 @@ mod tests {
         assert!(!f.intersects_aabb(light * 2.0, Vec3::splat(0.1)));
     }
 }
+
+/// WebXR uses OpenGL [-1,1] depth; wgpu render views use [0,1].
+pub fn xr_view(projection: &[f32], world: &[f32]) -> Option<(Mat4, Vec3)> {
+    let projection: &[f32; 16] = projection.try_into().ok()?;
+    let world: &[f32; 16] = world.try_into().ok()?;
+    let projection = Mat4::from_cols_array(projection);
+    let world = Mat4::from_cols_array(world);
+    if !projection.is_finite() || !world.is_finite() || world.determinant().abs() < 1e-8 {
+        return None;
+    }
+    let depth = Mat4::from_cols(
+        Vec4::X,
+        Vec4::Y,
+        Vec4::new(0., 0., 0.5, 0.),
+        Vec4::new(0., 0., 0.5, 1.),
+    );
+    Some((
+        depth * projection * world.inverse(),
+        world.transform_point3(Vec3::ZERO),
+    ))
+}
+
+#[cfg(test)]
+mod xr_tests {
+    use super::*;
+    #[test]
+    fn xr_eye_pose_and_depth_conversion() {
+        let p = glam::camera::rh::proj::opengl::perspective(1.0, 1.0, 0.1, 100.0);
+        let world = Mat4::from_translation(Vec3::new(0.032, 1.6, 0.));
+        let (vp, eye) = xr_view(&p.to_cols_array(), &world.to_cols_array()).unwrap();
+        assert!((eye - Vec3::new(0.032, 1.6, 0.)).length() < 1e-6);
+        assert!(vp.project_point3(eye - Vec3::Z * 0.1).z.abs() < 1e-5);
+        assert!((vp.project_point3(eye - Vec3::Z * 100.).z - 1.).abs() < 1e-5);
+        assert!(xr_view(&[0.; 15], &[0.; 16]).is_none());
+        assert!(xr_view(&[f32::NAN; 16], &[0.; 16]).is_none());
+        assert!(xr_view(&p.to_cols_array(), &[0.; 16]).is_none());
+    }
+}

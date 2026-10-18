@@ -1,0 +1,253 @@
+// @ts-nocheck -- WebXR browser interfaces are not yet part of TypeScript lib.dom.
+// Platform adapter only: XR scheduling and canvas transfer. Rust computes views and scene state.
+export class WebXRHost extends EventTarget {
+    #engine; #canvas; #session = null; #pending = false; #disposed = false;
+    #gl; #program; #texture; #vao; #frame = null; #size; #previous = null;
+    #pressed = [null, null];
+    #sources = [null, null];
+    #space = null;
+    #trackingActive = false;
+    #roundEnded = false;
+    #button = null;
+    #buttonPoints = [undefined, undefined];
+    #controllerObjects = [null, null];
+    #bladePoses = [null, null];
+    #buttonTouch = [false, false];
+    #resetInputs = () => {
+        this.#pressed = [null, null];
+        this.#bladePoses = [null, null];
+        this.#buttonTouch = [false, false];
+        this.#buttonPoints = [undefined, undefined];
+        this.#sources = [null, null];
+        if (this.#session && this.#trackingActive && !this.#disposed) for (let index=0; index<2; index++) this.#engine.xr_update_controller(index,new Float32Array(),false);
+    };
+    #visibilityChanged = () => { this.#previous = null; this.#resetInputs(); };
+    #requireTrigger = [true, true];
+    #owns; #object;
+    #onEnd = () => this.#cleanup();
+    /** @param {any} engine @param {HTMLCanvasElement} canvas
+     * @param {(object: object) => boolean} owns @param {(id: number) => any} object */
+    constructor(engine, canvas, owns = () => false, object = id => id) { super(); this.#engine = engine; this.#canvas = canvas; this.#owns = owns; this.#object = object; }
+    bindController(hand, object, {cutting = false, requireTrigger = true} = {}) {
+        if (this.#disposed) throw new Error('WebXR byl ukončen.');
+        const index = hand === 'left' ? 0 : hand === 'right' ? 1 : -1;
+        if (index < 0 || (object !== null && !this.#owns(object))) throw new Error('Ovladač vyžaduje left/right a objekt tohoto enginu.');
+        this.#engine.xr_bind_controller(index, object === null ? 0xffffffff : object.id, cutting);
+        this.#requireTrigger[index] = requireTrigger;
+        this.#controllerObjects[index] = object;
+        this.#bladePoses[index] = null;
+        this.#buttonTouch[index] = false;
+    }
+    bindButton(object) {
+        if (this.#disposed || (object !== null && !this.#owns(object))) throw new Error('Tlačítko musí patřit tomuto enginu.');
+        this.#button = object;
+        this.#bladePoses = [null, null];
+        this.#buttonTouch = [false, false];
+        this.#buttonPoints = [undefined, undefined];
+    }
+    #updateControllers(session, frame, space, tracking) {
+        const sources = [...(session.inputSources ?? [])];
+        for (let index = 0; index < 2; index++) {
+            const hand = index === 0 ? 'left' : 'right';
+            const source = sources.find(source => source.handedness === hand && source.gripSpace);
+            if (source !== this.#sources[index]) {
+                this.#engine.xr_update_controller(index,new Float32Array(),false);
+                this.#pressed[index] = null;
+                this.#bladePoses[index] = null;
+                this.#buttonTouch[index] = false;
+                this.#sources[index] = source;
+            }
+            const pose = tracking && source ? frame.getPose(source.gripSpace, space) : null;
+            const pressed = !!pose && !!source.gamepad?.buttons[0]?.pressed;
+            const report = JSON.parse(this.#engine.xr_update_controller(index, pose ? pose.transform.matrix : new Float32Array(), !!pose && (pressed || !this.#requireTrigger[index])));
+            if (report.removed.length) this.dispatchEvent(new CustomEvent('cut', {detail: {...report, pieces: report.pieces.map(this.#object), handedness: hand}}));
+            let point = null;
+            if (this.#button && pose && source?.targetRaySpace) {
+                const ray = frame.getPose(source.targetRaySpace, space);
+                if (ray) {
+                    const hit = this.#engine.xr_panel_hit(this.#button.id, ray.transform.matrix);
+                    if (hit.length === 3) point = Array.from(hit);
+                }
+            }
+            if (this.#button) {
+                const previous=this.#buttonPoints[index];
+                if (point===null ? previous!==null : !previous || point.some((v,i)=>v!==previous[i])) {
+                    this.#buttonPoints[index]=point;
+                    this.dispatchEvent(new CustomEvent('buttonhover', {detail: {handedness: hand, point}}));
+                }
+            }
+            if (pressed && this.#pressed[index] === false) this.dispatchEvent(new CustomEvent('select', {detail: {handedness: hand, target: point ? this.#button : null}}));
+            const tool = this.#controllerObjects[index];
+            if (this.#button && tool && pose) {
+                const hit = this.#engine.xr_panel_blade_hit(this.#button.id, tool.id,
+                    this.#bladePoses[index] ?? new Float32Array(), pose.transform.matrix);
+                const strikes = hit[0] === 1, touches = hit[1] === 1;
+                if (strikes && !this.#buttonTouch[index]) this.dispatchEvent(new CustomEvent('buttonpress', {
+                    detail: {handedness: hand, target: this.#button}
+                }));
+                this.#buttonTouch[index] = strikes || touches;
+                this.#bladePoses[index] = new Float32Array(pose.transform.matrix);
+            } else {
+                this.#bladePoses[index] = null;
+                this.#buttonTouch[index] = false;
+            }
+            this.#pressed[index] = pose ? pressed : null;
+        }
+    }
+    get isPresenting() { return this.#session !== null; }
+    get roundState() { return JSON.parse(this.#engine.xr_round_state()); }
+    startRound(seconds = 30) {
+        if (this.#disposed || !this.#session) throw new Error('Kolo vyžaduje aktivní VR.');
+        this.#engine.xr_start_round(seconds);
+        this.#roundEnded = false;
+    }
+    async isSupported() {
+        return !!globalThis.isSecureContext && !!navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
+    }
+    async enter() {
+        if (this.#disposed) throw new Error('WebXR byl ukončen.');
+        if (this.#pending || this.#session) throw new Error('WebXR již běží nebo se spouští.');
+        if (!globalThis.isSecureContext) throw new Error('WebXR potřebuje důvěryhodné HTTPS nebo localhost přes ADB.');
+        if (!navigator.xr) throw new Error('Tento prohlížeč nemá WebXR. Otevřete stránku v Meta Quest Browser.');
+        if (this.#engine.renderer_backend() !== 'Gl') throw new Error('WebXR potřebuje initEngine(canvas, {backend: "webgl"}).');
+        this.lastError = undefined;
+        this.#pending = true;
+        let session;
+        try {
+            // Request immediately in the click gesture, before any asynchronous support probe.
+            session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
+            if (this.#disposed) throw new Error('Spuštění WebXR bylo zrušeno.');
+            this.#session = session;
+            session.addEventListener('end', this.#onEnd);
+            this.#size = [this.#canvas.width, this.#canvas.height];
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: false, antialias: false });
+            if (!gl) throw new Error('WebGL2 není dostupné.');
+            this.#gl = gl;
+            await gl.makeXRCompatible();
+            if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
+            const layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: 0.75 });
+            session.updateRenderState({ baseLayer: layer, depthNear: 0.05, depthFar: 100 });
+            let space;
+            try { space = await session.requestReferenceSpace('local-floor'); }
+            catch {
+                const local = await session.requestReferenceSpace('local');
+                space = local.getOffsetReferenceSpace(new XRRigidTransform({ y: -1.6 }));
+            }
+            if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
+            this.#space = space;
+            space.addEventListener?.('reset',this.#resetInputs);
+            session.addEventListener('visibilitychange',this.#visibilityChanged);
+            this.#createBlit();
+            this.#engine.xr_set_presenting(true);
+            this.#trackingActive = true;
+            const frame = (time, xrFrame) => {
+                this.#frame = null;
+                if (this.#session !== session) return;
+                try {
+                    const pose = xrFrame.getViewerPose(space);
+                    this.#engine.xr_begin_frame(this.#previous === null ? 0 : Math.max(0, (time - this.#previous) / 1000));
+                    this.#previous = time;
+                    const round = this.roundState;
+                    if (round?.finished && !this.#roundEnded) {
+                        this.#roundEnded = true;
+                        this.dispatchEvent(new CustomEvent('roundend', {detail: round}));
+                    }
+                    this.#updateControllers(session, xrFrame, space, !!pose && (!session.visibilityState || session.visibilityState === 'visible'));
+                    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+                    gl.clearColor(0.1, 0.1, 0.3, 1);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                    if (pose) for (const view of pose.views) {
+                        const viewport = layer.getViewport(view);
+                        if (!viewport) continue;
+                        this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
+                        // Cross-context GPU canvas transfer; no CPU pixels/scene geometry in JavaScript.
+                        gl.bindTexture(gl.TEXTURE_2D, this.#texture);
+                        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.#canvas);
+                        gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                        gl.useProgram(this.#program);
+                        gl.bindVertexArray(this.#vao);
+                        gl.drawArrays(gl.TRIANGLES, 0, 3);
+                    }
+                    this.#frame = session.requestAnimationFrame(frame);
+                } catch (error) {
+                    this.lastError = error;
+                    void session.end().catch(() => {});
+                    this.#cleanup();
+                    this.dispatchEvent(new Event('error'));
+                }
+            };
+            this.#frame = session.requestAnimationFrame(frame);
+            this.dispatchEvent(new Event('start'));
+        } catch (error) {
+            if (session) await session.end().catch(() => {});
+            this.#cleanup();
+            throw error;
+        } finally { this.#pending = false; }
+    }
+    async exit() { if (this.#session) await this.#session.end(); }
+    dispose() {
+        if (this.#disposed) return;
+        this.#disposed = true;
+        void this.exit().catch(() => {});
+        this.#cleanup();
+    }
+    #cleanup() {
+        const session = this.#session;
+        if (!session) return;
+        this.#session = null;
+        this.#trackingActive = false;
+        if (this.#frame !== null) session.cancelAnimationFrame(this.#frame);
+        session.removeEventListener('end', this.#onEnd);
+        session.removeEventListener('visibilitychange',this.#visibilityChanged);
+        this.#space?.removeEventListener?.('reset',this.#resetInputs);
+        this.#space = null;
+        this.#sources = [null,null];
+        this.#frame = null;
+        this.#previous = null;
+        this.#pressed = [null, null];
+        this.#bladePoses = [null, null];
+        this.#buttonTouch = [false, false];
+        this.#buttonPoints = [undefined, undefined];
+        try {
+            this.#engine.xr_set_presenting(false);
+            if (this.#size) this.#engine.resize(...this.#size);
+        } catch { /* Engine disposal can precede an asynchronous session end. */ }
+        if (this.#gl) {
+            this.#gl.deleteTexture(this.#texture);
+            this.#gl.deleteProgram(this.#program);
+            this.#gl.deleteVertexArray(this.#vao);
+            this.#gl.getExtension('WEBGL_lose_context')?.loseContext();
+        }
+        this.#gl = this.#program = this.#texture = this.#vao = null;
+        this.dispatchEvent(new Event('end'));
+    }
+    #createBlit() {
+        const gl = this.#gl;
+        const shader = (type, source) => {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source); gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                const error = gl.getShaderInfoLog(shader); gl.deleteShader(shader); throw new Error(error);
+            }
+            return shader;
+        };
+        const vertex = shader(gl.VERTEX_SHADER, `#version 300 es
+        out vec2 uv;
+        void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); uv=p; gl_Position=vec4(p*2.-1.,0.,1.); }`);
+        const fragment = shader(gl.FRAGMENT_SHADER, `#version 300 es
+        precision highp float; in vec2 uv; uniform sampler2D image; out vec4 color;
+        void main(){color=texture(image,uv);}`);
+        this.#program = gl.createProgram();
+        gl.attachShader(this.#program, vertex); gl.attachShader(this.#program, fragment); gl.linkProgram(this.#program);
+        gl.deleteShader(vertex); gl.deleteShader(fragment);
+        if (!gl.getProgramParameter(this.#program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(this.#program));
+        this.#vao = gl.createVertexArray();
+        this.#texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, this.#texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+}

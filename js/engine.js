@@ -1,3 +1,4 @@
+import { WebXRHost } from './webxr.js';
 // JavaScript bridge to the Rust engine. GPU state and the frame loop live in Rust.
 // The current Rust API supports one canvas with the id "gpu-canvas" per page.
 /** @typedef {import('./engine.d.ts').Vector3} Vector3 */
@@ -25,6 +26,12 @@ export class SceneObject {
      * @param {{base: Vector3, tip: Vector3}|null} blade */
     setCutter(blade) {
         this.#wasm.set_cutter(this.id, blade !== null, new Float32Array(blade ? [...blade.base, ...blade.tip] : [])); return this;
+    }
+    /** Physical flat/back contacts plus one sharp edge. Null restores legacy cutter sweeps.
+     * @param {{edge: Vector3, halfWidth?: number, halfThickness?: number}|null} options */
+    setBladePhysics(options) {
+        this.#wasm.set_blade_physics(this.id, new Float32Array(options?.edge ?? []), options?.halfWidth ?? .0225, options?.halfThickness ?? .004);
+        return this;
     }
     /** @returns {import('./engine.d.ts').TriangleMeshInfo} */
     get meshInfo() { return JSON.parse(this.#wasm.triangle_mesh_info(this.id)); }
@@ -119,6 +126,12 @@ export class Scene {
     createPlane(position = [0, 0, 0]) { return this.#create(this.#wasm.add_plane(...position)); }
     /** @param {Vector3} [position] */
     createSphere(position = [0, 0, 0]) { return this.#create(this.#wasm.add_sphere(...position)); }
+    /** World-space Rust text geometry, updated from native scene/round data.
+     * @param {'scene'|'round'|'restart'} kind
+     * @param {{position?: Vector3, width?: number, height?: number}} [options] */
+    createInfoPanel(kind, {position = [0,0,0], width = 1.2, height = .72} = {}) {
+        return this.#create(this.#wasm.add_info_panel(kind, width, height)).setPosition(position);
+    }
     /** Closed indexed triangle solid. Parsing, geometry, BVH and GPU upload are Rust.
      * @param {import('./engine.d.ts').TriangleMeshOptions} options */
     createMesh({positions, indices, color = [0.18, 0.65, 0.85], triangleColors, smooth = false}) {
@@ -311,12 +324,15 @@ async function initializeEngine(canvas, backend, initialization) {
         };
     } });
     const scene = new Scene(wasm);
+    const xr = new WebXRHost(wasm, canvas, object => handleBindings.get(object) === wasm, id => new SceneObject(wasm, id));
 
     /** @type {import("./engine.d.ts").Engine} */
     const engine = Object.freeze({
         scene,
+        xr,
         dispose() {
             if (disposed) return;
+            xr.dispose();
             scene.cancelLoads();
             disposed = true;
             try { bindings.dispose(); } finally {

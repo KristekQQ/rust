@@ -15,6 +15,8 @@
     "verify": "bash scripts/verify.sh all",
     "verify:push": "bash scripts/pre-push",
     "verify:native": "bash scripts/verify.sh native",
-    "verify:browser": "bash scripts/verify.sh browser"
+    "verify:browser": "bash scripts/verify.sh browser",
+    "test:xr": "node --test tests/xr-simulator-unit.test.mjs",
+    "verify:vr": "npm run test:xr && bash scripts/verify.sh browser --page webxr-contract,webxr,webxr-simulation --backend webgl --capture"
   }
 }

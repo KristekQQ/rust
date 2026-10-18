@@ -1,3 +1,4 @@
+pub mod blade_physics;
 pub mod collision;
 pub mod cutting;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -9,6 +10,7 @@ pub mod frame_metrics;
 pub mod gltf_animation;
 pub mod gltf_loader;
 pub mod gltf_model;
+pub mod info_panel;
 pub mod input;
 mod projectile;
 #[cfg(target_arch = "wasm32")]
@@ -19,6 +21,9 @@ mod spatial;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
+pub mod xr_buttons;
+pub mod xr_input;
+pub mod xr_round;
 
 // Exercise the actual GPU mesh data and uniform layout on the native test host.
 #[cfg(test)]

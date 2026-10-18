@@ -288,7 +288,14 @@ impl RenderQueue {
                 } else {
                     0.0
                 },
-                if scene.is_cuttable(*id) { 1.0 } else { 0.0 },
+                // Negative guide flag selects opaque unlit world-space text.
+                if scene.info_panels.contains_key(id) {
+                    -1.0
+                } else if scene.is_cuttable(*id) {
+                    1.0
+                } else {
+                    0.0
+                },
             ];
             if let MeshKind::Imported(mesh_id) = object.mesh {
                 self.imported.entry(mesh_id).or_default().push(instance);
@@ -343,7 +350,13 @@ mod tests {
                 } else {
                     0.0
                 },
-                0.0,
+                if scene.info_panels.contains_key(&id) {
+                    -1.0
+                } else if scene.is_cuttable(id) {
+                    1.0
+                } else {
+                    0.0
+                },
             ];
             match object.mesh {
                 MeshKind::Cube => expected.batches[0].push(instance),
@@ -819,5 +832,24 @@ mod tests {
         q.extract(&scene, camera(), true);
         assert_eq!((q.total, q.visible), (0, 0));
         assert_eq!(capacity, q.batches[0].capacity());
+    }
+    #[test]
+    fn info_panel_unlit_flag_survives_all_visibility_paths() {
+        let mut scene = SceneManager::default();
+        let panel = scene.add_info_panel("scene", 0.5, 0.5).unwrap();
+        let cube = scene.add_cube(Vec3::ZERO);
+        scene.set_object_position(panel, Vec3::new(0., 0., 0.5));
+        for culling in [false, true] {
+            for pass in [RenderPassKind::Main, RenderPassKind::Reflection] {
+                let mut queue = RenderQueue::default();
+                queue.extract_pass(&scene, Mat4::IDENTITY, culling, pass);
+                assert_eq!(queue.imported[&panel][0].material, [0., 0., 0., -1.]);
+                assert_eq!(queue.batches[0][0].material[3], 0.);
+                assert_brute_force(&scene, Mat4::IDENTITY, pass, culling);
+            }
+        }
+        assert!(!scene.is_cuttable(panel));
+        assert!(scene.object_exists(cube));
+        compare_passes(&scene);
     }
 }

@@ -1,7 +1,7 @@
 //! CPU mesh slicing shared by WebGPU/WebGL. Simple closed oriented triangle solids;
 //! caps may be concave, but nested contours (holes) are rejected transactionally.
 use crate::spatial::{Bounds, Bvh};
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -209,6 +209,39 @@ impl CutMesh {
             );
         }
     }
+    /// Uniform-density closed-solid centroid, integrated using signed tetrahedra.
+    pub(crate) fn centroid(&self) -> Vec3 {
+        let origin = self.bounds().0.to_array().map(f64::from);
+        let mut weighted = [0.; 3];
+        let mut volume6 = 0.;
+        for triangle in &self.triangles {
+            let [a, b, c] = triangle.indices.map(|i| {
+                let p = self.positions[i as usize].to_array().map(f64::from);
+                std::array::from_fn::<_, 3, _>(|axis| p[axis] - origin[axis])
+            });
+            let weight = a[0] * (b[1] * c[2] - b[2] * c[1])
+                + a[1] * (b[2] * c[0] - b[0] * c[2])
+                + a[2] * (b[0] * c[1] - b[1] * c[0]);
+            for axis in 0..3 {
+                weighted[axis] += (a[axis] + b[axis] + c[axis]) * weight;
+            }
+            volume6 += weight;
+        }
+        Vec3::from_array(std::array::from_fn(|axis| {
+            (origin[axis] + weighted[axis] / (4. * volume6)) as f32
+        }))
+    }
+    /// Preserve corner normals, caps and indices; only local coordinates change.
+    pub(crate) fn recenter(&mut self) -> Vec3 {
+        let center = self.centroid();
+        for position in &mut self.positions {
+            *position -= center;
+        }
+        self.local_bounds.0 -= center;
+        self.local_bounds.1 -= center;
+        self.bvh = OnceCell::new();
+        center
+    }
     pub fn volume(&self) -> f64 {
         let origin = self.bounds().0;
         self.triangles
@@ -376,6 +409,75 @@ impl CutMesh {
         cap_color: Vec3,
         prepared: Option<&CutGeometry>,
     ) -> Result<Option<Slice>, String> {
+        self.slice_region(a, b, motion, cap_color, prepared, None, 1., &mut 0.)
+    }
+
+    /// A sampled planar blade ribbon. Each consecutive endpoint pair bounds
+    /// two triangles; gaps and the unswept region near the grip remain misses.
+    pub(crate) fn slice_ribbon(
+        &self,
+        samples: &[[Vec3; 2]],
+        cap_color: Vec3,
+    ) -> Result<Option<Slice>, String> {
+        self.slice_ribbon_progress(samples, cap_color, 1.)
+            .map(|(_, slice)| slice)
+    }
+
+    pub(crate) fn slice_ribbon_progress(
+        &self,
+        samples: &[[Vec3; 2]],
+        cap_color: Vec3,
+        threshold: f32,
+    ) -> Result<(f32, Option<Slice>), String> {
+        let Some(first) = samples.first() else {
+            return Ok((0., None));
+        };
+        let a = first[0];
+        let b = first[1];
+        let blade = b - a;
+        let Some(motion) = samples
+            .iter()
+            .flat_map(|s| s.iter())
+            .map(|p| *p - a)
+            .find(|v| blade.cross(*v).length() > EPS)
+        else {
+            return Ok((0., None));
+        };
+        let normal = blade.cross(motion).normalize();
+        // A single planar mesh split cannot represent a twisted/nonplanar stroke.
+        if samples
+            .iter()
+            .flatten()
+            .any(|p| !p.is_finite() || normal.dot(*p - a).abs() > 1e-4)
+        {
+            return Ok((0., None));
+        }
+        let mut progress = 0.;
+        let slice = self.slice_region(
+            a,
+            b,
+            motion,
+            cap_color,
+            None,
+            Some(samples),
+            threshold,
+            &mut progress,
+        )?;
+        Ok((progress, slice))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn slice_region(
+        &self,
+        a: Vec3,
+        b: Vec3,
+        motion: Vec3,
+        cap_color: Vec3,
+        prepared: Option<&CutGeometry>,
+        ribbon: Option<&[[Vec3; 2]]>,
+        threshold: f32,
+        progress: &mut f32,
+    ) -> Result<Option<Slice>, String> {
         let blade = b - a;
         let cross = blade.cross(motion);
         if !a.is_finite() || !b.is_finite() || !motion.is_finite() || cross.length() < EPS {
@@ -503,11 +605,44 @@ impl CutMesh {
             if contours.is_empty() {
                 return Ok(None);
             }
+            if side == 0 && threshold < 1. {
+                if let Some(samples) = ribbon {
+                    let mut cap_positions = positions.clone();
+                    let mut caps = Vec::new();
+                    for contour in &contours {
+                        let mut contour: Vec<_> = contour.iter().copied().rev().collect();
+                        caps.extend(triangulate_cap(
+                            &mut contour,
+                            &mut cap_positions,
+                            -normal,
+                            cap_color,
+                        )?);
+                    }
+                    *progress = ribbon_area_coverage(&caps, &cap_positions, samples, normal)?;
+                    if *progress + 2e-5 < threshold {
+                        return Ok(None);
+                    }
+                }
+            }
             for contour in &contours {
-                if contour
-                    .iter()
-                    .any(|&i| !inside_sweep(positions[i as usize] - a, blade, motion))
-                {
+                let covered = if let Some(samples) = ribbon {
+                    contour
+                        .iter()
+                        .zip(contour.iter().cycle().skip(1))
+                        .all(|(&i, &j)| {
+                            ribbon_covers_segment(
+                                positions[i as usize],
+                                positions[j as usize],
+                                samples,
+                                normal,
+                            )
+                        })
+                } else {
+                    contour
+                        .iter()
+                        .all(|&i| inside_sweep(positions[i as usize] - a, blade, motion))
+                };
+                if threshold >= 1. && !covered {
                     return Ok(None);
                 }
             }
@@ -565,6 +700,59 @@ impl CutMesh {
         }
         Self::from_triangles(compact, triangles)
     }
+}
+
+// Clip a cap edge against each actual sampled ribbon triangle, then require
+// the union of covered parameter intervals to cover the entire edge.
+fn ribbon_covers_segment(a: Vec3, b: Vec3, samples: &[[Vec3; 2]], normal: Vec3) -> bool {
+    let mut intervals = Vec::new();
+    for pair in samples.windows(2) {
+        for tri in [
+            [pair[0][0], pair[0][1], pair[1][1]],
+            [pair[0][0], pair[1][1], pair[1][0]],
+        ] {
+            let area = normal.dot((tri[1] - tri[0]).cross(tri[2] - tri[0]));
+            if area.abs() < 1e-10 {
+                continue;
+            }
+            let sign = area.signum();
+            let (mut lo, mut hi) = (0.0_f32, 1.0_f32);
+            for i in 0..3 {
+                let edge = tri[(i + 1) % 3] - tri[i];
+                let start = sign * normal.dot(edge.cross(a - tri[i]));
+                let delta = sign * normal.dot(edge.cross(b - a));
+                let tolerance = EPS * edge.length();
+                if delta.abs() < 1e-12 {
+                    if start < -tolerance {
+                        hi = -1.;
+                        break;
+                    }
+                } else {
+                    let t = (-tolerance - start) / delta;
+                    if delta > 0. {
+                        lo = lo.max(t);
+                    } else {
+                        hi = hi.min(t);
+                    }
+                }
+            }
+            if lo <= hi {
+                intervals.push((lo, hi));
+            }
+        }
+    }
+    intervals.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut covered = 0.;
+    for (lo, hi) in intervals {
+        if lo > covered + 1e-5 {
+            return false;
+        }
+        covered = f32::max(covered, hi);
+        if covered >= 1. - 1e-5 {
+            return true;
+        }
+    }
+    false
 }
 
 fn inside_sweep(p: Vec3, u: Vec3, v: Vec3) -> bool {
@@ -732,9 +920,133 @@ fn components(triangles: Vec<Triangle>) -> Vec<Vec<Triangle>> {
     groups.into_values().collect()
 }
 
+/// Subtract each swept triangle from disjoint residual cap polygons. This computes
+/// union area without counting repeated/overlapping poses twice. A hard budget
+/// bounds adversarial fragmentation; failure never rounds an unknown area upward.
+fn ribbon_area_coverage(
+    caps: &[Triangle],
+    positions: &[Vec3],
+    samples: &[[Vec3; 2]],
+    normal: Vec3,
+) -> Result<f32, String> {
+    let u = normal.any_orthonormal_vector();
+    let v = normal.cross(u);
+    let project = |p: Vec3| Vec2::new(p.dot(u), p.dot(v));
+    let area = |p: &[Vec2]| -> f64 {
+        p.iter()
+            .zip(p.iter().cycle().skip(1))
+            .map(|(a, b)| a.perp_dot(*b) as f64)
+            .sum::<f64>()
+            .abs()
+            * 0.5
+    };
+    let mut total = 0.;
+    let mut uncovered = 0.;
+    let mut operations = 0usize;
+    for cap in caps {
+        let polygon: Vec<_> = cap
+            .indices
+            .iter()
+            .map(|&i| project(positions[i as usize]))
+            .collect();
+        total += area(&polygon);
+        let mut residual = vec![polygon];
+        for pair in samples.windows(2) {
+            let [a, b] = pair[0].map(project);
+            let [c, d] = pair[1].map(project);
+            for mut triangle in [[a, b, d], [a, d, c]] {
+                let cross = (triangle[1] - triangle[0]).perp_dot(triangle[2] - triangle[0]);
+                if cross.abs() < 1e-16 {
+                    continue;
+                }
+                if cross < 0. {
+                    triangle.swap(1, 2);
+                }
+                let mut next = Vec::new();
+                for polygon in residual {
+                    let mut inside = polygon;
+                    for k in 0..3 {
+                        if inside.len() < 3 {
+                            break;
+                        }
+                        operations += inside.len();
+                        if operations > 2_000_000 || next.len() > 8192 {
+                            return Err("Blade coverage complexity budget exceeded".into());
+                        }
+                        let a = triangle[k];
+                        let edge = triangle[(k + 1) % 3] - a;
+                        let mut keep = Vec::new();
+                        let mut outside = Vec::new();
+                        for (&p, &q) in inside.iter().zip(inside.iter().cycle().skip(1)) {
+                            let dp = edge.perp_dot(p - a);
+                            let dq = edge.perp_dot(q - a);
+                            if dp >= 0. {
+                                keep.push(p);
+                            }
+                            if dp <= 0. {
+                                outside.push(p);
+                            }
+                            if (dp > 0. && dq < 0.) || (dp < 0. && dq > 0.) {
+                                let hit = p.lerp(q, dp / (dp - dq));
+                                keep.push(hit);
+                                outside.push(hit);
+                            }
+                        }
+                        if outside.len() >= 3 && area(&outside) > 1e-16 {
+                            next.push(outside);
+                        }
+                        inside = keep;
+                    }
+                }
+                residual = next;
+                if residual.is_empty() {
+                    break;
+                }
+            }
+            if residual.is_empty() {
+                break;
+            }
+        }
+        uncovered += residual.iter().map(|p| area(p)).sum::<f64>();
+    }
+    Ok(if total > 1e-14 {
+        (1. - uncovered / total).clamp(0., 1.) as f32
+    } else {
+        0.
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cutting_recenter_preserves_closed_volume_normals_and_world_vertices() {
+        let mut mesh = cube();
+        mesh.smooth_normals();
+        let shift = Vec3::new(0.3, 1.7, -0.2);
+        // Use the constructor to ensure cached bounds and the BVH match the offset geometry.
+        let positions = mesh.positions.iter().map(|p| *p + shift).collect();
+        let mut mesh = CutMesh::from_triangles(positions, mesh.triangles).unwrap();
+        mesh.spatial_index();
+        let before = mesh.positions.clone();
+        let normals: Vec<_> = mesh.triangles.iter().map(|t| t.normals).collect();
+        let volume = mesh.volume();
+        let center = mesh.recenter();
+        assert!(center.distance(shift) < 1e-6);
+        assert!(mesh.centroid().length() < 1e-6);
+        assert!(mesh.bvh.get().is_none());
+        mesh.validate().unwrap();
+        mesh.spatial_index();
+        assert!((mesh.volume() - volume).abs() < 1e-5);
+        for (a, b) in before.iter().zip(&mesh.positions) {
+            assert!(a.distance(*b + center) < 1e-6);
+        }
+        assert_eq!(
+            normals,
+            mesh.triangles.iter().map(|t| t.normals).collect::<Vec<_>>()
+        );
+    }
+
     #[test]
     fn cutting_output_bvh_is_lazy_and_reused_for_subsequent_queries() {
         let mesh = cube();
@@ -871,6 +1183,49 @@ mod tests {
     }
     fn assert_near(a: Vec3, b: Vec3) {
         assert!((a - b).length() < 2e-5, "{a:?} != {b:?}");
+    }
+
+    #[test]
+    fn cutting_physical_exact_area_thresholds_and_union() {
+        let mesh = cube();
+        for percentage in [0.25, 0.50, 0.60, 0.74, 0.75, 0.90] {
+            let bottom = [Vec3::new(0., -1., -2.), Vec3::new(0., -1., 2.)];
+            let top = bottom.map(|p| p + Vec3::Y * (2. * percentage));
+            let samples = [bottom, top, bottom, top];
+            let (progress, split) = mesh.slice_ribbon_progress(&samples, Vec3::X, 0.75).unwrap();
+            assert!(
+                (progress - percentage).abs() < 2e-5,
+                "expected={percentage}, actual={progress}"
+            );
+            assert_eq!(split.is_some(), percentage >= 0.75);
+            assert!(mesh.slice_ribbon(&samples, Vec3::X).unwrap().is_none());
+            if let Some(split) = split {
+                assert!(
+                    (split.pieces.iter().map(CutMesh::volume).sum::<f64>() - mesh.volume()).abs()
+                        < 1e-5
+                );
+                for piece in split.pieces {
+                    piece.validate().unwrap();
+                }
+            }
+        }
+        let off_tip = [
+            [Vec3::new(0., -2., 1.01), Vec3::new(0., -2., 2.)],
+            [Vec3::new(0., 2., 1.01), Vec3::new(0., 2., 2.)],
+        ];
+        assert_eq!(
+            mesh.slice_ribbon_progress(&off_tip, Vec3::X, 0.75)
+                .unwrap()
+                .0,
+            0.
+        );
+        let grazing = [
+            [Vec3::new(0., -1., 0.9), Vec3::new(0., -1., 1.1)],
+            [Vec3::new(0., 1., 0.9), Vec3::new(0., 1., 1.1)],
+        ];
+        let (progress, split) = mesh.slice_ribbon_progress(&grazing, Vec3::X, 0.75).unwrap();
+        assert!((progress - 0.05).abs() < 2e-5);
+        assert!(split.is_none());
     }
 
     #[test]

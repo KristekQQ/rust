@@ -9,6 +9,7 @@ pub struct DebugHud {
     capacity: usize,
     count: u32,
     size: (u32, u32),
+    xr: bool,
     elapsed: f32,
     pub frames: u64,
     pub refreshes: u64,
@@ -23,12 +24,20 @@ impl DebugHud {
         queue: &wgpu::Queue,
         target: &RenderTarget<'_>,
         dt: f32,
-        lines: impl FnOnce() -> Vec<String>,
+        xr: bool,
+        content: impl FnOnce() -> crate::debug_overlay::HudContent,
     ) -> usize {
         self.elapsed += dt.clamp(0.0, 0.25);
         let mut uploaded = 0;
-        if self.size != (target.width, target.height) || self.elapsed >= 0.25 {
-            let rects = crate::debug_overlay::geometry(&lines(), target.width, target.height);
+        if self.size != (target.width, target.height) || self.xr != xr || self.elapsed >= 0.25 {
+            let rects = match content() {
+                crate::debug_overlay::HudContent::Desktop(lines) => {
+                    crate::debug_overlay::geometry(&lines, target.width, target.height)
+                }
+                crate::debug_overlay::HudContent::Xr(content) => {
+                    crate::debug_overlay::geometry_xr_tables(&content, target.width, target.height)
+                }
+            };
             if rects.len() > self.capacity {
                 self.capacity = rects.len().next_power_of_two();
                 self.buffer = Some(device.create_buffer(&wgpu::BufferDescriptor {
@@ -43,6 +52,7 @@ impl DebugHud {
             uploaded = bytes.len();
             self.count = rects.len() as u32;
             self.size = (target.width, target.height);
+            self.xr = xr;
             self.elapsed = 0.0;
             self.refreshes += 1;
         }

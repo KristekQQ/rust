@@ -17,6 +17,9 @@ thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
     static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static XR_CONTROLLERS: RefCell<[crate::xr_input::TrackedController; 2]> = RefCell::new(Default::default());
+    static RESET_FRAME_CLOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static XR_ACTIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = const { RefCell::new(None) };
 }
 
@@ -38,6 +41,8 @@ impl Drop for Runtime {
 /// Release the frame loop, input listeners, camera and GPU scene resources.
 #[wasm_bindgen]
 pub fn dispose() {
+    XR_ACTIVE.with(|active| active.set(false));
+    XR_CONTROLLERS.with(|controllers| *controllers.borrow_mut() = Default::default());
     GENERATION.with(|generation| generation.set(generation.get().wrapping_add(1)));
     STARTING.with(|starting| starting.set(None));
     RUNTIME.with(|runtime| runtime.borrow_mut().take());
@@ -782,6 +787,19 @@ pub fn clear_scene() {
     });
 }
 
+/// Create opt-in text geometry in local XY; use ordinary object transforms.
+#[wasm_bindgen]
+pub fn add_info_panel(kind: &str, width: f32, height: f32) -> Result<u32, JsValue> {
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let state = slot
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine is not initialized"))?;
+        let result = state.borrow_mut().add_info_panel(kind, width, height);
+        result
+    })
+}
+
 #[wasm_bindgen]
 pub fn add_cube(x: f32, y: f32, z: f32) -> u32 {
     let mut id = crate::scene::INVALID_ID;
@@ -953,19 +971,44 @@ pub fn cut_with_scatter(
 #[wasm_bindgen]
 pub fn triangle_mesh_info(id: u32) -> Result<String, JsValue> {
     cutting_command(|scene| {
+        if let Some(panel) = scene.info_panels.get(&id) {
+            let transform = scene.objects()[&id].transform;
+            let bottom = panel
+                .mesh
+                .vertices
+                .iter()
+                .map(|v| {
+                    transform
+                        .model()
+                        .transform_point3(glam::Vec3::from_array(v.position))
+                        .y
+                })
+                .fold(f32::INFINITY, f32::min);
+            return Ok(serde_json::json!({"triangles":panel.mesh.indices.len()/3,"vertices":panel.mesh.vertices.len(),"volume":0.,"cuttable":false,"closed":false,"resident":false,"cpuMaterialized":true,"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom,"cutProgress":0.,"jammedBy":null}).to_string());
+        }
+
         let object = scene
             .triangle_meshes()
             .get(&id)
             .ok_or("Triangle mesh no longer exists")?;
         let transform = scene.objects()[&id].transform;
         let bottom = object.mesh.bottom(transform)?;
-        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom}).to_string())
+        let (cut_progress, jammed_by) = scene.blade_cut_state(id);
+        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom,"cutProgress":cut_progress,"jammedBy":jammed_by}).to_string())
     })
 }
 /// Explicit diagnostic snapshot, never fetched by the render loop.
 #[wasm_bindgen]
 pub fn triangle_mesh_snapshot(id: u32) -> Result<String, JsValue> {
     cutting_command(|scene| {
+        if let Some(panel) = scene.info_panels.get(&id) {
+            let mesh = &panel.mesh;
+            return Ok(serde_json::json!({"positions":mesh.vertices.iter().map(|v| v.position).collect::<Vec<_>>(),
+                "triangles":mesh.indices.as_chunks::<3>().0,
+                "normals":mesh.vertices.iter().map(|v| v.normal).collect::<Vec<_>>(),
+                "colors":mesh.vertices.iter().map(|v| v.color).collect::<Vec<_>>()}).to_string());
+        }
+
         let mesh = &scene
             .triangle_meshes()
             .get(&id)
@@ -1470,6 +1513,242 @@ pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> boo
     ok
 }
 
+/// Bind an authored object to a grip pose. UINT32_MAX unbinds it.
+#[wasm_bindgen]
+pub fn xr_bind_controller(hand: usize, id: u32, cutting: bool) -> Result<(), JsValue> {
+    if hand > 1 {
+        return Err(JsValue::from_str("Invalid controller hand"));
+    }
+    cutting_command(|scene| {
+        XR_CONTROLLERS.with(|controllers| {
+            controllers.borrow_mut()[hand].bind(scene, (id != u32::MAX).then_some(id), cutting)
+        })
+    })
+}
+
+/// Opt-in finite blade contact profile; the edge direction is object-local.
+#[wasm_bindgen]
+pub fn set_blade_physics(
+    id: u32,
+    edge: &[f32],
+    half_width: f32,
+    half_thickness: f32,
+) -> Result<(), JsValue> {
+    let config = if edge.is_empty() {
+        None
+    } else {
+        let edge: &[f32; 3] = edge
+            .try_into()
+            .map_err(|_| JsValue::from_str("Invalid blade edge"))?;
+        Some(crate::blade_physics::BladePhysics {
+            edge: glam::Vec3::from_array(*edge),
+            half_width,
+            half_thickness,
+        })
+    };
+    cutting_command(|scene| scene.set_blade_physics(id, config))
+}
+
+/// A platform target ray against an actual transformed scene panel.
+#[wasm_bindgen]
+pub fn xr_panel_hit(id: u32, matrix: &[f32]) -> Vec<f32> {
+    let Ok(matrix) = <&[f32; 16]>::try_from(matrix) else {
+        return vec![];
+    };
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let Some(state) = state.as_ref() else {
+            return vec![];
+        };
+        let state = state.borrow();
+        let Some(panel) = state.scene.info_panels.get(&id) else {
+            return vec![];
+        };
+        let Some(object) = state.scene.objects().get(&id) else {
+            return vec![];
+        };
+        crate::xr_buttons::ray_panel_intersection(
+            glam::Mat4::from_cols_array(matrix),
+            object.transform.model(),
+            panel.width,
+            panel.height,
+            5.,
+        )
+        .map_or_else(Vec::new, |point| point.to_array().to_vec())
+    })
+}
+
+/// Raw grip poses against the registered finite blade and actual panel volume.
+#[wasm_bindgen]
+pub fn xr_panel_blade_hit(panel_id: u32, cutter_id: u32, from: &[f32], to: &[f32]) -> Vec<u8> {
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let Some(state) = state.as_ref() else {
+            return vec![];
+        };
+        let state = state.borrow();
+        let Some(panel) = state.scene.info_panels.get(&panel_id) else {
+            return vec![];
+        };
+        let Some(panel_object) = state.scene.objects().get(&panel_id) else {
+            return vec![];
+        };
+        let Some(cutter) = state.scene.objects().get(&cutter_id) else {
+            return vec![];
+        };
+        let Some(blade) = state.scene.tracked_blade(cutter_id) else {
+            return vec![];
+        };
+        let Ok(to) = <&[f32; 16]>::try_from(to) else {
+            return vec![0, 0];
+        };
+        let from = <&[f32; 16]>::try_from(from)
+            .ok()
+            .map(glam::Mat4::from_cols_array);
+        crate::xr_buttons::blade_panel_contact(
+            from,
+            glam::Mat4::from_cols_array(to),
+            blade,
+            cutter.transform.scale,
+            panel_object.transform.model(),
+            [panel.width, panel.height],
+            state.frame_dt(),
+        )
+        .map(u8::from)
+        .to_vec()
+    })
+}
+
+/// Raw platform grip matrix; all pose/sweep/geometry calculations remain in Rust.
+#[wasm_bindgen]
+pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Result<String, JsValue> {
+    if hand > 1 || !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR controller frame"));
+    }
+    let pose = if matrix.is_empty() {
+        None
+    } else {
+        let matrix: &[f32; 16] = matrix
+            .try_into()
+            .map_err(|_| JsValue::from_str("Invalid grip matrix"))?;
+        Some(glam::Mat4::from_cols_array(matrix))
+    };
+    let (dt, round_finished) = STATE.with(|slot| {
+        slot.borrow().as_ref().map_or((0., false), |state| {
+            let state = state.borrow();
+            (state.frame_dt(), state.xr_round_finished())
+        })
+    });
+    let report = cutting_command(|scene| {
+        XR_CONTROLLERS.with(|controllers| {
+            controllers.borrow_mut()[hand].update_timed(scene, pose, pressed && !round_finished, dt)
+        })
+    })?;
+    // cutting_command's mutable scene borrow must end before borrowing State again.
+    STATE.with(|slot| {
+        if let Some(state) = slot.borrow().as_ref() {
+            state.borrow_mut().record_xr_cuts(report.removed.len());
+        }
+    });
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests}).to_string())
+}
+
+/// Opt-in round duration; the application chooses its game length.
+#[wasm_bindgen]
+pub fn xr_start_round(seconds: f32) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("XR session is not active"));
+    }
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let state = slot
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
+        let mut state = state.borrow_mut();
+        state.start_xr_round(seconds)?;
+        XR_CONTROLLERS.with(|controllers| {
+            for controller in controllers.borrow_mut().iter_mut() {
+                controller.reset(&mut state.scene);
+            }
+        });
+        Ok(())
+    })
+}
+
+#[wasm_bindgen]
+pub fn xr_round_state() -> String {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map_or_else(|| "null".into(), |state| state.borrow().xr_round_state())
+    })
+}
+
+/// WebXR host owns session scheduling; Rust retains scene and view calculations.
+#[wasm_bindgen]
+pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
+        if active && state.borrow().backend != "Gl" {
+            return Err(JsValue::from_str("WebXR requires backend: webgl"));
+        }
+        if !active {
+            let mut state = state.borrow_mut();
+            XR_CONTROLLERS.with(|controllers| {
+                for controller in controllers.borrow_mut().iter_mut() {
+                    controller.reset(&mut state.scene);
+                }
+            });
+        }
+        XR_ACTIVE.with(|flag| flag.set(active));
+        RESET_FRAME_CLOCK.with(|reset| reset.set(true));
+        Ok(())
+    })
+}
+
+/// Advance once per XR frame, never once per eye.
+#[wasm_bindgen]
+pub fn xr_begin_frame(dt: f32) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) || !dt.is_finite() || dt < 0.0 {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
+        state.borrow_mut().advance_xr(dt);
+        Ok(())
+    })
+}
+
+/// Matrices come unchanged from XRView; clip conversion and eye position are Rust.
+#[wasm_bindgen]
+pub fn xr_render_eye(
+    projection: &[f32],
+    world: &[f32],
+    width: u32,
+    height: u32,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) || width == 0 || height == 0 {
+        return Err(JsValue::from_str("Invalid XR eye"));
+    }
+    let (matrix, position) = crate::render_math::xr_view(projection, world)
+        .ok_or_else(|| JsValue::from_str("Invalid XR matrices"))?;
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
+        let mut state = state.borrow_mut();
+        state.resize(width, height);
+        state.render_xr_eye(matrix, position)
+    })
+}
+
 #[wasm_bindgen]
 pub fn start() -> js_sys::Promise {
     if STATE.with(|state| state.borrow().is_some()) {
@@ -1558,9 +1837,13 @@ async fn start_runtime(generation: u64) -> Result<(), JsValue> {
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         frame_c.set(None);
         let now = perf_c.now();
-        let dt = (now - *prev_time_c.borrow()) as f32 / 1000.0;
+        let dt = if RESET_FRAME_CLOCK.with(|reset| reset.replace(false)) {
+            0.0
+        } else {
+            (now - *prev_time_c.borrow()) as f32 / 1000.0
+        };
         *prev_time_c.borrow_mut() = now;
-        {
+        if !XR_ACTIVE.with(|active| active.get()) {
             let mut cam = camera_c.borrow_mut();
             let mut st = state_c.borrow_mut();
             let prepare_start = perf_c.now();

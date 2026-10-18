@@ -1,0 +1,30 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VR simulace · letící jablka a katana</title>
+<style>
+body{margin:0;padding:20px;background:#101827;color:#eef3ff;font:15px system-ui}h1{font-size:23px}#gpu-canvas{width:360px;height:240px}#status{font-size:12px}button,a{color:inherit}button{background:#2454ad;padding:8px;border:1px solid #81afff;border-radius:5px}pre{white-space:pre-wrap}.frames{display:flex;flex-wrap:wrap;gap:16px}figure{margin:0}figure canvas{width:min(640px,90vw);height:auto;border:1px solid #536788}#exit,#shoot,#debug,#cuts{display:none}
+</style>
+<h1>VR simulace: automatický výstřel → švih katany → skutečné kusy</h1>
+<p>Náhrada headsetu a ovladačů. Fyzika, geometrie a oba pohledy běží v produkčním Rust/WASM rendereru.</p>
+<p><a href="?backend=webgl&slow=1">Přehrát pomalu</a> · <a href="../examples/webxr/">Skutečná VR ukázka</a></p>
+<button id="export">Stáhnout report + stopu</button><button id="enter" disabled>Spustit VR simulaci</button><button id="exit"></button><button id="shoot"></button><input type="checkbox" id="debug"><span id="cuts"></span>
+<p id="status">Inicializace hry…</p><p><a href="webxr-contract.html">Obecné kontroly VR enginu</a></p><pre id="result" role="status">Probíhá simulace…</pre>
+<canvas id="gpu-canvas"></canvas>
+<div class="frames"><figure><figcaption>Letící jablko před zásahem (levé a pravé oko)</figcaption><canvas id="before" width="640" height="320"></canvas></figure><figure><figcaption>Skutečné fragmenty po zásahu</figcaption><canvas id="after" width="640" height="320"></canvas></figure><figure><figcaption>Konec 30sekundového kola — skutečné VR tabulky a finální skóre</figcaption><canvas id="score" width="640" height="320"></canvas></figure><figure><figcaption>Řez — první snímek</figcaption><canvas id="slice-start" width="640" height="320"></canvas></figure><figure><figcaption>Plynulé rozevření — po 178 ms</figcaption><canvas id="slice-open" width="640" height="320"></canvas></figure><figure><figcaption>Dvěma meči na osminy — skutečné opakované řezy</figcaption><canvas id="recut" width="640" height="320"></canvas></figure><figure><figcaption>Zaklíněné jablko na ostří při pohybu ruky</figcaption><canvas id="jam" width="640" height="320"></canvas></figure><figure><figcaption>Ovoce podpírané plochou čepele — skutečná fyzika</figcaption><canvas id="physics" width="640" height="320"></canvas></figure></div><ol id="checks"></ol>
+<script type="module">
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,enableReportDownload} from './xr/testkit.js';
+import {runAppleScenario} from './xr/scenarios/apples.js';
+const simulator=installXRSimulator({profile:{eyeWidth:640,eyeHeight:640}});
+const run=new XRTestRun('webxr-apples',simulator,publishXRReport);
+const report=await run.execute(async test=>{
+    const evidence=await runAppleScenario({simulator,test,slow:new URLSearchParams(location.search).has('slow'),onSnapshot:(name,image)=>{
+        const canvas=document.getElementById(name);canvas.width=image.width;canvas.height=image.height;
+        canvas.getContext('2d').putImageData(image,0,0);
+    }});
+    test.report.evidence=evidence;
+});
+simulator.dispose();
+publishXRReport(report);
+enableReportDownload(document.getElementById('export'));
+const replay=document.querySelector('#enter');replay.textContent='Přehrát znovu';replay.disabled=false;replay.onclick=()=>location.reload();
+</script></html>

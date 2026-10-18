@@ -55,6 +55,32 @@ impl ResidentCandidate {
     }
 }
 
+#[derive(Clone, Copy)]
+struct BladeCutState {
+    progress: f32,
+    cutter: u32,
+    jammed: bool,
+    withdrawal: f32,
+    edge_velocity: Vec3,
+}
+
+#[derive(Clone, Copy)]
+struct CutFragment {
+    family: u64,
+    blade_grace_until: f32,
+    radius: f32,
+    generation: u8,
+    expires_at: f32,
+    birth_cutter: Option<u32>,
+    parent: u32,
+    parent_offset: Vec3,
+}
+
+const MAX_CUT_GENERATION: u8 = 4;
+const MAX_FAMILY_PIECES: usize = 32;
+const MIN_CUT_VOLUME: f64 = 2e-6;
+const MIN_CUT_EXTENT: f32 = 0.012;
+
 struct CutScatter {
     start: Transform,
     pivot: Vec3,
@@ -184,7 +210,11 @@ struct BoxCollider {
 pub struct SceneManager {
     objects: BTreeMap<u32, SceneObject>,
     triangle_meshes: BTreeMap<u32, TriangleObject>,
+    pub(crate) info_panels: BTreeMap<u32, crate::info_panel::InfoPanel>,
     cutters: BTreeMap<u32, [Vec3; 2]>,
+    blade_physics: BTreeMap<u32, crate::blade_physics::BladePhysics>,
+    blade_cut_states: BTreeMap<u32, BladeCutState>,
+    blade_body_radii: BTreeMap<u32, (Vec3, f32)>,
     cutting_index: crate::spatial::Bvh,
     cutting_swings: BTreeMap<u32, (Vec3, Vec3, f32)>,
     cutting_scatter: BTreeMap<u32, CutScatter>,
@@ -199,6 +229,7 @@ pub struct SceneManager {
     spins: BTreeMap<u32, Vec3>,
     projectiles: BTreeMap<u32, (Vec3, f32, f32)>,
     projectile_scratch: Vec<crate::projectile::Body>,
+    cut_fragments: BTreeMap<u32, CutFragment>,
     projectile_order: Vec<usize>,
     projectile_pairs: Vec<(usize, usize)>,
     pub projectile_contacts: u32,
@@ -356,6 +387,7 @@ impl SceneManager {
             return false;
         }
         if gravity == 0.0 && velocity == Vec3::ZERO {
+            self.blade_cut_states.remove(&id);
             self.projectiles.remove(&id);
         } else {
             self.projectiles.insert(id, (velocity, gravity, bounce));
@@ -369,14 +401,24 @@ impl SceneManager {
         let mut bodies = std::mem::take(&mut self.projectile_scratch);
         bodies.clear();
         for (&id, &(velocity, gravity, bounce)) in &self.projectiles {
+            if self.blade_cut_states.get(&id).is_some_and(|s| s.jammed) {
+                continue;
+            }
             if let Some(object) = self.objects.get(&id) {
                 bodies.push(crate::projectile::Body {
                     id,
+                    family: self
+                        .cut_fragments
+                        .get(&id)
+                        .map_or(0, |fragment| fragment.family),
                     velocity,
                     gravity,
                     bounce,
                     position: object.transform.position,
-                    radius: object.transform.scale.abs().max_element() * 1.15,
+                    radius: self.cut_fragments.get(&id).map_or(
+                        object.transform.scale.abs().max_element() * 1.15,
+                        |fragment| fragment.radius,
+                    ),
                 });
             }
         }
@@ -555,6 +597,42 @@ impl SceneManager {
         }
         id
     }
+    /// An ordinary scene object: app selects its transform and lifetime.
+    pub fn add_info_panel(&mut self, kind: &str, width: f32, height: f32) -> Result<u32, String> {
+        let panel = crate::info_panel::InfoPanel::new(
+            crate::info_panel::PanelKind::parse(kind)?,
+            width,
+            height,
+        )?;
+        let id = self.add_imported(
+            Vec3::from_array(panel.mesh.bounds_min),
+            Vec3::from_array(panel.mesh.bounds_max),
+        );
+        if id == INVALID_ID {
+            return Err("Object IDs exhausted".into());
+        }
+        self.set_render_options(
+            id,
+            RenderOptions {
+                casts_shadow: false,
+                receives_shadow: false,
+                ..Default::default()
+            },
+        );
+        self.info_panels.insert(id, panel);
+        Ok(id)
+    }
+    pub fn update_info_panels(
+        &mut self,
+        kind: crate::info_panel::PanelKind,
+        rows: &[(&'static str, String)],
+    ) {
+        // Text never changes the backing bounds or object transform. Existing culling,
+        // instance and shadow caches therefore remain valid; only mesh buffers change.
+        for panel in self.info_panels.values_mut().filter(|p| p.kind == kind) {
+            panel.update(rows.to_vec());
+        }
+    }
     pub fn triangle_meshes(&self) -> &BTreeMap<u32, TriangleObject> {
         &self.triangle_meshes
     }
@@ -597,6 +675,9 @@ impl SceneManager {
             .get_mut(&id)
             .ok_or("Cuttable requires a custom triangle mesh")?;
         object.cuttable = enabled;
+        if !enabled {
+            self.blade_cut_states.remove(&id);
+        }
         object.cap_color = cap_color;
         self.render_revision = self.render_revision.wrapping_add(1);
         Ok(())
@@ -680,12 +761,285 @@ impl SceneManager {
             if self.triangle_meshes.get(&id).is_some_and(|o| o.cuttable) {
                 return Err("Cuttable object cannot also be cutter".into());
             }
+            if let Some(config) = self.blade_physics(id) {
+                config.validate([a, b])?;
+            }
             self.cutters.insert(id, [a, b]);
         } else {
             self.cutters.remove(&id);
+            self.blade_physics.remove(&id);
+            self.release_blade_cuts(id, false);
         }
         self.render_revision = self.render_revision.wrapping_add(1);
         Ok(())
+    }
+    pub fn set_blade_physics(
+        &mut self,
+        id: u32,
+        config: Option<crate::blade_physics::BladePhysics>,
+    ) -> Result<(), String> {
+        let blade = self
+            .tracked_blade(id)
+            .ok_or("Blade physics requires a registered cutter")?;
+        if let Some(config) = config {
+            config.validate(blade)?;
+            self.blade_physics.insert(id, config);
+        } else {
+            self.blade_physics.remove(&id);
+            self.release_blade_cuts(id, false);
+        }
+        Ok(())
+    }
+    pub fn blade_physics(&self, id: u32) -> Option<crate::blade_physics::BladePhysics> {
+        self.blade_physics.get(&id).copied()
+    }
+    /// Fraction of the actual planar cap covered by the finite sharp ribbon.
+    pub fn blade_cut_state(&self, id: u32) -> (f32, Option<u32>) {
+        self.blade_cut_states
+            .get(&id)
+            .map_or((0., None), |s| (s.progress, s.jammed.then_some(s.cutter)))
+    }
+    pub(crate) fn release_blade_cuts(&mut self, cutter: u32, rebound: bool) {
+        let released: Vec<_> = self
+            .blade_cut_states
+            .iter()
+            .filter(|(_, s)| s.cutter == cutter)
+            .map(|(&id, &s)| (id, s))
+            .collect();
+        for (id, state) in released {
+            if rebound && !state.jammed && state.progress > 1e-4 && state.progress < 0.5 {
+                if let Some(projectile) = self.projectiles.get_mut(&id) {
+                    projectile.0 += state.edge_velocity.normalize_or_zero()
+                        * state.edge_velocity.length().clamp(0.4, 4.)
+                        * (1. + projectile.2);
+                    self.projectile_contacts = self.projectile_contacts.saturating_add(1);
+                }
+            }
+            self.blade_cut_states.remove(&id);
+        }
+    }
+    pub(crate) fn release_unjammed_blade_cuts(&mut self, cutter: u32, rebound: bool) {
+        let jammed: Vec<_> = self
+            .blade_cut_states
+            .iter()
+            .filter(|(_, s)| s.cutter == cutter && s.jammed)
+            .map(|(&id, &s)| (id, s))
+            .collect();
+        self.blade_cut_states
+            .retain(|_, s| s.cutter != cutter || !s.jammed);
+        self.release_blade_cuts(cutter, rebound);
+        self.blade_cut_states.extend(jammed);
+    }
+    pub(crate) fn settle_shallow_blade_cuts(
+        &mut self,
+        cutter: u32,
+        previous_targets: &BTreeMap<u32, Vec3>,
+    ) -> bool {
+        let moving = self.blade_cut_states.iter().any(|(&id, s)| {
+            s.cutter == cutter
+                && !s.jammed
+                && self
+                    .objects
+                    .get(&id)
+                    .zip(previous_targets.get(&id))
+                    .is_some_and(|(object, old)| {
+                        object.transform.position.distance_squared(*old) > 1e-10
+                    })
+        });
+        if moving {
+            return false;
+        }
+        let shallow = self
+            .blade_cut_states
+            .values()
+            .any(|s| s.cutter == cutter && !s.jammed);
+        self.release_unjammed_blade_cuts(cutter, true);
+        shallow
+    }
+    pub(crate) fn follow_blade_jams(&mut self, cutter: u32, from: Mat4, to: Mat4, dt: f32) {
+        let Some(config) = self.blade_physics(cutter) else {
+            return;
+        };
+        let edge = to.transform_vector3(config.edge).normalize();
+        let delta_pose = to * from.inverse();
+        let ids: Vec<_> = self
+            .blade_cut_states
+            .iter()
+            .filter(|(_, s)| s.cutter == cutter && s.jammed)
+            .map(|(&id, _)| id)
+            .collect();
+        for id in ids {
+            let Some(object) = self.objects.get(&id) else {
+                continue;
+            };
+            let position = object.transform.position;
+            let delta = delta_pose.transform_point3(position) - position;
+            // Tangential/rotation following retains 75% relative sharp advance.
+            // Accumulate net pullback: submillimetre tracking reversals must not
+            // release a joint, but a sustained slow 2cm withdrawal must.
+            let advance = (to.w_axis.truncate() - from.w_axis.truncate()).dot(edge);
+            let state = self.blade_cut_states.get_mut(&id).unwrap();
+            state.withdrawal = (state.withdrawal - advance).max(0.);
+            if state.withdrawal >= 0.02 - 1e-6 {
+                self.blade_cut_states.remove(&id);
+                continue;
+            }
+            // Apply the same relative slip in both directions. Clamping reverse
+            // slip would ratchet reversible tracking jitter into a completed cut.
+            let translation = delta - edge * advance * 0.75;
+            let rotation = glam::Quat::from_mat4(&delta_pose)
+                * glam::Quat::from_euler(
+                    glam::EulerRot::YXZ,
+                    object.transform.rotation.y,
+                    object.transform.rotation.x,
+                    object.transform.rotation.z,
+                );
+            let (y, x, z) = rotation.to_euler(glam::EulerRot::YXZ);
+            let scale = object.transform.scale;
+            self.set_object_transform(id, position + translation, Vec3::new(x, y, z), scale);
+            if let Some(projectile) = self.projectiles.get_mut(&id) {
+                projectile.0 = translation / dt;
+            }
+            for removal in &mut self.removals {
+                if removal.id == id
+                    && !self.cut_fragments.contains_key(&id)
+                    && matches!(removal.kind, RemovalKind::Object)
+                {
+                    removal.at = self.time + 3.;
+                }
+            }
+        }
+    }
+    pub(crate) fn blade_contacts(
+        &mut self,
+        id: u32,
+        from: glam::Mat4,
+        to: glam::Mat4,
+        previous_targets: &BTreeMap<u32, Vec3>,
+        dt: f32,
+    ) {
+        let Some(config) = self.blade_physics(id) else {
+            return;
+        };
+        let Some(blade) = self.tracked_blade(id) else {
+            return;
+        };
+        let scale = self.objects[&id].transform.scale;
+        let config = config.scaled(scale, blade);
+        let scaled_blade = blade.map(|p| p * scale);
+        for (&target, state) in &mut self.blade_cut_states {
+            if state.cutter != id {
+                continue;
+            }
+            let Some(object) = self.objects.get(&target) else {
+                continue;
+            };
+            let axis = scaled_blade[1] - scaled_blade[0];
+            let local = to.inverse().transform_point3(object.transform.position);
+            let station =
+                ((local - scaled_blade[0]).dot(axis) / axis.length_squared()).clamp(0., 1.);
+            let material = scaled_blade[0] + axis * station + config.edge * config.half_width;
+            let target_motion = previous_targets
+                .get(&target)
+                .map_or(Vec3::ZERO, |old| object.transform.position - *old);
+            let velocity =
+                (to.transform_point3(material) - from.transform_point3(material) - target_motion)
+                    / dt;
+            if velocity.length_squared() > 1e-8 {
+                state.edge_velocity = velocity;
+            }
+        }
+        let mut updates = Vec::new();
+        for (&target, &(velocity, _, bounce)) in &self.projectiles {
+            if target == id
+                || self
+                    .cut_fragments
+                    .get(&target)
+                    .is_some_and(|f| self.time < f.blade_grace_until)
+                || self.blade_cut_states.get(&target).is_some_and(|s| s.jammed)
+            {
+                continue;
+            }
+            let Some(mesh) = self.triangle_meshes.get(&target) else {
+                continue;
+            };
+            let object = &self.objects[&target];
+            let (min, max) = mesh.mesh.bounds();
+            let local_center = (min + max) * 0.5;
+            let center = object.transform.model().transform_point3(local_center);
+            // Cache the enclosing radius of actual vertices around the authored
+            // bounds center. Lazy GPU-resident meshes keep the conservative
+            // bounds fallback without forcing geometry readback/materialization.
+            let radius = self
+                .blade_body_radii
+                .entry(target)
+                .or_insert_with(|| {
+                    let scale = object.transform.scale;
+                    let radius = mesh.mesh.ready_cpu().map_or_else(
+                        || ((max - min) * 0.5 * scale.abs()).length(),
+                        |cpu| {
+                            cpu.positions
+                                .iter()
+                                .map(|p| ((*p - local_center) * scale).length_squared())
+                                .fold(0., f32::max)
+                                .sqrt()
+                        },
+                    );
+                    (scale, radius)
+                })
+                .1;
+            let old = previous_targets
+                .get(&target)
+                .copied()
+                .unwrap_or(object.transform.position);
+            if old.distance(object.transform.position) > 0.75 {
+                continue;
+            }
+            let old_center = center + old - object.transform.position;
+            if let Some((resolved, velocity)) = crate::blade_physics::contact(
+                config,
+                blade.map(|p| p * scale),
+                from,
+                to,
+                old_center,
+                center,
+                radius,
+                Some((
+                    glam::Quat::from_euler(
+                        glam::EulerRot::YXZ,
+                        object.transform.rotation.y,
+                        object.transform.rotation.x,
+                        object.transform.rotation.z,
+                    ),
+                    (max - min) * 0.5 * object.transform.scale.abs(),
+                )),
+                velocity,
+                bounce,
+                dt,
+            ) {
+                updates.push((target, resolved - center, velocity));
+            }
+        }
+        for (target, delta, velocity) in updates {
+            // Keep scheduled fruit alive while held; finished fragments retain
+            // their original expiry. Release restarts the existing 3s cleanup.
+            if !self.cut_fragments.contains_key(&target)
+                && self
+                    .triangle_meshes
+                    .get(&target)
+                    .is_some_and(|mesh| mesh.cuttable)
+            {
+                for removal in &mut self.removals {
+                    if removal.id == target && matches!(removal.kind, RemovalKind::Object) {
+                        removal.at = self.time + 3.;
+                    }
+                }
+            }
+            self.projectiles.get_mut(&target).unwrap().0 = velocity;
+            let position = self.objects[&target].transform.position + delta;
+            self.set_object_position(target, position);
+            self.projectile_contacts = self.projectile_contacts.saturating_add(1);
+        }
     }
     /// Explicit straight sweep command. Geometry and new object ownership stay in Rust.
     /// All cuts are prepared first: a topology error never removes any source object.
@@ -697,6 +1051,89 @@ impl SceneManager {
     ) -> Result<CutReport, String> {
         self.cut_with_geometry(cutter, motion, separation, None)
     }
+    pub(crate) fn tracked_blade(&self, id: u32) -> Option<[Vec3; 2]> {
+        self.cutters.get(&id).copied()
+    }
+
+    /// Tracked cutters are posed externally, never by the presentation swing.
+    /// Fragments inherit source velocity, fall under gravity and expire after 4s.
+    pub(crate) fn cut_tracked_with(
+        &mut self,
+        cutter: u32,
+        ribbons: &BTreeMap<u32, Vec<[Vec3; 2]>>,
+    ) -> Result<CutReport, String> {
+        let report = self.cut_with_regions(cutter, Vec3::X, 0.0015, None, Some(ribbons))?;
+        self.cutting_swings.remove(&cutter);
+        for &id in &report.pieces {
+            let velocity = self.projectiles.get(&id).map_or(Vec3::ZERO, |body| body.0);
+            self.set_projectile(id, velocity, 9.81, 0.0);
+            let expires_at = self.cut_fragments[&id].expires_at;
+            self.schedule_remove_object(id, expires_at - self.time);
+        }
+        Ok(report)
+    }
+    /// Shared early gate: rejected descendants never allocate or clip a ribbon.
+    pub(crate) fn tracked_cut_eligible(&self, target: u32, cutter: u32) -> bool {
+        self.is_cuttable(target)
+            && self.cut_fragments.get(&target).is_none_or(|fragment| {
+                fragment.birth_cutter != Some(cutter)
+                    && fragment.generation < MAX_CUT_GENERATION
+                    && self.time < fragment.expires_at
+                    && self
+                        .cut_fragments
+                        .values()
+                        .filter(|f| f.family == fragment.family)
+                        .count()
+                        < MAX_FAMILY_PIECES
+            })
+    }
+
+    /// A newly split child follows the parent's already sampled translation.
+    /// Only an actual parent sample may seed the other controller's same-frame sweep.
+    pub(crate) fn tracked_previous_position(
+        &self,
+        target: u32,
+        previous: &BTreeMap<u32, Vec3>,
+    ) -> Option<Vec3> {
+        if let Some(&position) = previous.get(&target) {
+            return Some(position);
+        }
+        let fragment = self.cut_fragments.get(&target)?;
+        self.tracked_previous_position(fragment.parent, previous)
+            .map(|position| position + fragment.parent_offset)
+    }
+
+    /// A birth blade must leave the body (or start a distinct stroke) before it
+    /// can cut its own children. Other controllers can cut them immediately.
+    pub(crate) fn release_fragment_blade(
+        &mut self,
+        cutter: u32,
+        endpoints: [Vec3; 2],
+        fresh: bool,
+    ) {
+        let blade_margin = self.blade_physics.get(&cutter).map_or(0.015, |config| {
+            let scaled =
+                config.scaled(self.objects[&cutter].transform.scale, self.cutters[&cutter]);
+            scaled.half_width + scaled.half_thickness + 0.002
+        });
+        for (&id, fragment) in &mut self.cut_fragments {
+            if fragment.birth_cutter != Some(cutter) {
+                continue;
+            }
+            let object = &self.objects[&id];
+            let inverse = object.transform.model().inverse();
+            let points = endpoints.map(|p| inverse.transform_point3(p));
+            let (min, max) = self.triangle_meshes[&id].mesh.bounds();
+            // Conservative local AABB gate includes the blade edge/body width.
+            let margin = Vec3::splat(blade_margin) / object.transform.scale.abs();
+            let outside = points[0].max(points[1]).cmplt(min - margin).any()
+                || points[0].min(points[1]).cmpgt(max + margin).any();
+            if fresh || outside {
+                fragment.birth_cutter = None;
+            }
+        }
+    }
+
     pub fn cut_geometry_inputs(
         &self,
         cutter: u32,
@@ -955,6 +1392,17 @@ impl SceneManager {
         separation: f32,
         geometry: Option<&BTreeMap<u32, crate::cutting::CutGeometry>>,
     ) -> Result<CutReport, String> {
+        self.cut_with_regions(cutter, motion, separation, geometry, None)
+    }
+
+    fn cut_with_regions(
+        &mut self,
+        cutter: u32,
+        motion: Vec3,
+        separation: f32,
+        geometry: Option<&BTreeMap<u32, crate::cutting::CutGeometry>>,
+        ribbons: Option<&BTreeMap<u32, Vec<[Vec3; 2]>>>,
+    ) -> Result<CutReport, String> {
         if !motion.is_finite()
             || motion.abs().max_element() > 1000.
             || !separation.is_finite()
@@ -973,7 +1421,7 @@ impl SceneManager {
             .transform;
         let [a, b] = blade.map(|p| transform.model().transform_point3(p));
         let normal = (b - a).cross(motion).normalize_or_zero();
-        if normal.length_squared() < 0.5 {
+        if ribbons.is_none() && normal.length_squared() < 0.5 {
             return Err("Cut motion must cross the blade direction".into());
         }
         let min = a.min(b).min(a + motion).min(b + motion) - Vec3::splat(1e-4);
@@ -1005,16 +1453,23 @@ impl SceneManager {
         let mut object_tests = 0;
         self.cutting_index.query::<true>(
             &|bounds| {
-                (bounds.center + bounds.half_extent).cmpge(min).all()
-                    && (bounds.center - bounds.half_extent).cmple(max).all()
+                ribbons.is_some()
+                    || ((bounds.center + bounds.half_extent).cmpge(min).all()
+                        && (bounds.center - bounds.half_extent).cmple(max).all())
             },
-            &|_| true,
+            &|id| {
+                ribbons.is_none_or(|histories| {
+                    self.tracked_cut_eligible(id, cutter)
+                        && histories.get(&id).is_some_and(|h| h.len() >= 2)
+                })
+            },
             &mut candidates,
             &mut report.bvh_nodes,
             &mut object_tests,
         );
         report.object_candidates = candidates.len();
         let mut pending = vec![];
+        let mut family_delta = BTreeMap::<u64, isize>::new();
         for id in candidates {
             let source = &self.triangle_meshes[&id];
             let object = &self.objects[&id];
@@ -1022,13 +1477,149 @@ impl SceneManager {
             if !inverse.is_finite() {
                 return Err("Noninvertible cutting transform".into());
             }
-            if let Some(slice) = source.mesh.cpu()?.slice_prepared(
-                inverse.transform_point3(a),
-                inverse.transform_point3(b),
-                inverse.transform_vector3(motion),
-                source.cap_color,
-                geometry.and_then(|g| g.get(&id)),
-            )? {
+            let (slice, normal, a) = if let Some(ribbons) = ribbons {
+                let Some(history) = ribbons.get(&id) else {
+                    continue;
+                };
+                // Translate historical blade positions with the moving target.
+                // Rotation uses the current real mesh, not a frozen projectile.
+                let mut history = history.as_slice();
+                let (origin, normal) = loop {
+                    // Fit the actual swept surface. Crossing the first and
+                    // last blade axes instead chooses the plane of even tiny
+                    // wrist yaw, which can be perpendicular to the stroke.
+                    let normals = || {
+                        history.windows(2).flat_map(|pair| {
+                            let [a, b] = pair[0];
+                            let [c, d] = pair[1];
+                            [(b - a).cross(d - a), (d - a).cross(c - a)]
+                        })
+                    };
+                    let Some(seed) =
+                        normals().max_by(|a, b| a.length_squared().total_cmp(&b.length_squared()))
+                    else {
+                        break (Vec3::ZERO, Vec3::ZERO);
+                    };
+                    if seed.length_squared() < 1e-10 {
+                        break (Vec3::ZERO, Vec3::ZERO);
+                    }
+                    // Midpoint rotations sweep opposite-facing triangles;
+                    // align their normals before area-weighted averaging.
+                    let normal = normals()
+                        .map(|n| if n.dot(seed) < 0. { -n } else { n })
+                        .sum::<Vec3>()
+                        .normalize();
+                    let origin = history.iter().flatten().copied().sum::<Vec3>()
+                        / (history.len() * 2) as f32;
+                    // Short nearly planar arcs allow at most 3cm of projection
+                    // in world space. Discard older samples when normal target
+                    // drift exceeds that bound; never enlarge the finite ribbon.
+                    if history
+                        .iter()
+                        .flatten()
+                        .all(|p| normal.dot(*p - origin).abs() <= 0.03)
+                    {
+                        break (origin, normal);
+                    }
+                    history = &history[1..];
+                };
+                if normal.length_squared() < 0.5 {
+                    continue;
+                }
+                let samples: Vec<_> = history
+                    .iter()
+                    .map(|pair| {
+                        pair.map(|p| {
+                            let projected = p - normal * normal.dot(p - origin);
+                            inverse.transform_point3(projected + object.transform.position)
+                        })
+                    })
+                    .collect();
+                let physical = self.blade_physics.contains_key(&cutter);
+                let (progress, slice) = if physical {
+                    source
+                        .mesh
+                        .cpu()?
+                        .slice_ribbon_progress(&samples, source.cap_color, 0.75)?
+                } else {
+                    (
+                        0.,
+                        source
+                            .mesh
+                            .cpu()?
+                            .slice_ribbon(&samples, source.cap_color)?,
+                    )
+                };
+                if physical && progress > 0. {
+                    let previous = self.blade_cut_states.get(&id).copied();
+                    if previous.is_none_or(|s| !s.jammed || s.cutter == cutter) {
+                        self.blade_cut_states.insert(
+                            id,
+                            BladeCutState {
+                                progress,
+                                cutter,
+                                jammed: (progress + 2e-5 >= 0.5
+                                    || previous.is_some_and(|s| s.jammed))
+                                    && progress < 0.75,
+                                withdrawal: previous.map_or(0., |s| s.withdrawal),
+                                edge_velocity: previous.map_or(Vec3::ZERO, |s| s.edge_velocity),
+                            },
+                        );
+                    }
+                }
+                let Some(slice) = slice else {
+                    continue;
+                };
+                let origin = samples[0][0];
+                let axis = samples[0][1] - origin;
+                let local_normal = samples
+                    .iter()
+                    .flatten()
+                    .map(|p| axis.cross(*p - origin))
+                    .find(|n| n.length_squared() > 1e-10)
+                    .unwrap()
+                    .normalize();
+                let normal = inverse
+                    .transpose()
+                    .transform_vector3(local_normal)
+                    .normalize();
+                (
+                    Some(slice),
+                    normal,
+                    object.transform.model().transform_point3(origin),
+                )
+            } else {
+                (
+                    source.mesh.cpu()?.slice_prepared(
+                        inverse.transform_point3(a),
+                        inverse.transform_point3(b),
+                        inverse.transform_vector3(motion),
+                        source.cap_color,
+                        geometry.and_then(|g| g.get(&id)),
+                    )?,
+                    normal,
+                    a,
+                )
+            };
+            if let Some(slice) = slice {
+                if ribbons.is_some() {
+                    let family = self
+                        .cut_fragments
+                        .get(&id)
+                        .map_or(u64::from(id) + 1, |f| f.family);
+                    let live = self
+                        .cut_fragments
+                        .values()
+                        .filter(|f| f.family == family)
+                        .count();
+                    let retained = live as isize + family_delta.get(&family).copied().unwrap_or(0)
+                        - isize::from(self.cut_fragments.contains_key(&id));
+                    if retained + slice.pieces.len() as isize > MAX_FAMILY_PIECES as isize {
+                        continue; // Keep the complete source solid; never drop excess pieces.
+                    }
+                    *family_delta.entry(family).or_default() += slice.pieces.len() as isize
+                        - isize::from(self.cut_fragments.contains_key(&id));
+                }
                 report.bvh_nodes += slice.stats.nodes;
                 report.triangle_tests += slice.stats.triangle_tests;
                 for piece in slice.pieces {
@@ -1051,6 +1642,7 @@ impl SceneManager {
                         object.render_options,
                         source.cap_color,
                         normal * world_sign,
+                        self.projectiles.get(&id).copied(),
                     ));
                 }
                 report.removed.push(id);
@@ -1072,14 +1664,97 @@ impl SceneManager {
         if retained + pending.iter().map(|p| p.1.triangles.len()).sum::<usize>() > 200_000 {
             return Err("Scene cutting triangle budget exceeded".into());
         }
+        let mut fragment_motion = BTreeMap::new();
+        if ribbons.is_some() {
+            for &source in &report.removed {
+                let object = &self.objects[&source];
+                // The original projectile velocity belongs to its authored pivot.
+                // Preserve the instantaneous rigid velocity at each new center.
+                let center = object.transform.position;
+                let spin = self.spins.get(&source).copied().unwrap_or(Vec3::ZERO);
+                // spins stores YXZ Euler rates; convert their instantaneous axes to world space.
+                let yaw = glam::Quat::from_rotation_y(object.transform.rotation.y);
+                let pitch = glam::Quat::from_rotation_x(object.transform.rotation.x);
+                let omega =
+                    Vec3::Y * spin.y + yaw * Vec3::X * spin.x + (yaw * pitch) * Vec3::Z * spin.z;
+                let edge_speed = self
+                    .blade_cut_states
+                    .get(&source)
+                    .map_or(0., |state| state.edge_velocity.length());
+                let speed = (0.08 + edge_speed * 0.02).min(0.24);
+                let mut mass = 0.;
+                let mut direction_sum = Vec3::ZERO;
+                for piece in pending.iter().filter(|p| p.0 == source) {
+                    let volume = piece.1.volume() as f32;
+                    mass += volume;
+                    direction_sum += piece.5 * volume;
+                }
+                let ancestor = self.cut_fragments.get(&source).copied();
+                fragment_motion.insert(
+                    source,
+                    (center, spin, omega, speed, direction_sum / mass, ancestor),
+                );
+            }
+        }
         for &id in &report.removed {
             self.remove_object(id);
         }
-        for (_, piece, transform, options, cap_color, direction) in pending {
+        for (source, mut piece, mut transform, options, cap_color, direction, mut projectile) in
+            pending
+        {
+            let mut fragment = None;
+            let mut inherited_spin = None;
+            if let Some(&(source_center, spin, omega, speed, mean_direction, ancestor)) =
+                fragment_motion.get(&source)
+            {
+                let center = piece.recenter();
+                // Rebase the pivot without changing any world vertex, apart from the tiny kerf.
+                transform.position +=
+                    transform.model().transform_vector3(center) - mean_direction * separation * 0.5;
+                let offset = transform.position
+                    - (direction - mean_direction) * separation * 0.5
+                    - source_center;
+                let velocity = projectile.map_or(Vec3::ZERO, |body| body.0)
+                    + omega.cross(offset)
+                    + (direction - mean_direction) * speed;
+                projectile = Some((velocity, 9.81, 0.));
+                inherited_spin = Some(spin);
+                let radius = piece
+                    .positions
+                    .iter()
+                    .map(|p| (*p * transform.scale).length())
+                    .fold(0., f32::max);
+                fragment = Some(CutFragment {
+                    family: ancestor.map_or(u64::from(source) + 1, |f| f.family),
+                    blade_grace_until: self.time + 0.2,
+                    radius,
+                    generation: ancestor.map_or(1, |f| f.generation + 1),
+                    expires_at: ancestor.map_or(self.time + 4., |f| f.expires_at),
+                    birth_cutter: Some(cutter),
+                    parent: source,
+                    parent_offset: transform.position - source_center,
+                });
+            }
+            let eligible = fragment.is_none_or(|f| {
+                let (min, max) = piece.bounds();
+                f.generation < MAX_CUT_GENERATION
+                    && piece.volume() * f64::from(transform.scale.element_product().abs())
+                        >= MIN_CUT_VOLUME
+                    && ((max - min) * transform.scale.abs()).min_element() >= MIN_CUT_EXTENT
+            });
             let id = self.add_triangle_mesh(piece)?;
             self.set_object_transform(id, transform.position, transform.rotation, transform.scale);
             self.set_render_options(id, options);
-            self.set_cuttable(id, true, cap_color)?;
+            self.set_cuttable(id, eligible, cap_color)?;
+            if let Some((velocity, gravity, bounce)) = projectile {
+                self.set_projectile(id, velocity, gravity, bounce);
+            }
+            if let Some(fragment) = fragment {
+                self.cut_fragments.insert(id, fragment);
+            }
+            if let Some(spin) = inherited_spin {
+                self.set_object_spin(id, spin);
+            }
             report.pieces.push(id);
             report.piece_directions.push(direction);
         }
@@ -1202,11 +1877,16 @@ impl SceneManager {
     pub fn clear_scene(&mut self) {
         self.projectiles.clear();
         self.projectile_scratch.clear();
+        self.cut_fragments.clear();
         self.projectile_order.clear();
         self.projectile_pairs.clear();
         self.projectile_contacts = 0;
         self.triangle_meshes.clear();
+        self.info_panels.clear();
         self.cutters.clear();
+        self.blade_physics.clear();
+        self.blade_cut_states.clear();
+        self.blade_body_radii.clear();
         self.cutting_swings.clear();
         self.cutting_scatter.clear();
         self.cutting_guide = None;
@@ -1246,7 +1926,12 @@ impl SceneManager {
         self.collision_dirty |= self.colliders.remove(&id).is_some();
         self.models.remove(&id);
         self.triangle_meshes.remove(&id);
+        self.info_panels.remove(&id);
         self.cutters.remove(&id);
+        self.blade_physics.remove(&id);
+        self.release_blade_cuts(id, false);
+        self.blade_cut_states.remove(&id);
+        self.blade_body_radii.remove(&id);
         self.cutting_swings.remove(&id);
         self.cutting_scatter.remove(&id);
         if self
@@ -1264,6 +1949,7 @@ impl SceneManager {
         }
         self.spins.remove(&id);
         self.projectiles.remove(&id);
+        self.cut_fragments.remove(&id);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -1276,6 +1962,14 @@ impl SceneManager {
         rotation: Vec3,
         scale: Vec3,
     ) -> bool {
+        if self
+            .objects
+            .get(&id)
+            .is_some_and(|o| o.transform.position.distance(position) > 0.75)
+        {
+            self.release_blade_cuts(id, false);
+            self.blade_cut_states.remove(&id);
+        }
         let transform = Transform::new(position, rotation, scale);
         if !transform.is_valid() {
             return false;
@@ -1283,6 +1977,9 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
+        if object.transform.scale != scale {
+            self.blade_body_radii.remove(&id);
+        }
         object.transform = transform;
         object.refresh_render_data();
         self.cutting_swings.remove(&id);
@@ -1291,6 +1988,14 @@ impl SceneManager {
         true
     }
     pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
+        if self
+            .objects
+            .get(&id)
+            .is_some_and(|o| o.transform.position.distance(position) > 0.75)
+        {
+            self.release_blade_cuts(id, false);
+            self.blade_cut_states.remove(&id);
+        }
         if !position.is_finite() {
             return false;
         }
@@ -1324,6 +2029,9 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
+        if object.transform.scale != scale {
+            self.blade_body_radii.remove(&id);
+        }
         object.transform.scale = scale;
         object.refresh_render_data();
         self.cutting_scatter.remove(&id);
@@ -1480,7 +2188,13 @@ impl SceneManager {
         let now = self.time;
         let pending = std::mem::take(&mut self.removals);
         for removal in pending {
-            if now < removal.at {
+            if now < removal.at
+                || (!self.cut_fragments.contains_key(&removal.id)
+                    && self
+                        .blade_cut_states
+                        .get(&removal.id)
+                        .is_some_and(|s| s.jammed))
+            {
                 self.removals.push(removal);
                 continue;
             }
@@ -1563,6 +2277,9 @@ impl SceneManager {
             elapsed < rotation.duration
         });
         for (id, velocity) in &self.spins {
+            if self.blade_cut_states.get(id).is_some_and(|s| s.jammed) {
+                continue;
+            }
             if let Some(object) = self.objects.get_mut(id) {
                 object.transform.rotation += *velocity * dt;
                 // Active projectiles refresh once after both rotation and motion.
@@ -1595,6 +2312,350 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    fn apple() -> crate::cutting::CutMesh {
+        let (segments, rings) = (20, 12);
+        let mut positions = vec![Vec3::new(0., 0.2, 0.), Vec3::new(0., 2.12, 0.)];
+        for j in 1..rings {
+            let theta = j as f32 / rings as f32 * std::f32::consts::PI;
+            for i in 0..segments {
+                let phi = i as f32 / segments as f32 * std::f32::consts::TAU;
+                let radius =
+                    theta.sin() * 1.1 * (1. - 0.1 * theta.cos()) * (1. + 0.045 * (phi * 5.).cos());
+                let y = 0.2 + 1.1 * (1. - theta.cos())
+                    - 0.28 * (-((std::f32::consts::PI - theta) / 0.38).powi(2)).exp();
+                positions.push(Vec3::new(phi.cos() * radius, y, phi.sin() * radius));
+            }
+        }
+        let mut indices = vec![];
+        for i in 0..segments {
+            let next = (i + 1) % segments;
+            indices.extend([0, 2 + i, 2 + next]);
+            let top = 2 + (rings - 2) * segments;
+            indices.extend([1, top + next, top + i]);
+            for j in 0..rings - 2 {
+                let b = 2 + j * segments + i;
+                let bn = 2 + j * segments + next;
+                indices.extend([b, b + segments, bn + segments, b, bn + segments, bn]);
+            }
+        }
+        crate::cutting::CutMesh::new(positions, &indices, Vec3::X).unwrap()
+    }
+
+    #[test]
+    fn xr_input_cut_fragments_keep_world_geometry_and_rigid_motion() {
+        use super::*;
+        let mut scene = SceneManager::default();
+        let mesh = apple();
+        let source_volume = mesh.volume();
+        let source_centroid = mesh.centroid();
+        assert!(
+            source_centroid.y > 0.8,
+            "fixture must have an off-origin center"
+        );
+        let source = scene.add_triangle_mesh(mesh).unwrap();
+        let root = Vec3::new(0., 3., 0.);
+        let scale = Vec3::new(0.15, 0.18, 0.12);
+        scene.set_object_transform(source, root, Vec3::ZERO, scale);
+        scene.set_cuttable(source, true, Vec3::ONE).unwrap();
+        let velocity = Vec3::new(0.3, 0.6, -0.2);
+        let spin = Vec3::new(0., 0., 0.8);
+        scene.set_projectile(source, velocity, 9.81, 0.);
+        scene.set_object_spin(source, spin);
+        let cutter = scene.add_cube(Vec3::ZERO);
+        scene
+            .set_cutter(cutter, Some([Vec3::ZERO, Vec3::Z]))
+            .unwrap();
+        // Target-relative ribbon fully crosses an intentionally unequal split.
+        let x = 0.03;
+        let history = vec![
+            [Vec3::new(x, 0.5, -0.4), Vec3::new(x, 0.5, 0.4)],
+            [Vec3::new(x, -0.1, -0.4), Vec3::new(x, -0.1, 0.4)],
+        ];
+        let before: Vec<_> = scene.triangle_meshes[&source]
+            .mesh
+            .cpu()
+            .unwrap()
+            .positions
+            .iter()
+            .map(|&p| root + p * scale)
+            .collect();
+        let report = scene
+            .cut_tracked_with(cutter, &BTreeMap::from([(source, history)]))
+            .unwrap();
+        assert_eq!(report.pieces.len(), 2);
+        let mut weighted_velocity = Vec3::ZERO;
+        let mut weighted_position = Vec3::ZERO;
+        let mut volume = 0.;
+        let mut initial = Vec::new();
+        for (&id, direction) in report.pieces.iter().zip(&report.piece_directions) {
+            let mesh = scene.triangle_meshes[&id].mesh.cpu().unwrap();
+            mesh.validate().unwrap();
+            assert!(mesh.centroid().length() < 1e-5);
+            let mass = mesh.volume();
+            volume += mass;
+            weighted_velocity += scene.projectiles[&id].0 * mass as f32;
+            weighted_position += scene.objects[&id].transform.position * mass as f32;
+            assert_eq!(scene.spins[&id], spin);
+            assert!(scene.triangle_meshes[&id].cuttable);
+            // Every retained original vertex stays within the 1.5mm kerf.
+            let model = scene.objects[&id].transform.model();
+            for vertex in &before {
+                if direction.dot(*vertex - (root + Vec3::X * x)) > 0.002 {
+                    assert!(mesh
+                        .positions
+                        .iter()
+                        .any(|&p| model.transform_point3(p).distance(*vertex) < 0.0016));
+                }
+            }
+            initial.push(scene.objects[&id].transform.position);
+        }
+        assert!((volume - source_volume).abs() < 1e-5);
+        let com = root + source_centroid * scale;
+        assert!((weighted_position / volume as f32 - com).length() < 1e-5);
+        let expected = velocity + spin.cross(com - root);
+        assert!((weighted_velocity / volume as f32 - expected).length() < 1e-5);
+        let axis = report.piece_directions[1];
+        let initial_gap = (initial[1] - initial[0]).dot(axis);
+        scene.update(1. / 90.);
+        for (&id, position) in report.pieces.iter().zip(&initial) {
+            assert!(scene.objects[&id].transform.position.distance(*position) < 0.02);
+        }
+        assert_eq!(scene.projectile_contacts, 0);
+        for _ in 0..17 {
+            scene.update(1. / 90.);
+        }
+        let gap = (scene.objects[&report.pieces[1]].transform.position
+            - scene.objects[&report.pieces[0]].transform.position)
+            .dot(axis);
+        assert!(
+            gap > initial_gap + 0.015 && gap < initial_gap + 0.09,
+            "opening {gap} from {initial_gap}"
+        );
+        for &id in &report.pieces {
+            let mesh = scene.triangle_meshes[&id].mesh.cpu().unwrap();
+            assert!(
+                scene.objects[&id]
+                    .transform
+                    .model()
+                    .transform_point3(mesh.centroid())
+                    .distance(scene.objects[&id].transform.position)
+                    < 1e-5
+            );
+        }
+        for _ in 0..390 {
+            scene.update(1. / 90.);
+        }
+        assert!(report.pieces.iter().all(|id| !scene.object_exists(*id)));
+        assert!(scene.cut_fragments.is_empty());
+        scene.clear_scene();
+        assert!(scene.cut_fragments.is_empty());
+    }
+
+    fn recut_ribbon(scene: &SceneManager, target: u32, normal: Vec3) -> Vec<[Vec3; 2]> {
+        let mesh = scene.triangle_meshes[&target].mesh.cpu().unwrap();
+        let object = &scene.objects[&target];
+        let center =
+            object.transform.model().transform_point3(mesh.centroid()) - object.transform.position;
+        let axis = if normal.dot(Vec3::Z).abs() < 0.8 {
+            Vec3::Z
+        } else {
+            Vec3::X
+        };
+        let across = normal.cross(axis);
+        vec![
+            [center - across - axis, center - across + axis],
+            [center + across - axis, center + across + axis],
+        ]
+    }
+
+    #[test]
+    fn xr_input_two_swords_recut_apple_closed_halves_quarters_and_bounded_descendants() {
+        let mut scene = SceneManager::default();
+        let source = scene.add_triangle_mesh(apple()).unwrap();
+        scene.set_object_transform(source, Vec3::Y * 2., Vec3::ZERO, Vec3::splat(0.15));
+        scene.set_cuttable(source, true, Vec3::ONE).unwrap();
+        scene.set_projectile(source, Vec3::new(0.3, 1., -0.2), 9.81, 0.);
+        scene.set_object_spin(source, Vec3::new(0., 0.4, 0.2));
+        let volume = scene.triangle_meshes[&source].mesh.volume();
+        let mut swords = Vec::new();
+        for _ in 0..2 {
+            let sword = scene.add_cube(Vec3::ZERO);
+            scene.set_cutter(sword, Some([-Vec3::Z, Vec3::Z])).unwrap();
+            swords.push(sword);
+        }
+        let family = u64::from(source) + 1;
+        let mut pieces = vec![source];
+        for generation in 1..=4 {
+            let cutter = swords[(generation - 1) % 2];
+            let normal = [Vec3::X, Vec3::Y, Vec3::Z, Vec3::X][generation - 1];
+            let histories = pieces
+                .iter()
+                .map(|&id| (id, recut_ribbon(&scene, id, normal)))
+                .collect();
+            let old_velocity: BTreeMap<_, _> = pieces
+                .iter()
+                .map(|&id| (id, scene.projectiles[&id].0))
+                .collect();
+            let old_positions: BTreeMap<_, _> = pieces
+                .iter()
+                .map(|&id| (id, scene.objects[&id].transform.position))
+                .collect();
+            let report = scene.cut_tracked_with(cutter, &histories).unwrap();
+            let mut removed = report.removed.clone();
+            let mut expected = pieces.clone();
+            removed.sort_unstable();
+            expected.sort_unstable();
+            assert_eq!(removed, expected, "generation={generation}");
+            assert_eq!(report.pieces.len(), pieces.len() * 2);
+            // Reusing stale removed IDs, by either hand in the same frame, is harmless.
+            assert!(scene
+                .cut_tracked_with(swords[1], &histories)
+                .unwrap()
+                .pieces
+                .is_empty());
+            pieces = report.pieces;
+            let total: f64 = pieces
+                .iter()
+                .map(|id| scene.triangle_meshes[id].mesh.volume())
+                .sum();
+            assert!((total - volume).abs() < volume * 1e-4);
+            for &id in &pieces {
+                let fragment = scene.cut_fragments[&id];
+                let mesh = scene.triangle_meshes[&id].mesh.cpu().unwrap();
+                mesh.validate().unwrap();
+                assert!(mesh.centroid().length() < 1e-5);
+                assert_eq!(fragment.family, family);
+                assert_eq!(fragment.generation, generation as u8);
+                assert_eq!(fragment.expires_at, 4.);
+                assert_eq!(scene.removals.iter().find(|r| r.id == id).unwrap().at, 4.);
+                assert!(!scene.tracked_cut_eligible(id, cutter));
+                assert_eq!(
+                    scene.tracked_cut_eligible(id, swords[generation % 2]),
+                    generation < 4
+                );
+                let previous = scene.tracked_previous_position(id, &old_positions).unwrap();
+                assert!(previous.distance(scene.objects[&id].transform.position) < 1e-5);
+                assert!((scene.projectiles[&id].0 - old_velocity[&fragment.parent]).length() < 0.3);
+            }
+            // Holding the birth blade through every descendant cannot recursively chip it.
+            let held = pieces
+                .iter()
+                .map(|&id| (id, recut_ribbon(&scene, id, Vec3::Z)))
+                .collect();
+            let report = scene.cut_tracked_with(cutter, &held).unwrap();
+            assert!(report.pieces.is_empty() && report.object_candidates == 0);
+            assert!(pieces.len() <= MAX_FAMILY_PIECES);
+            if generation == 1 {
+                scene.update(0.2); // Recutting later must not renew the original expiry.
+            }
+        }
+        assert!(pieces.iter().all(|id| !scene.is_cuttable(*id)));
+        scene.blade_cut_states.insert(
+            pieces[0],
+            BladeCutState {
+                progress: 0.6,
+                cutter: swords[0],
+                jammed: true,
+                withdrawal: 0.,
+                edge_velocity: Vec3::ZERO,
+            },
+        );
+        scene.update(3.7);
+        assert!(pieces.iter().all(|id| scene.object_exists(*id)));
+        scene.update(0.11);
+        assert!(pieces.iter().all(|id| !scene.object_exists(*id)));
+        assert!(scene.cut_fragments.is_empty());
+        assert!(scene.removals.is_empty());
+    }
+
+    #[test]
+    fn xr_input_family_budget_counts_all_pending_splits_without_dropping_solids() {
+        let mut scene = SceneManager::default();
+        let source = scene.add_triangle_mesh(apple()).unwrap();
+        scene.set_object_scale(source, Vec3::splat(0.13));
+        scene.set_cuttable(source, true, Vec3::ONE).unwrap();
+        let mut swords = Vec::new();
+        for _ in 0..2 {
+            let sword = scene.add_cube(Vec3::ZERO);
+            scene.set_cutter(sword, Some([-Vec3::Z, Vec3::Z])).unwrap();
+            swords.push(sword);
+        }
+        let history = recut_ribbon(&scene, source, Vec3::X);
+        let halves = scene
+            .cut_tracked_with(swords[0], &BTreeMap::from([(source, history)]))
+            .unwrap()
+            .pieces;
+        let metadata = scene.cut_fragments[&halves[0]];
+        // Simulate a disconnected lineage near its live-piece budget. These
+        // retained solids cannot be candidates, but still consume the budget.
+        for _ in 0..29 {
+            let id = scene.add_triangle_mesh(apple()).unwrap();
+            scene.cut_fragments.insert(id, metadata);
+            scene.schedule_remove_object(id, 4.);
+        }
+        let before: f64 = scene
+            .triangle_meshes
+            .values()
+            .map(|mesh| mesh.mesh.volume())
+            .sum();
+        let histories = halves
+            .iter()
+            .map(|&id| (id, recut_ribbon(&scene, id, Vec3::Y)))
+            .collect();
+        let report = scene.cut_tracked_with(swords[1], &histories).unwrap();
+        assert_eq!(report.removed.len(), 1);
+        assert_eq!(report.pieces.len(), 2);
+        assert_eq!(scene.cut_fragments.len(), MAX_FAMILY_PIECES);
+        assert_eq!(
+            halves.iter().filter(|id| scene.object_exists(**id)).count(),
+            1
+        );
+        let after: f64 = scene
+            .triangle_meshes
+            .values()
+            .map(|mesh| mesh.mesh.volume())
+            .sum();
+        assert!((after - before).abs() < before * 1e-5);
+        assert!(
+            scene
+                .cut_tracked_with(swords[1], &histories)
+                .unwrap()
+                .object_candidates
+                == 0
+        );
+        scene.update(4.01);
+        assert!(scene.cut_fragments.is_empty());
+    }
+
+    #[test]
+    fn xr_input_fragment_immunity_releases_only_birth_blade_and_tiny_pieces_stay_solid() {
+        let mut scene = SceneManager::default();
+        let source = scene.add_triangle_mesh(apple()).unwrap();
+        scene.set_object_scale(source, Vec3::splat(0.006));
+        scene.set_cuttable(source, true, Vec3::ONE).unwrap();
+        let cutter = scene.add_cube(Vec3::ZERO);
+        scene.set_cutter(cutter, Some([-Vec3::Z, Vec3::Z])).unwrap();
+        let history = recut_ribbon(&scene, source, Vec3::X);
+        let report = scene
+            .cut_tracked_with(cutter, &BTreeMap::from([(source, history)]))
+            .unwrap();
+        assert_eq!(report.pieces.len(), 2);
+        for &id in &report.pieces {
+            assert!(!scene.is_cuttable(id));
+            assert!(scene.triangle_meshes[&id].mesh.volume() > 0.);
+        }
+        let id = report.pieces[0];
+        let center = scene.objects[&id].transform.position;
+        scene.release_fragment_blade(cutter + 1, [Vec3::splat(5.); 2], true);
+        assert_eq!(scene.cut_fragments[&id].birth_cutter, Some(cutter));
+        scene.release_fragment_blade(cutter, [center; 2], false);
+        assert_eq!(scene.cut_fragments[&id].birth_cutter, Some(cutter));
+        scene.release_fragment_blade(cutter, [Vec3::splat(5.); 2], false);
+        assert_eq!(scene.cut_fragments[&id].birth_cutter, None);
+        scene.clear_scene();
+        assert!(scene.cut_fragments.is_empty());
+    }
+
     #[test]
     fn clearing_scene_and_parking_release_projectile_work() {
         use super::*;
@@ -1842,5 +2903,41 @@ mod tests {
         assert!(!scene.set_box_collider(player, Vec3::ONE, Vec3::ZERO));
         let invalid = scene.add_cube(Vec3::ZERO);
         assert!(!scene.set_box_collider(invalid, Vec3::ZERO, Vec3::ZERO));
+    }
+}
+
+#[cfg(test)]
+mod info_panel_tests {
+    use super::*;
+    #[test]
+    fn info_panel_stable_handle_bounds_cache_and_removal() {
+        let mut scene = SceneManager::default();
+        assert!(scene.info_panels.is_empty());
+        let id = scene.add_info_panel("round", 1.2, 0.7).unwrap();
+        scene.set_object_transform(id, Vec3::new(1., 2., -3.), Vec3::ZERO, Vec3::ONE);
+        let bounds = scene.objects[&id].local_bounds;
+        let revision = scene.render_revision();
+        let static_revision = scene.static_revision();
+        scene.update_info_panels(
+            crate::info_panel::PanelKind::Round,
+            &[("ROZKROJENO", "222".into())],
+        );
+        assert_eq!(scene.objects[&id].local_bounds, bounds);
+        assert_eq!(
+            scene.objects[&id].transform.position,
+            Vec3::new(1., 2., -3.)
+        );
+        assert_eq!(scene.render_revision(), revision);
+        assert_eq!(scene.static_revision(), static_revision);
+        assert!(!scene.is_cuttable(id));
+        assert!(!scene.objects[&id].render_options.casts_shadow);
+        assert!(!scene.objects[&id].render_options.receives_shadow);
+        assert!(scene.remove_object(id));
+        assert!(scene.info_panels.is_empty());
+        let next = scene.add_info_panel("scene", 1., 1.).unwrap();
+        assert_ne!(next, id);
+        scene.clear_scene();
+        assert!(scene.info_panels.is_empty());
+        assert!(!scene.object_exists(next));
     }
 }

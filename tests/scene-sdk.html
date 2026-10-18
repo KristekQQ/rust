@@ -8,6 +8,7 @@
 <canvas id="gpu-canvas" width="640" height="360"></canvas>
 <script type="module">
 import { createScene } from "../examples/basic/scene.js";
+import {capturePixels,assertForeground} from './pixels.js';
 
 const result = document.getElementById("result");
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
@@ -78,6 +79,18 @@ try {
     assert(engine.postprocessing.stats().passes === 2, 'Two postprocess passes');
     engine.postprocessing.disable('ssr'); engine.postprocessing.disable('godRays');
     assert(engine.postprocessing.stats().targets === 0, 'Postprocess targets released');
+    scene.clear();engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+    engine.setCameraView([0,0,3],[0,0,0]);
+    const panel=scene.createInfoPanel('round',{position:[0,0,0],width:1.4,height:.8});
+    assert(panel.exists && panel.meshInfo.triangles>20 && !panel.meshInfo.cuttable,'World text is an ordinary noncuttable scene object');
+    const textImage=await capturePixels(canvas);assertForeground(textImage,'World text without scene lights',500);
+    const whites=image=>{let n=0;for(let i=0;i<image.data.length;i+=4)if(image.data[i]>180 && image.data[i+1]>180 && image.data[i+2]>180)n++;return n;};
+    assert(whites(textImage)>100,'World text remains readable without lights or specular glare');
+    const panelId=panel.id;panel.remove();
+    assert(!panel.exists && whites(await capturePixels(canvas))<20,'Removing world panel releases its visible geometry');
+    const nextPanel=scene.createInfoPanel('scene',{width:1.4,height:.8});
+    assert(nextPanel.id!==panelId,'World panels preserve stable IDs');
+    scene.clear();assert(!nextPanel.exists && scene.objectCount===0,'Clear removes dynamic panel bindings');
     result.textContent = `PASS: ${engine.renderer_backend()} Rust scene manager + JavaScript SDK\nSingle runtime initialization, detached canvas rejection, camera view, empty start, JavaScript sample, object commands, Rust animation/removal, stable IDs, lights, four shadow maps, helper controls, clear, postprocessing.`;
 } catch (error) {
     console.error(error);

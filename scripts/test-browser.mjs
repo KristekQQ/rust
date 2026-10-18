@@ -21,6 +21,10 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },
+    { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true },
+    { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },
+    { name: 'webxr', path: 'tests/webxr.html', status: '#result', xrReport: true },
     { name: 'projectiles', path: 'examples/projectiles/', interaction: 'projectiles' },
     { name: 'cutting', path: 'examples/cutting/', interaction: 'cutting' },
     { name: 'cutting-compute', path: 'tests/cutting-compute.html', status: '#result' },
@@ -36,10 +40,12 @@ const suites = [
     { name: 'fox-control', path: 'examples/fox-control/', status: '#status', interaction: 'fox' },
     { name: 'culling', path: 'examples/culling/', interaction: 'culling' },
 ];
+let xrSlow = false;
 let backends = ['webgpu', 'webgl'], selected = suites, software = false, headed = false, capture = false, timeout = 90000;
 for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
-    if (arg === '--software') software = true;
+    if (arg === '--xr-slow') xrSlow = true;
+    else if (arg === '--software') software = true;
     else if (arg === '--capture') capture = true;
     else if (arg === '--headed') headed = true;
     else if (arg === '--backend') {
@@ -54,7 +60,7 @@ for (let i = 2; i < process.argv.length; i++) {
         timeout = Number(process.argv[++i]);
         if (!Number.isFinite(timeout) || timeout < 1000) throw new Error('--timeout must be at least 1000 ms');
     } else if (arg === '--help') {
-        console.log('node scripts/test-browser.mjs [--backend all|webgpu|webgl] [--page suite,suite] [--software] [--headed] [--capture] [--timeout ms]');
+        console.log('node scripts/test-browser.mjs [--backend all|webgpu|webgl] [--page suite,suite] [--software] [--headed] [--capture] [--xr-slow] [--timeout ms]');
         process.exit(0);
     } else throw new Error(`Unknown option ${arg}`);
 }
@@ -375,6 +381,7 @@ try {
     browser = await puppeteer.launch({ headless: !headed, args, executablePath: report.browserExecutable, timeout: 30000, protocolTimeout: timeout, dumpio: process.env.DEBUG_BROWSER_STARTUP === '1' });
     report.browser = await browser.version();
     for (const backend of backends) for (const suite of selected) {
+        if (suite.backends && !suite.backends.includes(backend)) continue;
         if (interrupted) throw new Error('Verification interrupted');
         const page = await browser.newPage();
         await page.setViewport({ width: 960, height: 640, deviceScaleFactor: 1 });
@@ -395,6 +402,7 @@ try {
         try {
             const url = new URL(suite.path, baseUrl);
             url.searchParams.set('backend', backend === 'webgl' ? 'webgl' : 'auto');
+            if (xrSlow && suite.xrReport) url.searchParams.set('slow','1');
             result.url = url.href;
             await page.goto(url.href, { waitUntil: 'load' });
             if (suite.button) {
@@ -405,19 +413,61 @@ try {
                 const failure = await page.$eval(suite.status, node => /FAIL/.test(node.textContent || ''));
                 if (!failure) await page.click(suite.button);
             }
-            if (suite.interaction === 'cutting') result.text = await verifyCutting(page);
+            if (suite.interaction === 'webxr-preview') {
+                result.text = await page.evaluate(async () => {
+                    const {engine} = await import('./main.js');
+                    const {capturePixels, assertForeground} = await import('../../tests/pixels.js');
+                    assertForeground(await capturePixels(document.querySelector('#gpu-canvas')), 'WebXR example preview');
+                    if (engine.scene.objectCount !== 10 || engine.scene.lightCount !== 2) throw new Error('Incomplete WebXR example scene');
+                    if (!document.querySelector('#status').textContent.includes('Meta Quest')) throw new Error('Missing unsupported-headset UI');
+                    const {shootApple} = await import('./main.js');
+                    const apple = shootApple();
+                    if (!apple) throw new Error('Apple launcher failed');
+                    const y = apple.meshInfo.position[1];
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                    if (apple.meshInfo.position[1] <= y + 0.3) throw new Error('Rust projectile did not rise');
+                    assertForeground(await capturePixels(document.querySelector('#gpu-canvas')), 'flying apple preview');
+                    // This example deliberately requires WebGL, even when desktop WebGPU exists.
+                    document.documentElement.dataset.rendererBackend = engine.renderer_backend();
+                    return 'PASS: vlastní WebXR ukázka, skutečné pixely náhledu a UI bez headsetu';
+                });
+            }
+            else if (suite.interaction === 'cutting') result.text = await verifyCutting(page);
             else if (suite.interaction === 'projectiles') result.text = await verifyProjectiles(page);
             else if (suite.interaction === 'fox') result.text = await verifyFox(page);
             else if (suite.interaction === 'culling') result.text = await verifyCulling(page);
             else {
-                await page.waitForFunction(selector => /^(PASS|FAIL):/.test(document.querySelector(selector)?.textContent?.trim() || ''), { polling: 100 }, suite.status);
+                await page.waitForFunction(selector => /^(PASS|FAIL):/.test(document.querySelector(selector)?.textContent?.trim() || ''), { polling: suite.xrReport ? 'raf' : 100 }, suite.status);
                 result.text = await page.$eval(suite.status, node => node.textContent.trim());
+            }
+            if (suite.xrReport) {
+                const report = await page.evaluate(() => window.xrTestReport || null);
+                if (!report) throw new Error('XR scenario did not publish a structured report');
+                const {trace, ...summary} = report;
+                if (summary.profiles) summary.profiles = summary.profiles.map(({trace, ...profile}) => profile);
+                result.xrReport = `${suite.name}-report.json`;
+                result.xrTrace = `${suite.name}-trace.json`;
+                await writeFile(path.join(output,result.xrReport),JSON.stringify(summary,null,2)+'\n');
+                await writeFile(path.join(output,result.xrTrace),JSON.stringify(trace,null,2)+'\n');
+                if (report.status !== 'PASS') throw new Error(report.error || 'XR checks failed');
             }
             if (!result.text.startsWith('PASS:')) throw new Error(result.text);
             result.actualBackend = await page.evaluate(() => document.documentElement.dataset.rendererBackend || document.querySelector('[role="status"]')?.textContent?.match(/BrowserWebGpu|\bGl\b/)?.[0]);
             const expected = backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
             if (result.actualBackend !== expected) throw new Error(`Requested ${backend}, observed ${result.actualBackend || 'unknown'}; fallback is not a pass`);
             if (errors.length) throw new Error(errors.join('\n'));
+            if (capture && suite.xrReport) {
+                result.xrScreenshot = `${suite.name}-report.png`;
+                await page.screenshot({path:path.join(output,result.xrScreenshot),fullPage:true});
+            }
+            if (capture && suite.name === 'webxr-simulation') {
+                result.simulationScreenshot = 'webxr-simulation-stereo.png';
+                await page.screenshot({path:path.join(output,result.simulationScreenshot),fullPage:true});
+                for (const phase of ['before','after','score','physics','jam','slice-start','slice-open','recut']) {
+                    const pixels = await page.$eval(`#${phase}`, canvas => canvas.toDataURL('image/png').split(',')[1]);
+                    await writeFile(path.join(output,`webxr-simulation-${phase}.png`),Buffer.from(pixels,'base64'));
+                }
+            }
             if (capture) {
                 result.screenshot = `${suite.name}-${backend}.png`;
                 const png = await page.evaluate(() => new Promise((resolve, reject) => requestAnimationFrame(() => {
