@@ -8,6 +8,7 @@ pub struct InstanceData {
     pub model: [[f32; 4]; 4],
     pub normal_matrix: [[f32; 4]; 4],
     pub material: [f32; 4],
+    pub emission: [f32; 4],
 }
 
 pub(crate) struct ObjectRenderData {
@@ -41,6 +42,7 @@ impl ObjectRenderData {
                 model: model.to_cols_array_2d(),
                 normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
                 material: [0.0, 1.0, 0.0, 0.0],
+                emission: [0.0; 4],
             },
             center: model.transform_point3((max + min) * 0.5),
             half_extent: model.x_axis.truncate().abs() * local.x
@@ -85,6 +87,7 @@ pub enum RenderPassKind {
     Reflection,
     ShadowStatic,
     ShadowDynamic,
+    Environment,
 }
 impl RenderPassKind {
     pub fn index(self) -> usize {
@@ -107,7 +110,7 @@ pub(crate) struct VisibilityIndex {
     dynamic_tree: crate::spatial::Bvh,
     static_revision: Option<u64>,
     render_revision: Option<u64>,
-    totals: [usize; 4],
+    totals: [usize; 5],
     static_rebuilds: usize,
     dynamic_rebuilds: usize,
 }
@@ -119,13 +122,14 @@ impl VisibilityIndex {
         let rebuild_static = self.static_revision != Some(scene.static_revision());
         let mut statics = Vec::new();
         let mut dynamics = Vec::new();
-        self.totals = [0; 4];
+        self.totals = [0; 5];
         for (&id, object) in scene.objects() {
             for pass in [
                 RenderPassKind::Main,
                 RenderPassKind::Reflection,
                 RenderPassKind::ShadowStatic,
                 RenderPassKind::ShadowDynamic,
+                RenderPassKind::Environment,
             ] {
                 self.totals[pass.index()] += usize::from(included(scene, id, object, pass));
             }
@@ -182,7 +186,7 @@ impl VisibilityIndex {
                 &mut stats.object_tests,
             );
         }
-        if pass != RenderPassKind::ShadowStatic {
+        if pass != RenderPassKind::ShadowStatic && pass != RenderPassKind::Environment {
             self.dynamic_tree.query::<TRACK>(
                 &intersects,
                 &eligible,
@@ -205,6 +209,7 @@ fn included(
     let options = object.render_options;
     match pass {
         RenderPassKind::Main => true,
+        RenderPassKind::Environment => options.is_static && Some(id) != scene.mirror_object,
         RenderPassKind::Reflection => Some(id) != scene.mirror_object,
         RenderPassKind::ShadowStatic => options.casts_shadow && options.is_static,
         RenderPassKind::ShadowDynamic => options.casts_shadow && !options.is_static,
@@ -280,6 +285,8 @@ impl RenderQueue {
                 MeshKind::Imported(_) => 3,
             };
             let mut instance = data.instance;
+            instance.emission[0] = object.emission;
+            instance.emission[1] = object.color_cutout;
             instance.material = [
                 options.reflectivity,
                 if options.receives_shadow { 1.0 } else { 0.0 },
@@ -328,6 +335,7 @@ mod tests {
             let options = object.render_options;
             let eligible = match pass {
                 RenderPassKind::Main => true,
+                RenderPassKind::Environment => options.is_static && Some(id) != scene.mirror_object,
                 RenderPassKind::Reflection => Some(id) != scene.mirror_object,
                 RenderPassKind::ShadowStatic => options.is_static && options.casts_shadow,
                 RenderPassKind::ShadowDynamic => !options.is_static && options.casts_shadow,
@@ -420,12 +428,38 @@ mod tests {
                 RenderPassKind::Reflection,
                 RenderPassKind::ShadowStatic,
                 RenderPassKind::ShadowDynamic,
+                RenderPassKind::Environment,
             ] {
                 for culling in [false, true] {
                     assert_brute_force(scene, matrix, pass, culling);
                 }
             }
         }
+    }
+    #[test]
+    fn environment_includes_static_neon_without_shadow_and_excludes_dynamic() {
+        let mut scene = SceneManager::default();
+        let neon = scene.add_cube(Vec3::ZERO);
+        scene.set_render_options(
+            neon,
+            crate::scene::RenderOptions {
+                is_static: true,
+                casts_shadow: false,
+                ..Default::default()
+            },
+        );
+        let dynamic = scene.add_cube(Vec3::ZERO);
+        let revision = scene.static_revision();
+        assert!(scene.set_emission(neon, 1.5));
+        assert!(scene.static_revision() > revision);
+        assert!(!scene.set_emission(neon, f32::NAN));
+        assert!(!scene.set_emission(neon, -1.0));
+        let mut queue = RenderQueue::default();
+        queue.extract_pass(&scene, Mat4::IDENTITY, false, RenderPassKind::Environment);
+        assert_eq!(queue.visible, 1);
+        assert_eq!(queue.batches[0][0].emission[0], 1.5);
+        assert!(scene.set_emission(dynamic, 1.0));
+        assert_eq!(scene.static_revision(), revision + 1);
     }
     #[test]
     fn bvh_matches_brute_force_across_passes_mutations_and_planar_imports() {
@@ -700,7 +734,7 @@ mod tests {
             object.render_data.instance.normal_matrix,
             crate::scene::normal_matrix(object.transform.model()).to_cols_array_2d()
         );
-        assert_eq!(std::mem::size_of::<InstanceData>(), 144);
+        assert_eq!(std::mem::size_of::<InstanceData>(), 160);
     }
     #[test]
     fn render_revision_invalidates_on_commands_and_animation_but_not_idle_frames() {

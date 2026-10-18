@@ -23,6 +23,7 @@ pub mod visibility;
 pub mod web;
 pub mod xr_buttons;
 pub mod xr_input;
+pub mod xr_player;
 pub mod xr_round;
 
 // Exercise the actual GPU mesh data and uniform layout on the native test host.

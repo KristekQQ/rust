@@ -105,6 +105,12 @@ culling, scénu i simulaci. Simulace postupuje jednou za XR snímek.
 
 Aktuální cesta vyžaduje `webgl`: každé oko se vyrenderuje přes stávající Rust/wgpu
 renderer a zkopíruje přes canvas do druhého WebGL kontextu XR kompozitoru.
+Každé oko znovu používá vlastní přenosovou texturu: `texImage2D(..., null)`
+vyhradí úložiště jen při prvním přenosu nebo změně rozměrů canvasu a
+[`texSubImage2D`](https://registry.khronos.org/webgl/specs/latest/1.0/#TEXSUBIMAGE2D)
+aktualizuje obsah bez opětovné definice úložiště. Rozdílné rozměry očí tak
+nevyvolávají realokaci při každém přepnutí oka. JS nečte pixely zpět na CPU;
+interní kopie a synchronizace mezi kontexty ale zůstávají závislé na prohlížeči.
 Nejde o přímý multiview výstup; přenos má náklady a výkon na Questu je nutné změřit.
 Výchozí rozlišení vrstvy je 75 % doporučeného. Grip ovladače a trigger jsou
 podporované. Ruce bez ovladačů, teleportace a AR/passthrough nejsou součástí ukázky.
@@ -259,3 +265,34 @@ Bez opt-in `setBladePhysics` zůstává původní obecný cutter beze změny.
 Regrese obsahují ostrou/plochou/tupou stranu, rychlé průchody, pětisekundovou
 podporu včetně expirace, přenášení třením, ztrátu trackingu a stisk 3D tlačítka
 oběma ovladači. Každé úspěšné rozdělení přidá bod; samotné vytvoření dvou fragmentů nepřidává dva body.
+
+
+## Obecný hráč: XRPlayer
+
+`engine.xr.player` je jedna enginem vlastněná instance `XRPlayer` (v Rustu
+`xr_player::XrPlayer`). Hlava a obě ruce se sledují i bez geometrie. Hráč sám
+nevytváří tělo, zbraně ani objekty scény. Konkrétní hra vybavuje libovolné objekty:
+
+```js
+const player = engine.xr.player;
+player.addItem(flashlight);                 // existující SceneObject
+player.equip('right', flashlight);           // bez řezání
+player.equip('left', sword, {cutting:true, requireTrigger:false, haptics:true});
+player.unequip('right');                     // ponechá předmět v inventáři
+player.removeItem(flashlight);               // odpojí a vyřadí; nemaže geometrii
+const {head, leftHand, rightHand, inventory} = player.state;
+```
+
+Snapshot obsahuje `tracked`, polohu, quaternion, matici, rychlost gripu v m/s
+(z posunu a skutečného času) a volitelný připojený objekt. Rychlost hlavy je zatím
+0. Při ztrátě trackingu jsou pozice/matice `null`, rychlost 0 a připojené objekty
+skryté. Opuštění XR zachová inventář i vybavení; `engine.dispose()` zneplatní SDK.
+Snapshot je diagnostika na vyžádání, nikoli další JS simulační smyčka.
+
+`player.bindHead(object)` volitelně připojí existující objekt k hlavě. Měřítko
+objektů zůstává zachované. Jeden objekt smí ovládat jen jeden slot. Inventář má
+limit 64 živých objektů a předměty se automaticky registrují při vybavení.
+`bindController` zůstává kompatibilní zkratka přes tentýž nativní hráčský stav.
+Neon aréna vybavuje své meče v `examples/neon-arena/main.js`; základní hráč nemá
+žádné znalosti o ovoci nebo zbraních. Hand tracking prstů ani fyzický avatar těla
+zatím nejsou součástí této abstrakce.

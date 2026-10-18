@@ -56,6 +56,8 @@ test('cutting commands preserve handle ownership, typed buffers and Rust piece I
         set_cuttable(...args) { calls.push(['cuttable', ...args]); },
         set_cutter(...args) { calls.push(['cutter', ...args]); },
         set_blade_physics(...args) { calls.push(['bladePhysics', ...args]); },
+        set_blade_contact_response(...args) { calls.push(['bladeContactResponse', ...args]); },
+        set_cut_assist(...args) { calls.push(['cutAssist', ...args]); },
         triangle_mesh_info: () => JSON.stringify({triangles: 12, volume: 8, closed: true, cuttable: true}),
         triangle_mesh_gpu_snapshot: async id => {calls.push(['gpuSnapshot',id]);return JSON.stringify({positions:[[1,2,3]],normals:[[0,1,0]],colors:[[1,0,0]]});},
         cut_with(...args) { calls.push(['cut', ...args]); return JSON.stringify({removed:[10],pieces:[12,13],objectCandidates:1,bvhNodes:9,triangleTests:8}); },
@@ -102,6 +104,14 @@ test('cutting commands preserve handle ownership, typed buffers and Rust piece I
     assert.deepEqual(calls.at(-1),['async',11,new Float32Array([0,-3,0]),.12,new Float32Array([.2,.8,.6]),'gpu']);
     assert.equal(computed.execution,'webgpu-compute');assert.deepEqual(computed.pieces.map(p=>p.id),[18,19]);
     await assert.rejects(()=>scene.cutWithAsync(new SceneObject({},11),{motion:[0,-3,0]}),/Čepel/);
+    assert.equal(blade.setCutAssist(.35), blade);
+    assert.deepEqual(calls.at(-1), ['cutAssist',11,.35]);
+    assert.equal(blade.setBladeContactResponse(true), blade);
+    assert.deepEqual(calls.at(-1), ['bladeContactResponse',11,true]);
+    blade.setBladeContactResponse(false);
+    assert.deepEqual(calls.at(-1), ['bladeContactResponse',11,false]);
+    blade.setCutAssist(0);
+    assert.deepEqual(calls.at(-1), ['cutAssist',11,0]);
     blade.setBladePhysics({edge:[0,-1,0]});
     assert.deepEqual(calls.at(-1),['bladePhysics',11,new Float32Array([0,-1,0]),.0225,.004]);
     blade.setBladePhysics(null);
@@ -398,4 +408,131 @@ test('XR controller bindings enforce engine handle ownership and disposal', asyn
     engine.dispose();
     assert.throws(() => engine.xr.bindController('right', sword), /ukončen/);
     assert.throws(()=>engine.xr.bindButton(sword),/tomuto enginu/);
+});
+
+
+test('environment maps validate upload shape and intensity before WASM', async t => {
+    const canvas = environment(t);
+    const uploads = [], intensities = [];
+    let clears = 0;
+    globalThis.__sdkImport = async () => wasmMock({
+        start: async () => {}, dispose() {},
+        set_environment_cube_map: (...args) => { uploads.push(args); return true; },
+        set_environment_intensity: value => { intensities.push(value); return true; },
+        clear_environment_cube_map: () => { clears++; return true; },
+    });
+    const engine = await (await sdk()).initEngine(canvas);
+    const color = new Uint8Array(24), emission = new Uint8Array(24);
+    engine.postprocessing.setEnvironmentCubeMap({ size: 1, color, emission });
+    assert.deepEqual(uploads[0], [1, color, emission, 1.2, new Float32Array()]);
+    engine.postprocessing.setEnvironmentIntensity(0);
+    engine.postprocessing.setEnvironmentIntensity(8);
+    assert.deepEqual(intensities, [0, 8]);
+    for (const invalid of [{ size: 0 }, { size: 1.5 }, { size: 2049 },
+        { color: new Uint8Array(7) }, { emission: [] }, { intensity: NaN }, { intensity: 9 },
+        ...[{}, { center: [0, 0], halfExtents: [1, 1, 1] },
+            { center: new Array(3), halfExtents: [1, 1, 1] },
+            { center: [0, 0, 0], halfExtents: new Array(3) },
+            { center: [0, Infinity, 0], halfExtents: [1, 1, 1] },
+            { center: [1e7, 0, 0], halfExtents: [1, 1, 1] },
+            { center: [0, 0, 0], halfExtents: [1, 0, 1] },
+            { center: [0, 0, 0], halfExtents: [1, NaN, 1] },
+            { center: [0, 0, 0], halfExtents: [1, 1e7, 1] }].map(projection => ({ projection }))]) {
+        assert.throws(() => engine.postprocessing.setEnvironmentCubeMap({ size: 1, color, emission, ...invalid }), /Invalid environment/);
+    }
+    for (const invalid of [-1, Infinity, NaN, 9]) assert.throws(() => engine.postprocessing.setEnvironmentIntensity(invalid), /Invalid environment/);
+    assert.equal(uploads.length, 1);
+    engine.postprocessing.setEnvironmentCubeMap(null);
+    assert.equal(clears, 1);
+    engine.postprocessing.setEnvironmentCubeMap({ size: 1, color, emission, intensity: 2 });
+    assert.deepEqual(uploads[1], [1, color, emission, 2, new Float32Array()]);
+    engine.postprocessing.setEnvironmentCubeMap({ size: 1, color, emission, projection: { center: [0, 1.65, 0], halfExtents: [7, 10.35, 7] } });
+    assert.deepEqual(uploads[2], [1, color, emission, 1.2, new Float32Array([0, 1.65, 0, 7, 10.35, 7])]);
+    engine.postprocessing.setEnvironmentCubeMap({ size: 1, color, emission, projection: null });
+    assert.deepEqual(uploads[3], [1, color, emission, 1.2, new Float32Array()]);
+    engine.dispose();
+    assert.throws(() => engine.postprocessing.setEnvironmentIntensity(1), /ukončen/);
+    assert.throws(() => engine.postprocessing.setEnvironmentCubeMap(null), /ukončen/);
+});
+
+
+test('world bitmap panels forward static inscriptions and diagnostic kind to Rust', async () => {
+    const {Scene, SceneObject} = await sdk();
+    const calls = [];
+    const scene = new Scene({
+        add_text_panel(...args) { calls.push(['text', ...args]); return 71; },
+        add_info_panel(...args) { calls.push(['info', ...args]); return 72; },
+        set_object_position(...args) { calls.push(['position', ...args]); return true; },
+    });
+    const panel = scene.createTextPanel({title:'CODEX', lines:['POSTAVENO SPOLECNE', 'S HONZOU'], position:[1,2,3], width:1.6, height:.7});
+    assert(panel instanceof SceneObject);
+    assert.equal(panel.id,71);
+    assert.deepEqual(calls[0],['text','CODEX','["POSTAVENO SPOLECNE","S HONZOU"]',1.6,.7]);
+    assert.deepEqual(calls[1],['position',71,1,2,3]);
+    assert.equal(scene.createInfoPanel('diagnostics').id,72);
+    assert.deepEqual(calls[2],['info','diagnostics',1.2,.72]);
+    scene.createTextPanel({title:'TITLE',lines:[]});
+    assert.deepEqual(calls[4],['text','TITLE','[]',1.2,.72]);
+});
+
+
+test('color cutout forwards validation to Rust and remains chainable', async () => {
+    const { SceneObject } = await sdk();
+    const calls = [];
+    const object = new SceneObject({
+        set_object_color_cutout(...args) { calls.push(args); return Number.isFinite(args[1]) && args[1] >= 0 && args[1] <= 1; },
+    }, 17);
+    assert.equal(object.setColorCutout(0.25), object);
+    assert.equal(object.setColorCutout(0), object);
+    assert.deepEqual(calls, [[17, 0.25], [17, 0]]);
+    for (const invalid of [NaN, Infinity, -0.1, 1.1]) assert.throws(() => object.setColorCutout(invalid), /odmítl/);
+});
+
+test('cut feedback and blade trail are thin ownership-checked native commands', async () => {
+    const {Scene, SceneObject} = await sdk();
+    const calls = [];
+    const wasm = {
+        play_cut_feedback_facing(ids, mirrorText, size) { calls.push(['feedback', Array.from(ids), mirrorText, size]); return JSON.stringify({objects:[40,41],duration:.65}); },
+        clear_cut_feedback() { calls.push(['clearFeedback']); },
+        set_blade_trail(id, enabled) { calls.push(['trail',id,enabled]); },
+    };
+    const scene = new Scene(wasm);
+    const pieces = [new SceneObject(wasm,12), new SceneObject(wasm,13)];
+    const result = scene.playCutFeedback(pieces);
+    assert.deepEqual(result.objects.map(p=>p.id),[40,41]);
+    assert.equal(result.duration,.65);
+    assert.equal(pieces[0].setBladeTrail(true),pieces[0]);
+    scene.clearCutFeedback();
+    assert.deepEqual(calls,[['feedback',[12,13],false,1],['trail',12,true],['clearFeedback']]);
+    scene.playCutFeedback(pieces,{mirrorText:true,size:.15});
+    assert.deepEqual(calls[3],['feedback',[12,13],true,.15]);
+    assert.throws(()=>scene.playCutFeedback([pieces[0],new SceneObject({},14)]),/scéně/);
+    assert.equal(calls.length,4,'Foreign handles never reach native mutation');
+});
+
+test('XRPlayer exposes native tracking and generic inventory without weapon assumptions', async () => {
+    const {XRPlayer,SceneObject}=await sdk();
+    let alive=true;
+    const calls=[];
+    const pose={tracked:true,matrix:Array(16).fill(0),position:[1,2,3],orientation:[0,0,0,1],speed:.5,object:12};
+    const state={head:{...pose,object:null},leftHand:{...pose,object:null},rightHand:pose,inventory:[12]};
+    const wasm={
+        xr_player_state:()=>JSON.stringify(state),
+        xr_bind_head:id=>calls.push(['head',id]),
+        xr_add_item:id=>calls.push(['add',id]),
+        xr_remove_item:id=>calls.push(['remove',id]),
+    };
+    const tool=new SceneObject(wasm,12),head=new SceneObject(wasm,13);
+    const host={bindController:(hand,object,options)=>calls.push(['equip',hand,object?.id??null,options])};
+    const player=new XRPlayer(wasm,host,object=>object===tool||object===head,id=>new SceneObject(wasm,id),()=>alive);
+    assert.equal(player.rightHand.speed,.5);
+    assert.deepEqual(player.head.position,[1,2,3]);
+    assert.deepEqual(player.inventory.map(object=>object.id),[12]);
+    player.addItem(tool).bindHead(head).equip('right',tool).unequip('left').removeItem(tool);
+    assert.deepEqual(calls,[['add',12],['head',13],['equip','right',12,{}],['equip','left',null,{}],['equip','right',null,{}],['remove',12]]);
+    assert.throws(()=>player.equip('left',new SceneObject({},12)),/patřit/);
+    assert.throws(()=>player.bindHead(new SceneObject({},13)),/patřit/);
+    alive=false;
+    assert.throws(()=>player.state,/ukončen/);
+    assert.throws(()=>player.equip('right',tool),/ukončen/);
 });

@@ -4,6 +4,10 @@ Reply in Czech. Rust owns scene state, calculations, simulation and rendering; J
 
 Project-owned skills live in versioned `.agents/skills/`, not personal `~/.codex/skills`. Use [rust-webgpu-project](.agents/skills/rust-webgpu-project/SKILL.md) for engine/SDK/example work; keep its links portable. Generic personal/tool skills stay outside the project.
 
+For scene placement, rotations, scale and attached world-space labels, use [scene-object-layout](.agents/skills/scene-object-layout/SKILL.md); verify requested sides in XR coordinates, not only the desktop preview.
+
+For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-player-equipment/SKILL.md). For cut-impact visuals and speed tuning use [cut-feedback-tuning](.agents/skills/cut-feedback-tuning/SKILL.md); prefer existing configuration knobs for numeric iteration.
+
 Keep Rust/WGSL layouts and `src/web.rs` exports consistent with `js/engine.js`, types and callers. Rebuild ignored `pkg/` when WASM/export changes need browser verification. Test the affected Rust page; `cube.html` and JS graphics demos do not verify this renderer.
 
 Use `MEMORY.md` only for orientation/current decisions; consult linked docs only for the affected area. Choose required checks from [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Native tests omit wasm32 renderer/web code. Preserve independent pass visibility, static revisions and resource cleanup. Respect `rust-toolchain.toml`; inspect Cargo configuration before source/offline changes.

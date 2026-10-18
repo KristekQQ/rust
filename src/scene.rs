@@ -2,6 +2,9 @@
 use glam::{Mat4, Vec3};
 use std::collections::BTreeMap;
 
+#[path = "cut_feedback.rs"]
+pub(crate) mod cut_feedback;
+
 pub const MAX_LIGHTS: usize = 4;
 pub const INVALID_ID: u32 = u32::MAX;
 
@@ -66,6 +69,7 @@ struct BladeCutState {
 
 #[derive(Clone, Copy)]
 struct CutFragment {
+    cut_speed: f32,
     family: u64,
     blade_grace_until: f32,
     radius: f32,
@@ -157,6 +161,10 @@ pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
     pub render_options: RenderOptions,
+    pub emission: f32,
+    pub color_cutout: f32,
+    cut_assist: f32,
+    blade_contact_response: bool,
     local_bounds: Option<(Vec3, Vec3)>,
     pub(crate) render_data: crate::visibility::ObjectRenderData,
 }
@@ -208,6 +216,7 @@ struct BoxCollider {
 
 #[derive(Default)]
 pub struct SceneManager {
+    feedback: cut_feedback::Feedback,
     objects: BTreeMap<u32, SceneObject>,
     triangle_meshes: BTreeMap<u32, TriangleObject>,
     pub(crate) info_panels: BTreeMap<u32, crate::info_panel::InfoPanel>,
@@ -297,6 +306,30 @@ impl SceneManager {
         {
             self.static_revision = self.static_revision.wrapping_add(1);
         }
+    }
+    /// Vertex-color emission for primitive/triangle meshes; glTF owns its materials.
+    pub fn set_emission(&mut self, id: u32, intensity: f32) -> bool {
+        if !intensity.is_finite() || !(0.0..=8.0).contains(&intensity) {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.emission = intensity;
+        self.changed(id);
+        true
+    }
+    /// Discard dark vertex-color fragments; zero preserves the opaque surface.
+    pub fn set_color_cutout(&mut self, id: u32, threshold: f32) -> bool {
+        if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.color_cutout = threshold;
+        self.changed(id);
+        true
     }
     pub fn set_render_options(&mut self, id: u32, options: RenderOptions) -> bool {
         if !options.reflectivity.is_finite() || !(0.0..=1.0).contains(&options.reflectivity) {
@@ -393,6 +426,10 @@ impl SceneManager {
             self.projectiles.insert(id, (velocity, gravity, bounce));
         }
         true
+    }
+    #[cfg(test)]
+    pub(crate) fn projectile_velocity(&self, id: u32) -> Option<Vec3> {
+        self.projectiles.get(&id).map(|state| state.0)
     }
     fn update_projectiles(&mut self, dt: f32) {
         if self.projectiles.is_empty() {
@@ -575,6 +612,10 @@ impl SceneManager {
                 mesh,
                 transform,
                 render_options: RenderOptions::default(),
+                emission: 0.0,
+                color_cutout: 0.0,
+                cut_assist: 0.0,
+                blade_contact_response: false,
                 local_bounds: None,
                 render_data: crate::visibility::ObjectRenderData::new(mesh, transform),
             },
@@ -604,6 +645,20 @@ impl SceneManager {
             width,
             height,
         )?;
+        self.insert_info_panel(panel)
+    }
+    pub fn add_text_panel(
+        &mut self,
+        title: &str,
+        lines: &[String],
+        width: f32,
+        height: f32,
+    ) -> Result<u32, String> {
+        self.insert_info_panel(crate::info_panel::InfoPanel::text(
+            title, lines, width, height,
+        )?)
+    }
+    fn insert_info_panel(&mut self, panel: crate::info_panel::InfoPanel) -> Result<u32, String> {
         let id = self.add_imported(
             Vec3::from_array(panel.mesh.bounds_min),
             Vec3::from_array(panel.mesh.bounds_max),
@@ -766,12 +821,46 @@ impl SceneManager {
             }
             self.cutters.insert(id, [a, b]);
         } else {
+            self.reset_blade_trail(id);
             self.cutters.remove(&id);
             self.blade_physics.remove(&id);
             self.release_blade_cuts(id, false);
         }
         self.render_revision = self.render_revision.wrapping_add(1);
         Ok(())
+    }
+    /// Tracked finite-ribbon coverage required to complete a cut; zero restores physical mode.
+    pub fn set_cut_assist(&mut self, id: u32, coverage: f32) -> Result<(), String> {
+        if !coverage.is_finite() || !(0.0..=1.0).contains(&coverage) {
+            return Err("Cut assist coverage must be finite and in 0..1".into());
+        }
+        let object = self
+            .objects
+            .get_mut(&id)
+            .ok_or("Cutter object does not exist")?;
+        object.cut_assist = coverage;
+        self.release_blade_cuts(id, false);
+        Ok(())
+    }
+    pub(crate) fn cut_assist(&self, id: u32) -> f32 {
+        self.objects.get(&id).map_or(0., |object| object.cut_assist)
+    }
+    /// Enable rigid projectile contacts during assisted cutting. Requires blade physics.
+    pub fn set_blade_contact_response(&mut self, id: u32, enabled: bool) -> Result<(), String> {
+        if enabled && !self.blade_physics.contains_key(&id) {
+            return Err("Blade contact response requires configured blade physics".into());
+        }
+        self.objects
+            .get_mut(&id)
+            .ok_or("Cutter object does not exist")?
+            .blade_contact_response = enabled;
+        self.release_blade_cuts(id, false);
+        Ok(())
+    }
+    pub(crate) fn blade_contact_response(&self, id: u32) -> bool {
+        self.objects
+            .get(&id)
+            .is_some_and(|object| object.blade_contact_response)
     }
     pub fn set_blade_physics(
         &mut self,
@@ -950,6 +1039,7 @@ impl SceneManager {
             }
         }
         let mut updates = Vec::new();
+        let assisted_contacts = self.cut_assist(id) > 0. && self.blade_contact_response(id);
         for (&target, &(velocity, _, bounce)) in &self.projectiles {
             if target == id
                 || self
@@ -1016,7 +1106,14 @@ impl SceneManager {
                 velocity,
                 bounce,
                 dt,
+                assisted_contacts,
+                self.tracked_cut_eligible(target, id),
             ) {
+                let velocity = if assisted_contacts {
+                    velocity.clamp_length_max(8.)
+                } else {
+                    velocity
+                };
                 updates.push((target, resolved - center, velocity));
             }
         }
@@ -1342,6 +1439,13 @@ impl SceneManager {
                 .ok_or("Cut target no longer exists")?
                 .render_options;
         }
+        let materials: BTreeMap<_, _> = removed
+            .iter()
+            .map(|id| {
+                let object = &self.objects[id];
+                (*id, (object.emission, object.color_cutout))
+            })
+            .collect();
         for &id in &removed {
             self.remove_object(id);
         }
@@ -1367,6 +1471,9 @@ impl SceneManager {
                     transform.scale,
                 );
                 self.set_render_options(id, candidate.options);
+                let (emission, cutoff) = materials[&candidate.id];
+                self.set_emission(id, emission);
+                self.set_color_cutout(id, cutoff);
                 self.set_cuttable(id, true, candidate.color)?;
                 report.pieces.push(id);
                 report.piece_directions.push(direction);
@@ -1535,12 +1642,14 @@ impl SceneManager {
                         })
                     })
                     .collect();
-                let physical = self.blade_physics.contains_key(&cutter);
-                let (progress, slice) = if physical {
-                    source
-                        .mesh
-                        .cpu()?
-                        .slice_ribbon_progress(&samples, source.cap_color, 0.75)?
+                let assist = self.cut_assist(cutter);
+                let physical = assist == 0. && self.blade_physics.contains_key(&cutter);
+                let (progress, slice) = if physical || assist > 0. {
+                    source.mesh.cpu()?.slice_ribbon_progress(
+                        &samples,
+                        source.cap_color,
+                        if assist > 0. { assist } else { 0.75 },
+                    )?
                 } else {
                     (
                         0.,
@@ -1696,6 +1805,14 @@ impl SceneManager {
                 );
             }
         }
+        let materials: BTreeMap<_, _> = report
+            .removed
+            .iter()
+            .map(|id| {
+                let object = &self.objects[id];
+                (*id, (object.emission, object.color_cutout))
+            })
+            .collect();
         for &id in &report.removed {
             self.remove_object(id);
         }
@@ -1725,6 +1842,7 @@ impl SceneManager {
                     .map(|p| (*p * transform.scale).length())
                     .fold(0., f32::max);
                 fragment = Some(CutFragment {
+                    cut_speed: 0.,
                     family: ancestor.map_or(u64::from(source) + 1, |f| f.family),
                     blade_grace_until: self.time + 0.2,
                     radius,
@@ -1745,6 +1863,9 @@ impl SceneManager {
             let id = self.add_triangle_mesh(piece)?;
             self.set_object_transform(id, transform.position, transform.rotation, transform.scale);
             self.set_render_options(id, options);
+            let (emission, cutoff) = materials[&source];
+            self.set_emission(id, emission);
+            self.set_color_cutout(id, cutoff);
             self.set_cuttable(id, eligible, cap_color)?;
             if let Some((velocity, gravity, bounce)) = projectile {
                 self.set_projectile(id, velocity, gravity, bounce);
@@ -1875,6 +1996,7 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.feedback = cut_feedback::Feedback::default();
         self.projectiles.clear();
         self.projectile_scratch.clear();
         self.cut_fragments.clear();
@@ -1916,6 +2038,7 @@ impl SceneManager {
         self.paused = false;
     }
     pub fn remove_object(&mut self, id: u32) -> bool {
+        self.remove_blade_trail_binding(id);
         let was_static = self
             .objects
             .get(&id)
@@ -2184,6 +2307,7 @@ impl SceneManager {
                 }
             }
         }
+        self.update_cut_feedback(dt);
         self.time += dt;
         let now = self.time;
         let pending = std::mem::take(&mut self.removals);
@@ -2909,6 +3033,29 @@ mod tests {
 #[cfg(test)]
 mod info_panel_tests {
     use super::*;
+    #[test]
+    fn text_panel_preserves_transform_and_static_text_during_info_updates() {
+        let mut scene = SceneManager::default();
+        assert!(scene.add_text_panel("TITLE", &[], f32::NAN, 1.).is_err());
+        assert!(scene.objects().is_empty());
+        let id = scene
+            .add_text_panel("TITLE", &["LINE".into()], 1., 0.5)
+            .unwrap();
+        scene.set_object_position(id, Vec3::new(1., 2., -3.));
+        let original = scene.info_panels[&id].mesh.indices.clone();
+        scene.update_info_panels(crate::info_panel::PanelKind::Text, &[("FPS", "90".into())]);
+        scene.update_info_panels(
+            crate::info_panel::PanelKind::Diagnostics,
+            &[("FPS", "90".into())],
+        );
+        assert_eq!(scene.info_panels[&id].mesh.indices, original);
+        assert_eq!(
+            scene.objects[&id].transform.position,
+            Vec3::new(1., 2., -3.)
+        );
+        assert!(scene.remove_object(id));
+        assert!(scene.info_panels.is_empty());
+    }
     #[test]
     fn info_panel_stable_handle_bounds_cache_and_removal() {
         let mut scene = SceneManager::default();

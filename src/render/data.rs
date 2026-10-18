@@ -441,7 +441,7 @@ mod tests {
     #[test]
     fn instance_material_layout_matches_shader() {
         use crate::visibility::InstanceData;
-        assert_eq!(std::mem::size_of::<InstanceData>(), 144);
+        assert_eq!(std::mem::size_of::<InstanceData>(), 160);
         assert_eq!(std::mem::offset_of!(InstanceData, material), 128);
         assert_eq!(
             InstanceData::layout()
@@ -449,11 +449,11 @@ mod tests {
                 .last()
                 .unwrap()
                 .shader_location,
-            11
+            12
         );
         assert_eq!(
             InstanceData::layout().attributes.last().unwrap().offset,
-            128
+            144
         );
     }
     #[test]
@@ -467,9 +467,9 @@ mod tests {
 
 impl crate::visibility::InstanceData {
     pub fn layout<'a>() -> VertexBufferLayout<'a> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![
+        const ATTRIBUTES: [wgpu::VertexAttribute; 10] = wgpu::vertex_attr_array![
             3 => Float32x4, 4 => Float32x4, 5 => Float32x4, 6 => Float32x4,
-            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4, 11 => Float32x4
+            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4, 11 => Float32x4, 12 => Float32x4
         ];
         VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as u64,

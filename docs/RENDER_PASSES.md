@@ -67,8 +67,8 @@ fragmentové oříznutí, nikoliv oblique near-plane clipping. Odraz se nerekurz
 Odraz je RGBA8 sRGB + hloubka, poloviční rozlišení canvasu s delší stranou
 omezenou na 1024. Zachovává poměr stran; materiál používá projekční UV.
 Podporovány jsou neprůhledné objekty, jedna rovina a single-sample přílohy.
-Více zrcadel, environment cubemaps, průhlednost, roughness mip chain a VR/WebXR
-binding zatím nejsou implementovány.
+Více zrcadel, průhlednost a roughness mip chain rovinného zrcadla zatím nejsou implementovány.
+Samostatný statický environment probe pro SSR a omezení XR viz [postprocessing](POSTPROCESSING.md).
 
 ## JS/TS příkazy
 
@@ -143,7 +143,7 @@ odpovídat deklarovaným formátům/rozměrům, vzorkování musí být single-s
 Nativní testy kontrolují odraz, rovinu po změně transformace, konzervativní
 frusta, castery mimo hlavní kameru, rozdělení statických/dynamických casterů,
 invalidaci statické revize, pause a Rust/WGSL layout materiálu (InstanceData
-144 B, material na offsetu 128). `tests/render-effects.html` testuje cache v
+160 B, material na offsetu 128 a emission na offsetu 144). `tests/render-effects.html` testuje cache v
 klidu, obnovování za pohybu, vypnutí efektů, resize a výstup přes texturu.
 Skutečný obraz a GPU konzoli je nutné kontrolovat v browseru; statistiky samy
 nejsou důkazem správných stínů/odrazu.

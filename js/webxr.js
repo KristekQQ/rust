@@ -1,8 +1,42 @@
 // @ts-nocheck -- WebXR browser interfaces are not yet part of TypeScript lib.dom.
 // Platform adapter only: XR scheduling and canvas transfer. Rust computes views and scene state.
+/** Logical tracked person. Scene objects are equipment, never built-in weapons or body meshes. */
+export class XRPlayer {
+    #engine; #host; #owns; #object; #alive;
+    constructor(engine, host, owns, object, alive) {
+        this.#engine=engine;this.#host=host;this.#owns=owns;this.#object=object;this.#alive=alive;
+    }
+    #check(object) {
+        if(!this.#alive())throw new Error('WebXR byl ukončen.');
+        if(object!==undefined&&object!==null&&!this.#owns(object))throw new Error('Objekt musí patřit tomuto enginu.');
+    }
+    get state() {
+        this.#check();
+        const state=JSON.parse(this.#engine.xr_player_state());
+        for(const key of ['head','leftHand','rightHand'])state[key]={...state[key],object:state[key].object===null?null:this.#object(state[key].object)};
+        return {...state,inventory:state.inventory.map(this.#object)};
+    }
+    get head(){return this.state.head;}
+    get leftHand(){return this.state.leftHand;}
+    get rightHand(){return this.state.rightHand;}
+    get inventory(){return this.state.inventory;}
+    bindHead(object){this.#check(object);this.#engine.xr_bind_head(object?.id??0xffffffff);return this;}
+    addItem(object){this.#check(object);if(!object)throw new Error('Chybí objekt.');this.#engine.xr_add_item(object.id);return this;}
+    removeItem(object){
+        this.#check(object);if(!object)throw new Error('Chybí objekt.');
+        const state=this.state;
+        for(const [hand,key] of [['left','leftHand'],['right','rightHand']])if(state[key].object?.id===object.id)this.equip(hand,null);
+        this.#engine.xr_remove_item(object.id);return this;
+    }
+    equip(hand,object,options={}){this.#check(object);this.#host.bindController(hand,object,options);return this;}
+    unequip(hand){return this.equip(hand,null);}
+}
+
 export class WebXRHost extends EventTarget {
+    #player;
+    get player(){return this.#player;}
     #engine; #canvas; #session = null; #pending = false; #disposed = false;
-    #gl; #program; #texture; #vao; #frame = null; #size; #previous = null;
+    #gl; #program; #textures = []; #vao; #frame = null; #size; #previous = null;
     #pressed = [null, null];
     #sources = [null, null];
     #space = null;
@@ -13,13 +47,19 @@ export class WebXRHost extends EventTarget {
     #controllerObjects = [null, null];
     #bladePoses = [null, null];
     #buttonTouch = [false, false];
+    #haptics = [false, false];
+    #contactActive = [false, false];
     #resetInputs = () => {
         this.#pressed = [null, null];
         this.#bladePoses = [null, null];
         this.#buttonTouch = [false, false];
         this.#buttonPoints = [undefined, undefined];
         this.#sources = [null, null];
-        if (this.#session && this.#trackingActive && !this.#disposed) for (let index=0; index<2; index++) this.#engine.xr_update_controller(index,new Float32Array(),false);
+        this.#contactActive = [false, false];
+        if (this.#session && this.#trackingActive && !this.#disposed) {
+            this.#engine.xr_update_head(new Float32Array());
+            for (let index=0; index<2; index++) this.#engine.xr_update_controller(index,new Float32Array(),false);
+        }
     };
     #visibilityChanged = () => { this.#previous = null; this.#resetInputs(); };
     #requireTrigger = [true, true];
@@ -27,14 +67,16 @@ export class WebXRHost extends EventTarget {
     #onEnd = () => this.#cleanup();
     /** @param {any} engine @param {HTMLCanvasElement} canvas
      * @param {(object: object) => boolean} owns @param {(id: number) => any} object */
-    constructor(engine, canvas, owns = () => false, object = id => id) { super(); this.#engine = engine; this.#canvas = canvas; this.#owns = owns; this.#object = object; }
-    bindController(hand, object, {cutting = false, requireTrigger = true} = {}) {
+    constructor(engine, canvas, owns = () => false, object = id => id) { super(); this.#engine = engine; this.#canvas = canvas; this.#owns = owns; this.#object = object; this.#player=new XRPlayer(engine,this,owns,object,()=>!this.#disposed); }
+    bindController(hand, object, {cutting = false, requireTrigger = true, haptics = false} = {}) {
         if (this.#disposed) throw new Error('WebXR byl ukončen.');
         const index = hand === 'left' ? 0 : hand === 'right' ? 1 : -1;
         if (index < 0 || (object !== null && !this.#owns(object))) throw new Error('Ovladač vyžaduje left/right a objekt tohoto enginu.');
         this.#engine.xr_bind_controller(index, object === null ? 0xffffffff : object.id, cutting);
         this.#requireTrigger[index] = requireTrigger;
         this.#controllerObjects[index] = object;
+        this.#haptics[index] = !!object && haptics;
+        this.#contactActive[index] = false;
         this.#bladePoses[index] = null;
         this.#buttonTouch[index] = false;
     }
@@ -56,10 +98,17 @@ export class WebXRHost extends EventTarget {
                 this.#bladePoses[index] = null;
                 this.#buttonTouch[index] = false;
                 this.#sources[index] = source;
+                this.#contactActive[index] = false;
             }
             const pose = tracking && source ? frame.getPose(source.gripSpace, space) : null;
             const pressed = !!pose && !!source.gamepad?.buttons[0]?.pressed;
             const report = JSON.parse(this.#engine.xr_update_controller(index, pose ? pose.transform.matrix : new Float32Array(), !!pose && (pressed || !this.#requireTrigger[index])));
+            const contact = !!pose && report.bladeContacts > 0;
+            if (pose && this.#haptics[index]) {
+                if (report.removed.length) this.#pulse(source, 0.45, 35);
+                else if (contact && !this.#contactActive[index]) this.#pulse(source, 0.2, 20);
+            }
+            this.#contactActive[index] = contact;
             if (report.removed.length) this.dispatchEvent(new CustomEvent('cut', {detail: {...report, pieces: report.pieces.map(this.#object), handedness: hand}}));
             let point = null;
             if (this.#button && pose && source?.targetRaySpace) {
@@ -93,6 +142,12 @@ export class WebXRHost extends EventTarget {
             }
             this.#pressed[index] = pose ? pressed : null;
         }
+    }
+    #pulse(source, intensity, milliseconds) {
+        const actuator = source?.gamepad?.hapticActuators?.[0] ?? source?.gamepad?.vibrationActuator;
+        if (typeof actuator?.pulse !== 'function') return;
+        try { Promise.resolve(actuator.pulse(intensity, milliseconds)).catch(() => {}); }
+        catch { /* Haptics are optional platform feedback. */ }
     }
     get isPresenting() { return this.#session !== null; }
     get roundState() { return JSON.parse(this.#engine.xr_round_state()); }
@@ -153,18 +208,17 @@ export class WebXRHost extends EventTarget {
                         this.#roundEnded = true;
                         this.dispatchEvent(new CustomEvent('roundend', {detail: round}));
                     }
+                    const tracked = !!pose && (!session.visibilityState || session.visibilityState === 'visible');
+                    this.#engine.xr_update_head(tracked ? pose.transform.matrix : new Float32Array());
                     this.#updateControllers(session, xrFrame, space, !!pose && (!session.visibilityState || session.visibilityState === 'visible'));
                     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
                     gl.clearColor(0.1, 0.1, 0.3, 1);
                     gl.clear(gl.COLOR_BUFFER_BIT);
-                    if (pose) for (const view of pose.views) {
+                    if (pose) for (const [index, view] of pose.views.entries()) {
                         const viewport = layer.getViewport(view);
                         if (!viewport) continue;
                         this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
-                        // Cross-context GPU canvas transfer; no CPU pixels/scene geometry in JavaScript.
-                        gl.bindTexture(gl.TEXTURE_2D, this.#texture);
-                        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.#canvas);
+                        this.#uploadCanvas(index);
                         gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
                         gl.useProgram(this.#program);
                         gl.bindVertexArray(this.#vao);
@@ -204,6 +258,7 @@ export class WebXRHost extends EventTarget {
         this.#space?.removeEventListener?.('reset',this.#resetInputs);
         this.#space = null;
         this.#sources = [null,null];
+        this.#contactActive = [false, false];
         this.#frame = null;
         this.#previous = null;
         this.#pressed = [null, null];
@@ -215,13 +270,35 @@ export class WebXRHost extends EventTarget {
             if (this.#size) this.#engine.resize(...this.#size);
         } catch { /* Engine disposal can precede an asynchronous session end. */ }
         if (this.#gl) {
-            this.#gl.deleteTexture(this.#texture);
+            for (const image of this.#textures) if (image) this.#gl.deleteTexture(image.texture);
             this.#gl.deleteProgram(this.#program);
             this.#gl.deleteVertexArray(this.#vao);
             this.#gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
-        this.#gl = this.#program = this.#texture = this.#vao = null;
+        this.#textures = [];
+        this.#gl = this.#program = this.#vao = null;
         this.dispatchEvent(new Event('end'));
+    }
+    #uploadCanvas(index) {
+        const gl = this.#gl;
+        let image = this.#textures[index];
+        if (!image) {
+            image = this.#textures[index] = {texture: gl.createTexture(), width: 0, height: 0};
+            gl.bindTexture(gl.TEXTURE_2D, image.texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        } else gl.bindTexture(gl.TEXTURE_2D, image.texture);
+        const {width, height} = this.#canvas;
+        // Each eye retains its storage even when the viewports have different sizes.
+        if (image.width !== width || image.height !== height) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            image.width = width; image.height = height;
+        }
+        // Cross-context canvas upload still has browser synchronization/copy costs; no JS pixel readback.
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.#canvas);
     }
     #createBlit() {
         const gl = this.#gl;
@@ -244,10 +321,5 @@ export class WebXRHost extends EventTarget {
         gl.deleteShader(vertex); gl.deleteShader(fragment);
         if (!gl.getProgramParameter(this.#program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(this.#program));
         this.#vao = gl.createVertexArray();
-        this.#texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, this.#texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     }
 }

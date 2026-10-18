@@ -1,4 +1,5 @@
-import { WebXRHost } from './webxr.js';
+import { WebXRHost, XRPlayer } from './webxr.js';
+export { XRPlayer };
 // JavaScript bridge to the Rust engine. GPU state and the frame loop live in Rust.
 // The current Rust API supports one canvas with the id "gpu-canvas" per page.
 /** @typedef {import('./engine.d.ts').Vector3} Vector3 */
@@ -27,6 +28,14 @@ export class SceneObject {
     setCutter(blade) {
         this.#wasm.set_cutter(this.id, blade !== null, new Float32Array(blade ? [...blade.base, ...blade.tip] : [])); return this;
     }
+    /** @param {boolean} enabled */
+    setBladeTrail(enabled) { this.#wasm.set_blade_trail(this.id, enabled); return this; }
+    /** Opt-in rigid fruit contacts during assisted cuts; requires setBladePhysics.
+     * @param {boolean} enabled */
+    setBladeContactResponse(enabled) { this.#wasm.set_blade_contact_response(this.id, enabled); return this; }
+    /** Tracked finite ribbon coverage (0..1); zero restores physical cutting.
+     * @param {number} coverage */
+    setCutAssist(coverage) { this.#wasm.set_cut_assist(this.id, coverage); return this; }
     /** Physical flat/back contacts plus one sharp edge. Null restores legacy cutter sweeps.
      * @param {{edge: Vector3, halfWidth?: number, halfThickness?: number}|null} options */
     setBladePhysics(options) {
@@ -56,6 +65,10 @@ export class SceneObject {
     rotate(degrees, { delay = 0, duration = 1 } = {}) {
         accepted(this.#wasm.schedule_rotate(this.id, ...degrees, delay, duration)); return this;
     }
+    /** Vertex-color emission, 0..8; primitive and triangle meshes. @param {number} intensity */
+    setEmission(intensity) { accepted(this.#wasm.set_object_emission(this.id, intensity)); return this; }
+    /** Discard fragments below this maximum vertex RGB; finite 0..1, zero disables. Triangle meshes show both sides. @param {number} threshold */
+    setColorCutout(threshold) { accepted(this.#wasm.set_object_color_cutout(this.id, threshold)); return this; }
     /** @param {{isStatic?: boolean, castsShadow?: boolean, receivesShadow?: boolean, reflectivity?: number}} [options] */
     setRenderOptions({isStatic=false, castsShadow=true, receivesShadow=true, reflectivity=0} = {}) {
         accepted(this.#wasm.set_object_render_options(this.id,isStatic,castsShadow,receivesShadow,reflectivity)); return this;
@@ -127,10 +140,15 @@ export class Scene {
     /** @param {Vector3} [position] */
     createSphere(position = [0, 0, 0]) { return this.#create(this.#wasm.add_sphere(...position)); }
     /** World-space Rust text geometry, updated from native scene/round data.
-     * @param {'scene'|'round'|'restart'} kind
+     * @param {'scene'|'round'|'restart'|'diagnostics'} kind
      * @param {{position?: Vector3, width?: number, height?: number}} [options] */
     createInfoPanel(kind, {position = [0,0,0], width = 1.2, height = .72} = {}) {
         return this.#create(this.#wasm.add_info_panel(kind, width, height)).setPosition(position);
+    }
+    /** Static world-space bitmap inscription built by Rust, without a background.
+     * @param {{title: string, lines: string[], position?: Vector3, width?: number, height?: number}} options */
+    createTextPanel({title, lines, position = [0,0,0], width = 1.2, height = .72}) {
+        return this.#create(this.#wasm.add_text_panel(title, JSON.stringify(lines), width, height)).setPosition(position);
     }
     /** Closed indexed triangle solid. Parsing, geometry, BVH and GPU upload are Rust.
      * @param {import('./engine.d.ts').TriangleMeshOptions} options */
@@ -159,6 +177,14 @@ export class Scene {
             : this.#wasm.cut_with(cutter.id, ...motion, separation));
         return {...result, pieces: result.pieces.map((/** @type {number} */ id) => this.#create(id))};
     }
+    /** Explicit bounded Rust burst and fragment presentation.
+     * @param {SceneObject[]} pieces @param {{mirrorText?: boolean,size?: number}} [options] @returns {{objects: SceneObject[], duration: number}} */
+    playCutFeedback(pieces, {mirrorText = false, size = 1} = {}) {
+        if (pieces.some(p => handleBindings.get(p) !== this.#wasm)) throw new Error('Fragmenty musí patřit této scéně.');
+        const result = JSON.parse(this.#wasm.play_cut_feedback_facing(new Uint32Array(pieces.map(p => p.id)), mirrorText, size));
+        return {objects: result.objects.map((/** @type {number} */ id) => this.#create(id)), duration: result.duration};
+    }
+    clearCutFeedback() { this.#wasm.clear_cut_feedback(); }
     /** Hybrid compute preparation + identical Rust topology; WebGL uses CPU.
      * @param {SceneObject} cutter @param {import('./engine.d.ts').AsyncCutOptions} options
      * @returns {Promise<import('./engine.d.ts').AsyncCutResult>} */
@@ -339,6 +365,8 @@ async function initializeEngine(canvas, backend, initialization) {
                 if (ownership[initializationKey] === initialization) delete ownership[initializationKey];
             }
         },
+        /** @param {Vector3} color Linear RGB clear color. */
+        setBackgroundColor(color) { accepted(wasm.set_background_color(...color)); },
         // Thin commands only: pass order, resources and execution live in Rust.
         postprocessing: Object.freeze({
             /** @param {import("./engine.d.ts").PostEffectName} name */
@@ -354,6 +382,29 @@ async function initializeEngine(canvas, backend, initialization) {
             setReflectionMask({ width, height, pixels, center = [0, 0], size = [1, 1] }) {
                 accepted(wasm.set_reflection_mask(width, height, pixels, ...center, ...size));
             },
+            /** @param {Parameters<import("./engine.d.ts").PostProcessing["configureEnvironment"]>[0]} [options] */
+            configureEnvironment({ enabled = true, center = /** @type {Vector3} */ ([0, 2, 0]), halfExtents = /** @type {Vector3} */ ([14, 10, 14]) } = {}) {
+                accepted(wasm.configure_environment(enabled, ...center, ...halfExtents));
+            },
+            /** @param {Parameters<import("./engine.d.ts").PostProcessing["setEnvironmentCubeMap"]>[0]} options */
+            setEnvironmentCubeMap(options) {
+                if (options === null) { accepted(wasm.clear_environment_cube_map()); return; }
+                const { size, color, emission, intensity = 1.2, projection = null } = options;
+                if (!Number.isInteger(size) || size < 1 || size > 2048 || !(color instanceof Uint8Array) || !(emission instanceof Uint8Array) || color.length !== size * size * 6 * 4 || emission.length !== color.length || !Number.isFinite(intensity) || intensity < 0 || intensity > 8) throw new RangeError("Invalid environment cube map");
+                let projectionValues = [];
+                if (projection !== null) {
+                    const { center, halfExtents } = projection;
+                    if (!Array.isArray(center) || center.length !== 3 || ![...center].every(v => Number.isFinite(v) && Math.abs(v) <= 1e6) || !Array.isArray(halfExtents) || halfExtents.length !== 3 || ![...halfExtents].every(v => Number.isFinite(v) && v > 0 && v <= 1e6)) throw new RangeError("Invalid environment projection");
+                    projectionValues = [...center, ...halfExtents];
+                }
+                accepted(wasm.set_environment_cube_map(size, color, emission, intensity, new Float32Array(projectionValues)));
+            },
+            /** @param {number} intensity */
+            setEnvironmentIntensity(intensity) {
+                if (!Number.isFinite(intensity) || intensity < 0 || intensity > 8) throw new RangeError("Invalid environment intensity");
+                accepted(wasm.set_environment_intensity(intensity));
+            },
+            environmentCaptures() { return wasm.environment_captures(); },
             stats() {
                 const [passes, width, height, targets, frames] = wasm.postprocess_stats();
                 return { passes, width, height, targets, frames };

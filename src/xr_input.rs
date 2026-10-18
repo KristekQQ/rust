@@ -5,6 +5,7 @@
 //! accumulates; its current orientation is used for the final mesh split. Twisted strokes, teleports and tracking loss never become giant
 //! inferred cutting planes.
 use crate::scene::{CutReport, SceneManager};
+use crate::xr_player::GripSpeed;
 use glam::{EulerRot, Mat4, Quat, Vec3};
 use std::collections::BTreeMap;
 
@@ -25,6 +26,7 @@ pub struct TrackedController {
     cutting: bool,
     scale: Vec3,
     previous: Option<Sample>,
+    grip_speed: GripSpeed,
     anchor: Option<Sample>,
     direction: Vec3,
     frames: u32,
@@ -33,6 +35,11 @@ pub struct TrackedController {
 }
 
 impl TrackedController {
+    /// The scene object bound to this controller, if any.
+    pub fn object_id(&self) -> Option<u32> {
+        self.id
+    }
+
     pub fn bind(
         &mut self,
         scene: &mut SceneManager,
@@ -65,11 +72,13 @@ impl TrackedController {
     pub fn reset(&mut self, scene: &mut SceneManager) {
         if let Some(id) = self.id {
             scene.release_blade_cuts(id, false);
+            scene.reset_blade_trail(id);
             scene.set_object_position(id, HIDDEN);
         }
         self.ribbons.clear();
         self.target_positions.clear();
         self.previous = None;
+        self.grip_speed = GripSpeed::default();
         self.anchor = None;
         self.direction = Vec3::ZERO;
         self.frames = 0;
@@ -91,6 +100,19 @@ impl TrackedController {
         pose: Option<Mat4>,
         pressed: bool,
         dt: f32,
+    ) -> Result<CutReport, String> {
+        self.update_timed_with_speed(scene, pose, pressed, dt, None)
+    }
+
+    /// Player-owned tracking supplies its measured grip speed; standalone callers
+    /// retain the controller's original measurement through `update_timed`.
+    pub(crate) fn update_timed_with_speed(
+        &mut self,
+        scene: &mut SceneManager,
+        pose: Option<Mat4>,
+        pressed: bool,
+        dt: f32,
+        speed: Option<f32>,
     ) -> Result<CutReport, String> {
         let Some(id) = self.id else {
             return Ok(CutReport::default());
@@ -117,18 +139,19 @@ impl TrackedController {
             endpoints: blade.map(|p| pose.transform_point3(p * self.scale)),
         };
         self.apply(scene, id, sample);
+        scene.sample_blade_trail(id, sample.endpoints, dt);
         scene.release_fragment_blade(id, sample.endpoints, !pressed);
         let target_positions = std::mem::replace(
             &mut self.target_positions,
             scene
                 .triangle_meshes()
                 .iter()
-                .filter(|(_, mesh)| mesh.cuttable)
                 .map(|(&id, _)| (id, scene.objects()[&id].transform.position))
                 .collect(),
         );
         let previous = self.previous.replace(sample);
         if !self.cutting || !pressed || previous.is_none() {
+            self.grip_speed = GripSpeed::default();
             scene.release_blade_cuts(id, !pressed);
             self.anchor = if self.cutting && pressed {
                 Some(sample)
@@ -160,6 +183,7 @@ impl TrackedController {
             || translation > 15. * dt + 0.025
             || angle > 45. * dt + 0.03
         {
+            self.grip_speed = GripSpeed::default();
             scene.release_blade_cuts(id, false);
             self.anchor = Some(sample);
             self.direction = Vec3::ZERO;
@@ -168,7 +192,26 @@ impl TrackedController {
             self.record(scene, sample);
             return Ok(CutReport::default());
         }
-        scene.follow_blade_jams(id, previous.pose, sample.pose, dt);
+        let blade_speed = speed.unwrap_or_else(|| {
+            self.grip_speed.sample(
+                previous.pose.w_axis.truncate(),
+                sample.pose.w_axis.truncate(),
+                dt,
+            )
+        });
+        let assisted = scene.cut_assist(id) > 0.;
+        let contact_response = scene.blade_contact_response(id);
+        if assisted && translation < 1e-6 && angle < 1e-6 {
+            if contact_response {
+                scene.blade_contacts(id, previous.pose, sample.pose, &target_positions, dt);
+            }
+            self.ribbons.clear();
+            self.record(scene, sample);
+            return Ok(CutReport::default());
+        }
+        if !assisted {
+            scene.follow_blade_jams(id, previous.pose, sample.pose, dt);
+        }
         let jam_rotation = sample.orientation * previous.orientation.conjugate();
         for (&target, history) in &mut self.ribbons {
             if scene.blade_cut_state(target).1 == Some(id) {
@@ -180,7 +223,6 @@ impl TrackedController {
         self.target_positions = scene
             .triangle_meshes()
             .iter()
-            .filter(|(_, m)| m.cuttable)
             .map(|(&id, _)| (id, scene.objects()[&id].transform.position))
             .collect();
         // Do not smooth target teleports into apparently continuous motion.
@@ -263,6 +305,7 @@ impl TrackedController {
                         last,
                         &target_positions,
                         (index - 1) as f32 / subdivisions as f32,
+                        None,
                     );
                 }
             } else {
@@ -272,7 +315,7 @@ impl TrackedController {
                 self.direction = step.normalize();
             }
             // Every blade pose shares the corresponding target translation in time.
-            self.record_interpolated(scene, current, &target_positions, t);
+            self.record_interpolated(scene, current, &target_positions, t, Some(last));
             last = current;
         }
         // Usually one mesh query per frame, with at most two extra prefix
@@ -292,20 +335,24 @@ impl TrackedController {
             self.record(scene, sample);
         }
         append_report(&mut report, result?);
-        let settled = translation < 1e-5
+        let settled = !assisted
+            && translation < 1e-5
             && angle < 1e-5
             && scene.settle_shallow_blade_cuts(id, &target_positions);
-        scene.blade_contacts(id, previous.pose, sample.pose, &target_positions, dt);
+        if !assisted || contact_response {
+            scene.blade_contacts(id, previous.pose, sample.pose, &target_positions, dt);
+        }
         if settled {
             self.ribbons
                 .retain(|target, _| scene.blade_cut_state(*target).1 == Some(id));
             self.record(scene, sample);
         }
+        scene.set_cut_feedback_speed(&report.pieces, blade_speed);
         Ok(report)
     }
 
     fn record(&mut self, scene: &SceneManager, sample: Sample) {
-        self.record_interpolated(scene, sample, &BTreeMap::new(), 1.);
+        self.record_interpolated(scene, sample, &BTreeMap::new(), 1., None);
     }
 
     fn record_interpolated(
@@ -314,6 +361,7 @@ impl TrackedController {
         sample: Sample,
         previous_targets: &BTreeMap<u32, Vec3>,
         t: f32,
+        previous_sample: Option<Sample>,
     ) {
         self.ribbons.retain(|id, _| {
             self.id
@@ -360,7 +408,30 @@ impl TrackedController {
                         ((center - points[0]).dot(axis) / axis.length_squared()).clamp(0., 1.);
                     let delta = last[0].lerp(last[1], station);
                     let delta = points[0].lerp(points[1], station) - delta;
-                    if delta.length_squared() > 1e-10 && !config.sharp(sample.pose, axis, delta) {
+                    let assisted_contacts = self.id.is_some_and(|cutter| {
+                        scene.cut_assist(cutter) > 0. && scene.blade_contact_response(cutter)
+                    });
+                    // Target motion cannot turn a flat controller stroke into an edge cut.
+                    let delta = if assisted_contacts {
+                        previous_sample.map_or(Vec3::ZERO, |previous| {
+                            let old_edge =
+                                previous.pose.transform_vector3(config.edge) * config.half_width;
+                            sample.endpoints[0].lerp(sample.endpoints[1], station) + edge_offset
+                                - previous.endpoints[0].lerp(previous.endpoints[1], station)
+                                - old_edge
+                        })
+                    } else {
+                        delta
+                    };
+                    if (assisted_contacts
+                        || self.id.is_none_or(|cutter| scene.cut_assist(cutter) == 0.))
+                        && (assisted_contacts || delta.length_squared() > 1e-10)
+                        && !(if assisted_contacts {
+                            config.assisted_sharp(sample.pose, axis, delta)
+                        } else {
+                            config.sharp(sample.pose, axis, delta)
+                        })
+                    {
                         // An established joint keeps its real finite ribbon during
                         // tracking reversals; only sharp advance can extend it.
                         if self
@@ -434,7 +505,7 @@ fn midpoint(sample: Sample) -> Vec3 {
     (sample.endpoints[0] + sample.endpoints[1]) * 0.5
 }
 
-fn valid_pose(pose: Mat4) -> bool {
+pub(crate) fn valid_pose(pose: Mat4) -> bool {
     if !pose.is_finite() || pose.w_axis.truncate().abs().max_element() > 100. {
         return false;
     }
@@ -509,6 +580,33 @@ mod tests {
     }
     fn edge_pose(percentage: f32) -> Mat4 {
         Mat4::from_translation(Vec3::Y + Vec3::X * (percentage * 0.4 - 0.2 - 0.0225))
+    }
+    #[test]
+    fn grip_speed_uses_distance_over_real_time_and_rejects_alternating_jitter() {
+        for hz in [72., 90., 120.] {
+            for speed in [0.2, 1., 3.6] {
+                let mut meter = GripSpeed::default();
+                let dt = 1. / hz;
+                for i in 0..120 {
+                    let from = Vec3::X * (i as f32 * dt * speed);
+                    let to = from + Vec3::X * (dt * speed);
+                    assert!((meter.sample(from, to, dt) - speed).abs() < 0.001);
+                }
+            }
+            let mut meter = GripSpeed::default();
+            let mut previous = Vec3::ZERO;
+            for i in 0..120 {
+                let position = Vec3::X * if i % 2 == 0 { 0.001 } else { -0.001 };
+                let speed = meter.sample(previous, position, 1. / hz);
+                if i > 10 {
+                    assert!(
+                        speed < 0.05,
+                        "tracking jitter must not imply a strong attack"
+                    );
+                }
+                previous = position;
+            }
+        }
     }
     #[test]
     fn xr_input_cut_of_one_body_preserves_other_body_jam_ribbon() {
@@ -872,6 +970,253 @@ mod tests {
         assert!(cut.is_none());
     }
 
+    #[test]
+    fn xr_input_cut_assist_short_backhand_is_real_closed_cut_without_contacts() {
+        for (assisted, contacts) in [(false, false), (true, false), (true, true)] {
+            for direction in [-1., 1.] {
+                let (mut scene, mut controller, target, sword) = physical_setup();
+                scene.set_projectile(target, Vec3::ZERO, 0., 0.);
+                if assisted {
+                    scene.set_cut_assist(sword, 0.35).unwrap();
+                }
+                scene.set_blade_contact_response(sword, contacts).unwrap();
+                let volume = scene.triangle_meshes()[&target]
+                    .mesh
+                    .cpu()
+                    .unwrap()
+                    .volume();
+                let mut pieces = vec![];
+                for frame in 0..=5 {
+                    // Only half of the actual 40cm cross-section is swept.
+                    let x = direction * (-0.22 + frame as f32 * 0.04);
+                    let pose = Mat4::from_translation(Vec3::new(x, 1., 0.));
+                    pieces.extend(
+                        controller
+                            .update_timed(&mut scene, Some(pose), true, 1. / 90.)
+                            .unwrap()
+                            .pieces,
+                    );
+                }
+                assert_eq!(
+                    !scene.object_exists(target),
+                    assisted,
+                    "assist={assisted}, direction={direction}"
+                );
+                if assisted {
+                    assert_eq!(scene.projectile_contacts, 0);
+                    assert_eq!(scene.blade_cut_state(target).1, None);
+                    assert_eq!(pieces.len(), 2);
+                    let total: f64 = pieces
+                        .iter()
+                        .map(|id| {
+                            let mesh = scene.triangle_meshes()[id].mesh.cpu().unwrap();
+                            mesh.validate().unwrap();
+                            mesh.volume()
+                        })
+                        .sum();
+                    assert!((total - volume).abs() < 1e-5);
+                    let moving = scene.play_cut_feedback(&pieces).unwrap();
+                    let moving_radius = scene.objects()[&moving[0]].transform.scale.x;
+                    scene.set_cut_feedback_speed(&pieces, 0.);
+                    let base = scene.play_cut_feedback(&pieces).unwrap();
+                    let base_radius = scene.objects()[&base[0]].transform.scale.x;
+                    assert!(
+                        (moving_radius / base_radius - 16.666667).abs() < 1e-4,
+                        "actual 3.6m/s tracked stroke must visibly exceed a stationary hit"
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn xr_input_assisted_contacts_flat_strike_bounces_without_cut_or_jam() {
+        let (mut scene, mut controller, target, sword) = physical_setup();
+        scene.set_cut_assist(sword, 0.35).unwrap();
+        scene.set_blade_contact_response(sword, true).unwrap();
+        scene.set_projectile(target, Vec3::ZERO, 9.81, 0.5);
+        for y in [0.65, 0.95] {
+            let report = controller
+                .update_timed(
+                    &mut scene,
+                    Some(Mat4::from_translation(Vec3::Y * y)),
+                    true,
+                    0.025,
+                )
+                .unwrap();
+            assert!(report.pieces.is_empty());
+        }
+        assert!(scene.object_exists(target));
+        assert_eq!(scene.blade_cut_state(target), (0., None));
+        assert!(scene.projectile_contacts > 0);
+        let velocity = scene.projectile_velocity(target).unwrap();
+        assert!(
+            velocity.y > 0. && velocity.length() <= 8.001,
+            "{velocity:?}"
+        );
+    }
+
+    #[test]
+    fn xr_input_assisted_contacts_moving_edge_bounces_noncuttable_debris() {
+        for direction in [-1., 1.] {
+            let (mut scene, mut controller, target, sword) = physical_setup();
+            scene.set_cuttable(target, false, Vec3::X).unwrap();
+            scene.set_cut_assist(sword, 0.35).unwrap();
+            scene.set_blade_contact_response(sword, true).unwrap();
+            scene.set_projectile(target, Vec3::ZERO, 9.81, 0.5);
+            for x in [-0.4 * direction, 0.] {
+                let pose = Mat4::from_translation(Vec3::new(x, 1., 0.));
+                let report = controller
+                    .update_timed(&mut scene, Some(pose), true, 0.03)
+                    .unwrap();
+                assert!(report.pieces.is_empty());
+            }
+            assert!(scene.object_exists(target));
+            assert_eq!(scene.blade_cut_state(target), (0., None));
+            assert!(scene.projectile_contacts > 0);
+            assert!(scene.objects()[&target].transform.position.x * direction > 0.1);
+            let velocity = scene.projectile_velocity(target).unwrap();
+            assert!(
+                velocity.x * direction > 0. && velocity.length() <= 8.001,
+                "{velocity:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn xr_input_assisted_contacts_stationary_blade_bounces_incoming_flat_and_edge() {
+        for (direction, cuttable) in [(Vec3::X, true), (Vec3::Y, true), (Vec3::Y, false)] {
+            let (mut scene, mut controller, target, sword) = physical_setup();
+            scene.set_cuttable(target, cuttable, Vec3::X).unwrap();
+            scene.set_cut_assist(sword, 0.35).unwrap();
+            scene.set_blade_contact_response(sword, true).unwrap();
+            scene.set_projectile(target, -direction * 2., 0., 0.5);
+            let origin = Vec3::new(0., 1., -0.5);
+            scene.set_object_position(target, origin + direction * 0.3);
+            let pose = Mat4::from_translation(Vec3::Y);
+            controller
+                .update_timed(&mut scene, Some(pose), true, 0.025)
+                .unwrap();
+            scene.set_object_position(target, origin + direction * 0.1);
+            let report = controller
+                .update_timed(&mut scene, Some(pose), true, 0.025)
+                .unwrap();
+            assert!(report.pieces.is_empty());
+            assert!(scene.object_exists(target));
+            assert_eq!(scene.blade_cut_state(target), (0., None));
+            assert!(scene.projectile_contacts > 0);
+            assert!(scene.projectile_velocity(target).unwrap().dot(direction) > 0.);
+        }
+    }
+
+    #[test]
+    fn xr_input_assisted_contacts_stationary_support_settles_and_releases() {
+        let (mut scene, mut controller, target, sword) = physical_setup();
+        scene.set_cut_assist(sword, 0.35).unwrap();
+        scene.set_blade_contact_response(sword, true).unwrap();
+        scene.set_projectile(target, Vec3::ZERO, 9.81, 0.5);
+        scene.set_object_position(target, Vec3::new(0., 1.4, -0.5));
+        let pose = Mat4::from_translation(Vec3::Y);
+        for _ in 0..300 {
+            scene.update(1. / 90.);
+            let report = controller
+                .update_timed(&mut scene, Some(pose), true, 1. / 90.)
+                .unwrap();
+            assert!(report.pieces.is_empty());
+        }
+        let y = scene.objects()[&target].transform.position.y;
+        assert!((y - 1.204).abs() < 0.01, "support height: {y}");
+        assert!(scene.projectile_velocity(target).unwrap().length() < 0.1);
+        assert!(scene.projectile_contacts > 100);
+        controller
+            .update_timed(&mut scene, None, true, 1. / 90.)
+            .unwrap();
+        for _ in 0..20 {
+            scene.update(1. / 90.);
+        }
+        assert!(scene.objects()[&target].transform.position.y < y - 0.2);
+    }
+
+    #[test]
+    fn xr_input_assisted_contacts_tracking_guards_and_miss_have_no_impulse() {
+        let (mut scene, mut controller, target, sword) = physical_setup();
+        assert!(!scene.blade_contact_response(sword));
+        scene.set_cut_assist(sword, 0.35).unwrap();
+        scene.set_blade_contact_response(sword, true).unwrap();
+        let velocity = Vec3::X;
+        scene.set_projectile(target, velocity, 0., 0.5);
+        for pose in [
+            Some(Vec3::Y * 0.7),
+            None,
+            Some(Vec3::Y),
+            Some(Vec3::Y * 3.),
+            Some(Vec3::Y * 3.1),
+        ] {
+            let report = controller
+                .update_timed(&mut scene, pose.map(Mat4::from_translation), true, 0.025)
+                .unwrap();
+            assert!(report.pieces.is_empty());
+            assert_eq!(scene.projectile_velocity(target), Some(velocity));
+            assert_eq!(scene.projectile_contacts, 0);
+        }
+        let unconfigured = scene.add_cube(Vec3::ZERO);
+        assert!(scene
+            .set_blade_contact_response(unconfigured, true)
+            .is_err());
+    }
+
+    #[test]
+    fn xr_input_cut_assist_tiny_positive_threshold_still_requires_real_intersection() {
+        let (mut scene, mut controller, target, sword) = physical_setup();
+        scene.set_projectile(target, Vec3::ZERO, 0., 0.);
+        scene.set_cut_assist(sword, 1e-6).unwrap();
+        // The blade crosses the target's infinite cutting plane but its finite
+        // tip stays 1cm beyond the actual closed mesh.
+        for frame in 0..=12 {
+            let pose = Mat4::from_translation(Vec3::new(-0.24 + frame as f32 * 0.04, 1., 0.71));
+            assert!(controller
+                .update_timed(&mut scene, Some(pose), true, 1. / 90.)
+                .unwrap()
+                .removed
+                .is_empty());
+        }
+        assert!(scene.object_exists(target));
+        assert_eq!(scene.projectile_contacts, 0);
+    }
+    #[test]
+    fn xr_input_cut_assist_rejects_miss_stationary_and_reacquisition() {
+        let (mut scene, mut controller, target, sword) = physical_setup();
+        scene.set_projectile(target, Vec3::ZERO, 0., 0.);
+        for coverage in [f32::NAN, f32::INFINITY, -0.1, 1.1] {
+            assert!(scene.set_cut_assist(sword, coverage).is_err());
+        }
+        assert_eq!(scene.cut_assist(sword), 0.);
+        scene.set_cut_assist(sword, 0.35).unwrap();
+        for x in [
+            -0.22, -0.18, -0.14, -0.1, -0.06, -0.02, 0.02, 0.06, 0.1, 0.14, 0.18, 0.22,
+        ] {
+            let pose = Mat4::from_translation(Vec3::new(x, 2., 0.));
+            assert!(controller
+                .update_timed(&mut scene, Some(pose), true, 1. / 90.)
+                .unwrap()
+                .removed
+                .is_empty());
+        }
+        controller
+            .update_timed(&mut scene, None, true, 1. / 90.)
+            .unwrap();
+        let pose = Mat4::from_translation(Vec3::Y);
+        for _ in 0..4 {
+            assert!(controller
+                .update_timed(&mut scene, Some(pose), true, 1. / 90.)
+                .unwrap()
+                .removed
+                .is_empty());
+        }
+        assert!(scene.object_exists(target));
+        assert_eq!(scene.projectile_contacts, 0);
+        scene.set_cut_assist(sword, 0.).unwrap();
+        assert_eq!(scene.cut_assist(sword), 0.);
+    }
     #[test]
     fn xr_input_sharp_edge_cuts_but_flat_and_back_same_path_do_not() {
         for (edge, should_cut) in [(Vec3::X, true), (Vec3::Y, false), (-Vec3::X, false)] {

@@ -17,7 +17,7 @@ thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
     static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
-    static XR_CONTROLLERS: RefCell<[crate::xr_input::TrackedController; 2]> = RefCell::new(Default::default());
+    static XR_PLAYER: RefCell<crate::xr_player::XrPlayer> = RefCell::new(Default::default());
     static RESET_FRAME_CLOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static XR_ACTIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static CAMERA: RefCell<Option<Rc<RefCell<ActiveCamera>>>> = const { RefCell::new(None) };
@@ -42,7 +42,7 @@ impl Drop for Runtime {
 #[wasm_bindgen]
 pub fn dispose() {
     XR_ACTIVE.with(|active| active.set(false));
-    XR_CONTROLLERS.with(|controllers| *controllers.borrow_mut() = Default::default());
+    XR_PLAYER.with(|player| *player.borrow_mut() = Default::default());
     GENERATION.with(|generation| generation.set(generation.get().wrapping_add(1)));
     STARTING.with(|starting| starting.set(None));
     RUNTIME.with(|runtime| runtime.borrow_mut().take());
@@ -308,6 +308,90 @@ pub fn effects_stats() -> js_sys::Float64Array {
             .unwrap_or([0.0; 19])
     });
     js_sys::Float64Array::from(values.as_slice())
+}
+#[wasm_bindgen]
+pub fn set_object_emission(id: u32, intensity: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.set_emission(id, intensity))
+    })
+}
+#[wasm_bindgen]
+pub fn set_object_color_cutout(id: u32, threshold: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().scene.set_color_cutout(id, threshold))
+    })
+}
+#[wasm_bindgen]
+pub fn set_background_color(r: f32, g: f32, b: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().set_background(glam::Vec3::new(r, g, b)))
+    })
+}
+#[wasm_bindgen]
+pub fn set_environment_cube_map(
+    size: u32,
+    color: &[u8],
+    emission: &[u8],
+    intensity: f32,
+    projection: &[f32],
+) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .set_environment_cube_map(size, color, emission, intensity, projection)
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn clear_environment_cube_map() -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut().clear_environment_cube_map();
+            true
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn set_environment_intensity(intensity: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().set_environment_intensity(intensity))
+    })
+}
+#[wasm_bindgen]
+pub fn configure_environment(
+    enabled: bool,
+    x: f32,
+    y: f32,
+    z: f32,
+    hx: f32,
+    hy: f32,
+    hz: f32,
+) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut().configure_environment(
+                enabled,
+                glam::Vec3::new(x, y, z),
+                glam::Vec3::new(hx, hy, hz),
+            )
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn environment_captures() -> u32 {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .map_or(0, |s| s.borrow().environment_captures())
+    })
 }
 #[wasm_bindgen]
 pub fn set_object_render_options(
@@ -800,6 +884,33 @@ pub fn add_info_panel(kind: &str, width: f32, height: f32) -> Result<u32, JsValu
     })
 }
 
+/// Static bitmap inscription with no backing rectangle.
+#[wasm_bindgen]
+pub fn add_text_panel(
+    title: &str,
+    lines_json: &str,
+    width: f32,
+    height: f32,
+) -> Result<u32, JsValue> {
+    if lines_json.len() > 8192 || title.len() > 192 {
+        return Err(JsValue::from_str("Text panel input exceeds limits"));
+    }
+    let lines: Vec<String> =
+        serde_json::from_str(lines_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let state = slot
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine is not initialized"))?;
+        let result = state
+            .borrow_mut()
+            .scene
+            .add_text_panel(title, &lines, width, height)
+            .map_err(|e| JsValue::from_str(&e));
+        result
+    })
+}
+
 #[wasm_bindgen]
 pub fn add_cube(x: f32, y: f32, z: f32) -> u32 {
     let mut id = crate::scene::INVALID_ID;
@@ -936,11 +1047,51 @@ pub fn set_cutter(id: u32, enabled: bool, endpoints: &[f32]) -> Result<(), JsVal
 }
 
 #[wasm_bindgen]
+pub fn set_blade_contact_response(id: u32, enabled: bool) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_blade_contact_response(id, enabled))
+}
+
+#[wasm_bindgen]
+pub fn set_cut_assist(id: u32, coverage: f32) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_cut_assist(id, coverage))
+}
+
+#[wasm_bindgen]
 pub fn cut_with(id: u32, x: f32, y: f32, z: f32, separation: f32) -> Result<String, JsValue> {
     cutting_command(|scene| {
         let report = scene.cut_with(id, glam::Vec3::new(x, y, z), separation)?;
         Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests}).to_string())
     })
+}
+
+#[wasm_bindgen]
+pub fn play_cut_feedback(pieces: &[u32]) -> Result<String, JsValue> {
+    cutting_command(|scene| {
+        let objects = scene.play_cut_feedback(pieces)?;
+        Ok(serde_json::json!({"objects":objects,"duration":0.65}).to_string())
+    })
+}
+#[wasm_bindgen]
+pub fn play_cut_feedback_facing(
+    pieces: &[u32],
+    mirror_text: bool,
+    size: Option<f32>,
+) -> Result<String, JsValue> {
+    cutting_command(|scene| {
+        let objects = scene.play_cut_feedback_sized(pieces, mirror_text, size.unwrap_or(1.))?;
+        Ok(serde_json::json!({"objects":objects,"duration":0.65}).to_string())
+    })
+}
+#[wasm_bindgen]
+pub fn clear_cut_feedback() -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        scene.clear_cut_feedback();
+        Ok(())
+    })
+}
+#[wasm_bindgen]
+pub fn set_blade_trail(id: u32, enabled: bool) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_blade_trail(id, enabled))
 }
 
 #[wasm_bindgen]
@@ -1513,6 +1664,66 @@ pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> boo
     ok
 }
 
+fn xr_pose_state(
+    pose: Option<crate::xr_player::TrackedPoseState>,
+    object: Option<u32>,
+) -> serde_json::Value {
+    if let Some(pose) = pose {
+        let orientation = glam::Quat::from_mat4(&pose.matrix).normalize();
+        serde_json::json!({"tracked":true,"matrix":pose.matrix.to_cols_array(),"position":pose.matrix.w_axis.truncate().to_array(),"orientation":orientation.to_array(),"speed":pose.speed,"object":object})
+    } else {
+        serde_json::json!({"tracked":false,"matrix":null,"position":null,"orientation":null,"speed":0.,"object":object})
+    }
+}
+#[wasm_bindgen]
+pub fn xr_player_state() -> Result<String, JsValue> {
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+        let player = player.borrow();
+        let live = |id: u32| scene.object_exists(id);
+        Ok(serde_json::json!({
+            "head":xr_pose_state(player.head(),player.head_object().filter(|id|live(*id))),
+            "leftHand":xr_pose_state(player.hand(0),player.controllers[0].object_id().filter(|id|live(*id))),
+            "rightHand":xr_pose_state(player.hand(1),player.controllers[1].object_id().filter(|id|live(*id))),
+            "inventory":player.inventory().into_iter().filter(|id|live(*id)).collect::<Vec<_>>()
+        }).to_string())
+    })
+    })
+}
+#[wasm_bindgen]
+pub fn xr_bind_head(id: u32) -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            player
+                .borrow_mut()
+                .bind_head(scene, (id != u32::MAX).then_some(id))
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn xr_add_item(id: u32) -> Result<(), JsValue> {
+    cutting_command(|scene| XR_PLAYER.with(|player| player.borrow_mut().add_item(scene, id)))
+}
+#[wasm_bindgen]
+pub fn xr_remove_item(id: u32) -> Result<(), JsValue> {
+    cutting_command(|scene| XR_PLAYER.with(|player| player.borrow_mut().remove_item(scene, id)))
+}
+#[wasm_bindgen]
+pub fn xr_update_head(matrix: &[f32]) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("XR is not presenting"));
+    }
+    let pose = if matrix.is_empty() {
+        None
+    } else {
+        let matrix: &[f32; 16] = matrix
+            .try_into()
+            .map_err(|_| JsValue::from_str("Invalid head matrix"))?;
+        Some(glam::Mat4::from_cols_array(matrix))
+    };
+    cutting_command(|scene| XR_PLAYER.with(|player| player.borrow_mut().update_head(scene, pose)))
+}
+
 /// Bind an authored object to a grip pose. UINT32_MAX unbinds it.
 #[wasm_bindgen]
 pub fn xr_bind_controller(hand: usize, id: u32, cutting: bool) -> Result<(), JsValue> {
@@ -1520,8 +1731,10 @@ pub fn xr_bind_controller(hand: usize, id: u32, cutting: bool) -> Result<(), JsV
         return Err(JsValue::from_str("Invalid controller hand"));
     }
     cutting_command(|scene| {
-        XR_CONTROLLERS.with(|controllers| {
-            controllers.borrow_mut()[hand].bind(scene, (id != u32::MAX).then_some(id), cutting)
+        XR_PLAYER.with(|player| {
+            player
+                .borrow_mut()
+                .bind_hand(scene, hand, (id != u32::MAX).then_some(id), cutting)
         })
     })
 }
@@ -1639,10 +1852,14 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
             (state.frame_dt(), state.xr_round_finished())
         })
     });
-    let report = cutting_command(|scene| {
-        XR_CONTROLLERS.with(|controllers| {
-            controllers.borrow_mut()[hand].update_timed(scene, pose, pressed && !round_finished, dt)
-        })
+    let (report, blade_contacts) = cutting_command(|scene| {
+        let before = scene.projectile_contacts;
+        let report = XR_PLAYER.with(|player| {
+            player
+                .borrow_mut()
+                .update_hand(scene, hand, pose, pressed && !round_finished, dt)
+        })?;
+        Ok((report, scene.projectile_contacts.saturating_sub(before)))
     })?;
     // cutting_command's mutable scene borrow must end before borrowing State again.
     STATE.with(|slot| {
@@ -1650,7 +1867,7 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
             state.borrow_mut().record_xr_cuts(report.removed.len());
         }
     });
-    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests}).to_string())
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts}).to_string())
 }
 
 /// Opt-in round duration; the application chooses its game length.
@@ -1666,8 +1883,8 @@ pub fn xr_start_round(seconds: f32) -> Result<(), JsValue> {
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
         let mut state = state.borrow_mut();
         state.start_xr_round(seconds)?;
-        XR_CONTROLLERS.with(|controllers| {
-            for controller in controllers.borrow_mut().iter_mut() {
+        XR_PLAYER.with(|player| {
+            for controller in player.borrow_mut().controllers.iter_mut() {
                 controller.reset(&mut state.scene);
             }
         });
@@ -1697,11 +1914,7 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
         }
         if !active {
             let mut state = state.borrow_mut();
-            XR_CONTROLLERS.with(|controllers| {
-                for controller in controllers.borrow_mut().iter_mut() {
-                    controller.reset(&mut state.scene);
-                }
-            });
+            XR_PLAYER.with(|player| player.borrow_mut().reset_tracking(&mut state.scene));
         }
         XR_ACTIVE.with(|flag| flag.set(active));
         RESET_FRAME_CLOCK.with(|reset| reset.set(true));

@@ -619,7 +619,8 @@ impl CutMesh {
                         )?);
                     }
                     *progress = ribbon_area_coverage(&caps, &cap_positions, samples, normal)?;
-                    if *progress + 2e-5 < threshold {
+                    // Threshold tolerance must never promote a finite miss into a cut.
+                    if *progress <= 0. || *progress + 2e-5 < threshold {
                         return Ok(None);
                     }
                 }
@@ -1219,6 +1220,13 @@ mod tests {
                 .0,
             0.
         );
+        for threshold in [f32::MIN_POSITIVE, 1e-6, 2e-5] {
+            let (progress, split) = mesh
+                .slice_ribbon_progress(&off_tip, Vec3::X, threshold)
+                .unwrap();
+            assert_eq!(progress, 0.);
+            assert!(split.is_none(), "zero coverage at threshold={threshold}");
+        }
         let grazing = [
             [Vec3::new(0., -1., 0.9), Vec3::new(0., -1., 1.1)],
             [Vec3::new(0., 1., 0.9), Vec3::new(0., 1., 1.1)],
@@ -1566,6 +1574,58 @@ mod tests {
         assert!(
             (arms.pieces.iter().map(CutMesh::volume).sum::<f64>() - mesh.volume()).abs() < 1e-5
         );
+    }
+
+    #[test]
+    fn color_cutout_validates_extracts_and_survives_closed_mesh_cuts() {
+        use crate::{
+            scene::{RenderOptions, SceneManager},
+            visibility::{RenderPassKind, RenderQueue},
+        };
+        let mut scene = SceneManager::default();
+        let target = scene.add_triangle_mesh(cube()).unwrap();
+        assert_eq!(scene.objects()[&target].color_cutout, 0.);
+        scene.set_render_options(
+            target,
+            RenderOptions {
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        let render = scene.render_revision();
+        let static_revision = scene.static_revision();
+        for invalid in [f32::NAN, f32::INFINITY, -0.1, 1.1] {
+            assert!(!scene.set_color_cutout(target, invalid));
+        }
+        assert!(!scene.set_color_cutout(u32::MAX, 0.5));
+        assert_eq!(scene.render_revision(), render);
+        assert!(scene.set_color_cutout(target, 1.));
+        assert!(scene.set_color_cutout(target, 0.));
+        assert!(scene.set_color_cutout(target, 0.25));
+        assert!(scene.render_revision() > render);
+        assert!(scene.static_revision() > static_revision);
+        assert!(scene.set_emission(target, 2.));
+        let mut queue = RenderQueue::default();
+        queue.extract_pass(&scene, glam::Mat4::IDENTITY, false, RenderPassKind::Main);
+        assert_eq!(queue.imported[&target][0].emission[..2], [2., 0.25]);
+        let volume = scene.triangle_meshes()[&target].mesh.volume();
+        scene.set_cuttable(target, true, Vec3::ONE).unwrap();
+        let sword = scene.add_cube(Vec3::new(0., -3., -3.));
+        scene
+            .set_cutter(sword, Some([Vec3::ZERO, Vec3::new(0., 6., 0.)]))
+            .unwrap();
+        let report = scene.cut_with(sword, Vec3::new(0., 0., 6.), 0.).unwrap();
+        assert_eq!(report.removed, [target]);
+        assert_eq!(report.pieces.len(), 2);
+        let mut piece_volume = 0.;
+        for id in report.pieces {
+            assert_eq!(scene.objects()[&id].color_cutout, 0.25);
+            assert_eq!(scene.objects()[&id].emission, 2.);
+            let mesh = scene.triangle_meshes()[&id].mesh.cpu().unwrap();
+            mesh.validate().unwrap();
+            piece_volume += mesh.volume();
+        }
+        assert!((piece_volume - volume).abs() < 1e-5);
     }
 
     #[test]

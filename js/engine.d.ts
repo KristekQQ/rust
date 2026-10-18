@@ -63,6 +63,11 @@ export class SceneObject {
     readonly exists: boolean;
     setCuttable(enabled?: boolean, options?: {capColor?: Vector3}): this;
     setCutter(blade: {base: Vector3; tip: Vector3} | null): this;
+    setBladeTrail(enabled: boolean): this;
+    /** Tracked finite ribbon coverage (0..1); zero restores physical cutting. */
+    setCutAssist(coverage: number): this;
+    /** Opt-in rigid fruit contacts during assisted cuts; requires setBladePhysics. */
+    setBladeContactResponse(enabled: boolean): this;
     setBladePhysics(options: {edge: Vector3; halfWidth?: number; halfThickness?: number}|null): this;
     readonly meshInfo: TriangleMeshInfo;
     readonly meshSnapshot: TriangleMeshSnapshot;
@@ -76,6 +81,10 @@ export class SceneObject {
     removeCollider(): this;
     /** Delta rotation in degrees; timing in seconds. Calculated by Rust. */
     rotate(degrees: Vector3, options?: RotationOptions): this;
+    /** Vertex-color emission, 0..8; primitive and triangle meshes. */
+    setEmission(intensity: number): this;
+    /** Discard fragments below maximum vertex RGB; finite 0..1, zero disables. Triangle meshes show both sides. */
+    setColorCutout(threshold: number): this;
     setRenderOptions(options?: {isStatic?: boolean; castsShadow?: boolean; receivesShadow?: boolean; reflectivity?: number}): this;
     spin(radiansPerSecond: Vector3): this;
     /** Rust-owned ballistic motion with ground bounce. */
@@ -124,7 +133,10 @@ export class Scene {
     createSphere(position?: Vector3): SceneObject;
     createMesh(options: TriangleMeshOptions): SceneObject;
     /** Actual world-space text mesh; width/height in metres, facing local +Z. */
-    createInfoPanel(kind: 'scene'|'round'|'restart', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
+    createInfoPanel(kind: 'scene'|'round'|'restart'|'diagnostics', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
+    createTextPanel(options: {title: string; lines: string[]; position?: Vector3; width?: number; height?: number}): SceneObject;
+    playCutFeedback(pieces: SceneObject[], options?: {mirrorText?: boolean; /** Gentle hit size multiplier, 0.01..2; fast tracked attacks retain full size. */ size?: number}): {objects: SceneObject[]; duration: number};
+    clearCutFeedback(): void;
     cutWithAsync(cutter:SceneObject,options:AsyncCutOptions):Promise<AsyncCutResult>;
     aimCutter(cutter:SceneObject,options:CutterAimOptions):Vector3;
     cutWith(cutter: SceneObject, options: {motion: Vector3; separation?: number; scatter?:CutScatterOptions}): CutResult;
@@ -172,8 +184,13 @@ export interface DebugStats {
     hudFrames: number; hudRefreshes: number;
     xrCuts: number; xrRoundRemaining: number|null;
 }
-export type PostEffectName = "ssr" | "godRays";
+export type PostEffectName = "ssr" | "godRays" | "bloom";
 export interface PostProcessing {
+    /** Six square sRGB RGBA8 faces packed +X,-X,+Y,-Y,+Z,-Z, size 1..2048. RGB emission adds before LDR bloom; intensity 0..8 (default 1.2). Pass null to release uploaded maps and disable their background/reflection fallback. */
+    setEnvironmentCubeMap(options: { size: number; color: Uint8Array; emission: Uint8Array; intensity?: number; projection?: { center: Vector3; halfExtents: Vector3 } | null } | null): void;
+    setEnvironmentIntensity(intensity: number): void;
+    configureEnvironment(options?: {enabled?: boolean; center?: Vector3; halfExtents?: Vector3}): void;
+    environmentCaptures(): number;
     /** Strength 0..1. Unknown effects and invalid values throw. Computed in Rust/WGSL. */
     enable(name: PostEffectName, options?: { strength?: number }): void;
     /** Volume density 0..1 and exposure 0..100; independent of surface lighting. */
@@ -183,16 +200,45 @@ export interface PostProcessing {
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
     stats(): { passes: number; width: number; height: number; targets: number; frames: number };
 }
-export interface XRCutReport extends CutResult { handedness: 'left'|'right' }
+export interface XRCutReport extends CutResult { handedness: 'left'|'right'; bladeContacts?: number }
 export interface XRRoundState { duration: number; remaining: number; finished: boolean; cuts: number }
+export interface XRHandOptions {cutting?: boolean; requireTrigger?: boolean; haptics?: boolean}
+export interface XRTrackedPose {
+    readonly tracked: boolean;
+    readonly position: Vector3|null;
+    /** Quaternion [x,y,z,w], in the XR reference space. */
+    readonly orientation: readonly [number,number,number,number]|null;
+    readonly matrix: readonly number[]|null;
+    /** Filtered grip translation in m/s. Head currently reports zero. */
+    readonly speed: number;
+    readonly object: SceneObject|null;
+}
+export interface XRPlayerState {head:XRTrackedPose;leftHand:XRTrackedPose;rightHand:XRTrackedPose;inventory:SceneObject[]}
+/** Engine-owned person with generic equipment. No avatar geometry or weapons are spawned. */
+export class XRPlayer {
+    protected constructor();
+    readonly state: XRPlayerState;
+    readonly head: XRTrackedPose;
+    readonly leftHand: XRTrackedPose;
+    readonly rightHand: XRTrackedPose;
+    readonly inventory: SceneObject[];
+    bindHead(object: SceneObject|null): this;
+    addItem(object: SceneObject): this;
+    /** Unregister/unequip without deleting the scene object. */
+    removeItem(object: SceneObject): this;
+    /** Equip any scene object; a cutting role is explicit and optional. Null empties the hand. */
+    equip(hand:'left'|'right',object:SceneObject|null,options?:XRHandOptions): this;
+    unequip(hand:'left'|'right'): this;
+}
 export interface WebXRHost extends EventTarget {
+    readonly player: XRPlayer;
     /** Select a scene button with target ray + trigger or a bound blade strike. Emits buttonhover, select.detail.target and buttonpress. */
     bindButton(object: SceneObject|null): void;
     /** Optional Rust-owned round clock and score; emits roundend at zero. */
     startRound(seconds?: number): void;
     readonly roundState: XRRoundState|null;
     /** Grip pose is applied in Rust. requireTrigger defaults to true; false enables natural swings. Null unbinds. */
-    bindController(hand: 'left'|'right', object: SceneObject|null, options?: {cutting?: boolean; requireTrigger?: boolean}): void;
+    bindController(hand: 'left'|'right', object: SceneObject|null, options?: XRHandOptions): void;
     readonly isPresenting: boolean;
     readonly lastError?: unknown;
     isSupported(): Promise<boolean>;
@@ -201,6 +247,7 @@ export interface WebXRHost extends EventTarget {
     exit(): Promise<void>;
     dispose(): void;
 }
-export type Engine = Readonly<RawEngine & { readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+export type Engine = Readonly<RawEngine & {
+    setBackgroundColor(color: Vector3): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;

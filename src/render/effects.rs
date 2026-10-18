@@ -235,7 +235,7 @@ impl Effects {
             entries: &entries,
         })
     }
-    fn write_uniform(&mut self, queue: &wgpu::Queue, value: EffectsUniforms) -> usize {
+    pub(super) fn write_uniform(&mut self, queue: &wgpu::Queue, value: EffectsUniforms) -> usize {
         if self.last_uniform == value {
             return 0;
         }

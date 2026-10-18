@@ -1,0 +1,273 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Neonová aréna / VR hra</title>
+<style>body{background:#101827;color:#eef3ff;font:14px system-ui}#gpu-canvas{width:480px;height:320px}#enter,#exit,#shoot{display:none}pre{white-space:pre-wrap}</style>
+<canvas id="gpu-canvas"></canvas><button id="enter"></button><button id="exit" hidden></button><button id="shoot"></button><span id="cuts">0</span><p id="status">Inicializace…</p><pre id="result">RUNNING</pre>
+<figure><figcaption>Skutečné obrazy obou očí v simulovaném XR: prostředí a prostorové panely</figcaption><canvas id="stereo" style="width:100%;height:auto"></canvas></figure>
+<figure><figcaption>Skutečný zásah: neonový výboj a rozříznuté kusy</figcaption><canvas id="hit" style="width:100%;height:auto"></canvas></figure>
+<figure><figcaption>Konec kola: skóre a čas uvnitř scény</figcaption><canvas id="score" style="width:100%;height:auto"></canvas></figure><ol id="checks"></ol>
+<script type="module">
+import {cutFaceColor} from '../examples/neon-arena/scene.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+import {assertForeground} from './pixels.js';
+const sim=installXRSimulator({profile:{eyeWidth:640,eyeHeight:640}});
+const run=new XRTestRun('neon-arena-xr',sim,publishXRReport);
+const snapshot=id=>{
+    const left=sim.pixels('left'),right=sim.pixels('right'),canvas=document.getElementById(id);
+    canvas.width=left.width+right.width;canvas.height=left.height;
+    const context=canvas.getContext('2d');context.putImageData(left,0,0);context.putImageData(right,left.width,0);
+};
+let app;
+const report=await run.execute(async test=>{
+    app=await import('../examples/neon-arena/main.js');
+    const {engine,world}=app;
+    test.assert(engine.renderer_backend()==='Gl','actual WebGL production arena');
+    const reports=[];
+    engine.xr.addEventListener('cut',event=>reports.push({...event.detail,info:event.detail.pieces.map(p=>p.meshInfo),colors:event.detail.pieces.map(p=>p.meshSnapshot.colors)}));
+    await engine.xr.enter();
+    test.assert(app.gameState().shots===1 && sim.timerCount===1,'VR starts one automatic fruit launch timer');
+    test.assert(engine.xr.roundState.duration===30,'Rust owns a 30 second round');
+    const still={dt:0,head:{position:[0,1.55,0]},controllers:{
+        right:{position:[1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false},
+        left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false}
+    }};
+    sim.frame(still);
+    const person=engine.xr.player;
+    const initialPerson=person.state;
+    test.assert(initialPerson.head.tracked&&Math.abs(initialPerson.head.position[1]-1.55)<1e-5,'generic XRPlayer receives the actual viewer head pose');
+    test.assert(initialPerson.leftHand.tracked&&initialPerson.rightHand.tracked,'generic XRPlayer tracks both hands');
+    test.assert(initialPerson.inventory.length===2&&initialPerson.rightHand.object.id===world.sword.id&&initialPerson.leftHand.object.id===world.leftSword.id,'arena equips its own swords through generic inventory slots');
+    // A non-weapon object must work through the same slot, including unbound tracking.
+    const prop=engine.scene.createCube([0,-10000,0]).setScale([.05,.08,.1]);
+    person.unequip('right').addItem(prop).equip('right',prop);
+    sim.frame(still);
+    test.assert(person.rightHand.object.id===prop.id&&person.rightHand.tracked,'generic hand equips an arbitrary non-cutting prop');
+    person.removeItem(prop);
+    sim.frame(still);
+    test.assert(person.rightHand.object===null&&person.rightHand.tracked&&prop.exists,'removal keeps the object alive and hand tracking active without equipment');
+    prop.remove();
+    person.equip('right',world.sword,{cutting:true,requireTrigger:false,haptics:true});
+    sim.frame({...still,head:{tracked:false}});
+    test.assert(!person.head.tracked&&!person.leftHand.tracked&&!person.rightHand.tracked,'viewer tracking loss clears generic player poses');
+    sim.frame({...still,head:{...still.head,tracked:true}});
+    const left=sim.pixels('left'),right=sim.pixels('right');
+    assertForeground(left,'arena left');assertForeground(right,'arena right');
+    test.assert(pixelDifference(left,right)>20,'separate stereo eye projections');
+    // Prove the playable target itself renders; panels alone must never satisfy this check.
+    const visibleFruit=app.gameState().liveApples[0],fruitOrigin=visibleFruit.meshInfo.position;
+    visibleFruit.setPosition([100,100,100]);sim.frame(still);
+    test.assert(pixelDifference(left,sim.pixels('left'),3)>200 && pixelDifference(right,sim.pixels('right'),3)>200,'first playable neon fruit is visible in BOTH eyes immediately on entry');
+    const hiddenLeft=sim.pixels('left'),hiddenRight=sim.pixels('right');
+    for(const [image,hidden] of [[left,hiddenLeft],[right,hiddenRight]]){
+        let red=0,green=0;
+        for(let i=0;i<image.data.length;i+=4){
+            const [r,g,b]=image.data.slice(i,i+3);
+            if(Math.abs(r-hidden.data[i])+Math.abs(g-hidden.data[i+1])+Math.abs(b-hidden.data[i+2])<25)continue;
+            if(r>100&&r>g*1.4&&r>b*1.2)red++;
+            if(g>100&&g>r*1.4&&g>b*1.2)green++;
+        }
+        test.assert(red>50&&green>4,'cherries visibly have red/pink berries AND green stalks in each eye', {red,green});
+    }
+    test.assert(world.fruits.every(f=>{
+        const palette=new Set();const colors=f.geometry.triangleColors;
+        for(let i=0;i<colors.length;i+=3)if(Math.max(colors[i],colors[i+1],colors[i+2])>.25)palette.add([colors[i],colors[i+1],colors[i+2]].join(','));
+        return palette.size>=2;
+    }),'every fruit uses at least two distinct neon colors without extra objects');
+    visibleFruit.setPosition(fruitOrigin);sim.frame(still);
+    test.assert(visibleFruit.meshInfo.closed && fruitOrigin[1]>1.1 && fruitOrigin[2]>-1.5,'first target is a closed solid within hand reach, above the floor');
+    test.assert(['cherry','lime','banana','orange','plum','grapes','watermelon'].every(name=>world.fruits.some(f=>f.name===name)),'all seven Midnight Fruits fruit types exist as distinct neon meshes');
+    test.assert(world.playFruits[0].name==='cherry','a new round starts with cherries');
+    // From inside the fruit, its back-facing neon seams must still render in both eyes.
+    const inside={...still,head:{position:[fruitOrigin[0]+.49*.19,fruitOrigin[1]-.32*.19,fruitOrigin[2]]}};
+    sim.frame(inside);const innerLeft=sim.pixels('left'),innerRight=sim.pixels('right');
+    visibleFruit.setPosition([100,100,100]);sim.frame(inside);
+    test.assert(pixelDifference(innerLeft,sim.pixels('left'),3)>100 && pixelDifference(innerRight,sim.pixels('right'),3)>100,'transparent mesh retains visible rear-facing seams in both eyes');
+    visibleFruit.setPosition(fruitOrigin);sim.frame(still);
+    snapshot('stereo');
+    const panels=[world.infoPanel,world.scorePanel],origins=panels.map(p=>p.meshInfo.position);
+    test.assert(origins[0][0]>1.2 && origins[0][2]>-3.1 && origins[0][2]<-2.4 && origins[0][1]<.75,'diagnostic gravestone is closer for reading, still right and low in world space');
+    test.assert(world.monument.info.primitives>=2 && world.monument.info.textures===1,'diagnostics have a real textured stone monument');
+    test.assert(world.scoreDisplay.info.textures===0 && world.logo.meshInfo.triangles>20,'central score housing and bitmap APOLLO GAMES lettering');
+    const creditsGeometry=JSON.stringify(world.credits.meshSnapshot.positions);
+    const creditsPosition=world.credits.meshInfo.position,logoPosition=world.logo.meshInfo.position;
+    world.credits.setPosition([100,100,100]);world.logo.setPosition([100,100,100]);sim.frame(still);
+    test.assert(pixelDifference(left,sim.pixels('left'),3)>50,'bitmap credit and logo visibly render on the 3D objects');
+    world.credits.setPosition(creditsPosition);world.logo.setPosition(logoPosition);
+    test.assert(!engine.debugStats().enabled && panels.every(p=>p.meshInfo.triangles>20),'scene info and score are real world meshes');
+    panels.forEach(p=>p.setPosition([100,100,100]));sim.frame(still);
+    test.assert(pixelDifference(left,sim.pixels('left'))>100 && pixelDifference(right,sim.pixels('right'))>100,'info and score visibly render in both eyes');
+    panels.forEach((p,i)=>p.setPosition(origins[i]));
+    sim.frame({...still,head:{position:[.25,1.55,0]}});
+    test.assert(panels.every((p,i)=>p.meshInfo.position.every((v,j)=>Math.abs(v-origins[i][j])<1e-5)),'head motion preserves world panel positions');
+    sim.frame(still);
+    const blackFrame=sim.pixels('left');let blackPixels=0;
+    for(let i=0;i<blackFrame.data.length;i+=4)if(blackFrame.data[i]<3&&blackFrame.data[i+1]<3&&blackFrame.data[i+2]<3)blackPixels++;
+    test.assert(blackPixels>blackFrame.width*blackFrame.height*.3,'stereo scene has a real black background');
+    test.assert(engine.postprocessing.stats().passes===0&&engine.postprocessing.stats().targets===0,'no environment, SSR, bloom or postprocess targets in XR');
+    test.assert(!performance.getEntriesByType('resource').some(r=>/\/(?:color|emission)-(?:px|nx|py|ny|pz|nz)\.png/.test(r.name)),'arena never loads environment image assets');
+    const first=app.gameState().liveApples[0],startY=first.meshInfo.position[1];
+    for(let i=0;i<25;i++)sim.frame({...still,dt:1000/72});
+    test.assert(first.meshInfo.position[1]>startY+.3,'launched neon fruit moves with Rust physics');
+    // Production blade contacts remain active even while the hand is stationary.
+    for(const target of app.gameState().liveApples)if(target.exists)target.remove();
+    const incoming=engine.scene.createMesh(world.fruits[0].geometry).setPosition([.76,1.3,-.9])
+        .setScale([.13,.13,.13]).setColorCutout(.25).setEmission(1.1)
+        .setCuttable(true,{capColor:cutFaceColor(world.fruits[0])}).projectile([-1.8,0,0],{gravity:0,bounce:.65});
+    const held={...still,dt:1000/72,controllers:{...still.controllers,
+        right:{position:[.45,1.3,-.3],orientation:[0,0,0,1],pressed:false}}};
+    const oldContacts=engine.projectileContacts();let nearest=incoming.meshInfo.position[0];
+    for(let i=0;i<24;i++){sim.frame(held);nearest=Math.min(nearest,incoming.meshInfo.position[0]);}
+    test.assert(incoming.exists&&!reports.some(report=>report.removed.includes(incoming.id)),'a held sword rebounds incoming fruit without inventing a stationary cut');
+    test.assert(engine.projectileContacts()>oldContacts&&incoming.meshInfo.position[0]>nearest+.08,'real fruit reverses direction after hitting the stationary blade flat');
+    incoming.remove();
+    const debris=engine.scene.createMesh(world.fruits[3].geometry).setPosition([.45,1.4,-.9])
+        .setScale([.12,.12,.12]).setColorCutout(.25).setEmission(1.1)
+        .projectile([0,-.02,0],{gravity:0,bounce:.6});
+    const beforeDebrisContacts=engine.projectileContacts();
+    for(let i=0;i<=24;i++)sim.frame({...held,controllers:{...held.controllers,
+        right:{position:[.45,1.1+i*.02,-.3],orientation:[0,0,0,1],pressed:false}}});
+    test.assert(debris.exists&&!reports.some(report=>report.removed.includes(debris.id))&&engine.projectileContacts()>beforeDebrisContacts&&debris.meshInfo.position[1]>1.5,'moving blade edge rebounds uncuttable debris instead of passing through it');
+    debris.remove();
+    const trailPose=i=>({...still,dt:1000/72,controllers:{...still.controllers,
+        right:{position:[.5,1.2+i*.06,-.4],orientation:[0,0,0,1],pressed:false}}});
+    for(let i=0;i<4;i++)sim.frame(trailPose(i));
+    const trailLeft=sim.pixels('left'),trailRight=sim.pixels('right');
+    world.sword.setBladeTrail(false);world.leftSword.setBladeTrail(false);sim.frame({...trailPose(3),dt:0});
+    test.assert(pixelDifference(trailLeft,sim.pixels('left'),3)>25&&pixelDifference(trailRight,sim.pixels('right'),3)>25,'moving katana has a real spatial motion trail in both eyes');
+    world.sword.setBladeTrail(true);world.leftSword.setBladeTrail(true);
+    let hitEvidence=false;
+    // Both production katanas must perform a real closed-mesh cut.
+    for(let batch=0;batch<Math.ceil(world.fruits.length/2);batch++){
+    const batchFruits=world.fruits.slice(batch*2,batch*2+2);
+    const pair=batchFruits.map((fruit,i)=>engine.scene.createMesh(fruit.geometry).setPosition([[-.45,.45][i]-(fruit.name==='cherry'?.49*.19:0),1.35,-1.1])
+        .setScale([.19,.19,.19]).setEmission(1.1).setColorCutout(.25).setCuttable(true,{capColor:cutFaceColor(fruit)}));
+    const volumes=pair.map(p=>p.meshInfo.volume);
+    const pairOrigins=pair.map(p=>p.meshInfo.position);
+    for(let i=0;i<=60;i++){sim.frame({dt:1000/72,head:still.head,controllers:{
+        left:{position:[-.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false},
+        right:{position:[.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false}
+    }});
+    if(engine.xr.lastError)throw new Error(`XR cut failed batch=${batch} frame=${i} fruit=${batchFruits.map(f=>f.name)}: ${engine.xr.lastError}`);
+    if(!hitEvidence&&reports.length&&reports[reports.length-1].removed.length===1&&pair.some(piece=>reports[reports.length-1].removed.includes(piece.id))){
+        const feedback=app.gameState().feedback;
+        test.assert(feedback?.objects.length===8,'successful cut emits exactly one bounded eight-object celebration');
+        const ring=feedback.objects[0].meshInfo,title=feedback.objects[7].meshInfo;
+        const mostRecent=reports[reports.length-1];
+        const expectedX=pairOrigins[mostRecent.removed.includes(pair[0].id)?0:1][0];
+        test.assert(Math.abs(ring.position[0]-expectedX)<.025&&Math.abs(ring.position[2]+1.1)<.005,'cut ring is anchored at the actual struck fruit in world space');
+        test.assert(ring.position[1]-ring.bottom>.001&&ring.position[1]-ring.bottom<.03&&title.position[1]>1.63,'gentle stroke has a tiny ring and popup above fruit top');
+        const vertices=feedback.objects[0].meshSnapshot.positions;
+        const extent=axis=>Math.max(...vertices.map(p=>p[axis]))-Math.min(...vertices.map(p=>p[axis]));
+        test.assert(extent(2)<.05&&feedback.objects[0].meshInfo.triangles===256,'hit uses one closed rim, oriented in world space to the actual cut plane');
+        const radii=vertices.map(p=>Math.hypot(p[0],p[1]));
+        test.assert(Math.max(...radii)-Math.min(...radii)>.5,'hit has a broad flat disc surface instead of a thin wire ring');
+        const [rx,ry]=ring.rotation;
+        const rimNormal=[Math.sin(ry)*Math.cos(rx),-Math.sin(rx),Math.cos(ry)*Math.cos(rx)];
+        test.assert(Math.abs(rimNormal[0])>.999,'upward controller stroke along the forward blade aligns rim to the YZ cut plane, not the camera',{rotation:ring.rotation,rimNormal});
+        const anchorPositions=feedback.objects.map(object=>object.meshInfo.position);
+        sim.frame({dt:0,head:{position:[.28,1.55,.15]},controllers:{
+            left:{position:[-.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false},
+            right:{position:[.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false}}});
+        test.assert(feedback.objects.every((object,j)=>object.meshInfo.position.every((value,k)=>Math.abs(value-anchorPositions[j][k])<1e-5)),'head motion preserves the impact location instead of dragging feedback with the head');
+        sim.frame({dt:0,head:still.head,controllers:{
+            left:{position:[-.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false},
+            right:{position:[.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false}}});
+        const burstLeft=sim.pixels('left'),burstRight=sim.pixels('right');snapshot('hit');
+        const positions=feedback.objects.map(object=>object.meshInfo.position);
+        feedback.objects.forEach(object=>object.setPosition([100,100,100]));
+        sim.frame({dt:0,head:still.head,controllers:{
+            left:{position:[-.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false},
+            right:{position:[.45,1.0+i/60*.8,-.45],orientation:[0,0,0,1],pressed:false}}});
+        test.assert(pixelDifference(burstLeft,sim.pixels('left'),3)>50&&pixelDifference(burstRight,sim.pixels('right'),3)>50,'shockwave, sparks and hit popup visibly render in both eyes');
+        feedback.objects.forEach((object,j)=>object.setPosition(positions[j]));hitEvidence=true;
+    }
+    }
+    for(const [i,hand] of ['left','right'].slice(0,pair.length).entries()){
+        const hit=reports.find(r=>r.handedness===hand && r.removed.includes(pair[i].id));
+        test.assert(Boolean(hit),`${hand} katana backhand cuts ${world.fruits[batch*2+i].name} without trigger`);
+        const expectedPieces=batchFruits[i].name==='cherry'?5:batchFruits[i].name==='grapes'?8:2;
+        test.assert(hit.pieces.length===expectedPieces && hit.info.every(p=>p.closed),`${hand} cut creates closed components of ${batchFruits[i].name}`);
+        test.assert(hit.pieces.every(piece=>!piece.exists||!piece.meshInfo.cuttable),'finished fruit pieces are decorative halves, never re-cut in the same stroke');
+        const flesh=cutFaceColor(batchFruits[i]);
+        test.assert(hit.colors.some(colors=>colors.some(color=>color.every((c,j)=>Math.abs(c-flesh[j])<1e-5))),'actual fruit fragments contain visible colored closed cut faces');
+        test.assert(Math.abs(hit.info.reduce((sum,p)=>sum+p.volume,0)-volumes[i])<volumes[i]*.0001,`${hand} cut conserves volume`);
+    }
+    }
+    test.assert(hitEvidence,'a real isolated fruit cut proved spatial feedback placement and visibility');
+    const short=engine.scene.createMesh(world.fruits[0].geometry).setPosition([.45,1.35,-1.1])
+        .setScale([.19,.19,.19]).setColorCutout(.25).setEmission(1.1).setCuttable(true,{capColor:cutFaceColor(world.fruits[0])});
+    for(let i=0;i<=16;i++)sim.frame({...still,dt:1000/72,controllers:{...still.controllers,
+        right:{position:[.45,1.35+i/16*.14,-.45],orientation:[0,0,0,1],pressed:false}}});
+    test.assert(reports.some(report=>report.removed.includes(short.id)),'assisted short 14cm backhand really splits fruit without a full traverse');
+    const fragment=reports.flatMap(report=>report.pieces).find(piece=>piece.exists);
+    test.assert(Boolean(fragment),'actual cut leaves a live fragment for pixel verification');
+    const fragmentOrigin=fragment.meshInfo.position;
+    fragment.setPosition([0,1.4,-1.15]);sim.frame(still);
+    const glowing=sim.pixels('left');
+    fragment.setColorCutout(0);sim.frame(still);
+    test.assert(pixelDifference(glowing,sim.pixels('left'),3)>30,'real cut fragments inherit transparent gaps instead of opaque faces');
+    fragment.setColorCutout(.25);
+    fragment.setEmission(0);sim.frame(still);
+    test.assert(pixelDifference(glowing,sim.pixels('left'),3)>30,'cut fragments retain visibly emissive neon edges');
+    fragment.setEmission(1.1).setPosition(fragmentOrigin);
+    for(const target of app.gameState().liveApples)if(target.exists)target.remove();
+    const simultaneous=[-1.,-1.3].map(z=>engine.scene.createMesh(world.fruits[0].geometry).setPosition([0,1.35,z])
+        .setScale([.1,.1,.1]).setEmission(1.1).setColorCutout(.25).setCuttable(true,{capColor:cutFaceColor(world.fruits[0])}));
+    for(let i=0;i<=40;i++){
+        sim.frame({...still,dt:1000/72,controllers:{...still.controllers,
+            right:{position:[0,1.1+i/40*.5,-.55],orientation:[0,0,0,1],pressed:false}}});
+        if(reports.some(report=>simultaneous.every(piece=>report.removed.includes(piece.id))))break;
+    }
+    test.assert(reports.some(report=>simultaneous.every(piece=>report.removed.includes(piece.id))),'one genuine blade update can cut two separate fruit');
+    const grouped=app.gameState().feedback;
+    test.assert(grouped.objects.length===16,'simultaneous fruit keep two bounded celebrations');
+    const impactZ=grouped.objects.filter((_,i)=>i%8===0).map(object=>object.meshInfo.position[2]).sort((a,b)=>a-b);
+    test.assert(Math.abs(impactZ[0]+1.3)<.005&&Math.abs(impactZ[1]+1.)<.005,'each simultaneous hit is anchored to its own fruit, never between them');
+    // Same fruit/path, different actual controller speed; measure at the same birth age.
+    const speedSizes=[];
+    for(const steps of [120,12]){
+        engine.scene.clearCutFeedback();
+        for(const target of app.gameState().liveApples)if(target.exists)target.remove();
+        sim.frame({...still,controllers:{...still.controllers,right:null}});
+        const target=engine.scene.createMesh(world.fruits[0].geometry).setPosition([.45,1.35,-1.1])
+            .setScale([.19,.19,.19]).setEmission(1.1).setColorCutout(.25)
+            .setCuttable(true,{capColor:cutFaceColor(world.fruits[0])});
+        let size=0;
+        for(let i=0;i<=steps;i++){
+            sim.frame({...still,dt:1000/72,controllers:{...still.controllers,
+                right:{position:[.45,.9+i/steps*.9,-.45],orientation:[0,0,0,1],pressed:false}}});
+            if(reports.some(report=>report.removed.includes(target.id))){
+                const ring=app.gameState().feedback.objects[0].meshInfo;
+                size=ring.position[1]-ring.bottom;
+                break;
+            }
+        }
+        test.assert(size>0,`real ${steps===120?'slow':'fast'} controller stroke produces a hit effect`);
+        speedSizes.push(size);
+        if(target.exists)target.remove();
+    }
+    test.assert(speedSizes[0]<.03&&speedSizes[1]>.4,'gentle setting keeps slow hit tiny while fast hit retains a large visible ring',{slow:speedSizes[0],fast:speedSizes[1]});
+    test.assert(speedSizes[1]>speedSizes[0]*2.5,'fast stroke renders a clearly larger ring than slow stroke at identical effect age',{slow:speedSizes[0],fast:speedSizes[1]});
+    engine.scene.clearCutFeedback();
+    test.assert(engine.xr.roundState.cuts===app.gameState().cuts && app.gameState().cuts>=2,'Rust round score matches successful source cuts');
+    for(let i=0;i<310 && !engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
+    test.assert(engine.xr.roundState.finished && sim.timerCount===0 && !app.gameState().launching,'round finishes and stops automatic launches');
+    snapshot('score');
+    test.assert(JSON.stringify(world.credits.meshSnapshot.positions)===creditsGeometry,'static bitmap credit is preserved through live diagnostics and scoring updates');
+    const aim=pressed=>({...still,dt:1000/72,controllers:{...still.controllers,
+        left:{...still.controllers.left,targetRayMatrix:sim.gripX(0,[0,1.05,-.2]),pressed}}});
+    sim.frame(aim(false));
+    test.assert(Math.abs(world.pointers[0].meshInfo.position[2]+1.65)<.02,'target ray cursor reaches real restart object');
+    sim.frame(aim(true));
+    test.assert(engine.xr.roundState.remaining===30 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
+    sim.frame(aim(true));test.assert(app.gameState().shots===1,'held trigger never repeatedly restarts');
+    test.assert(!engine.xr.lastError,'real stereo rendering completes without XR error',engine.xr.lastError);
+    await engine.xr.exit();
+    test.assert(!person.head.tracked&&!person.rightHand.tracked&&person.inventory.length===2,'XR exit clears poses while retaining owned equipment for reentry');
+    test.assert(sim.timerCount===0 && !app.gameState().launching,'XR exit releases launch timer');
+    await engine.xr.enter();test.assert(sim.timerCount===1,'XR reentry owns exactly one timer');
+    await engine.xr.exit();
+    test.report.evidence={cuts:reports.length,panels:panels.map(p=>p.id),background:'black',postprocessPasses:engine.postprocessing.stats().passes};
+});
+if(app?.engine.xr.isPresenting)await app.engine.xr.exit();
+app?.engine.dispose();sim.dispose();publishXRReport(report);
+</script></html>

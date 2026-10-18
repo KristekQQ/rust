@@ -19,10 +19,18 @@ struct Uniforms {
     mask_params: [f32; 4],
     shadow_view_projection: [[f32; 4]; 4],
     volume_params: [f32; 4],
+    environment_center: [f32; 4],
+    environment_half_extents: [f32; 4],
+    sky_cube_params: [f32; 4],
+    sky_cube_center: [f32; 4],
+    sky_cube_half_extents: [f32; 4],
+    // Ray steps, refinement steps, quadratic spacing; XR keeps the same range.
+    reflection_trace: [f32; 4],
 }
-// Rust offsets match WGSL matrices and vec4 fields (288 bytes total).
-const _: () = assert!(std::mem::size_of::<Uniforms>() == 288);
+// Rust offsets match WGSL matrices and vec4 fields (384 bytes total).
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 384);
 const _: () = assert!(std::mem::offset_of!(Uniforms, params) == 176);
+const _: () = assert!(std::mem::offset_of!(Uniforms, environment_center) == 288);
 
 // Add a WGSL fragment entry point and a descriptor to extend the chain.
 // All passes read original scene depth; intermediate alpha is material metadata.
@@ -33,6 +41,11 @@ struct EffectDescriptor {
 }
 const EFFECTS: &[EffectDescriptor] = &[
     EffectDescriptor {
+        name: "environment",
+        entry_point: "fs_environment",
+        shader_source: include_str!("postprocess.wgsl"),
+    },
+    EffectDescriptor {
         name: "ssr",
         entry_point: "fs_ssr",
         shader_source: include_str!("postprocess.wgsl"),
@@ -40,6 +53,11 @@ const EFFECTS: &[EffectDescriptor] = &[
     EffectDescriptor {
         name: "godRays",
         entry_point: "fs_god_rays",
+        shader_source: include_str!("postprocess.wgsl"),
+    },
+    EffectDescriptor {
+        name: "bloom",
+        entry_point: "fs_bloom",
         shader_source: include_str!("postprocess.wgsl"),
     },
 ];
@@ -148,6 +166,15 @@ pub struct PostProcessor {
     shadow_views: Option<(wgpu::TextureView, wgpu::TextureView)>,
     effects: Vec<Effect>,
     reflection_mask: ReflectionMask,
+    sky_cube_color: wgpu::TextureView,
+    sky_cube_emission: wgpu::TextureView,
+    sky_cube_enabled: bool,
+    sky_cube_intensity: f32,
+    sky_cube_projection: Option<(Vec3, Vec3)>,
+    environment_fallback: wgpu::TextureView,
+    environment_view: Option<wgpu::TextureView>,
+    environment_center: Vec3,
+    environment_half_extents: Vec3,
     targets: Option<Targets>,
     submitted_frames: u64,
     last_pass_count: usize,
@@ -209,6 +236,36 @@ impl PostProcessor {
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::Cube,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::Cube,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 9,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::Cube,
                         multisampled: false,
                     },
                     count: None,
@@ -325,7 +382,40 @@ impl PostProcessor {
                 }
             })
             .collect();
+        // A cube binding must remain valid even while environment reflections are disabled.
+        // wgpu initializes this texture to zero; the shader skips it without an environment.
+        let environment_fallback = device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("postprocess environment fallback"),
+                size: wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 6,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+            .create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::Cube),
+                ..Default::default()
+            });
+        let sky_cube_fallback = Self::sky_cube_texture(device, 1);
         Self {
+            sky_cube_color: sky_cube_fallback.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::Cube),
+                ..Default::default()
+            }),
+            sky_cube_emission: sky_cube_fallback.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::Cube),
+                ..Default::default()
+            }),
+            sky_cube_enabled: false,
+            sky_cube_intensity: 1.2,
+            sky_cube_projection: None,
             format,
             layout,
             sampler,
@@ -336,12 +426,116 @@ impl PostProcessor {
             shadow_views: None,
             effects,
             reflection_mask: ReflectionMask::new(device, 1, 1),
+            environment_fallback,
+            environment_view: None,
+            environment_center: Vec3::ZERO,
+            environment_half_extents: Vec3::ONE,
             targets: None,
             submitted_frames: 0,
             last_pass_count: 0,
             volume_density: 0.035,
             volume_exposure: 2.5,
         }
+    }
+    fn sky_cube_texture(device: &wgpu::Device, size: u32) -> wgpu::Texture {
+        device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("photographic environment cube"),
+            size: wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: 6,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        })
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_environment_cube_map(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        size: u32,
+        color: &[u8],
+        emission: &[u8],
+        intensity: f32,
+        projection: &[f32],
+    ) -> bool {
+        // Validate all projection input before allocating or replacing textures.
+        let projection = match projection {
+            [] => None,
+            [cx, cy, cz, hx, hy, hz]
+                if [cx, cy, cz].iter().all(|v| v.is_finite() && v.abs() <= 1e6)
+                    && [hx, hy, hz]
+                        .iter()
+                        .all(|v| v.is_finite() && **v > 0.0 && **v <= 1e6) =>
+            {
+                Some((Vec3::new(*cx, *cy, *cz), Vec3::new(*hx, *hy, *hz)))
+            }
+            _ => return false,
+        };
+        if size == 0
+            || size > 2048
+            || size > device.limits().max_texture_dimension_2d
+            || color.len() != size as usize * size as usize * 6 * 4
+            || emission.len() != color.len()
+            || !intensity.is_finite()
+            || !(0.0..=8.0).contains(&intensity)
+        {
+            return false;
+        }
+        let upload = |pixels: &[u8]| {
+            let texture = Self::sky_cube_texture(device, size);
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                pixels,
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(size * 4),
+                    rows_per_image: Some(size),
+                },
+                wgpu::Extent3d {
+                    width: size,
+                    height: size,
+                    depth_or_array_layers: 6,
+                },
+            );
+            texture.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::Cube),
+                ..Default::default()
+            })
+        };
+        self.sky_cube_color = upload(color);
+        self.sky_cube_emission = upload(emission);
+        self.sky_cube_enabled = true;
+        self.sky_cube_intensity = intensity;
+        self.sky_cube_projection = projection;
+        self.targets = None;
+        true
+    }
+    pub fn clear_environment_cube_map(&mut self) {
+        self.sky_cube_enabled = false;
+        self.sky_cube_projection = None;
+        // Reuse the existing zero cube; dropping views and bind groups releases uploads.
+        self.sky_cube_color = self.environment_fallback.clone();
+        self.sky_cube_emission = self.environment_fallback.clone();
+        self.targets = None;
+        self.last_pass_count = 0;
+    }
+    pub fn set_environment_intensity(&mut self, intensity: f32) -> bool {
+        if !intensity.is_finite() || !(0.0..=8.0).contains(&intensity) {
+            return false;
+        }
+        self.sky_cube_intensity = intensity;
+        true
     }
     fn shadow_group(
         device: &wgpu::Device,
@@ -445,11 +639,44 @@ impl PostProcessor {
         true
     }
 
+    /// Supply a static, linear-sampled cubemap and its box-projection volume.
+    /// None (or invalid bounds) restores the original screen-space-only behavior.
+    pub fn set_environment(
+        &mut self,
+        view: Option<wgpu::TextureView>,
+        center: Vec3,
+        half_extents: Vec3,
+    ) {
+        let valid =
+            center.is_finite() && half_extents.is_finite() && half_extents.cmpgt(Vec3::ZERO).all();
+        let view = view.filter(|_| valid);
+        let center = if valid { center } else { Vec3::ZERO };
+        let half_extents = if valid { half_extents } else { Vec3::ONE };
+        if self.environment_view == view
+            && self.environment_center == center
+            && self.environment_half_extents == half_extents
+        {
+            return;
+        }
+        let rebind = self.environment_view != view;
+        self.environment_view = view;
+        self.environment_center = center;
+        self.environment_half_extents = half_extents;
+        if rebind {
+            self.targets = None;
+            self.last_pass_count = 0;
+        }
+    }
+
     pub fn set_effect(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
         if !strength.is_finite() || !(0.0..=1.0).contains(&strength) {
             return false;
         }
-        let Some(effect) = self.effects.iter_mut().find(|effect| effect.name == name) else {
+        let Some(effect) = self
+            .effects
+            .iter_mut()
+            .find(|effect| effect.name == name && name != "environment")
+        else {
             return false;
         };
         effect.enabled = enabled;
@@ -461,9 +688,11 @@ impl PostProcessor {
         true
     }
     pub fn enabled(&self) -> bool {
-        self.effects
-            .iter()
-            .any(|effect| effect.enabled && effect.strength > 0.0)
+        self.sky_cube_enabled
+            || self
+                .effects
+                .iter()
+                .any(|effect| effect.enabled && effect.strength > 0.0)
     }
     pub fn ensure_size(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         if !self.enabled() || width == 0 || height == 0 {
@@ -514,6 +743,22 @@ impl PostProcessor {
                             resource: wgpu::BindingResource::TextureView(
                                 &self.reflection_mask.view,
                             ),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 7,
+                            resource: wgpu::BindingResource::TextureView(
+                                self.environment_view
+                                    .as_ref()
+                                    .unwrap_or(&self.environment_fallback),
+                            ),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 8,
+                            resource: wgpu::BindingResource::TextureView(&self.sky_cube_color),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 9,
+                            resource: wgpu::BindingResource::TextureView(&self.sky_cube_emission),
                         },
                     ],
                 })
@@ -567,6 +812,7 @@ impl PostProcessor {
         light_color: Vec3,
         output: &wgpu::TextureView,
         shadows_enabled: bool,
+        xr_rendering: bool,
     ) -> usize {
         // new() has no queue; initialize its white fallback once, before sampling.
         if self.reflection_mask.needs_white_upload {
@@ -580,7 +826,10 @@ impl PostProcessor {
             .effects
             .iter()
             .enumerate()
-            .filter(|(_, effect)| effect.enabled && effect.strength > 0.0)
+            .filter(|(_, effect)| {
+                (effect.name == "environment" && self.sky_cube_enabled)
+                    || (effect.enabled && effect.strength > 0.0)
+            })
             .collect();
         if active.is_empty() {
             return 0;
@@ -617,6 +866,32 @@ impl PostProcessor {
                     24.0,
                     self.volume_exposure,
                 ],
+                environment_center: self
+                    .environment_center
+                    .extend(if self.environment_view.is_some() {
+                        1.0
+                    } else {
+                        0.0
+                    })
+                    .to_array(),
+                environment_half_extents: self.environment_half_extents.extend(0.0).to_array(),
+                sky_cube_params: [
+                    if self.sky_cube_enabled { 1.0 } else { 0.0 },
+                    self.sky_cube_intensity,
+                    0.0,
+                    0.0,
+                ],
+                sky_cube_center: self
+                    .sky_cube_projection
+                    .map_or([0.0; 4], |(center, _)| center.extend(1.0).to_array()),
+                sky_cube_half_extents: self
+                    .sky_cube_projection
+                    .map_or([1.0; 4], |(_, extents)| extents.extend(0.0).to_array()),
+                reflection_trace: if xr_rendering {
+                    [16.0, 3.0, 48.0 / 225.0, 0.0]
+                } else {
+                    [64.0, 5.0, 0.0, 0.0]
+                },
             };
             queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
             let destination = if index + 1 == active.len() {

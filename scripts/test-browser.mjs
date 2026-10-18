@@ -21,6 +21,9 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify' },
     { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },
     { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true },
     { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },
@@ -388,7 +391,7 @@ try {
         page.setDefaultTimeout(timeout);
         page.setDefaultNavigationTimeout(timeout);
         const errors = [], abortedRequests = [];
-        page.on('pageerror', error => errors.push(`JS: ${error.message}`));
+        page.on('pageerror', error => errors.push(`JS: ${error.message || String(error)}`));
         page.on('console', message => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
         page.on('response', response => { if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
         page.on('requestfailed', request => {
@@ -480,10 +483,19 @@ try {
                     } catch (error) { reject(error); }
                 })));
                 await writeFile(path.join(output, result.screenshot), Buffer.from(png, 'base64'));
+                const cutFrame = await page.evaluate(() => {
+                    const evidence=document.querySelector('#cut-evidence');
+                    return evidence instanceof HTMLCanvasElement ? evidence.toDataURL('image/png').split(',')[1] : null;
+                });
+                if(cutFrame){
+                    result.cutScreenshot=`${suite.name}-${backend}-cut.png`;
+                    await writeFile(path.join(output,result.cutScreenshot),Buffer.from(cutFrame,'base64'));
+                }
             }
             result.status = 'PASS';
         } catch (error) {
             result.error = error.message;
+            if(suite.status) result.statusText = await page.$eval(suite.status, node => node.textContent).catch(() => null);
             result.errors = errors;
             result.screenshot = `${suite.name}-${backend}-failure.png`;
             await page.screenshot({ path: path.join(output, result.screenshot) }).catch(() => {});

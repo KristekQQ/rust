@@ -11,6 +11,8 @@ pub struct State {
     renderer: SceneRenderer,
     output: CanvasOutput,
     postprocess: PostProcessor,
+    environment: Option<super::environment::EnvironmentProbe>,
+    background: wgpu::Color,
     pub backend: String,
     pub aspect: f32,
     view: RenderView,
@@ -57,6 +59,13 @@ impl State {
             renderer,
             output,
             postprocess,
+            environment: None,
+            background: wgpu::Color {
+                r: 0.1,
+                g: 0.1,
+                b: 0.3,
+                a: 1.0,
+            },
             backend,
             aspect,
             model_camera: None,
@@ -160,6 +169,64 @@ impl State {
     }
     pub fn configure_god_rays(&mut self, density: f32, exposure: f32) -> bool {
         self.postprocess.configure_volume(density, exposure)
+    }
+    pub fn set_background(&mut self, color: Vec3) -> bool {
+        if !color.is_finite() || color.min_element() < 0.0 || color.max_element() > 1.0 {
+            return false;
+        }
+        self.background = wgpu::Color {
+            r: color.x as f64,
+            g: color.y as f64,
+            b: color.z as f64,
+            a: 1.0,
+        };
+        true
+    }
+    pub fn set_environment_cube_map(
+        &mut self,
+        size: u32,
+        color: &[u8],
+        emission: &[u8],
+        intensity: f32,
+        projection: &[f32],
+    ) -> bool {
+        self.postprocess.set_environment_cube_map(
+            &self.renderer.device,
+            &self.renderer.queue,
+            size,
+            color,
+            emission,
+            intensity,
+            projection,
+        )
+    }
+    pub fn clear_environment_cube_map(&mut self) {
+        self.postprocess.clear_environment_cube_map();
+    }
+    pub fn set_environment_intensity(&mut self, intensity: f32) -> bool {
+        self.postprocess.set_environment_intensity(intensity)
+    }
+    pub fn configure_environment(
+        &mut self,
+        enabled: bool,
+        center: Vec3,
+        half_extents: Vec3,
+    ) -> bool {
+        if !center.is_finite() || !half_extents.is_finite() || half_extents.min_element() <= 0.1 {
+            return false;
+        }
+        self.environment = enabled.then(|| {
+            super::environment::EnvironmentProbe::new(&self.renderer.device, center, half_extents)
+        });
+        self.postprocess.set_environment(
+            self.environment.as_ref().map(|p| p.view.clone()),
+            center,
+            half_extents,
+        );
+        true
+    }
+    pub fn environment_captures(&self) -> u32 {
+        self.environment.as_ref().map_or(0, |p| p.captures)
     }
     pub fn set_postprocess(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
         self.postprocess.set_effect(name, enabled, strength)
@@ -287,12 +354,12 @@ impl State {
         }
     }
     fn sync_info_diagnostics(&mut self) {
-        let scene_panel = self
-            .renderer
-            .scene
-            .info_panels
-            .values()
-            .any(|p| p.kind == crate::info_panel::PanelKind::Scene);
+        let scene_panel = self.renderer.scene.info_panels.values().any(|p| {
+            matches!(
+                p.kind,
+                crate::info_panel::PanelKind::Scene | crate::info_panel::PanelKind::Diagnostics
+            )
+        });
         self.renderer
             .set_debug_diagnostics(self.debug_enabled || scene_panel);
     }
@@ -326,6 +393,10 @@ impl State {
             self.renderer
                 .scene
                 .update_info_panels(PanelKind::Scene, &rows);
+            let diagnostics = self.renderer.info_diagnostic_rows();
+            self.renderer
+                .scene
+                .update_info_panels(PanelKind::Diagnostics, &diagnostics);
         }
         if self.info_round_dirty {
             let mut rows = vec![("ROZKROJENO", self.xr_cuts.to_string())];
@@ -422,6 +493,13 @@ impl State {
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
         self.refresh_info_panels(0.0);
+        self.renderer.draw_calls = 0;
+        self.renderer.main_draw_calls = 0;
+        if let Some(probe) = &mut self.environment {
+            probe
+                .update(&mut self.renderer)
+                .map_err(|e| JsValue::from_str(&e))?;
+        }
         let Some(frame) = self.output.acquire(&self.renderer.device)? else {
             return Ok(());
         };
@@ -431,14 +509,15 @@ impl State {
         }
         self.resident_sources
             .retain(|id, _| self.renderer.scene.object_exists(*id));
-        self.renderer.draw_calls = 0;
-        self.renderer.main_draw_calls = 0;
-        let target = self.output.target(&frame);
+        let mut target = self.output.target(&frame);
+        target.color_load = wgpu::LoadOp::Clear(self.background);
         if self.postprocess.enabled() {
             self.postprocess
                 .ensure_size(&self.renderer.device, target.width, target.height);
+            let mut scene_target = self.postprocess.target();
+            scene_target.color_load = wgpu::LoadOp::Clear(self.background);
             self.renderer
-                .render_view(self.view, &self.postprocess.target())
+                .render_view(self.view, &scene_target)
                 .map_err(|e| JsValue::from_str(&e))?;
             // Effects lazily replaces fallback maps when shadows are first enabled.
             // Rebind by resource identity; unchanged maps do not allocate a new bind group.
@@ -457,6 +536,7 @@ impl State {
                 color,
                 target.color,
                 self.renderer.shadows_enabled(),
+                self.xr_rendering,
             );
             let overlays = super::target::RenderTarget {
                 depth: self.postprocess.target().depth,

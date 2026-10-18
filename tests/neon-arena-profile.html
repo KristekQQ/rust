@@ -1,0 +1,34 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Profil skutečné neonové arény v simulovaném XR</title>
+<canvas id="gpu-canvas" style="width:640px;height:480px"></canvas><button id="enter"></button><button id="exit"></button><button id="shoot"></button><span id="cuts"></span><p id="status"></p><pre id="result">RUNNING</pre><pre id="measurements"></pre>
+<script type="module">
+import {launchApple} from '../examples/neon-arena/scene.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport} from './xr/testkit.js';
+const sim=installXRSimulator({profile:{eyeWidth:1024,eyeHeight:1024}});
+const run=new XRTestRun('neon-arena-profile',sim,publishXRReport);
+let app;
+const report=await run.execute(async test=>{
+    app=await import('../examples/neon-arena/main.js');
+    const {engine,world}=app;
+    await engine.xr.enter();
+    const names=['cherry','grapes','banana','orange','watermelon','pear'];
+    const targets=[app.gameState().liveApples[0],...names.slice(1).map(name=>launchApple(engine.scene,world.fruits.find(f=>f.name===name),1))];
+    targets.forEach((target,i)=>target.setPosition([(i%3-1)*.48,i<3?1.6:1.08,-1.3]));
+    const still={dt:0,head:{position:[0,1.65,0]},controllers:{
+        left:{position:[-1,1.1,0],orientation:[0,0,0,1],pressed:false},
+        right:{position:[1,1.1,0],orientation:[0,0,0,1],pressed:false}
+    }};
+    for(let i=0;i<5;i++){sim.frame(still);sim.pixels('left');}
+    const samples=[];
+    for(let i=0;i<12;i++){
+        const start=performance.now();sim.frame(still);sim.pixels('left');samples.push(performance.now()-start);
+    }
+    samples.sort((a,b)=>a-b);
+    const stats=engine.postprocessing.stats();
+    test.report.evidence={environment:'desktop simulated stereo XR; includes synchronous pixel readback, not headset FPS',eyeSize:[1024,1024],targetNames:names,targetTriangles:targets.reduce((sum,p)=>sum+p.meshInfo.triangles,0),catalogTriangles:world.fruits.reduce((sum,f)=>sum+f.geometry.indices.length/3,0),results:[{name:'black fruit scene',medianMs:samples[6],p95Ms:samples[11],samples:12,postprocessPasses:stats.passes}]};
+    document.querySelector('#measurements').textContent=JSON.stringify(test.report.evidence,null,2);
+    test.assert(stats.passes===0&&stats.targets===0,'production black scene performs no postprocessing');
+    await engine.xr.exit();
+});
+app?.engine.dispose();sim.dispose();publishXRReport(report);
+</script></html>

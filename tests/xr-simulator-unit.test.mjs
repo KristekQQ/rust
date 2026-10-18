@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {matrixFromPose,multiply,inverse} from './xr/poses.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {swordGeometry} from '../examples/webxr/geometry.js';
+import {WebXRHost} from '../js/webxr.js';
 
 test('katana flat follows grip palm normal and cutter covers visible blade',()=>{
     const {positions}=swordGeometry();
@@ -22,6 +23,84 @@ function environment(run) {
     return Promise.resolve().then(()=>run(navigator)).finally(()=>descriptor?Object.defineProperty(globalThis,'navigator',descriptor):delete globalThis.navigator);
 }
 async function start(options) {const simulator=installXRSimulator(options);await navigator.xr.requestSession('immersive-vr');return simulator;}
+
+test('XR host reuses eye storage and provides optional contact-onset and cut haptics',()=>environment(async()=>{
+    const restorations=[];
+    const replace=(key,value)=>{const descriptor=Object.getOwnPropertyDescriptor(globalThis,key);Object.defineProperty(globalThis,key,{configurable:true,value});restorations.push(()=>descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key]);};
+    const canvas={width:640,height:480}, allocations=[],uploads=[],draws=[],deleted=[],renders=[];
+    let boundTexture,viewport,flip,nextId=0;
+    const gl={};
+    for(const key of ['TEXTURE_2D','TEXTURE_BINDING_2D','FRAMEBUFFER_BINDING','RENDERBUFFER_BINDING','FRAMEBUFFER','RENDERBUFFER','FRAMEBUFFER_COMPLETE','RGBA','UNSIGNED_BYTE','UNPACK_FLIP_Y_WEBGL','COMPILE_STATUS','LINK_STATUS'])gl[key]=key;
+    for(const name of ['texParameteri','bindFramebuffer','bindRenderbuffer','framebufferTexture2D','renderbufferStorage','framebufferRenderbuffer','shaderSource','compileShader','attachShader','linkProgram','deleteShader','clearColor','clear','useProgram','bindVertexArray','deleteProgram','deleteVertexArray'])gl[name]=()=>{};
+    Object.assign(gl,{
+        makeXRCompatible:async()=>{},getParameter:()=>null,getExtension:()=>({loseContext:()=>deleted.push('context')}),
+        createTexture:()=>({id:++nextId}),createFramebuffer:()=>({}),createRenderbuffer:()=>({}),createShader:()=>({}),createProgram:()=>({}),createVertexArray:()=>({}),
+        checkFramebufferStatus:()=>gl.FRAMEBUFFER_COMPLETE,getShaderParameter:()=>true,getProgramParameter:()=>true,
+        bindTexture:(_,texture)=>{boundTexture=texture;},pixelStorei:(_,value)=>{flip=value;},
+        texImage2D(...args){assert.equal(args.length,9);assert.equal(args[8],null);boundTexture.width=args[3];boundTexture.height=args[4];allocations.push({texture:boundTexture,width:args[3],height:args[4]});},
+        texSubImage2D(...args){assert.equal(args.length,7);assert.equal(args[6],canvas);assert.equal(flip,true);assert.equal(boundTexture.width,canvas.width);assert.equal(boundTexture.height,canvas.height);uploads.push({texture:boundTexture,eye:canvas.eye});},
+        viewport:(...value)=>{viewport=value;},drawArrays:()=>draws.push({viewport,texture:boundTexture,eye:canvas.eye}),
+        deleteTexture:texture=>deleted.push(texture),deleteFramebuffer:()=>{},deleteRenderbuffer:()=>{},
+    });
+    const engine={renderer_backend:()=> 'Gl',xr_set_presenting:()=>{},xr_begin_frame:()=>{},xr_round_state:()=> 'null',xr_update_head:()=>{},xr_bind_controller:()=>{},xr_update_controller:()=> '{"removed":[]}',
+        xr_render_eye(projection,transform,width,height){canvas.width=width;canvas.height=height;canvas.eye=transform[12]<0?'left':'right';renders.push({projection,transform,width,height});},
+        resize(width,height){canvas.width=width;canvas.height=height;},
+    };
+    let sim,host;
+    try {
+        replace('isSecureContext',true);replace('document',{createElement:()=>({getContext:()=>gl})});
+        sim=installXRSimulator({clockTimers:false,profile:{eyeWidth:320,eyeHeight:240}});
+        host=new WebXRHost(engine,canvas,()=>true);await host.enter();
+        const layer=sim.session.renderState.baseLayer,originalViewport=layer.getViewport.bind(layer);
+        let rightWidth=300,rightHeight=220;
+        layer.getViewport=view=>({...originalViewport(view),...(view.eye==='right'?{width:rightWidth,height:rightHeight}:{})});
+        // The simulator's framebuffer is separate from the host's two upload textures.
+        const layerAllocations=allocations.length;
+        sim.frame();sim.frame();sim.frame();
+        assert.equal(host.lastError,undefined);assert.equal(allocations.length-layerAllocations,2);assert.equal(uploads.length,6);
+        assert.notEqual(uploads[0].texture,uploads[1].texture);
+        assert.deepEqual(draws.slice(0,2).map(draw=>[draw.eye,draw.viewport]),[['left',[0,0,320,240]],['right',[320,0,300,220]]]);
+        assert.deepEqual(uploads.map(upload=>upload.eye),['left','right','left','right','left','right']);
+        assert.ok(renders[0].transform[12]<0&&renders[1].transform[12]>0);
+        assert.ok(renders.every(render=>render.projection.length===16&&render.transform.length===16));
+        rightWidth=280;rightHeight=200;sim.frame();sim.frame();
+        assert.equal(allocations.length-layerAllocations,3);assert.equal(uploads.length,10);assert.equal(draws.length,10);
+        assert.equal(allocations.at(-1).texture,uploads[1].texture);
+        const pulses=[];
+        let report={removed:[],pieces:[],bladeContacts:1};
+        engine.xr_update_controller=(index,matrix)=>JSON.stringify(index===1&&matrix.length?report:{removed:[],pieces:[]});
+        host.bindController('right',{id:1});
+        sim.frame({controllers:{right:{}}});
+        const source=sim.session.inputSources.find(source=>source.handedness==='right');
+        source.gamepad.hapticActuators=[{pulse:(...args)=>{pulses.push(args);return Promise.resolve(true);}}];
+        sim.frame();assert.deepEqual(pulses,[],'haptics default to disabled');
+        host.bindController('right',{id:1},{haptics:true});
+        sim.frame();sim.frame();sim.frame();
+        assert.deepEqual(pulses,[[.2,20]],'resting contact pulses only on onset');
+        report={removed:[12],pieces:[13,14],bladeContacts:1};
+        sim.frame();assert.deepEqual(pulses.at(-1),[.45,35],'cut takes precedence over contact');
+        report={removed:[],pieces:[],bladeContacts:1};
+        sim.frame({controllers:{right:{tracked:false}}});
+        assert.equal(pulses.length,2,'tracking loss cannot pulse');
+        sim.frame({controllers:{right:{tracked:true}}});
+        assert.deepEqual(pulses,[[.2,20],[.45,35],[.2,20]],'tracking loss resets contact onset');
+        report={removed:[],pieces:[],bladeContacts:0};sim.frame();
+        report={removed:[],pieces:[],bladeContacts:1};sim.frame();
+        assert.equal(pulses.length,4,'a new impact pulses again');
+        source.gamepad.hapticActuators[0].pulse=()=>Promise.reject(new Error('optional actuator rejected'));
+        report={removed:[12],pieces:[13,14],bladeContacts:0};sim.frame();await Promise.resolve();
+        source.gamepad.hapticActuators[0].pulse=()=>{throw new Error('optional actuator threw');};
+        sim.frame();assert.equal(host.lastError,undefined);
+        delete source.gamepad.hapticActuators;sim.frame();assert.equal(host.lastError,undefined);
+        await host.exit();assert.equal(sim.session.pendingFrameCount,0);assert.equal(canvas.width,640);assert.equal(canvas.height,480);
+        for(const {texture} of uploads.slice(0,2))assert.equal(deleted.filter(value=>value===texture).length,1);
+        // A new session must allocate fresh storage; stale size caches cannot survive disposal.
+        await host.enter();sim.frame();assert.equal(allocations.length-layerAllocations,6);
+        const fresh=uploads.slice(-2).map(upload=>upload.texture);host.dispose();host.dispose();
+        for(const texture of fresh)assert.equal(deleted.filter(value=>value===texture).length,1);
+        assert.equal(sim.session.pendingFrameCount,0);
+    } finally {host?.dispose();sim?.dispose();for(const restore of restorations.reverse())restore();}
+}));
 
 test('pose composition and inverse preserve full six degree transforms',()=>{
     const pose=matrixFromPose({position:[2,3,4],orientation:[0,Math.sin(Math.PI/4),0,Math.cos(Math.PI/4)]});

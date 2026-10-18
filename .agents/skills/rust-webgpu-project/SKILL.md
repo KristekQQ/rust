@@ -9,6 +9,9 @@ This skill belongs to this repository, not a personal skill installation. Keep p
 
 Locate the affected path before editing: JS SDK → WASM export → CPU scene/runtime → renderer/pass/output. Runtime examples own their `main.js` bootstrap and `scene.js`. Keep one owner per file; agree shared interfaces before parallel work.
 
+For object placement and attached text, use [scene-object-layout](../scene-object-layout/SKILL.md) for coordinate conventions, shared transforms and XR layout checks.
+For the shared XR person and inventory use [xr-player-equipment](../xr-player-equipment/SKILL.md); for cut-hit materials, size and speed response use [cut-feedback-tuning](../cut-feedback-tuning/SKILL.md).
+
 Use the [verification matrix](../../../docs/DEVELOPMENT.md). During iteration run targeted checks and reuse matching evidence. Native tests do not compile the wasm32 renderer; browser acceptance must use fresh matching `pkg/` and the actual Rust page. A build, DOM load, `cube.html` or separate JS graphics demo is not renderer acceptance.
 
 Before a requested commit/push run `npm run verify:push` once: full native/WASM/SDK/harness/types checks, every registered browser scenario on both WebGPU and WebGL, then source dump. Include `all_sources.txt` in the commit. Do not substitute cutting-only checks for the full gate. Browser coverage includes direct render-target, shadow/reflection/cache, postprocessing, mirrored-transform, glTF animation/PBR and culling/pixel checks as well as scene/SDK/lifecycle/examples. A matching content-bound PASS receipt allows the pre-push hook to reuse tests; changed inputs/build options invalidate it. Preserve unrelated staging. A successful gate is not permission to commit/push, and desktop browser checks do not verify Quest/WebXR or software-WebGL CI.

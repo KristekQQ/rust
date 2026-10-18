@@ -31,6 +31,8 @@ struct VertexOutput {
     @location(1) world_pos: vec3<f32>,
     @location(2) world_normal: vec3<f32>,
     @location(3) @interpolate(flat) material: vec4<f32>,
+    @location(4) @interpolate(flat) emission: f32,
+    @location(5) @interpolate(flat) color_cutout: f32,
 };
 
 struct InstanceInput {
@@ -43,6 +45,7 @@ struct InstanceInput {
     @location(9) normal2: vec4<f32>,
     @location(10) normal3: vec4<f32>,
     @location(11) material: vec4<f32>,
+    @location(12) emission: vec4<f32>,
 };
 @vertex
 fn vs_main(input: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -52,6 +55,8 @@ fn vs_main(input: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.pos = scene.view_projection * model * vec4<f32>(input.position, 1.0);
     out.color = input.color;
     out.material = instance.material;
+    out.emission = instance.emission.x;
+    out.color_cutout = instance.emission.y;
     out.world_pos = (model * vec4<f32>(input.position, 1.0)).xyz;
     // Rust supplies the inverse transpose. Normalize after interpolation so
     // non-uniformly scaled smooth surfaces retain the correct normal field.
@@ -65,6 +70,8 @@ fn vs_lines(input: VertexInput) -> VertexOutput {
     out.pos = scene.view_projection * vec4<f32>(input.position, 1.0);
     out.color = input.color;
     out.material = vec4(0.0);
+    out.emission = 0.0;
+    out.color_cutout = 0.0;
     out.world_pos = input.position;
     out.world_normal = input.normal;
     return out;
@@ -113,6 +120,7 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
 }
 
 fn shade_surface(input: VertexOutput) -> vec4<f32> {
+    if (max(max(input.color.r, input.color.g), input.color.b) < input.color_cutout) { discard; }
     if (effects.params.z>0.5 && dot(effects.clip_plane,vec4(input.world_pos,1.0)) < -0.001) { discard; }
     // World-space text keeps its palette and normal depth/clip behavior.
     // Alpha is postprocessing metadata; zero excludes surface lighting effects.
@@ -142,6 +150,8 @@ fn shade_surface(input: VertexOutput) -> vec4<f32> {
         }
         result += (diff * input.color + spec) * light.color * visibility;
     }
+
+    result += input.color * input.emission;
 
     if(effects.params.y>0.5 && input.material.z>0.5 && input.material.x>0.0) {
         let reflected=effects.reflection_matrix*vec4(input.world_pos,1.0);

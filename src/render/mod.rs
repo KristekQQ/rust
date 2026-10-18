@@ -1,5 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
+mod cut_feedback_gpu;
 pub mod cutting_compute;
 pub mod cutting_resident;
 pub mod data;
@@ -17,3 +18,5 @@ pub mod textures;
 
 mod hud;
 pub mod postprocess;
+
+pub mod environment;

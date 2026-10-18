@@ -75,3 +75,6 @@ konkrétní `createScene` a volá ji sama. SDK nezná ukázky.
 Otevírej příklady ve stejné kartě, pokud nechceš více běžících enginů.
 
 Postprocess API a přidání efektu: [POSTPROCESSING](../docs/POSTPROCESSING.md).
+
+- [Neonová aréna](neon-arena/): skutečný kruhový interiér, tři galerie, selektivní
+  emise, statická environment cubemapa a dynamické SSR; [limity a ověření](neon-arena/README.md).

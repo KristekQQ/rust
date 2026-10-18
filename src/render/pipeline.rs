@@ -3,6 +3,7 @@
 use crate::render::data::Vertex;
 use wgpu::{BindGroupLayout, Device, RenderPipeline, TextureFormat};
 
+#[allow(clippy::too_many_arguments)] // Explicit render target and surface state.
 pub fn build(
     device: &Device,
     format: TextureFormat,
@@ -11,6 +12,7 @@ pub fn build(
     effects: &BindGroupLayout,
     reflected: bool,
     material_mask: bool,
+    double_sided: bool,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -56,11 +58,15 @@ pub fn build(
             topology: wgpu::PrimitiveTopology::TriangleList,
             // The left-handed camera projection reverses outward CCW meshes
             // in screen space. Cull CCW here and keep their visible CW faces.
-            cull_mode: Some(if reflected {
-                wgpu::Face::Back
+            cull_mode: if double_sided {
+                None
             } else {
-                wgpu::Face::Front
-            }),
+                Some(if reflected {
+                    wgpu::Face::Back
+                } else {
+                    wgpu::Face::Front
+                })
+            },
             front_face: wgpu::FrontFace::Ccw,
             ..Default::default()
         },
@@ -150,7 +156,12 @@ pub fn build_shadow(
                 Some(crate::visibility::InstanceData::layout()),
             ],
         },
-        fragment: None,
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            compilation_options: Default::default(),
+            targets: &[],
+        }),
         primitive: wgpu::PrimitiveState {
             cull_mode: None,
             ..Default::default()

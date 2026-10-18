@@ -9,6 +9,12 @@ struct Uniforms {
     shadow_view_projection: mat4x4<f32>,
     // shadow-enabled, extinction density, max ray range, scattering exposure
     volume_params: vec4<f32>,
+    environment_center: vec4<f32>,
+    environment_half_extents: vec4<f32>,
+    sky_cube_params: vec4<f32>,
+    sky_cube_center: vec4<f32>,
+    sky_cube_half_extents: vec4<f32>,
+    reflection_trace: vec4<f32>,
 };
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 @group(0) @binding(1) var scene_sampler: sampler;
@@ -16,6 +22,9 @@ struct Uniforms {
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
 @group(0) @binding(4) var depth_sampler: sampler;
 @group(0) @binding(6) var reflection_mask: texture_2d<f32>;
+@group(0) @binding(7) var environment_texture: texture_cube<f32>;
+@group(0) @binding(8) var sky_cube_color: texture_cube<f32>;
+@group(0) @binding(9) var sky_cube_emission: texture_cube<f32>;
 @group(1) @binding(0) var volume_static_shadow: texture_depth_2d;
 @group(1) @binding(1) var volume_dynamic_shadow: texture_depth_2d;
 @group(1) @binding(2) var volume_shadow_sampler: sampler_comparison;
@@ -48,6 +57,47 @@ fn reflection_mask_at(position: vec3<f32>) -> f32 {
     if !all(mask_uv >= vec2(0.0)) || !all(mask_uv <= vec2(1.0)) { return 0.0; }
     return textureSampleLevel(reflection_mask, scene_sampler, mask_uv, 0.0).r;
 }
+// Cubemap faces use WebGPU's +X,-X,+Y,-Y,+Z,-Z layer order.
+fn sky_cube_at(direction: vec3<f32>) -> vec3<f32> {
+    return textureSampleLevel(sky_cube_color, scene_sampler, direction, 0.0).rgb
+        + textureSampleLevel(sky_cube_emission, scene_sampler, direction, 0.0).rgb * uniforms.sky_cube_params.y;
+}
+// Capture-relative exit point makes a finite cubemap respond to camera translation.
+fn box_projected_direction(position: vec3<f32>, direction: vec3<f32>, center: vec3<f32>, half_extents: vec3<f32>) -> vec3<f32> {
+    let local = position - center;
+    var sample_direction = direction;
+    if all(abs(local) <= half_extents) {
+        // Intersect the forward ray with the volume's exit plane. Protect parallel
+        // components before division, including exact zero on a box boundary.
+        let safe_direction = select(vec3(-1.0), vec3(1.0), direction >= vec3(0.0)) * max(abs(direction), vec3(0.00001));
+        let exit_planes = select(-half_extents, half_extents, direction >= vec3(0.0));
+        let distances = select(vec3(1e20), (exit_planes - local) / safe_direction, abs(direction) > vec3(0.00001));
+        let exit_distance = min(min(distances.x, distances.y), distances.z);
+        let projected = local + direction * max(exit_distance, 0.0);
+        if dot(projected, projected) > 0.000001 { sample_direction = projected; }
+    }
+    return sample_direction;
+}
+fn sample_world_cube(position: vec3<f32>, direction: vec3<f32>) -> vec3<f32> {
+    var sample_direction = direction;
+    if uniforms.sky_cube_center.w > 0.5 {
+        sample_direction = box_projected_direction(position, direction, uniforms.sky_cube_center.xyz, uniforms.sky_cube_half_extents.xyz);
+    }
+    return sky_cube_at(sample_direction);
+}
+@fragment fn fs_environment(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    var color = source.rgb;
+    if depth_at(input.uv) >= 0.999999 {
+        color = sample_world_cube(uniforms.camera.xyz, world_at(input.uv, 0.999999) - uniforms.camera.xyz);
+    }
+    return vec4(color, select(source.a, 1.0, uniforms.params.y > 0.5));
+}
+fn environment_at(position: vec3<f32>, direction: vec3<f32>) -> vec3<f32> {
+    if uniforms.sky_cube_params.x > 0.5 { return sample_world_cube(position, direction); }
+    let sample_direction = box_projected_direction(position, direction, uniforms.environment_center.xyz, uniforms.environment_half_extents.xyz);
+    return textureSampleLevel(environment_texture, scene_sampler, sample_direction, 0.0).rgb;
+}
 fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     let depth = depth_at(uv);
     if depth >= 0.999999 || source.a <= 0.001 { return source.rgb; }
@@ -66,6 +116,12 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     var normal = normalize(raw_normal);
     if dot(normal, incident) > 0.0 { normal = -normal; }
     let direction = reflect(incident, normal);
+    let fresnel = 0.2 + 0.8 * pow(1.0 - max(dot(-incident, normal), 0.0), 5.0);
+    let weight = clamp(source.a * reflection_mask_at(position) * uniforms.params.x * fresnel, 0.0, 1.0);
+    var fallback = source.rgb;
+    if uniforms.environment_center.w > 0.5 || uniforms.sky_cube_params.x > 0.5 {
+        fallback = mix(source.rgb, environment_at(position, direction), weight);
+    }
     let camera_distance = distance(position, uniforms.camera.xyz);
     let step_length = clamp(camera_distance * 0.025, 0.04, 0.5);
     let thickness = clamp(camera_distance * 0.012, 0.06, 0.4);
@@ -73,7 +129,12 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     var previous_t = 0.0;
     var previous_delta = -thickness;
     for (var step = 1u; step <= 64u; step += 1u) {
-        let t = f32(step) * step_length;
+        if step > u32(uniforms.reflection_trace.x) { break; }
+        // Spend XR's smaller budget near the receiver, growing the stride
+        // toward the same 64-step far distance. Desktop spacing is unchanged.
+        let near_step = f32(step) - 1.0;
+        let trace_step = f32(step) + near_step * near_step * uniforms.reflection_trace.z;
+        let t = trace_step * step_length;
         let ray = origin + direction * t;
         let clip = uniforms.view_projection * vec4(ray, 1.0);
         if clip.w <= 0.0 { break; }
@@ -93,6 +154,7 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
             var hit_delta = delta;
             // Refine the crossing; reject depth discontinuities thicker than geometry budget.
             for (var refine = 0u; refine < 5u; refine += 1u) {
+                if refine >= u32(uniforms.reflection_trace.y) { break; }
                 let mid = (low + high) * 0.5;
                 let mid_ray = origin + direction * mid;
                 let mid_clip = uniforms.view_projection * vec4(mid_ray, 1.0);
@@ -106,16 +168,16 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
             if hit_delta < thickness && separation > 3.0 {
                 let border = min(min(hit_uv.x, 1.0 - hit_uv.x), min(hit_uv.y, 1.0 - hit_uv.y));
                 let edge_fade = smoothstep(0.0, 0.08, border);
-                let range_fade = 1.0 - smoothstep(40.0, 64.0, f32(step));
-                let fresnel = 0.2 + 0.8 * pow(1.0 - max(dot(-incident, normal), 0.0), 5.0);
-                let weight = clamp(source.a * reflection_mask_at(position) * uniforms.params.x * edge_fade * range_fade * fresnel, 0.0, 1.0);
-                return mix(source.rgb, scene_at(hit_uv).rgb, weight);
+                let range_fade = 1.0 - smoothstep(40.0, 64.0, trace_step);
+                // Confidence fades into the environment instead of losing the reflection.
+                let screen_reflection = mix(source.rgb, scene_at(hit_uv).rgb, weight);
+                return mix(fallback, screen_reflection, edge_fade * range_fade);
             }
         }
         previous_t = t;
         previous_delta = delta;
     }
-    return source.rgb;
+    return fallback;
 }
 // Single-scattering eye-ray integration with shadow-map visibility, inspired by
 // Toth/Umenhoffer (Eurographics 2009). No radial screen emitter or screen-light gating.
@@ -188,4 +250,23 @@ fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
 @fragment fn fs_god_rays(input: Output) -> @location(0) vec4<f32> {
     let source = scene_at(input.uv);
     return vec4(god_rays(input.uv, source.rgb), select(source.a, 1.0, uniforms.params.y > 0.5));
+}
+fn bloom_bright(uv: vec2<f32>) -> vec3<f32> {
+    let color = scene_at(uv).rgb;
+    let luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    return color * smoothstep(0.65, 0.95, luminance);
+}
+// Small LDR highlight blur, deliberately bounded; this is not an HDR bloom pyramid.
+@fragment fn fs_bloom(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    let pixel = 1.0 / uniforms.params.zw;
+    var glow = bloom_bright(input.uv) * 0.2;
+    for (var axis = 0u; axis < 4u; axis += 1u) {
+        let offsets = array<vec2<f32>, 4>(vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+        glow += bloom_bright(input.uv + offsets[axis] * pixel * 2.0) * 0.1;
+        glow += bloom_bright(input.uv + offsets[axis] * pixel * 4.0) * 0.05;
+        let diagonal = vec2(offsets[axis].x - offsets[axis].y, offsets[axis].x + offsets[axis].y);
+        glow += bloom_bright(input.uv + diagonal * pixel * 2.0) * 0.05;
+    }
+    return vec4(source.rgb + glow * (uniforms.params.x * 0.22), select(source.a, 1.0, uniforms.params.y > 0.5));
 }

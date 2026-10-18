@@ -35,6 +35,13 @@ impl BladePhysics {
             half_thickness: self.half_thickness * (axis.cross(self.edge) * scale).length(),
         }
     }
+    /// Assisted blades accept either edge direction, while rejecting flat sweeps.
+    pub(crate) fn assisted_sharp(self, pose: Mat4, axis: Vec3, motion: Vec3) -> bool {
+        let edge = pose.transform_vector3(self.edge).normalize();
+        let flat = axis.normalize().cross(edge).normalize();
+        let advance = motion.dot(edge).abs();
+        advance > 1e-6 && advance > motion.dot(flat).abs() * 0.75
+    }
     pub(crate) fn sharp(self, pose: Mat4, axis: Vec3, relative_motion: Vec3) -> bool {
         let edge = pose.transform_vector3(self.edge).normalize();
         let flat = axis.normalize().cross(edge).normalize();
@@ -56,6 +63,8 @@ pub(crate) fn contact(
     mut velocity: Vec3,
     bounce: f32,
     dt: f32,
+    assisted: bool,
+    edge_cut_eligible: bool,
 ) -> Option<(Vec3, Vec3)> {
     let axis_local = (blade[1] - blade[0]).normalize();
     let mid_local = (blade[0] + blade[1]) * 0.5;
@@ -130,7 +139,14 @@ pub(crate) fn contact(
         // bypasses rigid response so the finite mesh cut can finish.
         let supporting_flat = normal_local.z.abs() > 0.75
             && local.z.abs() >= config.half_thickness + flat_radius * 0.8;
-        if !supporting_flat && config.sharp(pose, axis, relative_motion) {
+        if edge_cut_eligible
+            && !supporting_flat
+            && if assisted {
+                config.assisted_sharp(pose, axis, blade_velocity * dt)
+            } else {
+                config.sharp(pose, axis, relative_motion)
+            }
+        {
             continue;
         }
         // Both the actual-vertex sphere and oriented bounds enclose the mesh.
@@ -192,6 +208,8 @@ mod tests {
                 velocity,
                 0.,
                 dt,
+                false,
+                true,
             ) {
                 center = p;
                 velocity = v;
@@ -226,6 +244,8 @@ mod tests {
             Vec3::ZERO,
             0.,
             0.05,
+            false,
+            true,
         )
         .unwrap();
         assert!(resolved.y > 0.5, "{resolved:?}");
@@ -250,6 +270,8 @@ mod tests {
             -Vec3::Y * (8. / 90.),
             0.,
             1. / 90.,
+            false,
+            true,
         )
         .expect("edge-facing board motion must preserve supporting flat contact");
         assert!(velocity.x > 0.025, "{velocity:?}");
@@ -262,5 +284,9 @@ mod tests {
         assert!(c.sharp(pose, -Vec3::Z, Vec3::Y));
         assert!(!c.sharp(pose, -Vec3::Z, -Vec3::Y));
         assert!(!c.sharp(pose, -Vec3::Z, Vec3::X));
+        assert!(c.assisted_sharp(pose, -Vec3::Z, Vec3::Y));
+        assert!(c.assisted_sharp(pose, -Vec3::Z, -Vec3::Y));
+        assert!(!c.assisted_sharp(pose, -Vec3::Z, Vec3::X));
+        assert!(!c.assisted_sharp(pose, -Vec3::Z, Vec3::ZERO));
     }
 }

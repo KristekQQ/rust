@@ -19,6 +19,7 @@ type ColorPipelines = (
     wgpu::RenderPipeline,
     wgpu::RenderPipeline,
     wgpu::RenderPipeline,
+    wgpu::RenderPipeline,
 );
 
 struct InstanceBatch {
@@ -178,11 +179,12 @@ pub struct SceneRenderer {
     sphere_mesh: Mesh,
     imported_meshes: HashMap<u32, Mesh>,
     gltf_gpu: super::gltf_gpu::GltfGpu,
+    cut_feedback_gpu: Option<super::cut_feedback_gpu::CutFeedbackGpu>,
     gltf_models: HashMap<u32, super::gltf_gpu::GpuModel>,
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     pub scene: SceneManager,
-    passes: [PassCache; 2 + MAX_LIGHTS * 2],
+    passes: [PassCache; 3 + MAX_LIGHTS * 2],
     active_cache: usize,
     helper_pipelines: HashMap<(wgpu::TextureFormat, wgpu::TextureFormat), wgpu::RenderPipeline>,
     shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
@@ -279,6 +281,7 @@ impl SceneRenderer {
             sphere_mesh,
             imported_meshes: HashMap::new(),
             gltf_gpu,
+            cut_feedback_gpu: None,
             gltf_models: HashMap::new(),
             grid_uniform_buffer,
             grid_bind_group,
@@ -466,7 +469,15 @@ impl SceneRenderer {
         self.prepare_pass(view, RenderPassKind::Main);
     }
     pub(super) fn prepare_pass(&mut self, view: RenderView, pass: RenderPassKind) {
-        self.prepare_pass_cache(view, pass, pass.index());
+        self.prepare_pass_cache(
+            view,
+            pass,
+            if pass == RenderPassKind::Environment {
+                2 + MAX_LIGHTS * 2
+            } else {
+                pass.index()
+            },
+        );
     }
     pub(super) fn prepare_shadow_pass(
         &mut self,
@@ -644,6 +655,22 @@ impl SceneRenderer {
             "staticRebuilds": bvh.static_rebuilds, "dynamicRebuilds": bvh.dynamic_rebuilds,
         })
     }
+    pub fn info_diagnostic_rows(&self) -> Vec<(&'static str, String)> {
+        let queue = &self.passes[0].queue;
+        vec![
+            ("FPS", format!("{:.1}", self.frame_metrics.fps)),
+            ("FRAME MS", format!("{:.2}", self.frame_metrics.frame_ms)),
+            ("CPU MS", format!("{:.2}", self.prepare_ms)),
+            ("CULL MS", format!("{:.2}", self.cull_ms)),
+            ("VISIBLE", queue.visible.to_string()),
+            (
+                "CULLED",
+                queue.total.saturating_sub(queue.visible).to_string(),
+            ),
+            ("OBJECTS", queue.total.to_string()),
+            ("DRAWS", self.draw_calls.to_string()),
+        ]
+    }
     pub fn xr_debug_content(
         &self,
         cuts: u64,
@@ -734,6 +761,19 @@ impl SceneRenderer {
         self.refresh_info_panel_meshes();
         let mut effects = self.effects.take().unwrap();
         let result = effects.render(self, view, target);
+        self.effects = Some(effects);
+        result
+    }
+    /// Static-only probe capture, independent from main/stereo visibility and overlays.
+    pub fn render_environment(
+        &mut self,
+        view: RenderView,
+        target: &RenderTarget<'_>,
+    ) -> Result<(), String> {
+        let mut effects = self.effects.take().unwrap();
+        effects.write_uniform(&self.queue, data::EffectsUniforms::default());
+        self.prepare_pass(view, RenderPassKind::Environment);
+        let result = self.draw_color(target, &effects, true);
         self.effects = Some(effects);
         result
     }
@@ -925,6 +965,11 @@ impl SceneRenderer {
         reflected: bool,
     ) -> Result<(), String> {
         target.validate()?;
+        let rings = self.cut_feedback_rings(self.active_cache);
+        let draw_rings = !reflected && target.auxiliary.is_none();
+        if draw_rings && rings.iter().any(Option::is_some) {
+            self.prepare_cut_feedback(target);
+        }
         let mut draws = 0;
         let key = (
             target.color_format,
@@ -944,6 +989,7 @@ impl SceneRenderer {
                     &effects.layout,
                     key.2,
                     key.3,
+                    false,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
                 pipeline::build(
@@ -954,6 +1000,17 @@ impl SceneRenderer {
                     &effects.layout,
                     !key.2,
                     key.3,
+                    false,
+                ),
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    &effects.layout,
+                    key.2,
+                    key.3,
+                    true,
                 ),
             )
         });
@@ -1067,14 +1124,20 @@ impl SceneRenderer {
                 }
             }
             for (id, instances) in &cache.queue.imported {
-                if instances.is_empty() {
+                // Presentation FX skip probes/reflections; auxiliary targets defer
+                // their rings to the final transparent overlay.
+                if instances.is_empty() || rings.contains(&Some(*id)) {
                     continue;
                 }
                 let Some(mesh) = self.imported_meshes.get(id) else {
                     continue;
                 };
                 rp.set_pipeline(
-                    if Mat4::from_cols_array_2d(&instances[0].model).determinant() < 0.0 {
+                    if instances[0].emission[1] > 0.0
+                        && self.scene.triangle_meshes().contains_key(id)
+                    {
+                        &pipelines.3
+                    } else if Mat4::from_cols_array_2d(&instances[0].model).determinant() < 0.0 {
                         &pipelines.2
                     } else {
                         &pipelines.0
@@ -1106,6 +1169,9 @@ impl SceneRenderer {
                     cache.camera_position,
                 );
             }
+            if draw_rings {
+                draws += self.draw_cut_feedback(&mut rp, self.active_cache, &rings, target);
+            }
             if !reflected
                 && target.auxiliary.is_none()
                 && (self.draw_grid || self.draw_light_helpers)
@@ -1131,15 +1197,94 @@ impl SceneRenderer {
         }
         Ok(())
     }
-    /// Transparent materials use opaque depth after screen-space effects.
-    pub fn draw_transparent(&mut self, target: &RenderTarget<'_>) -> Result<(), String> {
-        let cache = &self.passes[0];
-        if !cache
+    /// Fixed pool: reuse the existing imported mesh/instance buffers, at most two rings.
+    fn cut_feedback_rings(&self, cache_index: usize) -> [Option<u32>; 2] {
+        let mut rings = [None; 2];
+        for (slot, id) in self.passes[cache_index]
             .queue
             .imported
-            .keys()
-            .filter_map(|id| self.gltf_models.get(id))
-            .any(|m| super::gltf_gpu::draw_count(m, true) > 0)
+            .iter()
+            .filter(|(id, instances)| {
+                !instances.is_empty()
+                    && self.scene.is_cut_feedback_ring(**id)
+                    && self.imported_meshes.contains_key(*id)
+            })
+            .map(|(id, _)| *id)
+            .take(2)
+            .enumerate()
+        {
+            rings[slot] = Some(id);
+        }
+        rings
+    }
+
+    fn prepare_cut_feedback(&mut self, target: &RenderTarget<'_>) {
+        let gpu = self.cut_feedback_gpu.get_or_insert_with(|| {
+            super::cut_feedback_gpu::CutFeedbackGpu::new(&self.device, &self.queue)
+        });
+        gpu.prepare(
+            &self.device,
+            &self.bind_group_layout,
+            (
+                target.color_format,
+                target.depth_format,
+                target.auxiliary.is_some(),
+            ),
+        );
+    }
+
+    fn draw_cut_feedback<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        cache_index: usize,
+        rings: &[Option<u32>; 2],
+        target: &RenderTarget<'_>,
+    ) -> usize {
+        let Some(gpu) = self.cut_feedback_gpu.as_ref() else {
+            return 0;
+        };
+        if rings.iter().all(Option::is_none) {
+            return 0;
+        }
+        pass.set_pipeline(gpu.pipeline((
+            target.color_format,
+            target.depth_format,
+            target.auxiliary.is_some(),
+        )));
+        pass.set_bind_group(0, &self.grid_bind_group, &[]);
+        pass.set_bind_group(1, &gpu.bind_group, &[]);
+        let cache = &self.passes[cache_index];
+        let mut draws = 0;
+        for id in rings.iter().flatten() {
+            let mesh = &self.imported_meshes[id];
+            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            pass.set_vertex_buffer(1, cache.imported[id].buffer.slice(..));
+            pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
+            pass.draw_indexed(
+                0..mesh.index_count,
+                0,
+                0..cache.queue.imported[id].len() as u32,
+            );
+            draws += 1;
+        }
+        draws
+    }
+
+    /// Transparent materials use opaque depth after screen-space effects.
+    pub fn draw_transparent(&mut self, target: &RenderTarget<'_>) -> Result<(), String> {
+        target.validate()?;
+        let rings = self.cut_feedback_rings(0);
+        if rings.iter().any(Option::is_some) {
+            self.prepare_cut_feedback(target);
+        }
+        let cache = &self.passes[0];
+        if rings.iter().all(Option::is_none)
+            && !cache
+                .queue
+                .imported
+                .keys()
+                .filter_map(|id| self.gltf_models.get(id))
+                .any(|m| super::gltf_gpu::draw_count(m, true) > 0)
         {
             return Ok(());
         }
@@ -1147,7 +1292,7 @@ impl SceneRenderer {
             format: target.color_format,
             depth_format: target.depth_format,
             reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
-            material_mask: false,
+            material_mask: target.auxiliary.is_some(),
             shadow: false,
         };
         for id in cache.queue.imported.keys() {
@@ -1161,18 +1306,31 @@ impl SceneRenderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("glTF transparent overlay"),
             });
+        let mut draws;
+        let mut attachments = vec![Some(wgpu::RenderPassColorAttachment {
+            view: target.color,
+            resolve_target: None,
+            depth_slice: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: wgpu::StoreOp::Store,
+            },
+        })];
+        if let Some(auxiliary) = target.auxiliary {
+            attachments.push(Some(wgpu::RenderPassColorAttachment {
+                view: auxiliary,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            }));
+        }
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("glTF transparent overlay"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: target.color,
-                    resolve_target: None,
-                    depth_slice: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
+                color_attachments: &attachments,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: target.depth,
                     depth_ops: Some(wgpu::Operations {
@@ -1201,7 +1359,7 @@ impl SceneRenderer {
             );
             pass.set_bind_group(0, &self.grid_bind_group, &[]);
             pass.set_bind_group(1, &effects.scene_group, &[]);
-            let draws = self.gltf_gpu.draw_many(
+            draws = self.gltf_gpu.draw_many(
                 &mut pass,
                 cache
                     .queue
@@ -1212,10 +1370,11 @@ impl SceneRenderer {
                 true,
                 cache.camera_position,
             );
-            self.draw_calls += draws;
-            self.main_draw_calls += draws;
+            draws += self.draw_cut_feedback(&mut pass, 0, &rings, target);
         }
         self.queue.submit(Some(encoder.finish()));
+        self.draw_calls += draws;
+        self.main_draw_calls += draws;
         Ok(())
     }
 }

@@ -219,12 +219,14 @@ pub(crate) fn glyph(ch: char) -> [u8; 7] {
         'N' => [17, 25, 21, 19, 17, 17, 17],
         'O' => [14, 17, 17, 17, 17, 17, 14],
         'P' => [30, 17, 17, 30, 16, 16, 16],
+        'Q' => [14, 17, 17, 17, 21, 18, 13],
         'R' => [30, 17, 17, 30, 20, 18, 17],
         'S' => [15, 16, 16, 14, 1, 1, 30],
         'T' => [31, 4, 4, 4, 4, 4, 4],
         'U' => [17, 17, 17, 17, 17, 17, 14],
         'V' => [17, 17, 17, 17, 17, 10, 4],
         'W' => [17, 17, 17, 21, 21, 21, 10],
+        'X' => [17, 17, 10, 4, 10, 17, 17],
         '.' => [0, 0, 0, 0, 0, 6, 6],
         '/' => [1, 1, 2, 4, 8, 16, 16],
         '-' => [0, 0, 0, 31, 0, 0, 0],
@@ -353,7 +355,7 @@ mod tests {
     }
     #[test]
     fn all_metric_letters_have_glyphs() {
-        for c in "FPSFRAMECPUMSCULLACHEDFRUSTMBVHNODETESTSDRAWSMAINSCENASKOREROZKROJENOOBJEKTYCASHOTOVO0123456789./".chars() {
+        for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./".chars() {
             assert_ne!(glyph(c), [0; 7], "{c}");
         }
     }
