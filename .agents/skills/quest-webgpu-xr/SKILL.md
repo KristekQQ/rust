@@ -26,7 +26,8 @@ Kořen projektu je o tři adresáře výš. Použij [workflow enginu](../rust-we
   Lokální wgpu patch je popsán v [PATCH.md](../../../third_party/wgpu/PATCH.md).
 - WebGPU XR projekce má hloubku 0..1: znovu ji nepřeváděj z OpenGL. Oko vybírá
   `getViewDescriptor()` jako jediný 2D řez texture array. Browserové textury nedrž
-  přes snímky a nenič je. Přímá cesta aktuálně vyžaduje celé řezy a vypnutý postprocessing.
+  přes snímky a nenič je. Přímá cesta vyžaduje celé řezy. Postprocessing běží přes per-eye mezicíle;
+  finální pipeline musí odpovídat skutečnému formátu XR řezu (bez sRGB suffixu).
 - Quest 149.1 vrací u barevné XR textury někdy mip/sample/usage = **0/0/0**.
   `src/render/xr_output.rs` nahrazuje pouze tuto přesnou trojici u barevné přílohy
   známým nastavením projekční vrstvy 1/1/RENDER_ATTACHMENT. Zachovej ostatní validaci

@@ -137,6 +137,7 @@ impl XrAttachments {
             color: &self.color,
             depth: &self.depth,
             auxiliary: None,
+            material_mask: false,
             color_format: self.format,
             depth_format: wgpu::TextureFormat::Depth32Float,
             width: self.width,

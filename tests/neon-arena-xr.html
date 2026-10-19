@@ -5,7 +5,7 @@
 <figure><figcaption>Skutečný zásah: neonový výboj a rozříznuté kusy</figcaption><canvas id="hit" style="width:100%;height:auto"></canvas></figure>
 <figure><figcaption>Konec kola: skóre a čas uvnitř scény</figcaption><canvas id="score" style="width:100%;height:auto"></canvas></figure><ol id="checks"></ol>
 <script type="module">
-import {cutFaceColor} from '../examples/neon-arena/scene.js';
+import {cutFaceColor,FRUIT_POINTS,launchApple,NEON_GLOW} from '../examples/neon-arena/scene.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
 import {assertForeground} from './pixels.js';
@@ -25,8 +25,8 @@ const report=await run.execute(async test=>{
     engine.xr.addEventListener('cut',event=>reports.push({...event.detail,info:event.detail.pieces.map(p=>p.meshInfo),colors:event.detail.pieces.map(p=>p.meshSnapshot.colors)}));
     await engine.xr.enter();
     test.assert(app.gameState().shots===1 && sim.timerCount===1,'VR starts one automatic fruit launch timer');
-    test.assert(engine.xr.roundState.duration===30,'Rust owns a 30 second round');
-    const still={dt:0,head:{position:[0,1.55,0]},controllers:{
+    test.assert(engine.xr.roundState.duration===45,'Rust owns a 45 second round');
+    const still={dt:0,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{
         right:{position:[1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false},
         left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false}
     }};
@@ -34,6 +34,8 @@ const report=await run.execute(async test=>{
     const person=engine.xr.player;
     const initialPerson=person.state;
     test.assert(initialPerson.head.tracked&&Math.abs(initialPerson.head.position[1]-1.55)<1e-5,'generic XRPlayer receives the actual viewer head pose');
+    const floorY=world.floorTiles?.meshInfo.position[1]??Infinity;
+    test.assert(world.floorTiles?.exists&&world.floorTiles.meshInfo.triangles>0&&floorY<=.001&&world.floorGrout?.exists&&world.floorGrout.meshInfo.position[1]<=-.02&&initialPerson.head.position[1]>floorY+1,'tiled floor and recessed grout exist below the XR player');
     test.assert(initialPerson.leftHand.tracked&&initialPerson.rightHand.tracked,'generic XRPlayer tracks both hands');
     test.assert(initialPerson.inventory.length===2&&initialPerson.rightHand.object.id===world.sword.id&&initialPerson.leftHand.object.id===world.leftSword.id,'arena equips its own swords through generic inventory slots');
     // A non-weapon object must work through the same slot, including unbound tracking.
@@ -74,8 +76,40 @@ const report=await run.execute(async test=>{
     }),'every fruit uses at least two distinct neon colors without extra objects');
     visibleFruit.setPosition(fruitOrigin);sim.frame(still);
     test.assert(visibleFruit.meshInfo.closed && fruitOrigin[1]>1.1 && fruitOrigin[2]>-1.5,'first target is a closed solid within hand reach, above the floor');
+    test.assert(fruitOrigin[1]>floorY+1,'playable fruit remains above the tiled floor');
     test.assert(['cherry','lime','banana','orange','plum','grapes','watermelon'].every(name=>world.fruits.some(f=>f.name===name)),'all seven Midnight Fruits fruit types exist as distinct neon meshes');
     test.assert(world.playFruits[0].name==='cherry','a new round starts with cherries');
+    test.assert(world.playFruits.length===54 && world.playFruits.every((fruit,i)=>i%6===2?fruit.name==='wild':fruit.name===world.playFruits[Math.floor(i/6)*6].name),'each six-target wave offers five matching fruit plus a wildcard');
+    test.assert(new Set(world.fruits.map(fruit=>FRUIT_POINTS[fruit.name].points)).size===world.fruits.length,'every fruit has a distinct triple reward');
+    test.assert(world.comboRules.meshInfo.position[0]===0 && world.comboRules.meshInfo.triangles>20,'triple rules and fruit values are a real central world panel');
+    test.assert(world.galleryIcons.length===30 && world.galleryLabels.length===10 && world.galleryFrames.length===10,'each fruit and wild has its own vertical row of three symbols and a reward');
+    test.assert(world.galleryRows.every((row,i)=>row.icons.length===3 && row.icons.every((icon,slot)=>{
+        const pos=icon.meshInfo.position;
+        return Math.abs(pos[1]-row.icons[0].meshInfo.position[1])<1e-5 && (slot===0||pos[0]>row.icons[slot-1].meshInfo.position[0]);
+    }) && (i===0||row.icons[0].meshInfo.position[1]<world.galleryRows[i-1].icons[0].meshInfo.position[1])), 'three identical symbols run horizontally in each row, with rows stacked vertically');
+    const assertProgress=(name,count)=>{
+        test.assert(world.galleryRows.every(row=>row.icons.every((icon,slot)=>{
+            const active=row.name===name&&slot<count,info=icon.meshInfo;
+            return (active?info.emission>7:info.emission>.6&&info.emission<.7) && Math.abs(info.scale[0]-.073*(active?1.32:1))<1e-5;
+        })) && world.galleryRows.every((row,i)=>row.icons.every((_,slot)=>{
+            const info=world.galleryEarnedFrames[i*3+slot].meshInfo;
+            return row.name===name&&slot<count?info.emission>7:info.emission>.6&&info.emission<.7;
+        })),`visible earned slots and golden frames: ${name||'none'} ${count}/3`);
+    };
+    assertProgress('',0);
+    test.assert(world.boardTilt<-.25 && world.galleryFrames.every(frame=>Math.abs(frame.meshInfo.rotation[0]-world.boardTilt)<1e-5), 'reward board and row frames tilt toward the player as a single plane');
+    test.assert(world.galleryPositions[0][2]<world.galleryPositions[27][2]-.5 && world.galleryLabels.every(label=>Math.abs(label.meshInfo.rotation[0]-world.boardTilt)<1e-5), 'top edge leans away while the lower edge and aligned labels face upward');
+    test.assert(world.galleryEarnedFrames.length===30,'every earned fruit slot has a separate golden frame');
+    const galleryPose=world.galleryIcons[0].meshInfo.rotation;
+    sim.frame({...still,dt:250});
+    test.assert(world.galleryIcons[0].meshInfo.rotation.some((v,i)=>Math.abs(v-galleryPose[i])>.01),'gallery fruit rotates through the Rust simulation');
+    const galleryLeft=sim.pixels('left'),galleryRight=sim.pixels('right');
+    const galleryOrigins=world.galleryIcons.map(icon=>icon.meshInfo.position);
+    world.galleryIcons.forEach(icon=>icon.setPosition([100,100,100]));sim.frame(still);
+    test.assert(pixelDifference(galleryLeft,sim.pixels('left'),3)>150 && pixelDifference(galleryRight,sim.pixels('right'),3)>150,'rotating 3D reward fruit is visibly present in BOTH eyes during play');
+    world.galleryIcons.forEach((icon,i)=>icon.setPosition(galleryOrigins[i]));
+    // Isolate subsequent physics/score cases from the production launch timer.
+    app.stopLaunches();
     // From inside the fruit, its back-facing neon seams must still render in both eyes.
     const inside={...still,head:{position:[fruitOrigin[0]+.49*.19,fruitOrigin[1]-.32*.19,fruitOrigin[2]]}};
     sim.frame(inside);const innerLeft=sim.pixels('left'),innerRight=sim.pixels('right');
@@ -102,11 +136,35 @@ const report=await run.execute(async test=>{
     const blackFrame=sim.pixels('left');let blackPixels=0;
     for(let i=0;i<blackFrame.data.length;i+=4)if(blackFrame.data[i]<3&&blackFrame.data[i+1]<3&&blackFrame.data[i+2]<3)blackPixels++;
     test.assert(blackPixels>blackFrame.width*blackFrame.height*.3,'stereo scene has a real black background');
-    test.assert(engine.postprocessing.stats().passes===0&&engine.postprocessing.stats().targets===0,'no environment, SSR, bloom or postprocess targets in XR');
+    const postprocessing=engine.postprocessing.stats();
+    test.assert(postprocessing.passes===2&&postprocessing.targets>0&&postprocessing.ssrWidth===postprocessing.width/2,'SSR traces half-resolution then composites into full-size XR');
+    // Look down into the playable space and prove the real tiled floor contributes to both eye images.
+    const down={...still,head:{position:[0,1.55,0],orientation:[-Math.sin(Math.PI/6),0,0,Math.cos(Math.PI/6)]}};
+    sim.frame(down);const floorLeft=sim.pixels('left'),floorRight=sim.pixels('right');
+    const tilePosition=world.floorTiles.meshInfo.position,groutPosition=world.floorGrout.meshInfo.position;
+    world.floorTiles.setPosition([100,100,100]);world.floorGrout.setPosition([100,100,100]);sim.frame(down);
+    test.assert(pixelDifference(floorLeft,sim.pixels('left'),2)>20&&pixelDifference(floorRight,sim.pixels('right'),2)>20,'reflective tiled floor is visible in BOTH downward-looking XR eyes');
+    world.floorTiles.setPosition(tilePosition);world.floorGrout.setPosition(groutPosition);sim.frame(still);
     test.assert(!performance.getEntriesByType('resource').some(r=>/\/(?:color|emission)-(?:px|nx|py|ny|pz|nz)\.png/.test(r.name)),'arena never loads environment image assets');
+    const neonLeft=sim.pixels('left'),neonRight=sim.pixels('right');
+    test.assert(engine.debugStats().neonGlow.enabled&&engine.debugStats().neonGlow.draws>0,'texture-free glow draws in the real stereo renderer');
+    engine.setNeonGlow({strength:0});sim.frame(still);
+    test.assert(pixelDifference(neonLeft,sim.pixels('left'),2)>20&&pixelDifference(neonRight,sim.pixels('right'),2)>20,'glow adds visible colored light in BOTH eyes, including the offset right viewport');
+    test.assert(engine.debugStats().neonGlow.cachedMeshes===0,'disabling glow releases its stable-ID mesh cache');
+    engine.setNeonGlow(NEON_GLOW);sim.frame(still);
     const first=app.gameState().liveApples[0],startY=first.meshInfo.position[1];
     for(let i=0;i<25;i++)sim.frame({...still,dt:1000/72});
-    test.assert(first.meshInfo.position[1]>startY+.3,'launched neon fruit moves with Rust physics');
+    test.assert(first.meshInfo.position[1]>startY+.08 && first.meshInfo.position[1]<startY+.3,'launched neon fruit follows the gentler Rust physics arc');
+    for(const target of app.gameState().liveApples)if(target.exists)target.remove();
+    const flight=launchApple(engine.scene,world.fruits.find(f=>f.name==='watermelon'),-1),flightSamples=[];
+    for(let i=0;i<4;i++){
+        const pos=flight.meshInfo.position;flightSamples.push(pos);
+        test.assert(pos[1]>=1.10 && pos[1]<=1.65 && Math.abs(pos[0])<.5 && pos[2]>-1.12 && pos[2]<-.95,'production trajectory stays in a comfortable forward reach for over a second');
+        // Production frames must stay below the engine's large-delta clamp.
+        for(let frame=0;frame<32;frame++)sim.frame({...still,dt:1000/72});
+    }
+    flight.remove();
+    test.report.evidence={flightSamples};
     // Production blade contacts remain active even while the hand is stationary.
     for(const target of app.gameState().liveApples)if(target.exists)target.remove();
     const incoming=engine.scene.createMesh(world.fruits[0].geometry).setPosition([.76,1.3,-.9])
@@ -132,7 +190,8 @@ const report=await run.execute(async test=>{
     for(let i=0;i<4;i++)sim.frame(trailPose(i));
     const trailLeft=sim.pixels('left'),trailRight=sim.pixels('right');
     world.sword.setBladeTrail(false);world.leftSword.setBladeTrail(false);sim.frame({...trailPose(3),dt:0});
-    test.assert(pixelDifference(trailLeft,sim.pixels('left'),3)>25&&pixelDifference(trailRight,sim.pixels('right'),3)>25,'moving katana has a real spatial motion trail in both eyes');
+    const trailPixels=[pixelDifference(trailLeft,sim.pixels('left'),3),pixelDifference(trailRight,sim.pixels('right'),3)];
+    test.assert(trailPixels.every(count=>count>25),'moving katana has a real spatial motion trail in both eyes',trailPixels);
     world.sword.setBladeTrail(true);world.leftSword.setBladeTrail(true);
     let hitEvidence=false;
     // Both production katanas must perform a real closed-mesh cut.
@@ -249,16 +308,55 @@ const report=await run.execute(async test=>{
     test.assert(speedSizes[1]>speedSizes[0]*2.5,'fast stroke renders a clearly larger ring than slow stroke at identical effect age',{slow:speedSizes[0],fast:speedSizes[1]});
     engine.scene.clearCutFeedback();
     test.assert(engine.xr.roundState.cuts===app.gameState().cuts && app.gameState().cuts>=2,'Rust round score matches successful source cuts');
-    for(let i=0;i<310 && !engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
+    // Exercise actual tracked cuts through Rust scoring, not synthetic cut events.
+    for(const object of app.gameState().liveApples)if(object.exists)object.remove();
+    const hitCombo = (name) => {
+        const fruit=name==='wild'?world.wild:world.fruits.find(f=>f.name===name),rule=FRUIT_POINTS[name];
+        sim.frame({...still,controllers:{...still.controllers,right:{position:[1.8,.9,-.45],orientation:[0,0,0,1],pressed:false}}});
+        const target=engine.scene.createMesh(fruit.geometry).setPosition([1.8,1.35,-1.1]).setScale([.15,.15,.15])
+            .setCuttable(true,{capColor:cutFaceColor(fruit)}).setEmission(1.1).setColorCutout(.25).setComboTarget(rule.label,rule.points,{wild:name==='wild'});
+        for(let i=0;i<=24&&target.exists;i++)sim.frame({...still,dt:1000/72,controllers:{...still.controllers,
+            right:{position:[1.8,.9+i/24*.9,-.45],orientation:[0,0,0,1],pressed:false}}});
+        test.assert(!target.exists,`real tracked combo cut: ${name}`);
+    };
+    hitCombo('watermelon');assertProgress('watermelon',1);
+    sim.frame(still);const earnedPixel=sim.pixels('left');
+    const firstEarned=world.galleryRows.find(row=>row.name==='watermelon').icons[0];
+    firstEarned.setEmission(.08);sim.frame(still);const dimPixel=sim.pixels('left');
+    firstEarned.setEmission(8);sim.frame(still);
+    test.assert(pixelDifference(earnedPixel,dimPixel,3)>10,'earned fruit illumination changes actual world-space pixels');
+    hitCombo('watermelon');assertProgress('watermelon',2);
+    test.assert(engine.xr.roundState.score===0 && engine.xr.roundState.streak===2,'two matching hits award no points');
+    hitCombo('lemon');assertProgress('lemon',1);
+    test.assert(engine.xr.roundState.score===0 && engine.xr.roundState.streak===1 && engine.xr.roundState.fruit==='CITRON','different fruit resets streak and starts its own sequence');
+    hitCombo('watermelon');hitCombo('watermelon');hitCombo('watermelon');
+    assertProgress('watermelon',3);
+    test.assert(engine.xr.roundState.score===120 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===1,'three original watermelons award exactly their configured reward');
+    const scorePixels=sim.pixels('left'),scoreGeometry=JSON.stringify(world.scorePanel.meshSnapshot.positions);
+    hitCombo('lemon');hitCombo('lemon');hitCombo('lemon');
+    assertProgress('lemon',3);
+    test.assert(engine.xr.roundState.score===140 && engine.xr.roundState.triples===2,'another fruit adds its different reward');
+    test.assert(scoreGeometry!==JSON.stringify(world.scorePanel.meshSnapshot.positions) && pixelDifference(scorePixels,sim.pixels('left'))>50,'Rust updates the real world score mesh and visible stereo pixels');
+    hitCombo('watermelon');hitCombo('wild');hitCombo('watermelon');
+    test.assert(engine.xr.roundState.score===260,'a real sliced wildcard substitutes inside a fruit triple');
+    hitCombo('wild');hitCombo('wild');hitCombo('lemon');
+    test.assert(engine.xr.roundState.score===280,'leading wildcards adopt the subsequent fruit reward');
+    hitCombo('wild');hitCombo('wild');hitCombo('wild');
+    assertProgress('wild',3);
+    test.assert(engine.xr.roundState.score===400,'three real wildcard slices award the configured top reward');
+    for(let i=0;i<460 && !engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
     test.assert(engine.xr.roundState.finished && sim.timerCount===0 && !app.gameState().launching,'round finishes and stops automatic launches');
+    const finishedScore=engine.xr.roundState.score;
+    test.assert(app.shootApple()===null && engine.xr.roundState.score===finishedScore,'finished round blocks new targets and preserves score');
     snapshot('score');
     test.assert(JSON.stringify(world.credits.meshSnapshot.positions)===creditsGeometry,'static bitmap credit is preserved through live diagnostics and scoring updates');
     const aim=pressed=>({...still,dt:1000/72,controllers:{...still.controllers,
-        left:{...still.controllers.left,targetRayMatrix:sim.gripX(0,[0,1.05,-.2]),pressed}}});
+        left:{...still.controllers.left,targetRayMatrix:sim.gripX(0,[0,.20,-.2]),pressed}}});
     sim.frame(aim(false));
     test.assert(Math.abs(world.pointers[0].meshInfo.position[2]+1.65)<.02,'target ray cursor reaches real restart object');
     sim.frame(aim(true));
-    test.assert(engine.xr.roundState.remaining===30 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
+    test.assert(engine.xr.roundState.remaining===45 && engine.xr.roundState.score===0 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===0 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
+    assertProgress('',0);
     sim.frame(aim(true));test.assert(app.gameState().shots===1,'held trigger never repeatedly restarts');
     test.assert(!engine.xr.lastError,'real stereo rendering completes without XR error',engine.xr.lastError);
     await engine.xr.exit();
@@ -266,7 +364,7 @@ const report=await run.execute(async test=>{
     test.assert(sim.timerCount===0 && !app.gameState().launching,'XR exit releases launch timer');
     await engine.xr.enter();test.assert(sim.timerCount===1,'XR reentry owns exactly one timer');
     await engine.xr.exit();
-    test.report.evidence={cuts:reports.length,panels:panels.map(p=>p.id),background:'black',postprocessPasses:engine.postprocessing.stats().passes};
+    test.report.evidence={...test.report.evidence,cuts:reports.length,panels:panels.map(p=>p.id),background:'black',postprocessPasses:engine.postprocessing.stats().passes};
 });
 if(app?.engine.xr.isPresenting)await app.engine.xr.exit();
 app?.engine.dispose();sim.dispose();publishXRReport(report);

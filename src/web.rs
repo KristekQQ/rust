@@ -283,6 +283,60 @@ pub fn postprocess_stats() -> Vec<f64> {
 }
 
 #[wasm_bindgen]
+pub fn configure_ssr(resolution_scale: f32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().configure_ssr(resolution_scale))
+    })
+}
+
+#[wasm_bindgen]
+pub fn ssr_stats() -> Vec<f64> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|s| s.borrow().ssr_stats().to_vec())
+            .unwrap_or_default()
+    })
+}
+
+#[wasm_bindgen]
+pub fn configure_ssr_region(bounds: &[f32]) -> bool {
+    if !bounds.is_empty() && bounds.len() != 6 {
+        return false;
+    }
+    let (min, max, enabled) = if bounds.len() == 6 {
+        (
+            glam::Vec3::from_slice(&bounds[..3]),
+            glam::Vec3::from_slice(&bounds[3..]),
+            true,
+        )
+    } else {
+        (glam::Vec3::ZERO, glam::Vec3::ZERO, false)
+    };
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().configure_ssr_region(min, max, enabled))
+    })
+}
+
+#[wasm_bindgen]
+pub fn ssr_work_stats() -> Vec<f64> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|s| s.borrow().ssr_work_stats().to_vec())
+            .unwrap_or_default()
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_render_effects(shadows: bool, reflections: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {
@@ -323,6 +377,15 @@ pub fn set_object_color_cutout(id: u32, threshold: f32) -> bool {
         s.borrow()
             .as_ref()
             .is_some_and(|s| s.borrow_mut().scene.set_color_cutout(id, threshold))
+    })
+}
+/// Optional additive geometry glow; zero disables and releases its GPU cache.
+#[wasm_bindgen]
+pub fn set_neon_glow(strength: f32, radius: f32) -> bool {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().configure_neon_glow(strength, radius))
     })
 }
 #[wasm_bindgen]
@@ -866,7 +929,10 @@ pub fn resize(width: u32, height: u32) {
 pub fn clear_scene() {
     STATE.with(|s| {
         if let Some(st) = &*s.borrow() {
-            st.borrow_mut().scene.clear_scene();
+            let mut state = st.borrow_mut();
+            state.scene.clear_scene();
+            state.combo_score = Default::default();
+            state.clear_combo_indicators();
         }
     });
 }
@@ -1135,7 +1201,7 @@ pub fn triangle_mesh_info(id: u32) -> Result<String, JsValue> {
                         .y
                 })
                 .fold(f32::INFINITY, f32::min);
-            return Ok(serde_json::json!({"triangles":panel.mesh.indices.len()/3,"vertices":panel.mesh.vertices.len(),"volume":0.,"cuttable":false,"closed":false,"resident":false,"cpuMaterialized":true,"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom,"cutProgress":0.,"jammedBy":null}).to_string());
+            return Ok(serde_json::json!({"triangles":panel.mesh.indices.len()/3,"vertices":panel.mesh.vertices.len(),"volume":0.,"cuttable":false,"closed":false,"resident":false,"cpuMaterialized":true,"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"scale":transform.scale.to_array(),"emission":scene.objects()[&id].emission,"bottom":bottom,"cutProgress":0.,"jammedBy":null}).to_string());
         }
 
         let object = scene
@@ -1145,7 +1211,7 @@ pub fn triangle_mesh_info(id: u32) -> Result<String, JsValue> {
         let transform = scene.objects()[&id].transform;
         let bottom = object.mesh.bottom(transform)?;
         let (cut_progress, jammed_by) = scene.blade_cut_state(id);
-        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom,"cutProgress":cut_progress,"jammedBy":jammed_by}).to_string())
+        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"scale":transform.scale.to_array(),"emission":scene.objects()[&id].emission,"bottom":bottom,"cutProgress":cut_progress,"jammedBy":jammed_by}).to_string())
     })
 }
 /// Explicit diagnostic snapshot, never fetched by the render loop.
@@ -1864,10 +1930,40 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
     // cutting_command's mutable scene borrow must end before borrowing State again.
     STATE.with(|slot| {
         if let Some(state) = slot.borrow().as_ref() {
-            state.borrow_mut().record_xr_cuts(report.removed.len());
+            state.borrow_mut().record_xr_cuts(&report.removed);
         }
     });
     Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts}).to_string())
+}
+
+/// Bind a world object to one of three slots in the currently hit combo row.
+#[wasm_bindgen]
+pub fn bind_combo_indicator(id: u32, kind: &str, slot: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().bind_combo_indicator(id, kind, slot))
+    })
+}
+
+/// Explicit original-target scoring metadata; fragments do not inherit it.
+#[wasm_bindgen]
+pub fn set_combo_target(id: u32, kind: &str, points: u32, wild: bool) -> bool {
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let Some(state) = slot.as_ref() else {
+            return false;
+        };
+        let mut state = state.borrow_mut();
+        if !state.scene.object_exists(id) {
+            return false;
+        }
+        // Keep metadata bounded by live targets, including expired projectiles.
+        let live: std::collections::BTreeSet<_> = state.scene.objects().keys().copied().collect();
+        state.combo_score.targets.retain(|id, _| live.contains(id));
+        state.combo_score.register(id, kind, points, wild)
+    })
 }
 
 /// Opt-in round duration; the application chooses its game length.
@@ -1968,6 +2064,22 @@ pub fn xr_render_gpu_eye(
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
             .borrow_mut();
         state.render_xr_gpu_image(matrix, position, &sub_image)
+    })
+}
+
+/// Present completed stereo effects with one final compositor-facing submission.
+#[wasm_bindgen]
+pub fn xr_present_gpu_frame(images: js_sys::Array) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let mut state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow_mut();
+        state.present_xr_gpu_frame(&images)
     })
 }
 

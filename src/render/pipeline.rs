@@ -12,6 +12,7 @@ pub fn build(
     effects: &BindGroupLayout,
     reflected: bool,
     material_mask: bool,
+    packed_depth: bool,
     double_sided: bool,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
@@ -25,7 +26,7 @@ pub fn build(
         blend: Some(wgpu::BlendState::REPLACE),
         write_mask: wgpu::ColorWrites::ALL,
     })];
-    if material_mask {
+    if packed_depth {
         targets.push(Some(wgpu::ColorTargetState {
             format: TextureFormat::Rgba8Unorm,
             blend: Some(wgpu::BlendState::REPLACE),
@@ -46,8 +47,10 @@ pub fn build(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some(if material_mask {
+            entry_point: Some(if packed_depth {
                 "fs_postprocess"
+            } else if material_mask {
+                "fs_material_mask"
             } else {
                 "fs_main"
             }),

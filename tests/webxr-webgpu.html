@@ -7,8 +7,9 @@ import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
 import {assertForeground,capturePixels} from './pixels.js';
 
-const width=192,height=192,sim=installXRSimulator({clockTimers:false,profile:{eyeWidth:width,eyeHeight:height}});
-const run=new XRTestRun('webxr-webgpu',sim,publishXRReport),bindings=[],requests=[],validationErrors=[];
+const profiling=new URLSearchParams(location.search).has('profile');
+const width=profiling?1024:192,height=profiling?1024:208,sim=installXRSimulator({clockTimers:false,profile:{eyeWidth:width,eyeHeight:height}});
+const run=new XRTestRun(profiling?'neon-arena-gpu-profile':'webxr-webgpu',sim,publishXRReport),bindings=[],requests=[],validationErrors=[];
 const previousBinding=Object.getOwnPropertyDescriptor(globalThis,'XRGPUBinding');
 const adapterRequests=[],previousAdapter=Object.getOwnPropertyDescriptor(navigator.gpu,'requestAdapter');
 const requestAdapter=navigator.gpu.requestAdapter.bind(navigator.gpu);
@@ -24,6 +25,25 @@ navigator.xr.requestSession=(mode,options)=>{requests.push({mode,options});retur
 class SimulatedGPUBinding {
     constructor(session,device) {
         this.session=session;this.device=device;this.subimages=[];bindings.push(this);
+        // Observe actual attachment writes and the submit that contains them.
+        this.presentationWrites=[];this.colorViews=new WeakMap();this.depthViews=new WeakSet();
+        const commandWrites=new WeakMap(),makeEncoder=device.createCommandEncoder.bind(device),submit=device.queue.submit.bind(device.queue);
+        device.createCommandEncoder=(...args)=>{
+            const encoder=makeEncoder(...args),writes=[],begin=encoder.beginRenderPass.bind(encoder),finish=encoder.finish.bind(encoder);
+            encoder.beginRenderPass=descriptor=>{
+                for(const attachment of descriptor.colorAttachments){
+                    if(attachment&&this.colorViews.has(attachment.view))writes.push({layer:this.colorViews.get(attachment.view),depthAttached:!!descriptor.depthStencilAttachment,browserDepth:this.depthViews.has(descriptor.depthStencilAttachment?.view)});
+                }
+                return begin(descriptor);
+            };
+            encoder.finish=(...args)=>{const buffer=finish(...args);commandWrites.set(buffer,writes);return buffer;};
+            return encoder;
+        };
+        device.queue.submit=buffers=>{
+            const list=Array.from(buffers),writes=list.flatMap(buffer=>commandWrites.get(buffer)??[]);
+            if(writes.length)this.presentationWrites.push(writes);
+            submit(list);
+        };
         device.addEventListener('uncapturederror',event=>validationErrors.push(String(event.error)));
         device.pushErrorScope('validation');this.scopeOpen=true;
         // The shared simulator emits OpenGL projections. The WebGPU XR runtime emits depth 0..1.
@@ -45,6 +65,9 @@ class SimulatedGPUBinding {
         this.options=options;
         const texture=format=>this.device.createTexture({size:[width,height,2],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
         this.color=texture(options.colorFormat);this.depth=texture(options.depthStencilFormat);
+        const colorView=this.color.createView.bind(this.color),depthView=this.depth.createView.bind(this.depth);
+        this.color.createView=descriptor=>{const view=colorView(descriptor);this.colorViews.set(view,descriptor?.baseArrayLayer??0);return view;};
+        this.depth.createView=descriptor=>{const view=depthView(descriptor);this.depthViews.add(view);return view;};
         // Quest 149 compositor color handles report these three getters as zero.
         // Shadow only JS metadata; createView/readback still use the real GPUTexture.
         this.opaqueMetadata=bindings.length===2;
@@ -75,6 +98,18 @@ class SimulatedGPUBinding {
         if(this.scopeOpen){this.scopeOpen=false;const error=await this.device.popErrorScope();if(error)validationErrors.push(String(error));}
         test.assert(validationErrors.length===0,'GPU rendering has no validation errors',validationErrors);
     }
+    async depthPixels(index) {
+        const bytesPerRow=Math.ceil(width*4/256)*256;
+        const buffer=this.device.createBuffer({size:bytesPerRow*height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+        try {
+            const encoder=this.device.createCommandEncoder();
+            encoder.copyTextureToBuffer({texture:this.depth,origin:[0,0,index],aspect:'depth-only'},{buffer,bytesPerRow,rowsPerImage:height},[width,height,1]);
+            this.device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
+            const padded=new Float32Array(buffer.getMappedRange()),data=new Float32Array(width*height);
+            for(let y=0;y<height;y++)data.set(padded.subarray(y*bytesPerRow/4,y*bytesPerRow/4+width),y*width);
+            return data;
+        } finally {buffer.destroy();}
+    }
     destroy(){this.color?.destroy();this.depth?.destroy();}
 }
 Object.defineProperty(globalThis,'XRGPUBinding',{configurable:true,writable:true,value:SimulatedGPUBinding});
@@ -92,8 +127,28 @@ const report=await run.execute(async test=>{
     engine.scene.createSphere([.35,1.5,-2]).setScale([.2,.2,.2]);
     engine.scene.createLight({position:[-2,4,0],color:[1,1,1]});
     assertForeground(await capturePixels(canvas),'desktop WebGPU scene');
+    // A genuinely emissive triangle mesh exercises glow in native GPU array slices.
+    const {fruitGeometries}=await import('../examples/neon-arena/geometry.js');
+    engine.scene.createMesh(fruitGeometries()[2].geometry).setPosition([0,1.6,-1.1]).setScale([.22,.22,.22]).setEmission(2).setColorCutout(.25);
+    engine.setNeonGlow({strength:1,radius:.025});
+    // Keep the postprocess path active while toggling SSR, so format/gamma changes
+    // cannot masquerade as a reflection. The lower eye region contains the floor.
+    engine.scene.createPlane([0,.7,-2.5]).setScale([5,1,6])
+        .setRenderOptions({reflectivity:1,castsShadow:false});
+    engine.scene.createCube([0,1.05,-2.2]).setScale([.3,.5,.3]).setEmission(2);
+    engine.postprocessing.enable('bloom',{strength:.000001});
+    engine.postprocessing.configureSSR({resolutionScale:.5});
+    engine.postprocessing.enable('ssr',{strength:.92});
+    const floorDifference=(before,after)=>{
+        let changed=0;
+        for(let y=Math.floor(height*.75);y<height;y++)for(let x=8;x<width-8;x++){
+            const i=(y*width+x)*4;
+            if(Math.max(...[0,1,2].map(c=>Math.abs(before.data[i+c]-after.data[i+c])))>3)changed++;
+        }
+        return changed;
+    };
     const size=[canvas.width,canvas.height];
-    let firstFrames=0;engine.xr.addEventListener('firstframe',()=>firstFrames++);
+    let firstFrames=0;const performanceReports=[];engine.xr.addEventListener('performance',event=>performanceReports.push(event.detail));engine.xr.addEventListener('firstframe',()=>firstFrames++);
     test.assert(await engine.xr.isSupported(),'WebGPU XR support with native binding');
     const frame=()=>{sim.frame({head:{position:[0,1.6,0],orientation:[0,0,0,1]}});test.assert(!engine.xr.lastError,'XR frame completes',String(engine.xr.lastError));};
     await engine.xr.enter();const binding=bindings.at(-1);
@@ -105,13 +160,57 @@ const report=await run.execute(async test=>{
     assertForeground(left,'real GPU left array slice');assertForeground(right,'real GPU right array slice');
     test.assert(binding.subimages.join(',')==='0,1','both native array slices rendered once');
     test.assert(firstFrames===1,'first-frame diagnostic follows successful stereo submission');
+    test.assert(binding.presentationWrites.length===1&&binding.presentationWrites[0].length===2&&binding.presentationWrites[0].map(write=>write.layer).sort().join(',')==='0,1','SSR and overlays touch both compositor eyes only in ONE final stereo submission',binding.presentationWrites);
+    test.assert(binding.presentationWrites[0].every(write=>write.browserDepth),'final compositor color/depth attachments belong to the same browser layer');
     test.assert(pixelDifference(left,right)>20,'GPU stereo eyes have distinct IPD geometry');
+    const resolvedDepth=[await binding.depthPixels(0),await binding.depthPixels(1)];
+    test.assert(resolvedDepth.every(values=>values.some(v=>v>0&&v<1)&&values.some(v=>v===1)),'postprocessed XR depth contains real geometry and cleared background in BOTH eyes');
+    engine.postprocessing.disable('ssr');engine.postprocessing.disable('bloom');frame();
+    const directDepth=[await binding.depthPixels(0),await binding.depthPixels(1)];
+    const depthDifferences=resolvedDepth.map((values,eye)=>values.reduce((count,v,i)=>count+(Math.abs(v-directDepth[eye][i])>1e-6?1:0),0));
+    test.assert(depthDifferences.every(count=>count<width*height*.001),'resolved compositor depth matches direct scene depth in BOTH XR slices',depthDifferences);
+    engine.postprocessing.enable('bloom',{strength:.000001});engine.postprocessing.enable('ssr',{strength:.92});frame();
+    binding.layer.ignoreDepthValues=true;
+    const sentinel=0.375,clearDepth=binding.device.createCommandEncoder();
+    for(let eye=0;eye<2;eye++){
+        const pass=clearDepth.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:binding.depth.createView({dimension:'2d',baseArrayLayer:eye,arrayLayerCount:1}),depthClearValue:sentinel,depthLoadOp:'clear',depthStoreOp:'store'}});
+        pass.end();
+    }
+    binding.device.queue.submit([clearDepth.finish()]);
+    frame();
+    const ignoredDepth=[await binding.depthPixels(0),await binding.depthPixels(1)];
+    test.assert(ignoredDepth.every(values=>values.every(v=>v===sentinel)),'ignored compositor depth is retained while internal SSR depth still renders');
+    test.assert(binding.presentationWrites.at(-1).length===2&&binding.presentationWrites.at(-1).every(write=>!write.depthAttached),'ignored compositor depth is never attached to either final eye pass');
+    binding.layer.ignoreDepthValues=false;
+    engine.postprocessing.disable('ssr');frame();
+    const dryLeft=await binding.pixels(0),dryRight=await binding.pixels(1);
+    const reflectionPixels=[floorDifference(left,dryLeft),floorDifference(right,dryRight)];
+    test.assert(reflectionPixels.every(count=>count>5),'SSR changes visible reflective floor in BOTH GPU XR slices',reflectionPixels);
+    engine.postprocessing.enable('ssr',{strength:.92});frame();
+    engine.setNeonGlow({strength:0});frame();
+    const flatLeft=await binding.pixels(0),flatRight=await binding.pixels(1);
+    test.assert(pixelDifference(left,flatLeft,2)>10&&pixelDifference(right,flatRight,2)>10,'additive neon halo renders into BOTH direct GPU XR array slices');
+    engine.setNeonGlow({strength:1,radius:.025});frame();
     const preview=document.querySelector('#stereo');preview.width=width*2;preview.height=height;
     preview.getContext('2d').putImageData(left,0,0);preview.getContext('2d').putImageData(right,width,0);
     // Entire mesh lies before depthNear=.05. An erroneous second GL-to-GPU conversion exposes it.
     const clipped=engine.scene.createCube([0,1.6,-.03]).setScale([.2,.2,.005]);frame();
     test.assert(pixelDifference(left,await binding.pixels(0))===0,'GPU projection near clipping is not converted twice');clipped.remove();
     test.assert(canvas.width===size[0]&&canvas.height===size[1],'direct XR rendering preserves desktop canvas size');
+    test.assert(engine.postprocessing.stats().width===width&&engine.postprocessing.stats().height===height,'postprocess targets use eye dimensions');
+    test.assert(engine.postprocessing.stats().targets===4,'native depth removes the packed-depth color target while retaining half SSR');
+    const creations={createRenderPipeline:0,createTexture:0,createBindGroup:0};
+    const originalFactories=Object.fromEntries(Object.keys(creations).map(name=>[name,Object.getOwnPropertyDescriptor(binding.device,name)]));
+    for(const name of Object.keys(creations)){
+        const original=binding.device[name];
+        Object.defineProperty(binding.device,name,{configurable:true,value:function(...args){creations[name]++;return original.apply(this,args);}});
+    }
+    try {for(let i=0;i<8;i++)frame();}
+    finally {for(const name of Object.keys(creations)){
+        if(originalFactories[name])Object.defineProperty(binding.device,name,originalFactories[name]);else delete binding.device[name];
+    }}
+    test.assert(Object.values(creations).every(count=>count===0),'steady stereo SSR reuses all render pipelines, textures and bind groups',creations);
+
     await binding.checkValidation(test);
     const first=sim.session;await engine.xr.exit();
     test.assert(first.ended&&first.pendingFrameCount===0&&!engine.xr.isPresenting,'exit ends session and cancels frames');
@@ -121,6 +220,52 @@ const report=await run.execute(async test=>{
     test.assert(firstFrames===2,'first-frame diagnostic resets on reentry');
     test.assert(second.opaqueMetadata&&second.color.mipLevelCount===0&&second.color.sampleCount===0&&second.color.usage===0,'Quest opaque color metadata renders both real GPU eyes');
     await second.checkValidation(test);
+    if(profiling){
+        // The real arena workload on real GPU XR slices, with GPU completion instead of readback timing.
+        const {createScene,launchApple,NEON_GLOW,FLOOR_SSR,FLOOR_SSR_BOUNDS}=await import('../examples/neon-arena/scene.js');
+        const world=await createScene(engine.scene);
+        const names=['cherry','grapes','banana','orange','watermelon','pear'];
+        const fruitTargets=names.map((name,i)=>launchApple(engine.scene,world.fruits.find(f=>f.name===name),1)
+            .setPosition([(i%3-1)*.48,i<3?1.6:1.08,-1.3]));
+        engine.setNeonGlow(NEON_GLOW);engine.postprocessing.disable('bloom');
+        const profileFrame=()=>sim.frame({dt:0,head:{position:[0,1.65,0],orientation:[-Math.sin(.15),0,0,Math.cos(.15)]}});
+        const measurements=[];
+        for(const [name,scale,bounded] of [['SSR off',0,false],['previous half SSR',.5,false],['bounded half SSR',.5,true],['previous half SSR repeat',.5,false],['bounded half SSR repeat',.5,true],['previous half SSR final',.5,false],['bounded half SSR final',.5,true]]){
+            if(scale===0)engine.postprocessing.disable('ssr');
+            else {engine.postprocessing.configureSSR({resolutionScale:scale,receiverBounds:bounded?FLOOR_SSR_BOUNDS:null});engine.postprocessing.enable('ssr',FLOOR_SSR);}
+            for(let i=0;i<8;i++){profileFrame();await second.device.queue.onSubmittedWorkDone();}
+            const samples=[];
+            for(let i=0;i<24;i++){
+                const start=performance.now();profileFrame();await second.device.queue.onSubmittedWorkDone();samples.push(performance.now()-start);
+            }
+            samples.sort((a,b)=>a-b);
+            measurements.push({name,medianMs:samples[12],p95Ms:samples[22],samples:24,postprocess:engine.postprocessing.stats()});
+        }
+        test.report.evidence={environment:'desktop real WebGPU simulated XR slices, CPU submission plus GPU completion; no pixel readback in timed section; not Quest FPS',eyeSize:[width,height],fruitNames:names,targetTriangles:fruitTargets.reduce((n,f)=>n+f.meshInfo.triangles,0),measurements};
+        const stats=engine.postprocessing.stats();
+        test.assert(stats.ssrWidth===width/2&&stats.ssrHeight===height/2&&stats.ssrPixels===width*height/4,'half-resolution SSR traces one quarter of eye pixels and keeps full-size output',stats);
+        test.assert(stats.ssrTracePixels>0&&stats.ssrTracePixels<stats.ssrViewportPixels,'receiver projection restricts the actual trace draw rectangle',stats);
+        const optimizedEyes=[await second.pixels(0),await second.pixels(1)];
+        engine.postprocessing.disable('ssr');profileFrame();
+        const dryEyes=[await second.pixels(0),await second.pixels(1)];
+        const reflectedCounts=optimizedEyes.map((eye,i)=>floorDifference(eye,dryEyes[i]));
+        test.assert(reflectedCounts.every(count=>count>5),'bounded production arena still reflects into BOTH native GPU eyes',reflectedCounts);
+        engine.postprocessing.enable('ssr',FLOOR_SSR);profileFrame();
+        sim.frame({dt:0,head:{position:[0,1.65,0],orientation:[Math.sin(.5),0,0,Math.cos(.5)]}});
+        test.assert(engine.postprocessing.stats().ssrTracePixels===0,'looking away from the receiver skips the SSR trace draw',engine.postprocessing.stats());
+        test.assert(engine.postprocessing.stats().passes===0,'invisible bounded SSR bypasses the entire offscreen chain for the eye',engine.postprocessing.stats());
+        sim.frame({dt:0,head:{position:[0,.015,-1.5],orientation:[0,0,0,1]}});
+        const inside=engine.postprocessing.stats();
+        test.assert(inside.ssrTracePixels===inside.ssrViewportPixels,'camera inside receiver bounds keeps conservative full trace coverage',inside);
+        profileFrame();
+        test.assert(validationErrors.length===0,'arena profiling has no GPU validation errors',validationErrors);
+    }
+    if(!profiling){
+        engine.scene.clear();engine.postprocessing.disable('ssr');engine.postprocessing.disable('bloom');engine.setNeonGlow({strength:0});
+        for(let i=0;i<240;i++)sim.frame({dt:1/60,head:{position:[0,1.6,0],orientation:[0,0,0,1]}});
+        test.assert(performanceReports.length===1&&performanceReports[0].frames===180&&performanceReports[0].fps>0&&performanceReports[0].cpuSubmitMs>=0&&performanceReports[0].eyeViewports.length===2,'bounded XR telemetry reports delivered frame cadence, CPU submission and both eye viewports',performanceReports);
+        await second.checkValidation(test);
+    }
     const active=sim.session;engine.dispose();
     test.assert(!engine.xr.isPresenting&&active.pendingFrameCount===0,'dispose cancels active GPU XR');
     denyXR=true;

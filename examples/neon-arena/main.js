@@ -1,6 +1,6 @@
 import {reportDiagnostic,probeWebGpuXR} from '../shared/diagnostics.js';
 import { initEngine } from '../../js/engine.js';
-import { createScene, launchApple, previewSlice, CUT_EFFECT_SIZE } from './scene.js';
+import { createScene, launchApple, previewSlice, CUT_EFFECT_SIZE, NEON_GLOW, FLOOR_SSR, FLOOR_SSR_BOUNDS } from './scene.js';
 
 const canvas = document.getElementById('gpu-canvas');
 const status = document.getElementById('status');
@@ -8,24 +8,32 @@ const enter = document.getElementById('enter');
 const exit = document.getElementById('exit');
 if (!(canvas instanceof HTMLCanvasElement) || !status || !(enter instanceof HTMLButtonElement) || !(exit instanceof HTMLButtonElement)) throw new Error('Chybí UI.');
 
-const backend = new URLSearchParams(location.search).get('backend') === 'webgl' ? 'webgl' : 'auto';
+const parameters=new URLSearchParams(location.search);
+const backend = parameters.get('backend') === 'webgl' ? 'webgl' : 'auto';
+const enableSSR=parameters.get('ssr')!=='0',enableGlow=parameters.get('glow')!=='0';
 export const engine = await initEngine(canvas, {backend});
 document.documentElement.dataset.rendererBackend = engine.renderer_backend();
-reportDiagnostic('engine-ready');
+reportDiagnostic('engine-ready',undefined,{ssr:enableSSR,glow:enableGlow,revision:'xr-stereo-present-1'});
+engine.xr.addEventListener('gpuerror',event=>{const detail=/** @type {CustomEvent} */(event).detail;reportDiagnostic('gpu-validation',new Error(detail.message),detail);});
+engine.xr.addEventListener('gpulost',event=>{const detail=/** @type {CustomEvent} */(event).detail;reportDiagnostic('gpu-lost',new Error(detail.message),detail);});
+engine.xr.addEventListener('performance',event=>reportDiagnostic('xr-performance',undefined,{.../** @type {CustomEvent} */(event).detail,ssr:enableSSR,glow:enableGlow,postprocessing:engine.postprocessing.stats()}));
 engine.set_render_effects(false, false);
 engine.set_grid_visible(false);
 engine.setBackgroundColor([0,0,0]);
+engine.setNeonGlow(enableGlow?NEON_GLOW:{strength:0});
+engine.postprocessing.configureSSR({resolutionScale:.5,receiverBounds:FLOOR_SSR_BOUNDS});
+if(enableSSR)engine.postprocessing.enable('ssr',FLOOR_SSR);
 engine.set_light_helpers_visible(false);
 engine.setDebugOverlay(false);
-const home = () => engine.setOrbitView([0,1.65,1.6],[-.25,1.35,-2]);
+const home = () => engine.setOrbitView([0,1.9,3.3],[0,1.25,-1.8]);
 home();
 export const world = await createScene(engine.scene);
 // Desktop orbit and immersive eye views use opposite horizontal handedness.
 // Keep this preview correction local to the example's world-space text.
 const setPanelFacing = (/** @type {boolean} */ immersive) => {
-    for (const panel of [world.infoPanel,world.scorePanel,world.restartButton,world.credits,world.logo])
+    for (const panel of [world.infoPanel,world.scorePanel,world.comboRules,...world.galleryLabels,world.restartButton,world.credits,world.logo])
         panel.setScale([immersive ? 1 : -1,1,1]);
-    world.apples.forEach((apple,index)=>apple.setPosition(immersive?[100,100,100]:world.previewPositions[index]));
+
 };
 setPanelFacing(false);
 document.querySelector('#reset')?.addEventListener('click',home);
@@ -36,7 +44,7 @@ if(verify instanceof HTMLButtonElement)verify.onclick=async()=>{
         if(result)result.textContent='RUNNING: pixelové kontroly';
         const {verifyArena}=await import('./verify.js');
         await verifyArena(engine,world,canvas);
-        if(result)result.textContent='PASS: černé pozadí, ovoce, bitmapové panely a žádný postprocessing';
+        if(result)result.textContent='PASS: černé pozadí, ovoce, kachličky a dynamické SSR odrazy';
     }catch(error){if(result)result.textContent=`FAIL: ${error}`;}
 };
 export const player = engine.xr.player;
@@ -61,24 +69,23 @@ let flying = [];
 let launchTimer = 0;
 export function shootApple() {
     flying = flying.filter(apple => apple.exists);
-    if (flying.length >= 6) return null;
+    if (engine.xr.roundState?.finished || flying.length >= 3) return null;
     const index = shot++;
     const apple = launchApple(engine.scene, world.playFruits[index % world.playFruits.length], index % 2 === 0 ? -1 : 1);
     flying.push(apple);
     return apple;
 }
 export const gameState = () => ({shots: shot, cuts, round: engine.xr.roundState, liveApples: flying.filter(apple => apple.exists), launching: launchTimer !== 0, feedback});
-const stopLaunches = () => { window.clearInterval(launchTimer); launchTimer = 0; };
+export const stopLaunches = () => { window.clearInterval(launchTimer); launchTimer = 0; };
 const startRound = () => {
     stopLaunches();
     engine.scene.clearCutFeedback();feedback=null;
     for (const apple of flying) if (apple.exists) apple.remove();
     flying = []; shot = 0; cuts = 0;
-    if (engine.xr.isPresenting) world.apples.forEach(fruit=>fruit.setPosition([100,100,100]));
-    engine.xr.startRound(30);
+    engine.xr.startRound(45);
     const count = document.getElementById('cuts'); if (count) count.textContent = '0';
-    status.textContent = 'Kolo 30 s. Sekej oběma katanami. Čas a skóre vidíš ve VR.';
-    shootApple(); launchTimer = window.setInterval(shootApple, 850);
+    status.textContent = 'Kolo 45 s. Tref 3 stejné plody za sebou pro body. Jiný plod začne novou sérii.';
+    shootApple(); launchTimer = window.setInterval(shootApple, 650);
 };
 document.getElementById('shoot')?.addEventListener('click', shootApple);
 engine.xr.addEventListener('select', event => {
@@ -92,7 +99,7 @@ engine.xr.addEventListener('cut', event => {
     for (const piece of report.pieces) piece.setEmission(1.1);
     feedback=engine.scene.playCutFeedback(report.pieces,{mirrorText:!engine.xr.isPresenting,size:CUT_EFFECT_SIZE});
     cuts += report.removed.length;
-    const count = document.getElementById('cuts'); if (count) count.textContent = String(cuts);
+    const count = document.getElementById('cuts'); if (count) count.textContent = String(engine.xr.roundState?.score ?? 0);
 });
 const fit = () => { if (!engine.xr.isPresenting) engine.resize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight)); };
 fit();
@@ -103,7 +110,7 @@ const ready = async () => {
         const missingGpuBinding = engine.renderer_backend() === 'BrowserWebGpu' && typeof Reflect.get(globalThis,'XRGPUBinding') !== 'function';
         status.textContent = enter.disabled
             ? (!isSecureContext ? 'Pro VR je potřeba důvěryhodné HTTPS nebo localhost přes USB/ADB.'
-                : missingGpuBinding ? 'WebGPU náhled běží, ale prohlížeč neposkytuje WebGPU pro VR (XRGPUBinding). V about:flags zkontroluj WebXR/WebGPU Binding a případně WebXR Projection Layers, potom restartuj prohlížeč. Pokud tyto volby nejsou dostupné, použij WebGL / WebXR.'
+                : missingGpuBinding ? 'WebGPU náhled běží, ale prohlížeč neposkytuje WebGPU pro VR (XRGPUBinding). V chrome://flags zkontroluj WebXR Experiments a potom restartuj prohlížeč. Pokud volba není dostupná, použij WebGL / WebXR.'
                 : 'VR není pro tuto konfiguraci dostupné. Použij odkaz WebGL / WebXR.')
             : 'Připraveno. Sekej katanami v obou rukou. Neonové ovoce vystřeluje samo, informace o scéně vidíš i ve VR.';
     } catch (error) { status.textContent = String(error); }
@@ -113,12 +120,12 @@ enter.onclick = () => {
     void engine.xr.enter().catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
 };
 exit.onclick = () => { void engine.xr.exit().catch(error => { status.textContent = String(error); }); };
-engine.xr.addEventListener('firstframe', () => reportDiagnostic('xr-first-frame'));
+engine.xr.addEventListener('firstframe', event => reportDiagnostic('xr-first-frame',undefined,{.../** @type {CustomEvent} */(event).detail,postprocessing:engine.postprocessing.stats()}));
 engine.xr.addEventListener('start', () => { reportDiagnostic('xr-start'); setPanelFacing(true); exit.hidden = false; startRound(); });
 engine.xr.addEventListener('roundend', () => {
     stopLaunches();
     world.apples.forEach((fruit,i)=>fruit.setPosition(world.previewPositions[i]));
-    status.textContent = `Konec kola — rozkrojeno ${cuts} plodů. Namiř na DALSI KOLO a stiskni trigger.`;
+    status.textContent = `Konec kola — skóre ${engine.xr.roundState?.score ?? 0}, trojic ${engine.xr.roundState?.triples ?? 0}. Namiř na DALSI KOLO a stiskni trigger.`;
 });
 engine.xr.addEventListener('end', () => { setPanelFacing(false); stopLaunches(); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
 engine.xr.addEventListener('error', () => { status.textContent = `VR se zastavilo: ${engine.xr.lastError}`; reportDiagnostic('xr-frame',engine.xr.lastError); });

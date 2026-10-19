@@ -21,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify' },
@@ -491,6 +492,14 @@ try {
                 if(cutFrame){
                     result.cutScreenshot=`${suite.name}-${backend}-cut.png`;
                     await writeFile(path.join(output,result.cutScreenshot),Buffer.from(cutFrame,'base64'));
+                }
+                const reflectionFrame = await page.evaluate(() => {
+                    const evidence=document.querySelector('#reflection-evidence');
+                    return evidence instanceof HTMLCanvasElement ? evidence.toDataURL('image/png').split(',')[1] : null;
+                });
+                if(reflectionFrame){
+                    result.reflectionScreenshot=`${suite.name}-${backend}-reflection.png`;
+                    await writeFile(path.join(output,result.reflectionScreenshot),Buffer.from(reflectionFrame,'base64'));
                 }
             }
             result.status = 'PASS';

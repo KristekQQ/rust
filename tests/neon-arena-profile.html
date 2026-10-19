@@ -1,7 +1,7 @@
 <!doctype html><html lang="cs"><meta charset="utf-8"><title>Profil skutečné neonové arény v simulovaném XR</title>
 <canvas id="gpu-canvas" style="width:640px;height:480px"></canvas><button id="enter"></button><button id="exit"></button><button id="shoot"></button><span id="cuts"></span><p id="status"></p><pre id="result">RUNNING</pre><pre id="measurements"></pre>
 <script type="module">
-import {launchApple} from '../examples/neon-arena/scene.js';
+import {launchApple,NEON_GLOW} from '../examples/neon-arena/scene.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport} from './xr/testkit.js';
 const sim=installXRSimulator({profile:{eyeWidth:1024,eyeHeight:1024}});
@@ -18,16 +18,22 @@ const report=await run.execute(async test=>{
         left:{position:[-1,1.1,0],orientation:[0,0,0,1],pressed:false},
         right:{position:[1,1.1,0],orientation:[0,0,0,1],pressed:false}
     }};
-    for(let i=0;i<5;i++){sim.frame(still);sim.pixels('left');}
-    const samples=[];
-    for(let i=0;i<12;i++){
-        const start=performance.now();sim.frame(still);sim.pixels('left');samples.push(performance.now()-start);
+    app.stopLaunches();
+    const results=[];
+    for(const [name,strength] of [['glow off',0],['analytic edge glow',NEON_GLOW.strength]]){
+        engine.setNeonGlow({...NEON_GLOW,strength});
+        for(let i=0;i<5;i++){sim.frame(still);sim.pixels('left');}
+        const samples=[];
+        for(let i=0;i<12;i++){
+            const start=performance.now();sim.frame(still);sim.pixels('left');samples.push(performance.now()-start);
+        }
+        samples.sort((a,b)=>a-b);
+        results.push({name,medianMs:samples[6],p95Ms:samples[11],samples:12,postprocessPasses:engine.postprocessing.stats().passes,glow:engine.debugStats().neonGlow});
     }
-    samples.sort((a,b)=>a-b);
     const stats=engine.postprocessing.stats();
-    test.report.evidence={environment:'desktop simulated stereo XR; includes synchronous pixel readback, not headset FPS',eyeSize:[1024,1024],targetNames:names,targetTriangles:targets.reduce((sum,p)=>sum+p.meshInfo.triangles,0),catalogTriangles:world.fruits.reduce((sum,f)=>sum+f.geometry.indices.length/3,0),results:[{name:'black fruit scene',medianMs:samples[6],p95Ms:samples[11],samples:12,postprocessPasses:stats.passes}]};
+    test.report.evidence={environment:'desktop simulated stereo XR; includes synchronous pixel readback, not headset FPS',eyeSize:[1024,1024],glowSettings:NEON_GLOW,targetNames:names,targetTriangles:targets.reduce((sum,p)=>sum+p.meshInfo.triangles,0),catalogTriangles:world.fruits.reduce((sum,f)=>sum+f.geometry.indices.length/3,0),results};
     document.querySelector('#measurements').textContent=JSON.stringify(test.report.evidence,null,2);
-    test.assert(stats.passes===0&&stats.targets===0,'production black scene performs no postprocessing');
+    test.assert(stats.passes===2&&stats.targets>0,'production tiled floor uses half-resolution trace and composite');
     await engine.xr.exit();
 });
 app?.engine.dispose();sim.dispose();publishXRReport(report);

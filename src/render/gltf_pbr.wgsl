@@ -126,6 +126,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
     return vec4(color,base.a);
 }
 @fragment fn fs_main(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,select(1.0,c.a,material.extra.y==2.0)); }
+@fragment fn fs_material_mask(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,material.options.x); }
 struct PostSurface { @location(0) color:vec4<f32>, @location(1) depth:vec4<f32> };
 @fragment fn fs_postprocess(v:Output,@builtin(front_facing) front:bool)->PostSurface { var o:PostSurface; let c=surface(v,front); o.color=vec4(c.rgb,material.options.x); var e=fract(min(v.pos.z,0.9999999)*vec3(1.0,255.0,65025.0)); e-=e.yzz*vec3(1.0/255.0,1.0/255.0,0.0); o.depth=vec4(e,1.0); return o; }
 @fragment fn fs_shadow(v:Output) { alpha_test(base_color(v).a); if(material.extra.y==2.0 && base_color(v).a<0.5) { discard; } }

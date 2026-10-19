@@ -13,7 +13,7 @@ engine.postprocessing.disable('godRays');
 Síla je 0…1. Neplatné hodnoty a neznámé efekty se odmítají. Statistika vrací
 naposledy submitované `passes`, rozlišení, počet barevných `targets` a monotonní
 `frames` (počet submitů řetězce, nikoli dokončení GPU). Vypnutí posledního efektu
-uvolní čtyři barevné cíle, jejich depth a bind groups. Pipelines a případná malá
+uvolní základní barevné cíle (tři ve WebGPU, čtyři ve WebGL), případný SSR trace cíl, jejich depth a bind groups. Pipelines a případná malá
 maskovací textura se ponechávají pro další použití. Resize obnovuje cíle a bind
 groups společně; při stabilním rozlišení se GPU prostředky každý frame netvoří.
 
@@ -39,9 +39,61 @@ engine.postprocessing.setReflectionMask({
 Maska se promítá na světové XZ, násobí reflektivitu a v SSR průchodu ztmavuje
 mokrou část. Je to jedna globální maska pro horizontální povrchy, ne obecný
 texturový materiál ani vodní simulace; při vypnutí SSR se tento mokrý vzhled
-vypne také. Maximální maska je 1024×1024. Depth je v druhém MRT attachmentu zabalena do RGB8, aby se dala číst běžným samplerem ve WebGL i WebGPU. Normály jsou rekonstruované z depth,
+vypne také. Maximální maska je 1024×1024. WebGL čte hloubku zabalenou do RGB8 v druhém MRT attachmentu. WebGPU čte přímo původní Depth32Float pomocí `textureLoad`, bez RGB kvantizace a samplerového přepočtu souřadnic. WebGPU scene pass zapisuje jen jednu barevnou přílohu s materiálovou alfou; packed MRT textura se pro tento backend vůbec nevytváří. WebGL nadále používá dvě barevné přílohy. Normály jsou rekonstruované z depth,
 nikoli z normal mapy. Objekty mimo obraz nebo za viditelným povrchem v odrazu
 chybí; bez temporal accumulation a roughness. Volitelný environment fallback popisuje další odstavec.
+
+### SSR s nižším počtem paprsků
+
+`engine.postprocessing.configureSSR({resolutionScale:.5})` trasuje odrazy při
+poloviční šířce i výšce (čtvrtina pixelů). Hlavní scéna, packed depth, normály
+odvozené z původní hloubky a ostatní efekty zůstávají v plném rozlišení.
+Samostatný plnorozměrový composite interpoluje radianci a confidence ze čtyř
+sousedních vzorků; hloubka, reflektivita a maska odmítají jiné povrchy a spáry.
+Odrazy jsou měkčí, počet kroků a dosah paprsků se nemění. Nejde o temporal denoiser.
+
+Engine implicitně používá referenční `resolutionScale:1`; neon aréna explicitně
+zapíná `.5`. Přepnutí je příkaz SDK, nikoli JS render loop. Half režim používá
+jeden persistentní cíl navíc a dva skutečné SSR průchody (trace + composite).
+Resize/config změna obnoví potřebný cíl, vypnutí SSR jej uvolní. Statistika
+`ssrWidth`, `ssrHeight`, `ssrPixels` udává rozměry trace na jedno oko, nikoli
+počet úspěšných odrazů; po vypnutí jsou hodnoty nulové.
+
+Pro místní odraznou plochu lze určit světový AABB přijímače:
+
+```js
+engine.postprocessing.configureSSR({
+    resolutionScale:.5,
+    receiverBounds:{min:[-1.5,-.03,-3],max:[1.5,.03,.75]},
+});
+```
+
+Vynechané `receiverBounds` zachová nastavení, `null` jej odstraní. Výchozí engine
+žádné bounds nemá. Bounds omezují přijímače odrazu, nikoli zdrojovou geometrii.
+Rust konzervativně promítá box pro každé oko, ořezává jej u near plane a omezuje
+half trace scissorem; shader současně ověřuje světovou pozici přijímače i tapů.
+Kamera uvnitř boxu používá plný scissor. Neodrazné pixely přeskočí čtení hloubky.
+Když omezenou plochu oko nevidí a žádný další efekt není aktivní, vykreslí se scéna
+přímo bez SSR offscreen/trace/composite. Cíle se ponechají pro návrat pohledu;
+`passes` i pracovní pixelové statistiky jsou v tomto snímku nula.
+
+`ssrTracePixels` udává potenciální pixelový rozpočet skutečného trace draw obdélníku
+posledního oka, `ssrViewportPixels` rozpočet bez scissoru. Nejde o GPU čítač paprsků
+ani počet úspěšných zásahů; materiálová alpha a bounds ještě vyřazují další pixely.
+Aréna omezuje SSR na 3 × 3,75 m (20 prostředních kachliček), ostatní podlaha
+zůstává viditelná. Experimenty s projekční hloubkou a pevnou normálou nebyly
+rychlejší než samotný region a nejsou součástí finální implementace.
+
+Podklad pro omezení počtu paprsků a jejich sdílení mezi sousedy:
+[GPUOpen SSSR – Tile Classification](https://gpuopen.com/manuals/fidelityfx_sdk/techniques/stochastic-screen-space-reflections/).
+Zdejší implementace je vlastní fragmentová cesta společná pro WebGPU i WebGL.
+
+`neon-arena-gpu-profile` používá skutečné GPU XR array slices 1024×1024 na oko,
+skutečnou arénu a šest různých plodů. Po SSR off třikrát střídá neomezený half trace
+a half trace s oblastí přijímače se
+stejným glow. Čas zahrnuje CPU submission a čekání `queue.onSubmittedWorkDone`,
+bez readbacku v měřené části. Výsledky jsou desktopová evidence, ne FPS Questu.
+Spuštění: `VERIFY_WASM_PROFILE=release node scripts/test-browser.mjs --page neon-arena-gpu-profile --backend webgpu`.
 
 ## God rays / volumetrické světlo
 
@@ -117,9 +169,31 @@ Vypnutí SSR vypne také jeho environment fallback. Probe nevytváří skybox.
 `SceneObject.setEmission(0..8)` nastaví přídavnou vertex-color emisi primitiv a
 triangle meshes; glTF nadále používá vlastní materiály. Emise nevrhá světlo.
 `postprocessing.enable('bloom',{strength:.38})` přidá omezený LDR jasový blur,
-nikoli HDR pipeline. Ukázka: [neon-arena](../examples/neon-arena/README.md).
+nikoli HDR pipeline. Neonová aréna používá níže popsaný přímý geometrický glow.
 Sdílený probe je nezávislý na XR oku, SSR má matice a hloubku aktuálního oka;
 fyzický Quest a jeho výkon nejsou desktopovým testem prokázány.
+
+## Přímý neonový glow bez postprocessingu
+
+`engine.setNeonGlow({strength:1.6,radius:.045})` zapne opt-in rendererový efekt
+pro emissive CPU triangle meshes. Výchozí stav enginu je vypnutý. `radius` je
+poloměr v metrech (0,001–0,05), `strength` je 0–2; nula uvolní glow cache.
+CPU vybere hranice světlých ploch a ostré hrany meshe; koplanární triangulační
+diagonály přeskočí. `neon_glow.wgsl` je expanduje na camera-facing kapsle
+s úzkým svítícím jádrem a širším barevným lemem. Vertex atributy nesou původní konce hrany
+a barvu; instance nadále dodává transformaci, emisi a color cutout. Černé capy
+se přeskočí. Fragmentová hloubka pochází z nejbližšího bodu původní hrany.
+RGB používá maximum místo sčítání, takže se záře ve společných vrcholech
+nehromadí. Alpha se zachovává, depth test zůstává zapnutý bez zápisu hloubky.
+
+Při přímém renderu probíhají tyto draw calls ve stejném render passu, bez textur
+či dalších barevných cílů; podporují i posunuté WebGL viewporty a WebGPU XR slices.
+Pouze kombinace se zapnutým postprocessingem používá samostatný finální overlay
+se sdílenou hloubkou: WebGL nepodporuje nezávislé blendování packed-depth MRT.
+Geometrie se cachuje podle stabilních ID a po odstranění objektů se uvolní.
+`debugStats().neonGlow` udává skutečné náklady na draw/segmenty a cache bytes.
+Nejde o HDR bloom ani objemový rozptyl; glTF, resident GPU cutting a probe captures
+nemají tento automatický glow. Headsetový výkon je třeba změřit na zařízení.
 
 ## Obrazová cubemapa se samostatnou emisí
 
@@ -161,3 +235,9 @@ WGSL používá průsečík výstupního paprsku s boxem pro pozadí i odrazy; t
 reaguje na posun hlavy. Mimo objem, při chybějící projekci nebo `projection:null`
 zůstává nekonečný směrový sampling. Hodnoty musí být konečné, |center|≤1e6,
 0<halfExtents≤1e6. Nejde o skutečnou hloubkovou mapu ani přesnou paralaxu složité scény.
+
+Ustálená stereo SSR cesta je kontrolována čítači skutečných WebGPU volání:
+po zahřátí dalších osm stereo snímků nesmí volat `createRenderPipeline`,
+`createTexture` ani `createBindGroup`. Browserové XR view wrappers zůstávají
+frame-scoped. Změna výstupního formátu vytváří jen aktivní varianty efektů;
+seznam aktivních efektů je pevné pole bez heap alokace na každé oko.

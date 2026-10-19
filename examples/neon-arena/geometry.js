@@ -74,6 +74,24 @@ export function fruitGeometries() {
     return fruits;
 }
 
+/** Closed three-pronged jester crown. Its two-sided volume can be genuinely sliced.
+ * @returns {ReturnType<typeof fruitGeometries>[number]} */
+export function wildSymbol() {
+    const outline=[[-.8,-.65],[.8,-.65],[.95,.9],[.34,.45],[0,1.15],[-.34,.45],[-.95,.9]];
+    const positions=[0,0,.30,0,0,-.30,...outline.flatMap(([x,y])=>[x,y,0])];
+    const indices=[];
+    for(let i=0;i<outline.length;i++){
+        const a=2+i,b=2+(i+1)%outline.length;
+        indices.push(0,a,b,1,b,a);
+    }
+    const geometry=neonSurface({positions,indices},[1,.75,.08],[.045,.008,.055]);
+    const colors=Array.from(geometry.triangleColors??[]);
+    for(let i=0;i<colors.length;i+=3)if(Math.max(...colors.slice(i,i+3))>.25 && i%12===0)
+        colors.splice(i,3,1,.05,.8);
+    geometry.triangleColors=colors;
+    return {name:'wild',geometry,capColor:[0,0,0]};
+}
+
 // Spatial palettes are baked once into the mesh; no runtime recoloring, textures or extra draws.
 const PALETTE = {
     red:[1,.025,.09], pink:[1,.08,.36], green:[.035,1,.12], lime:[.35,1,.025],

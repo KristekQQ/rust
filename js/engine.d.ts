@@ -14,6 +14,7 @@ export interface TriangleMeshOptions {
 export interface CutterAimOptions {center:Vector3;yaw?:number;tilt?:number;height?:number;floorY?:number;guides?:readonly SceneObject[]}
 export interface CameraViewState {position:Vector3;orbitTarget:Vector3|null}
 export interface TriangleMeshInfo {
+    scale: Vector3; emission: number;
     triangles: number; vertices: number; volume: number; closed: boolean; cuttable: boolean;
     resident: boolean; cpuMaterialized: boolean;
     /** Fraction of the actual cross-section swept by the sharp edge (0..1). */
@@ -61,6 +62,8 @@ export class SceneObject {
     protected constructor();
     readonly id: number;
     readonly exists: boolean;
+    bindComboIndicator(kind: string, slot: 0|1|2): this;
+    setComboTarget(kind: string, points: number, options?: {wild?: boolean}): this;
     setCuttable(enabled?: boolean, options?: {capColor?: Vector3}): this;
     setCutter(blade: {base: Vector3; tip: Vector3} | null): this;
     setBladeTrail(enabled: boolean): this;
@@ -171,6 +174,7 @@ export interface EffectStats {
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
 export interface DebugStats {
+    neonGlow: {enabled:boolean;draws:number;segments:number;cachedMeshes:number;bufferBytes:number};
     enabled: boolean; fps: number; frameMs: number; cpuMs: number;
     /** Main-view extraction only, not GPU execution. Cached frames do not run culling. */
     cullMs: number; cullCached: boolean;
@@ -195,13 +199,15 @@ export interface PostProcessing {
     enable(name: PostEffectName, options?: { strength?: number }): void;
     /** Volume density 0..1 and exposure 0..100; independent of surface lighting. */
     configureGodRays(options?: { density?: number; exposure?: number }): void;
+    /** Trace reflections at half width/height; full scene and depth remain unchanged. 1 selects the reference path. */
+    configureSSR(options?: { resolutionScale?: .5 | 1; receiverBounds?: {min:Vector3;max:Vector3}|null; }): void;
     disable(name: PostEffectName): void;
     /** Grayscale mask on world XZ: 0 dry, 255 reflective. Uploaded once. */
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
-    stats(): { passes: number; width: number; height: number; targets: number; frames: number };
+    stats(): { passes: number; width: number; height: number; targets: number; frames: number; ssrWidth:number; ssrHeight:number; ssrPixels:number; ssrTracePixels:number; ssrViewportPixels:number };
 }
 export interface XRCutReport extends CutResult { handedness: 'left'|'right'; bladeContacts?: number }
-export interface XRRoundState { duration: number; remaining: number; finished: boolean; cuts: number }
+export interface XRRoundState { duration: number; remaining: number; finished: boolean; cuts: number; score: number; streak: number; fruit: string; triples: number }
 export interface XRHandOptions {cutting?: boolean; requireTrigger?: boolean; haptics?: boolean}
 export interface XRTrackedPose {
     readonly tracked: boolean;
@@ -248,6 +254,8 @@ export interface WebXRHost extends EventTarget {
     dispose(): void;
 }
 export type Engine = Readonly<RawEngine & {
-    setBackgroundColor(color: Vector3): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+    setBackgroundColor(color: Vector3): void;
+    /** Additive glow radius in world meters; strength 0..2, radius .001.. .05. */
+    setNeonGlow(options?: {strength?:number;radius?:number}): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;

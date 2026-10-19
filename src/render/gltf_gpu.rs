@@ -66,6 +66,7 @@ pub struct PipelineKey {
     pub depth_format: wgpu::TextureFormat,
     pub reflected: bool,
     pub material_mask: bool,
+    pub packed_depth: bool,
     pub shadow: bool,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -709,7 +710,7 @@ impl GltfGpu {
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
                     }));
-                    if key.material_mask {
+                    if key.packed_depth {
                         targets.push(Some(wgpu::ColorTargetState {
                             format: wgpu::TextureFormat::Rgba8Unorm,
                             blend: Some(wgpu::BlendState::REPLACE),
@@ -730,8 +731,10 @@ impl GltfGpu {
                         module: shader,
                         entry_point: Some(if key.shadow {
                             "fs_shadow"
-                        } else if key.material_mask {
+                        } else if key.packed_depth {
                             "fs_postprocess"
+                        } else if key.material_mask {
+                            "fs_material_mask"
                         } else {
                             "fs_main"
                         }),

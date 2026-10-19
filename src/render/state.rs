@@ -7,10 +7,19 @@ use std::ops::{Deref, DerefMut};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 
+struct ComboIndicator {
+    id: u32,
+    kind: String,
+    slot: u32,
+    scale: Vec3,
+}
+
 pub struct State {
     renderer: SceneRenderer,
     output: CanvasOutput,
     postprocess: PostProcessor,
+    xr_depth_resolve: Option<super::depth_resolve::DepthResolve>,
+    xr_present: Option<super::xr_present::XrPresent>,
     environment: Option<super::environment::EnvironmentProbe>,
     background: wgpu::Color,
     pub backend: String,
@@ -23,6 +32,8 @@ pub struct State {
     xr_rendering: bool,
     xr_hud_pending: bool,
     xr_cuts: u64,
+    pub combo_score: crate::xr_round::ComboScore,
+    combo_indicators: Vec<ComboIndicator>,
     info_panel_elapsed: f32,
     info_round_dirty: bool,
     xr_round: Option<crate::xr_round::RoundClock>,
@@ -59,6 +70,8 @@ impl State {
             renderer,
             output,
             postprocess,
+            xr_depth_resolve: None,
+            xr_present: None,
             environment: None,
             background: wgpu::Color {
                 r: 0.1,
@@ -75,6 +88,8 @@ impl State {
             xr_rendering: false,
             xr_hud_pending: false,
             xr_cuts: 0,
+            combo_score: Default::default(),
+            combo_indicators: Vec::new(),
             info_panel_elapsed: 0.25,
             info_round_dirty: true,
             xr_round: None,
@@ -230,6 +245,19 @@ impl State {
     }
     pub fn set_postprocess(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
         self.postprocess.set_effect(name, enabled, strength)
+    }
+    pub fn configure_ssr(&mut self, resolution_scale: f32) -> bool {
+        self.postprocess.configure_ssr(resolution_scale)
+    }
+    pub fn ssr_stats(&self) -> [f64; 3] {
+        self.postprocess.ssr_stats()
+    }
+    pub fn configure_ssr_region(&mut self, min: Vec3, max: Vec3, enabled: bool) -> bool {
+        self.postprocess.configure_ssr_region(min, max, enabled)
+    }
+
+    pub fn ssr_work_stats(&self) -> [f64; 2] {
+        self.postprocess.ssr_work_stats()
     }
     pub fn set_reflection_mask(
         &mut self,
@@ -399,7 +427,29 @@ impl State {
                 .update_info_panels(PanelKind::Diagnostics, &diagnostics);
         }
         if self.info_round_dirty {
-            let mut rows = vec![("ROZKROJENO", self.xr_cuts.to_string())];
+            let mut rows = if self.combo_score.enabled {
+                vec![
+                    ("SKORE", self.combo_score.score.to_string()),
+                    (
+                        "SERIE",
+                        format!(
+                            "{} {}/3",
+                            if self.combo_score.kind.is_empty() {
+                                if self.combo_score.streak > 0 {
+                                    "WILD"
+                                } else {
+                                    "CEKA"
+                                }
+                            } else {
+                                &self.combo_score.kind
+                            },
+                            self.combo_score.streak
+                        ),
+                    ),
+                ]
+            } else {
+                vec![("ROZKROJENO", self.xr_cuts.to_string())]
+            };
             if let Some(round) = self.xr_round {
                 rows.push(("CAS", format!("{} S", round.remaining.ceil() as u32)));
                 rows.push((
@@ -425,11 +475,58 @@ impl State {
     pub fn xr_round_finished(&self) -> bool {
         self.xr_round.is_some_and(|round| round.finished())
     }
+    pub fn clear_combo_indicators(&mut self) {
+        self.combo_indicators.clear();
+    }
+    pub fn bind_combo_indicator(&mut self, id: u32, kind: &str, slot: u32) -> bool {
+        if slot > 2
+            || kind.is_empty()
+            || kind.len() > 16
+            || !kind.bytes().all(|c| c.is_ascii_alphanumeric() || c == b' ')
+        {
+            return false;
+        }
+        let Some(object) = self.renderer.scene.objects().get(&id) else {
+            return false;
+        };
+        let scale = self
+            .combo_indicators
+            .iter()
+            .find(|item| item.id == id)
+            .map_or(object.transform.scale, |item| item.scale);
+        self.combo_indicators.retain(|item| item.id != id);
+        self.combo_indicators.push(ComboIndicator {
+            id,
+            kind: kind.into(),
+            slot,
+            scale,
+        });
+        self.refresh_combo_indicators();
+        true
+    }
+    fn refresh_combo_indicators(&mut self) {
+        let (kind, count) = self.combo_score.display_progress();
+        self.combo_indicators
+            .retain(|item| self.renderer.scene.object_exists(item.id));
+        for item in &self.combo_indicators {
+            let active = item.kind == kind && item.slot < count;
+            self.renderer
+                .scene
+                .set_emission(item.id, if active { 8.0 } else { 0.65 });
+            self.renderer
+                .scene
+                .set_object_scale(item.id, item.scale * if active { 1.32 } else { 1.0 });
+        }
+    }
     pub fn start_xr_round(&mut self, seconds: f32) -> Result<(), JsValue> {
         let round = crate::xr_round::RoundClock::new(seconds)
             .ok_or_else(|| JsValue::from_str("Round duration must be 1..3600 seconds"))?;
         self.xr_round = Some(round);
         self.xr_cuts = 0;
+        self.combo_score.reset();
+        let live: std::collections::BTreeSet<_> =
+            self.renderer.scene.objects().keys().copied().collect();
+        self.combo_score.targets.retain(|id, _| live.contains(id));
         self.invalidate_xr_hud();
         Ok(())
     }
@@ -439,18 +536,22 @@ impl State {
                 serde_json::json!({
                     "duration": round.duration, "remaining": round.remaining,
                     "finished": round.finished(), "cuts": self.xr_cuts,
+                    "score": self.combo_score.score, "streak": self.combo_score.streak,
+                    "fruit": self.combo_score.kind, "triples": self.combo_score.triples,
                 })
             })
             .unwrap_or(serde_json::Value::Null)
             .to_string()
     }
     fn invalidate_xr_hud(&mut self) {
+        self.refresh_combo_indicators();
         self.info_round_dirty = true;
         if let Some(hud) = &mut self.debug_hud {
             hud.invalidate();
         }
     }
-    pub fn record_xr_cuts(&mut self, count: usize) {
+    pub fn record_xr_cuts(&mut self, removed: &[u32]) {
+        let count = removed.len();
         if count > 0 {
             // Controller input follows advance_xr; new halves must be visible in
             // this same stereo frame instead of disappearing for one frame.
@@ -458,6 +559,9 @@ impl State {
         }
         if count > 0 && !self.xr_round_finished() {
             self.xr_cuts = self.xr_cuts.saturating_add(count as u64);
+            for id in removed {
+                self.combo_score.hit(*id);
+            }
             self.invalidate_xr_hud();
         }
     }
@@ -475,6 +579,9 @@ impl State {
             }
         }
         // FPS and the clock use elapsed time; only physics has a bounded step.
+        if let Some(present) = &mut self.xr_present {
+            present.reset_frame();
+        }
         self.renderer.advance_xr_scene(dt);
         self.refresh_info_panels(dt);
     }
@@ -492,20 +599,15 @@ impl State {
         result
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
-        self.render_to(None)
+        self.render_to(None, true)
     }
     pub fn xr_gpu_supported(&self) -> bool {
-        self.output.xr_compatible && !self.postprocess.enabled()
+        self.output.xr_compatible
     }
     pub fn xr_device(&self) -> Result<JsValue, JsValue> {
         if !self.output.xr_compatible {
             return Err(JsValue::from_str(
                 "XR-compatible WebGPU adapter unavailable; use WebGL",
-            ));
-        }
-        if self.postprocess.enabled() {
-            return Err(JsValue::from_str(
-                "Direct WebGPU XR requires postprocessing disabled",
             ));
         }
         self.renderer
@@ -529,22 +631,89 @@ impl State {
         image: &JsValue,
     ) -> Result<(), JsValue> {
         let attachments = super::xr_output::XrAttachments::new(&self.renderer.device, image)?;
-        self.render_xr_gpu_eye(matrix, position, &attachments.target())
+        // Only an explicit compositor declaration can omit the depth transfer.
+        // Older runtimes and direct SDK callers retain the conservative default.
+        let write_depth = js_sys::Reflect::get(image, &JsValue::from_str("ignoreDepthValues"))?
+            .as_bool()
+            != Some(true);
+        let target = attachments.target();
+        if !self.postprocess.enabled() {
+            self.xr_present = None;
+            return self.render_xr_gpu_eye(matrix, position, &target, write_depth);
+        }
+        let index = js_sys::Reflect::get(
+            &js_sys::Reflect::get(image, &JsValue::from_str("viewDescriptor"))?,
+            &JsValue::from_str("baseArrayLayer"),
+        )?
+        .as_f64()
+        .ok_or_else(|| JsValue::from_str("Missing XR eye layer"))? as usize;
+        // Own the complete output of each eye until both are ready. Browser
+        // attachments are never retained here or touched by intermediate passes.
+        let mut present = self.xr_present.take().unwrap_or_else(|| {
+            super::xr_present::XrPresent::new(&self.renderer.device, target.color_format)
+        });
+        let result = (|| {
+            present
+                .ensure_eye(&self.renderer.device, index, target.width, target.height)
+                .map_err(|e| JsValue::from_str(&e))?;
+            self.render_xr_gpu_eye(
+                matrix,
+                position,
+                &present.target(index).map_err(|e| JsValue::from_str(&e))?,
+                write_depth,
+            )?;
+            present
+                .mark_ready(index, write_depth)
+                .map_err(|e| JsValue::from_str(&e))
+        })();
+        self.xr_present = Some(present);
+        result
+    }
+    pub fn present_xr_gpu_frame(&mut self, images: &js_sys::Array) -> Result<(), JsValue> {
+        let Some(present) = &mut self.xr_present else {
+            return Ok(());
+        };
+        let mut attachments = Vec::with_capacity(images.length() as usize);
+        let mut indices = Vec::with_capacity(images.length() as usize);
+        if images.length() == 0 || images.length() > 2 {
+            return Err(JsValue::from_str(
+                "XR presentation requires one or two eyes",
+            ));
+        }
+        for image in images.iter() {
+            let descriptor = js_sys::Reflect::get(&image, &JsValue::from_str("viewDescriptor"))?;
+            let index = js_sys::Reflect::get(&descriptor, &JsValue::from_str("baseArrayLayer"))?
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Missing XR eye layer"))?
+                as usize;
+            if !present.is_ready(index) {
+                return Err(JsValue::from_str("XR eye has not been rendered"));
+            }
+            attachments.push(super::xr_output::XrAttachments::new(
+                &self.renderer.device,
+                &image,
+            )?);
+            indices.push(index);
+        }
+        let targets: Vec<_> = indices
+            .into_iter()
+            .zip(attachments.iter().map(|a| a.target()))
+            .collect();
+        self.renderer.draw_calls += present
+            .present(&self.renderer.device, &self.renderer.queue, &targets)
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(())
     }
     pub fn render_xr_gpu_eye(
         &mut self,
         matrix: Mat4,
         position: Vec3,
         target: &super::target::RenderTarget<'_>,
+        write_depth: bool,
     ) -> Result<(), JsValue> {
         if target.color_format != self.output.color_format().remove_srgb_suffix() {
             return Err(JsValue::from_str(
                 "XR layer format must match xr_gpu_color_format",
-            ));
-        }
-        if self.postprocess.enabled() {
-            return Err(JsValue::from_str(
-                "Direct WebGPU XR requires postprocessing disabled",
             ));
         }
         let saved = self.view;
@@ -554,7 +723,7 @@ impl State {
             view_projection: matrix,
             camera_position: position,
         };
-        let result = self.render_to(Some(target));
+        let result = self.render_to(Some(target), write_depth);
         self.view = saved;
         self.xr_rendering = saved_xr;
         result
@@ -562,6 +731,7 @@ impl State {
     fn render_to(
         &mut self,
         external: Option<&super::target::RenderTarget<'_>>,
+        write_external_depth: bool,
     ) -> Result<(), JsValue> {
         self.refresh_info_panels(0.0);
         self.renderer.draw_calls = 0;
@@ -591,7 +761,10 @@ impl State {
             color_load: wgpu::LoadOp::Clear(self.background),
             ..*target
         };
-        if self.postprocess.enabled() {
+        if self
+            .postprocess
+            .needs_render(self.view, target.width, target.height)
+        {
             self.postprocess
                 .ensure_size(&self.renderer.device, target.width, target.height);
             let mut scene_target = self.postprocess.target();
@@ -614,20 +787,39 @@ impl State {
                 self.view,
                 position,
                 color,
-                target.color,
+                &target,
                 self.renderer.shadows_enabled(),
                 self.xr_rendering,
             );
             let overlays = super::target::RenderTarget {
                 depth: self.postprocess.target().depth,
                 auxiliary: None,
+                material_mask: false,
                 ..target
             };
             self.renderer
                 .draw_transparent(&overlays)
                 .map_err(|e| JsValue::from_str(&e))?;
+            self.renderer.draw_neon_overlay(&overlays);
             self.renderer.draw_helpers(&overlays);
+            if external.is_some() && write_external_depth {
+                // Postprocessing writes only color. Supply the compositor with the
+                // actual scene depth, including any depth-writing overlays above.
+                let resolve = self.xr_depth_resolve.get_or_insert_with(|| {
+                    super::depth_resolve::DepthResolve::new(&self.renderer.device)
+                });
+                self.renderer.draw_calls += resolve.render(
+                    &self.renderer.device,
+                    &self.renderer.queue,
+                    self.postprocess.target().depth,
+                    target.depth,
+                );
+            }
         } else {
+            self.postprocess.skip_render();
+            if !self.postprocess.enabled() {
+                self.xr_depth_resolve = None;
+            }
             self.renderer
                 .render_view(self.view, &target)
                 .map_err(|e| JsValue::from_str(&e))?;

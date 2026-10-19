@@ -46,6 +46,8 @@ impl Viewport {
 /// must match this descriptor; wgpu validates the underlying GPU resources.
 pub struct RenderTarget<'a> {
     pub color: &'a wgpu::TextureView,
+    /// Store reflectivity in color alpha and defer presentation overlays.
+    pub material_mask: bool,
     /// Optional packed depth attachment for portable screen-space effects.
     pub auxiliary: Option<&'a wgpu::TextureView>,
     pub depth: &'a wgpu::TextureView,

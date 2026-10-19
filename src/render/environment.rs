@@ -85,6 +85,7 @@ impl EnvironmentProbe {
                 color: &self.faces[i],
                 depth: &self.depth.view,
                 auxiliary: None,
+                material_mask: false,
                 color_format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 depth_format: DepthTarget::FORMAT,
                 width: 256,

@@ -90,6 +90,7 @@ impl ColorTarget {
             color: &self.color,
             depth: &self.depth,
             auxiliary: None,
+            material_mask: false,
             color_format: self.format,
             depth_format: DepthTarget::FORMAT,
             width: self.width,

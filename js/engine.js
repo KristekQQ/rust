@@ -23,6 +23,18 @@ export class SceneObject {
     setCuttable(enabled = true, {capColor = [1, 0.3, 0.12]} = {}) {
         this.#wasm.set_cuttable(this.id, enabled, ...capColor); return this;
     }
+    /** Award points after three consecutive original targets of this kind in an XR round.
+     * @param {string} kind @param {number} points @param {{wild?:boolean}} [options] */
+    setComboTarget(kind, points, {wild=false} = {}) {
+        if (!Number.isInteger(points) || points < 1 || points > 1000000) throw new Error('Combo points must be an integer in 1..1000000');
+        accepted(this.#wasm.set_combo_target(this.id, kind, points, wild)); return this;
+    }
+    /** Rust highlights this world object when this combo slot is earned.
+     * @param {string} kind @param {0|1|2} slot */
+    bindComboIndicator(kind, slot) {
+        if (!Number.isInteger(slot) || slot < 0 || slot > 2) throw new Error('Combo slot must be 0, 1 or 2');
+        accepted(this.#wasm.bind_combo_indicator(this.id, kind, slot)); return this;
+    }
     /** Endpoints in this object's local coordinates, transformed by Rust at sweep time.
      * @param {{base: Vector3, tip: Vector3}|null} blade */
     setCutter(blade) {
@@ -369,6 +381,9 @@ async function initializeEngine(canvas, backend, initialization) {
         },
         /** @param {Vector3} color Linear RGB clear color. */
         setBackgroundColor(color) { accepted(wasm.set_background_color(...color)); },
+        /** Geometry glow in both eyes, independent of postprocessing. Zero strength releases caches.
+         * @param {{strength?:number,radius?:number}} [options] */
+        setNeonGlow({strength=.6,radius=.015} = {}) { accepted(wasm.set_neon_glow(strength,radius)); },
         // Thin commands only: pass order, resources and execution live in Rust.
         postprocessing: Object.freeze({
             /** @param {import("./engine.d.ts").PostEffectName} name */
@@ -377,6 +392,15 @@ async function initializeEngine(canvas, backend, initialization) {
             },
             configureGodRays({ density = 0.035, exposure = 2.5 } = {}) {
                 accepted(wasm.configure_god_rays(density, exposure));
+            },
+            /** @param {Parameters<import("./engine.d.ts").PostProcessing["configureSSR"]>[0]} [options] */
+            configureSSR({resolutionScale=.5,receiverBounds} = {}) {
+                if(receiverBounds!==undefined&&receiverBounds!==null){
+                    const {min,max}=receiverBounds;
+                    if(min.length!==3||max.length!==3||![...min,...max].every(v=>Number.isFinite(v)&&Math.abs(v)<=1e6)||min.some((v,i)=>v>=max[i]))throw new RangeError('Invalid SSR receiver bounds');
+                }
+                accepted(wasm.configure_ssr(resolutionScale));
+                if(receiverBounds!==undefined)accepted(wasm.configure_ssr_region(new Float32Array(receiverBounds===null?[]:[...receiverBounds.min,...receiverBounds.max])));
             },
             /** @param {import("./engine.d.ts").PostEffectName} name */
             disable(name) { accepted(wasm.set_postprocess(name, false, 0)); },
@@ -409,7 +433,9 @@ async function initializeEngine(canvas, backend, initialization) {
             environmentCaptures() { return wasm.environment_captures(); },
             stats() {
                 const [passes, width, height, targets, frames] = wasm.postprocess_stats();
-                return { passes, width, height, targets, frames };
+                const [ssrWidth,ssrHeight,ssrPixels] = wasm.ssr_stats();
+                const [ssrTracePixels,ssrViewportPixels] = wasm.ssr_work_stats();
+                return { passes, width, height, targets, frames,ssrWidth,ssrHeight,ssrPixels,ssrTracePixels,ssrViewportPixels };
             },
         }),
         add_cube: wasm.add_cube,

@@ -309,6 +309,7 @@ impl CanvasOutput {
             color,
             depth,
             auxiliary: None,
+            material_mask: false,
             color_format: self.config.format.add_srgb_suffix(),
             depth_format: DEPTH_FORMAT,
             width: self.config.width,

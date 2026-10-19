@@ -33,6 +33,8 @@ export class XRPlayer {
 }
 
 export class WebXRHost extends EventTarget {
+    #gpuErrorDevice=null;
+    #onGpuError=event=>this.dispatchEvent(new CustomEvent('gpuerror',{detail:{message:event.error.message,type:event.error.constructor.name}}));
     #player;
     get player(){return this.#player;}
     #engine; #canvas; #session = null; #pending = false; #disposed = false;
@@ -168,7 +170,7 @@ export class WebXRHost extends EventTarget {
         const gpu = this.#engine.renderer_backend() === 'BrowserWebGpu';
         if (gpu && typeof globalThis.XRGPUBinding !== 'function') throw new Error('Prohlížeč nemá WebGPU pro WebXR (XRGPUBinding). Použijte odkaz WebGL.');
         if (gpu && this.#gpuSessionUnavailable) throw new Error('Tento prohlížeč odmítl WebGPU ve VR. Aktualizujte Meta Quest Browser, nebo použijte odkaz WebGL / WebXR.');
-        if (gpu && !this.#engine.xr_gpu_supported()) throw new Error('WebGPU XR vyžaduje kompatibilní adaptér a vypnutý postprocessing. Použijte WebGL.');
+        if (gpu && !this.#engine.xr_gpu_supported()) throw new Error('WebGPU XR vyžaduje kompatibilní adaptér. Použijte WebGL.');
         this.lastError = undefined;
         this.#pending = true;
         let session;
@@ -189,7 +191,18 @@ export class WebXRHost extends EventTarget {
             this.#size = [this.#canvas.width, this.#canvas.height];
             let gl = null, layer = null;
             if (gpu) {
-                this.#gpuBinding = new XRGPUBinding(session, this.#engine.xr_gpu_device());
+                const device=this.#engine.xr_gpu_device();
+                if(this.#gpuErrorDevice!==device){
+                    this.#gpuErrorDevice?.removeEventListener('uncapturederror',this.#onGpuError);
+                    this.#gpuErrorDevice=device;
+                    device.addEventListener('uncapturederror',this.#onGpuError);
+                    const owner=new WeakRef(this);
+                    void device.lost.then(info=>{
+                        const host=owner.deref();
+                        if(host&&!host.#disposed&&host.#gpuErrorDevice===device&&info.reason!=='destroyed')host.dispatchEvent(new CustomEvent('gpulost',{detail:{message:info.message,reason:info.reason}}));
+                    });
+                }
+                this.#gpuBinding = new XRGPUBinding(session, device);
                 this.#gpuLayer = this.#gpuBinding.createProjectionLayer({
                     colorFormat:this.#engine.xr_gpu_color_format(), depthStencilFormat:'depth32float', textureUsage:GPUTextureUsage.RENDER_ATTACHMENT, scaleFactor:0.75,
                 });
@@ -218,11 +231,18 @@ export class WebXRHost extends EventTarget {
             this.#engine.xr_set_presenting(true);
             this.#trackingActive = true;
             let firstFrame = true;
+            // Bounded diagnostics: measure delivered XR cadence and CPU submission,
+            // never stall the GPU or confuse CPU time with GPU execution time.
+            let warmupFrames=60,perfFrames=0,perfElapsed=0,perfCpu=0,perfReports=0;
+            let eyeViewports=[];
             const frame = (time, xrFrame) => {
                 this.#frame = null;
                 if (this.#session !== session) return;
                 try {
+                    const cpuStart=performance.now();
+                    const elapsed=this.#previous===null?0:time-this.#previous;
                     const pose = xrFrame.getViewerPose(space);
+                    const firstGpuEyes=firstFrame&&gpu?[]:null;
                     this.#engine.xr_begin_frame(this.#previous === null ? 0 : Math.max(0, (time - this.#previous) / 1000));
                     this.#previous = time;
                     const round = this.roundState;
@@ -234,14 +254,22 @@ export class WebXRHost extends EventTarget {
                     this.#engine.xr_update_head(tracked ? pose.transform.matrix : new Float32Array());
                     this.#updateControllers(session, xrFrame, space, !!pose && (!session.visibilityState || session.visibilityState === 'visible'));
                     if (gpu) {
+                        const images=[];
                         if (pose) for (const view of pose.views) {
                             const image = this.#gpuBinding.getViewSubImage(this.#gpuLayer, view);
                             const viewDescriptor=image.getViewDescriptor();
+                            if(firstFrame)eyeViewports.push({eye:view.eye,width:image.viewport.width,height:image.viewport.height});
                             try {
-                                this.#engine.xr_render_gpu_eye(view.projectionMatrix, view.transform.matrix, {
-                                    colorTexture:image.colorTexture, depthStencilTexture:image.depthStencilTexture,
-                                    viewDescriptor, viewport:image.viewport,
-                                });
+                                const attachments={colorTexture:image.colorTexture,depthStencilTexture:image.depthStencilTexture,
+                                    viewDescriptor,viewport:image.viewport,ignoreDepthValues:this.#gpuLayer.ignoreDepthValues===true};
+                                this.#engine.xr_render_gpu_eye(view.projectionMatrix,view.transform.matrix,attachments);
+                                images.push(attachments);
+                                if(firstGpuEyes){
+                                    const metadata=texture=>texture ? Object.fromEntries(['width','height','depthOrArrayLayers','mipLevelCount','sampleCount','dimension','format','usage'].map(key=>[key,texture[key]])) : null;
+                                    firstGpuEyes.push({eye:view.eye,color:metadata(image.colorTexture),depth:metadata(image.depthStencilTexture),
+                                        viewDescriptor:{dimension:viewDescriptor.dimension,baseArrayLayer:viewDescriptor.baseArrayLayer,arrayLayerCount:viewDescriptor.arrayLayerCount},
+                                        viewport:{x:image.viewport.x,y:image.viewport.y,width:image.viewport.width,height:image.viewport.height}});
+                                }
                             } catch(error) {
                                 const metadata=texture=>texture ? Object.fromEntries(['width','height','depthOrArrayLayers','mipLevelCount','sampleCount','dimension','format','usage'].map(key=>[key,texture[key]])) : null;
                                 const attachment={eye:view.eye,color:metadata(image.colorTexture),depth:metadata(image.depthStencilTexture),viewDescriptor,
@@ -249,6 +277,7 @@ export class WebXRHost extends EventTarget {
                                 throw new Error(`${error} · XR attachments: ${JSON.stringify(attachment)}`,{cause:error});
                             }
                         }
+                        if(images.length)this.#engine.xr_present_gpu_frame(images);
                     } else {
                         gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
                         gl.clearColor(0.1, 0.1, 0.3, 1);
@@ -256,6 +285,7 @@ export class WebXRHost extends EventTarget {
                         if (pose) for (const [index, view] of pose.views.entries()) {
                             const viewport = layer.getViewport(view);
                             if (!viewport) continue;
+                            if(firstFrame)eyeViewports.push({eye:view.eye,width:viewport.width,height:viewport.height});
                             this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
                             this.#uploadCanvas(index);
                             gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
@@ -266,8 +296,19 @@ export class WebXRHost extends EventTarget {
                     }
                     if (firstFrame && pose?.views.length) {
                         firstFrame = false;
-                        this.dispatchEvent(new Event('firstframe'));
+                        this.dispatchEvent(new CustomEvent('firstframe',{detail:{enabledFeatures:Array.from(session.enabledFeatures??[]),
+                            ...(gpu?{presentation:'stereo-final-submit-v1',usesDepthValues:this.#gpuBinding.usesDepthValues,ignoreDepthValues:this.#gpuLayer.ignoreDepthValues,fixedFoveation:this.#gpuLayer.fixedFoveation,eyes:firstGpuEyes}:{})}}));
                     }
+                    if(tracked&&elapsed>0&&elapsed<250&&perfReports<3){
+                        if(warmupFrames>0)warmupFrames--;
+                        else {
+                            perfFrames++;perfElapsed+=elapsed;perfCpu+=performance.now()-cpuStart;
+                            if(perfFrames===180){
+                                this.dispatchEvent(new CustomEvent('performance',{detail:{frames:perfFrames,fps:1000*perfFrames/perfElapsed,frameMs:perfElapsed/perfFrames,cpuSubmitMs:perfCpu/perfFrames,eyeViewports}}));
+                                perfReports++;perfFrames=0;perfElapsed=0;perfCpu=0;
+                            }
+                        }
+                    }else {perfFrames=0;perfElapsed=0;perfCpu=0;}
                     this.#frame = session.requestAnimationFrame(frame);
                 } catch (error) {
                     this.lastError = error;
@@ -288,6 +329,8 @@ export class WebXRHost extends EventTarget {
     dispose() {
         if (this.#disposed) return;
         this.#disposed = true;
+        this.#gpuErrorDevice?.removeEventListener('uncapturederror',this.#onGpuError);
+        this.#gpuErrorDevice=null;
         void this.exit().catch(() => {});
         this.#cleanup();
     }

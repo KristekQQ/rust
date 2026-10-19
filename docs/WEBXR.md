@@ -119,8 +119,14 @@ Relace vyžaduje feature `webgpu`. Rust vykresluje každé oko přímo do přís
 neprobíhá upload canvasu, blit ani CPU readback. WebGPU projekce už používá
 hloubku 0..1, proto se znovu nepřevádí z OpenGL. Cizí textury se drží jen při
 vykreslení oka, engine je neničí. Zatím podporujeme celé samostatné řezy očí,
-`rgba8unorm`/`bgra8unorm` a `depth32float`, bez postprocessingu (aréně je vypnutý).
-Jiný viewport nebo zapnutý postprocessing vyvolá explicitní chybu.
+`rgba8unorm`/`bgra8unorm` a `depth32float`. Zapnutý postprocessing používá
+mezicíle pro každé oko a finální pipeline odpovídající formátu XR řezu; SSR má
+kameru a hloubku právě vykreslovaného oka. Jiný než celý viewport řezu vyvolá explicitní chybu.
+Okluze následných vrstev používá interní depth mezicíle. Postprocess cesta po
+overlays předává skutečnou hloubku externímu XR attachmentu depth-only GPU průchodem
+(`textureLoad` → `frag_depth`), protože browserové attachmenty nepotřebují COPY_DST.
+Kompozitor tak nedostává nevyplněnou hloubku ani při `usesDepthValues:true`.
+Nativní GPU test porovnává obsah obou depth slices s přímým renderem stejné scény.
 
 `wgpu 30.0.1` nemá volbu `xrCompatible` ve veřejném request API. Proto je
 v `third_party/wgpu` lokální kopie se dvěma úzkými změnami popsanými v
@@ -359,3 +365,36 @@ RENDER_ATTACHMENT. Ostatní kontroly i hloubková textura zůstávají přísné
 Browser test `webxr-webgpu` simuluje stejné nulové gettery na skutečné GPU
 textuře a čte oba vykreslené řezy. Po této opravě uživatel potvrdil funkční obraz na Questu;
 změny rendereru vyžadují vlastní následné ověření.
+
+Při `ignoreDepthValues === true` kompozitor hloubku nečte; postprocess vynechá její
+přenos do externího attachmentu (interní hloubka pro SSR a overlays zůstává).
+Chybějící nebo false hodnota zachová depth resolve. XR host po zahřátí pošle
+nejvýše tři události `performance`: skutečnou kadenci XR callbacků, průměrný
+CPU submission čas a rozměry očí. Nejde o GPU timestamp ani čas kompozitoru.
+
+### Quest Browser 152.1: dokončené stereo před kompozitorem
+
+Uživatel po aktualizaci hlásí artefakty pouze se SSR; nativní depth a odstranění
+packed MRT je neodstranily. Log potvrzuje načtený aktuální renderer, platné
+slices a `ignoreDepthValues:true`; konkrétní browserová regrese není potvrzená.
+Proto při zapnutém postprocessingu engine dokončí každé oko do vlastního
+trvalého barevného/depth cíle a teprve potom jediným závěrečným `queue.submit`
+vykreslí obě browserové slices. Efekty a overlays už nekombinují browserovou
+barvu s interní hloubkou. Finální kopie používá `textureLoad` bez změny barev,
+bez CPU readbacku a bez požadavku COPY_DST. Ignorovanou browserovou hloubku
+ani nepřipojuje; požadovanou přenáší z dokončené per-eye hloubky.
+
+Přímá cesta bez efektů zůstává zachovaná. Dva vlastní per-eye cíle přidávají
+paměť a jeden jednoduchý průchod na oko; jde o workaround předání obrazu,
+nikoli prokázané zrychlení. Uživatel 2026-10-19 potvrdil, že tato varianta
+odstranila artefakty SSR na Questu 3 / Browser 152.1. Přesný mechanismus chyby
+prohlížeče ani výkonová shoda WebGPU/WebGL tím potvrzené nejsou. `xr-first-frame`
+obsahuje `presentation:stereo-final-submit-v1`, aréna hlásí
+`revision:xr-stereo-present-1`. GPU test sleduje skutečné browserové attachments
+a příkazy: oba slices musí dostat jediný finální stereo submit, přitom stále
+procházejí SSR/glow/stereo/depth testy a žádné stabilní alokace GPU prostředků.
+Pravidelný test používá i nečtvercové oko 192×208.
+
+Podklad: [WebXR WebGPU binding – synchronizace posledního submitu](https://github.com/immersive-web/webxr-webgpu-binding/blob/main/index.bs).
+Více submitů je podle specifikace platných; tento workaround omezuje aplikační
+závislost na této cestě, sám o sobě nedokazuje chybu prohlížeče.

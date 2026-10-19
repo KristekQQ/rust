@@ -14,7 +14,7 @@ use crate::render::{
 };
 use std::collections::HashMap;
 
-type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool);
+type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool, bool);
 type ColorPipelines = (
     wgpu::RenderPipeline,
     wgpu::RenderPipeline,
@@ -178,6 +178,10 @@ pub struct SceneRenderer {
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
     imported_meshes: HashMap<u32, Mesh>,
+    neon_glow: Option<super::neon_glow::NeonGlow>,
+    neon_meshes: HashMap<u32, Option<super::neon_glow::GlowMesh>>,
+    neon_draws: usize,
+    neon_segments: usize,
     gltf_gpu: super::gltf_gpu::GltfGpu,
     cut_feedback_gpu: Option<super::cut_feedback_gpu::CutFeedbackGpu>,
     gltf_models: HashMap<u32, super::gltf_gpu::GpuModel>,
@@ -280,6 +284,10 @@ impl SceneRenderer {
             plane_mesh,
             sphere_mesh,
             imported_meshes: HashMap::new(),
+            neon_glow: None,
+            neon_meshes: HashMap::new(),
+            neon_draws: 0,
+            neon_segments: 0,
             gltf_gpu,
             cut_feedback_gpu: None,
             gltf_models: HashMap::new(),
@@ -643,10 +651,157 @@ impl SceneRenderer {
             self.cull_cached = true;
         }
     }
+    pub fn configure_neon_glow(&mut self, strength: f32, radius: f32) -> bool {
+        if !strength.is_finite()
+            || !(0.0..=2.0).contains(&strength)
+            || !radius.is_finite()
+            || !(0.001..=0.05).contains(&radius)
+        {
+            return false;
+        }
+        if strength == 0.0 {
+            self.neon_glow = None;
+            self.neon_meshes.clear();
+            self.neon_draws = 0;
+            self.neon_segments = 0;
+            return true;
+        }
+        self.neon_glow
+            .get_or_insert_with(|| super::neon_glow::NeonGlow::new(&self.device))
+            .configure(strength, radius)
+    }
+    fn prepare_neon_glow(&mut self, target: &RenderTarget<'_>) {
+        let Some(glow) = &mut self.neon_glow else {
+            return;
+        };
+        if !glow.enabled() {
+            return;
+        }
+        let cache = &self.passes[self.active_cache];
+        for (id, instances) in &cache.queue.imported {
+            if self.neon_meshes.contains_key(id) || !instances.iter().any(|i| i.emission[0] > 0.0) {
+                continue;
+            }
+            if let Some(mesh) = self
+                .scene
+                .triangle_meshes()
+                .get(id)
+                .and_then(|object| object.mesh.ready_cpu())
+            {
+                self.neon_meshes.insert(
+                    *id,
+                    super::neon_glow::GlowMesh::new(&self.device, &mesh.render_mesh()),
+                );
+            }
+        }
+        self.neon_meshes
+            .retain(|id, _| self.scene.object_exists(*id));
+        glow.prepare(
+            &self.device,
+            &self.queue,
+            RenderView {
+                view_projection: cache.key.expect("prepared render view").0,
+                camera_position: cache.camera_position,
+            },
+            target,
+        );
+    }
+    fn encode_neon_glow<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        cache_index: usize,
+    ) -> (usize, usize) {
+        let Some(glow) = &self.neon_glow else {
+            return (0, 0);
+        };
+        let cache = &self.passes[cache_index];
+        let mut stats = (0, 0);
+        for (id, instances) in &cache.queue.imported {
+            if instances.is_empty()
+                || !instances.iter().any(|i| i.emission[0] > 0.)
+                || self.scene.is_cut_feedback_ring(*id)
+            {
+                continue;
+            }
+            if let Some(Some(mesh)) = self.neon_meshes.get(id) {
+                glow.draw(
+                    pass,
+                    mesh,
+                    &cache.imported[id].buffer,
+                    instances.len() as u32,
+                );
+                stats.0 += 1;
+                stats.1 += mesh.vertices as usize / 6 * instances.len();
+            }
+        }
+        stats
+    }
+    /// The postprocess chain uses MRT. WebGL lacks independent attachment blends,
+    /// so only that opt-in combination draws glow into its final single-color target.
+    pub fn draw_neon_overlay(&mut self, target: &RenderTarget<'_>) {
+        if self.neon_glow.is_none() {
+            return;
+        }
+        self.active_cache = 0;
+        self.prepare_neon_glow(target);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("neon postprocess overlay"),
+            });
+        let stats;
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("neon postprocess overlay"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.,
+                1.,
+            );
+            pass.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            stats = self.encode_neon_glow(&mut pass, 0);
+        }
+        self.neon_draws = stats.0;
+        self.neon_segments = stats.1;
+        self.draw_calls += stats.0;
+        self.main_draw_calls += stats.0;
+        self.queue.submit(Some(encoder.finish()));
+    }
     pub fn debug_values(&self) -> serde_json::Value {
         let stats = self.render_stats();
         let bvh = self.passes[0].queue.culling_stats;
         serde_json::json!({
+            "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
+                "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>()).sum::<usize>()},
             "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],
             "cullMs": self.cull_ms, "cullCached": self.cull_cached,
             "total": stats[0], "visible": stats[1], "culled": stats[2],
@@ -801,6 +956,7 @@ impl SceneRenderer {
             depth_format: target.format,
             reflected: false,
             material_mask: false,
+            packed_depth: false,
             shadow: true,
         };
         for id in self.passes[self.active_cache].queue.imported.keys() {
@@ -966,10 +1122,16 @@ impl SceneRenderer {
     ) -> Result<(), String> {
         target.validate()?;
         let rings = self.cut_feedback_rings(self.active_cache);
-        let draw_rings = !reflected && target.auxiliary.is_none();
+        let draw_rings = !reflected && !target.material_mask;
         if draw_rings && rings.iter().any(Option::is_some) {
             self.prepare_cut_feedback(target);
         }
+        if !reflected && !target.material_mask {
+            self.prepare_neon_glow(target);
+        }
+        self.neon_draws = 0;
+        self.neon_segments = 0;
+        let mut neon_stats = (0, 0);
         let mut draws = 0;
         let key = (
             target.color_format,
@@ -977,6 +1139,7 @@ impl SceneRenderer {
             self.passes[self.active_cache]
                 .key
                 .is_some_and(|k| k.0.determinant() < 0.0),
+            target.material_mask,
             target.auxiliary.is_some(),
         );
         self.pipelines.entry(key).or_insert_with(|| {
@@ -989,6 +1152,7 @@ impl SceneRenderer {
                     &effects.layout,
                     key.2,
                     key.3,
+                    key.4,
                     false,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
@@ -1000,6 +1164,7 @@ impl SceneRenderer {
                     &effects.layout,
                     !key.2,
                     key.3,
+                    key.4,
                     false,
                 ),
                 pipeline::build(
@@ -1010,6 +1175,7 @@ impl SceneRenderer {
                     &effects.layout,
                     key.2,
                     key.3,
+                    key.4,
                     true,
                 ),
             )
@@ -1020,7 +1186,8 @@ impl SceneRenderer {
             reflected: self.passes[self.active_cache]
                 .key
                 .is_some_and(|k| k.0.determinant() < 0.0),
-            material_mask: target.auxiliary.is_some(),
+            material_mask: target.material_mask,
+            packed_depth: target.auxiliary.is_some(),
             shadow: false,
         };
         for id in self.passes[self.active_cache].queue.imported.keys() {
@@ -1124,7 +1291,7 @@ impl SceneRenderer {
                 }
             }
             for (id, instances) in &cache.queue.imported {
-                // Presentation FX skip probes/reflections; auxiliary targets defer
+                // Presentation FX skip probes/reflections; material-metadata targets defer
                 // their rings to the final transparent overlay.
                 if instances.is_empty() || rings.contains(&Some(*id)) {
                     continue;
@@ -1156,7 +1323,7 @@ impl SceneRenderer {
                             .draw(&mut rp, model, gltf_key, false, cache.camera_position);
                 }
             }
-            if reflected || target.auxiliary.is_none() {
+            if reflected || !target.material_mask {
                 draws += self.gltf_gpu.draw_many(
                     &mut rp,
                     cache
@@ -1169,27 +1336,30 @@ impl SceneRenderer {
                     cache.camera_position,
                 );
             }
+            if !reflected && !target.material_mask {
+                neon_stats = self.encode_neon_glow(&mut rp, self.active_cache);
+                draws += neon_stats.0;
+            }
             if draw_rings {
                 draws += self.draw_cut_feedback(&mut rp, self.active_cache, &rings, target);
             }
-            if !reflected
-                && target.auxiliary.is_none()
-                && (self.draw_grid || self.draw_light_helpers)
-            {
+            if !reflected && !target.material_mask && (self.draw_grid || self.draw_light_helpers) {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
-                if target.auxiliary.is_none() && self.draw_grid {
+                if !target.material_mask && self.draw_grid {
                     rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                     rp.draw(0..self.grid_vertex_count, 0..1);
                     draws += 1;
                 }
-                if target.auxiliary.is_none() && self.draw_light_helpers {
+                if !target.material_mask && self.draw_light_helpers {
                     rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
                     rp.draw(0..self.light_vertex_count, 0..1);
                     draws += 1;
                 }
             }
         }
+        self.neon_draws = neon_stats.0;
+        self.neon_segments = neon_stats.1;
         self.queue.submit(Some(encoder.finish()));
         self.draw_calls += draws;
         if !reflected {
@@ -1292,7 +1462,8 @@ impl SceneRenderer {
             format: target.color_format,
             depth_format: target.depth_format,
             reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
-            material_mask: target.auxiliary.is_some(),
+            material_mask: target.material_mask,
+            packed_depth: target.auxiliary.is_some(),
             shadow: false,
         };
         for id in cache.queue.imported.keys() {

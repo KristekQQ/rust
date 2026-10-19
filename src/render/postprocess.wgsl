@@ -15,10 +15,11 @@ struct Uniforms {
     sky_cube_center: vec4<f32>,
     sky_cube_half_extents: vec4<f32>,
     reflection_trace: vec4<f32>,
+    receiver_bounds_min: vec4<f32>,
+    receiver_bounds_max: vec4<f32>,
 };
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 @group(0) @binding(1) var scene_sampler: sampler;
-@group(0) @binding(2) var scene_depth: texture_2d<f32>;
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
 @group(0) @binding(4) var depth_sampler: sampler;
 @group(0) @binding(6) var reflection_mask: texture_2d<f32>;
@@ -28,6 +29,7 @@ struct Uniforms {
 @group(1) @binding(0) var volume_static_shadow: texture_depth_2d;
 @group(1) @binding(1) var volume_dynamic_shadow: texture_depth_2d;
 @group(1) @binding(2) var volume_shadow_sampler: sampler_comparison;
+@group(2) @binding(0) var ssr_trace: texture_2d<f32>;
 struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
 @vertex fn vs_main(@builtin(vertex_index) index: u32) -> Output {
     let positions = array<vec2<f32>, 3>(vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -36,14 +38,6 @@ struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f3
     output.position = vec4(p, 0.0, 1.0);
     output.uv = vec2((p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5);
     return output;
-}
-fn depth_at(uv: vec2<f32>) -> f32 {
-    let size = vec2<i32>(uniforms.params.zw);
-    let pixel = clamp(vec2<i32>(uv * uniforms.params.zw), vec2<i32>(0), size - vec2<i32>(1));
-    // RGB base-255 depth packing avoids depth-sampler LOD limitations in GLSL ES300.
-    // An auxiliary attachment cleared to white represents untouched far depth.
-    let packed = textureSampleLevel(scene_depth, depth_sampler, (vec2<f32>(pixel) + vec2(0.5)) / uniforms.params.zw, 0.0).rgb;
-    return clamp(dot(packed, vec3(1.0, 1.0 / 255.0, 1.0 / 65025.0)), 0.0, 1.0);
 }
 fn world_at(uv: vec2<f32>, depth: f32) -> vec3<f32> {
     let p = uniforms.inverse_view_projection * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
@@ -98,10 +92,15 @@ fn environment_at(position: vec3<f32>, direction: vec3<f32>) -> vec3<f32> {
     let sample_direction = box_projected_direction(position, direction, uniforms.environment_center.xyz, uniforms.environment_half_extents.xyz);
     return textureSampleLevel(environment_texture, scene_sampler, sample_direction, 0.0).rgb;
 }
-fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
+fn inside_receiver(position: vec3<f32>) -> bool {
+    return uniforms.receiver_bounds_min.w < 0.5 || (all(position >= uniforms.receiver_bounds_min.xyz) && all(position <= uniforms.receiver_bounds_max.xyz));
+}
+fn reflection_sample(uv: vec2<f32>, source: vec4<f32>) -> vec4<f32> {
+    if source.a <= 0.001 { return vec4(0.0); }
     let depth = depth_at(uv);
-    if depth >= 0.999999 || source.a <= 0.001 { return source.rgb; }
+    if depth >= 0.999999 { return vec4(0.0); }
     let position = world_at(uv, depth);
+    if !inside_receiver(position) { return vec4(0.0); }
     // Choose the nearer depth neighbour on each axis to reduce silhouette normals.
     let pixel = 1.0 / uniforms.params.zw;
     let left = world_at(uv - vec2(pixel.x, 0.0), depth_at(uv - vec2(pixel.x, 0.0)));
@@ -111,16 +110,18 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     let dx = select(position - left, right - position, distance(right, position) < distance(left, position));
     let dy = select(position - up, down - position, distance(down, position) < distance(up, position));
     let raw_normal = cross(dx, dy);
-    if dot(raw_normal, raw_normal) < 0.000000000001 { return source.rgb; }
+    if dot(raw_normal, raw_normal) < 0.000000000001 { return vec4(0.0); }
     let incident = normalize(position - uniforms.camera.xyz);
     var normal = normalize(raw_normal);
     if dot(normal, incident) > 0.0 { normal = -normal; }
     let direction = reflect(incident, normal);
     let fresnel = 0.2 + 0.8 * pow(1.0 - max(dot(-incident, normal), 0.0), 5.0);
     let weight = clamp(source.a * reflection_mask_at(position) * uniforms.params.x * fresnel, 0.0, 1.0);
-    var fallback = source.rgb;
+    var fallback = vec3(0.0);
+    var fallback_weight = 0.0;
     if uniforms.environment_center.w > 0.5 || uniforms.sky_cube_params.x > 0.5 {
-        fallback = mix(source.rgb, environment_at(position, direction), weight);
+        fallback = environment_at(position, direction);
+        fallback_weight = weight;
     }
     let camera_distance = distance(position, uniforms.camera.xyz);
     let step_length = clamp(camera_distance * 0.025, 0.04, 0.5);
@@ -170,14 +171,16 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
                 let edge_fade = smoothstep(0.0, 0.08, border);
                 let range_fade = 1.0 - smoothstep(40.0, 64.0, trace_step);
                 // Confidence fades into the environment instead of losing the reflection.
-                let screen_reflection = mix(source.rgb, scene_at(hit_uv).rgb, weight);
-                return mix(fallback, screen_reflection, edge_fade * range_fade);
+                let confidence = edge_fade * range_fade;
+                let combined_weight = mix(fallback_weight, weight, confidence);
+                let radiance = fallback * fallback_weight * (1.0 - confidence) + scene_at(hit_uv).rgb * weight * confidence;
+                return vec4(radiance / max(combined_weight, 0.000001), combined_weight);
             }
         }
         previous_t = t;
         previous_delta = delta;
     }
-    return fallback;
+    return vec4(fallback, fallback_weight);
 }
 // Single-scattering eye-ray integration with shadow-map visibility, inspired by
 // Toth/Umenhoffer (Eurographics 2009). No radial screen emitter or screen-light gating.
@@ -237,15 +240,65 @@ fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
     return source + scattering / (vec3(1.0) + scattering);
 }
 // Intermediate alpha remains material metadata; final output alpha is opaque. Keep SSR before color-only effects in EFFECTS by default.
+fn wet_surface(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
+    if uniforms.camera.w < 0.5 || source.a <= 0.001 { return source.rgb; }
+    let depth = depth_at(uv);
+    if uniforms.camera.w > 0.5 && source.a > 0.001 && depth < 0.999999 {
+        return source.rgb * mix(1.0, 0.58, reflection_mask_at(world_at(uv, depth)));
+    }
+    return source.rgb;
+}
 @fragment fn fs_ssr(input: Output) -> @location(0) vec4<f32> {
     let source = scene_at(input.uv);
-    var surface = source;
+    let reflected = reflection_sample(input.uv, source);
+    return vec4(mix(wet_surface(input.uv, source), reflected.rgb, reflected.a), select(source.a, 1.0, uniforms.params.y > 0.5));
+}
+@fragment fn fs_ssr_trace(input: Output) -> @location(0) vec4<f32> {
+    return reflection_sample(input.uv, scene_at(input.uv));
+}
+@fragment fn fs_ssr_composite(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    if source.a <= 0.001 { return vec4(source.rgb, select(source.a, 1.0, uniforms.params.y > 0.5)); }
+    let surface = wet_surface(input.uv, source);
     let depth = depth_at(input.uv);
-    if uniforms.camera.w > 0.5 && source.a > 0.001 && depth < 0.999999 {
-        let wetness = reflection_mask_at(world_at(input.uv, depth));
-        surface = vec4(source.rgb * mix(1.0, 0.58, wetness), source.a);
+    var weighted = vec3(0.0);
+    var confidence = 0.0;
+    var total = 0.0;
+    if source.a > 0.001 && depth < 0.999999 {
+        let position = world_at(input.uv, depth);
+        if !inside_receiver(position) { return vec4(surface, select(source.a, 1.0, uniforms.params.y > 0.5)); }
+        let size = vec2<f32>(textureDimensions(ssr_trace));
+        let grid = input.uv * size - vec2(0.5);
+        let base = floor(grid);
+        let fraction = fract(grid);
+        // Reconstruct each trace receiver from ORIGINAL depth. Reject edges,
+        // material boundaries and dry/grout pixels before interpolating radiance.
+        let footprint = max(distance(world_at(input.uv + vec2(1.0 / uniforms.params.z, 0.0), depth), position), distance(world_at(input.uv + vec2(0.0, 1.0 / uniforms.params.w), depth), position));
+        let eye_direction = normalize(position - uniforms.camera.xyz);
+        for (var y = 0; y < 2; y += 1) {
+            for (var x = 0; x < 2; x += 1) {
+                let tap_pixel = clamp(base + vec2(f32(x), f32(y)), vec2(0.0), size - vec2(1.0));
+                let tap_uv = (tap_pixel + vec2(0.5)) / size;
+                let tap_depth = depth_at(tap_uv);
+                let tap_source = scene_at(tap_uv);
+                let tap_position = world_at(tap_uv, tap_depth);
+                if !inside_receiver(tap_position) { continue; }
+                let separation = abs(dot(tap_position - position, eye_direction));
+                if tap_depth >= 0.999999 || tap_source.a <= 0.001 || abs(tap_source.a - source.a) > 0.08 || separation > max(0.025, footprint * 3.0) { continue; }
+                let tap_mask = reflection_mask_at(tap_position);
+                let mask = reflection_mask_at(position);
+                if tap_mask <= 0.001 || mask <= 0.001 || abs(tap_mask - mask) > 0.2 { continue; }
+                let bilinear = select(1.0 - fraction.x, fraction.x, x == 1) * select(1.0 - fraction.y, fraction.y, y == 1);
+                let sample = textureSampleLevel(ssr_trace, depth_sampler, tap_uv, 0.0);
+                weighted += sample.rgb * sample.a * bilinear;
+                confidence += sample.a * bilinear;
+                total += bilinear;
+            }
+        }
     }
-    return vec4(reflected_color(input.uv, surface), select(source.a, 1.0, uniforms.params.y > 0.5));
+    let weight = confidence / max(total, 0.000001);
+    let color = mix(surface, weighted / max(confidence, 0.000001), weight);
+    return vec4(color, select(source.a, 1.0, uniforms.params.y > 0.5));
 }
 @fragment fn fs_god_rays(input: Output) -> @location(0) vec4<f32> {
     let source = scene_at(input.uv);

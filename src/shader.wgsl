@@ -183,6 +183,9 @@ fn fs_color(input: VertexOutput) -> @location(0) vec4<f32> {
 @fragment fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(shade_surface(input).rgb, 1.0);
 }
+@fragment fn fs_material_mask(input: VertexOutput) -> @location(0) vec4<f32> {
+    return shade_surface(input);
+}
 struct PostSurface {
     @location(0) color: vec4<f32>,
     @location(1) depth: vec4<f32>,

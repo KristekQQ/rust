@@ -77,7 +77,16 @@ try {
     engine.postprocessing.enable('godRays', { strength: 0.4 });
     for (let i = 0; i < 8; i++) await new Promise(requestAnimationFrame);
     assert(engine.postprocessing.stats().passes === 2, 'Two postprocess passes');
-    engine.postprocessing.disable('ssr'); engine.postprocessing.disable('godRays');
+    let ssrRejected=false;
+    try { engine.postprocessing.configureSSR({resolutionScale:NaN}); } catch { ssrRejected=true; }
+    assert(ssrRejected,'Non-finite SSR scale rejected');
+    engine.postprocessing.configureSSR({resolutionScale:.5});
+    for (let i=0;i<8;i++)await new Promise(requestAnimationFrame);
+    const half=engine.postprocessing.stats();
+    assert(half.passes===3&&half.targets===(engine.renderer_backend()==='BrowserWebGpu'?4:5)&&half.ssrWidth===Math.ceil(half.width/2)&&half.ssrHeight===Math.ceil(half.height/2),'Half SSR keeps full-size chained effects with quarter-size trace');
+    engine.postprocessing.disable('ssr');
+    assert(engine.postprocessing.stats().ssrPixels===0&&engine.postprocessing.stats().targets===(engine.renderer_backend()==='BrowserWebGpu'?3:4),'Disabling SSR releases its trace while another effect remains');
+    engine.postprocessing.configureSSR({resolutionScale:1});engine.postprocessing.disable('godRays');
     assert(engine.postprocessing.stats().targets === 0, 'Postprocess targets released');
     scene.clear();engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
     engine.setCameraView([0,0,3],[0,0,0]);

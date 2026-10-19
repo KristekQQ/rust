@@ -12352,6 +12352,140 @@ pub fn create(device: &Device, w: u32, h: u32, format: TextureFormat) -> (Textur
 }
 
 
+# File: src/render/depth_resolve.rs
+//! Transfer postprocessed scene depth to the browser-owned XR depth slice.
+//!
+//! XR attachments need only RENDER_ATTACHMENT usage, so a depth-only draw is
+//! used instead of a texture copy. Only the internal source is retained.
+pub struct DepthResolve {
+    layout: wgpu::BindGroupLayout,
+    pipeline: wgpu::RenderPipeline,
+    source: Option<(wgpu::TextureView, wgpu::BindGroup)>,
+}
+
+impl DepthResolve {
+    pub fn new(device: &wgpu::Device) -> Self {
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("XR depth resolve layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            }],
+        });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("XR depth resolve shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("depth_resolve.wgsl").into()),
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("XR depth resolve pipeline layout"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("XR depth resolve"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[],
+            }),
+            primitive: Default::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Always),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        Self {
+            layout,
+            pipeline,
+            source: None,
+        }
+    }
+
+    /// The XR import requires full-size, single-sample Depth32Float slices.
+    /// No browser attachment is retained beyond this submission or destroyed.
+    pub fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        source: &wgpu::TextureView,
+        destination: &wgpu::TextureView,
+    ) -> usize {
+        // Compare GPU resource identity, not dimensions: resize replaces the view.
+        if self.source.as_ref().is_none_or(|(view, _)| view != source) {
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("XR depth resolve source"),
+                layout: &self.layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(source),
+                }],
+            });
+            self.source = Some((source.clone(), bind_group));
+        }
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("XR depth resolve encoder"),
+        });
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("XR depth resolve"),
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: destination,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(&self.pipeline);
+            pass.set_bind_group(0, &self.source.as_ref().unwrap().1, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        queue.submit(Some(encoder.finish()));
+        1
+    }
+}
+
+
+# File: src/render/depth_resolve.wgsl
+@group(0) @binding(0) var scene_depth: texture_depth_2d;
+
+@vertex
+fn vs_main(@builtin(vertex_index) index: u32) -> @builtin(position) vec4f {
+    let positions = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+    return vec4f(positions[index], 0.0, 1.0);
+}
+
+@fragment
+fn fs_main(@builtin(position) position: vec4f) -> @builtin(frag_depth) f32 {
+    return textureLoad(scene_depth, vec2i(position.xy), 0);
+}
+
+
 # File: src/render/effects.rs
 //! Persistent pass resources, scheduling and dirty keys, independent of canvas/DOM.
 use super::target::{RenderTarget, RenderView};
@@ -12865,6 +12999,7 @@ impl EnvironmentProbe {
                 color: &self.faces[i],
                 depth: &self.depth.view,
                 auxiliary: None,
+                material_mask: false,
                 color_format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 depth_format: DepthTarget::FORMAT,
                 width: 256,
@@ -12962,6 +13097,7 @@ pub struct PipelineKey {
     pub depth_format: wgpu::TextureFormat,
     pub reflected: bool,
     pub material_mask: bool,
+    pub packed_depth: bool,
     pub shadow: bool,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -13605,7 +13741,7 @@ impl GltfGpu {
                         }),
                         write_mask: wgpu::ColorWrites::ALL,
                     }));
-                    if key.material_mask {
+                    if key.packed_depth {
                         targets.push(Some(wgpu::ColorTargetState {
                             format: wgpu::TextureFormat::Rgba8Unorm,
                             blend: Some(wgpu::BlendState::REPLACE),
@@ -13626,8 +13762,10 @@ impl GltfGpu {
                         module: shader,
                         entry_point: Some(if key.shadow {
                             "fs_shadow"
-                        } else if key.material_mask {
+                        } else if key.packed_depth {
                             "fs_postprocess"
+                        } else if key.material_mask {
+                            "fs_material_mask"
                         } else {
                             "fs_main"
                         }),
@@ -13933,6 +14071,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
     return vec4(color,base.a);
 }
 @fragment fn fs_main(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,select(1.0,c.a,material.extra.y==2.0)); }
+@fragment fn fs_material_mask(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,material.options.x); }
 struct PostSurface { @location(0) color:vec4<f32>, @location(1) depth:vec4<f32> };
 @fragment fn fs_postprocess(v:Output,@builtin(front_facing) front:bool)->PostSurface { var o:PostSurface; let c=surface(v,front); o.color=vec4(c.rgb,material.options.x); var e=fract(min(v.pos.z,0.9999999)*vec3(1.0,255.0,65025.0)); e-=e.yzz*vec3(1.0/255.0,1.0/255.0,0.0); o.depth=vec4(e,1.0); return o; }
 @fragment fn fs_shadow(v:Output) { alpha_test(base_color(v).a); if(material.extra.y==2.0 && base_color(v).a<0.5) { discard; } }
@@ -14088,6 +14227,8 @@ pub mod cutting_compute;
 pub mod cutting_resident;
 pub mod data;
 pub mod depth;
+mod depth_resolve;
+mod neon_glow;
 pub mod pipeline;
 pub mod state;
 
@@ -14105,6 +14246,404 @@ pub mod postprocess;
 pub mod environment;
 
 pub mod xr_output;
+pub mod xr_present;
+
+
+# File: src/render/neon_glow.rs
+//! Texture-free halos drawn over actual bright mesh edges.
+use super::{data::Vertex, target::RenderView};
+use crate::{gltf_loader::ImportedMesh, visibility::InstanceData};
+use glam::Vec3;
+use std::collections::{BTreeMap, HashMap};
+use wgpu::util::DeviceExt;
+
+pub struct GlowMesh {
+    pub buffer: wgpu::Buffer,
+    pub vertices: u32,
+}
+struct GlowEdge {
+    color_sum: Vec3,
+    count: usize,
+    first_normal: Vec3,
+    crease: bool,
+}
+impl GlowMesh {
+    pub fn new(device: &wgpu::Device, mesh: &ImportedMesh) -> Option<Self> {
+        let mut vertices = Vec::new();
+        let mut edges = BTreeMap::<[[u32; 3]; 2], GlowEdge>::new();
+        let max_vertices = (device.limits().max_buffer_size / std::mem::size_of::<Vertex>() as u64)
+            .min(u32::MAX as u64) as usize;
+        for triangle in mesh.indices.as_chunks::<3>().0 {
+            let Some(a) = mesh.vertices.get(triangle[0] as usize) else {
+                continue;
+            };
+            let Some(b) = mesh.vertices.get(triangle[1] as usize) else {
+                continue;
+            };
+            let Some(c) = mesh.vertices.get(triangle[2] as usize) else {
+                continue;
+            };
+            let color = (Vec3::from(a.color) + Vec3::from(b.color) + Vec3::from(c.color)) / 3.0;
+            let points = [
+                Vec3::from(a.position),
+                Vec3::from(b.position),
+                Vec3::from(c.position),
+            ];
+            let face_normal = (points[1] - points[0]).cross(points[2] - points[0]);
+            let normal_length_squared = face_normal.length_squared();
+            if !color.is_finite()
+                || color.max_element() < 0.25
+                || points.iter().any(|p| !p.is_finite())
+                || !normal_length_squared.is_finite()
+                || normal_length_squared <= 1e-20
+            {
+                continue;
+            }
+            let face_normal = face_normal / normal_length_squared.sqrt();
+            // Weld split mesh vertices by exact position, including signed zero.
+            let bits = |p: Vec3| {
+                p.to_array()
+                    .map(|value| if value == 0.0 { 0 } else { value.to_bits() })
+            };
+            for (a, b) in [(0, 1), (1, 2), (2, 0)] {
+                let length_squared = points[a].distance_squared(points[b]);
+                if !length_squared.is_finite() || length_squared <= 1e-20 {
+                    continue;
+                }
+                let mut ends = [bits(points[a]), bits(points[b])];
+                ends.sort_unstable();
+                edges
+                    .entry(ends)
+                    .and_modify(|edge| {
+                        edge.color_sum += color;
+                        edge.count += 1;
+                        // Winding supplies consistently outward face normals.
+                        edge.crease |= edge.first_normal.dot(face_normal) < 0.95;
+                    })
+                    .or_insert(GlowEdge {
+                        color_sum: color,
+                        count: 1,
+                        first_normal: face_normal,
+                        crease: false,
+                    });
+            }
+        }
+        // Ordered keys make generated capsules stable across builds and runs.
+        for (ends, edge) in edges {
+            // Bright/dark boundaries and creases glow; coplanar diagonals do not.
+            if edge.count != 1 && !edge.crease {
+                continue;
+            }
+            let vertex = Vertex {
+                position: ends[0].map(f32::from_bits),
+                color: (edge.color_sum / edge.count as f32).to_array(),
+                normal: ends[1].map(f32::from_bits),
+            };
+            if vertices.len().checked_add(6)? > max_vertices {
+                return None;
+            }
+            vertices.extend_from_slice(&[vertex; 6]);
+        }
+        if vertices.is_empty() {
+            return None;
+        }
+        let count = u32::try_from(vertices.len()).ok()?;
+        Some(Self {
+            buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("neon glow edge capsules"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }),
+            vertices: count,
+        })
+    }
+}
+impl Drop for GlowMesh {
+    fn drop(&mut self) {
+        self.buffer.destroy();
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct Uniforms {
+    view_projection: [[f32; 4]; 4],
+    // Pixel viewport dimensions, strength, world-space radius.
+    params: [f32; 4],
+}
+type PipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat);
+
+pub struct NeonGlow {
+    strength: f32,
+    radius: f32,
+    uniform: wgpu::Buffer,
+    layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+    pipelines: HashMap<PipelineKey, wgpu::RenderPipeline>,
+    active: Option<PipelineKey>,
+}
+impl NeonGlow {
+    pub fn new(device: &wgpu::Device) -> Self {
+        let uniform = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("neon glow view uniform"),
+            size: std::mem::size_of::<Uniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("neon glow view layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("neon glow view"),
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform.as_entire_binding(),
+            }],
+        });
+        Self {
+            strength: 0.0,
+            radius: 0.015,
+            uniform,
+            layout,
+            bind_group,
+            pipelines: HashMap::new(),
+            active: None,
+        }
+    }
+
+    pub fn configure(&mut self, strength: f32, radius: f32) -> bool {
+        if !strength.is_finite()
+            || !radius.is_finite()
+            || !(0.0..=2.0).contains(&strength)
+            || !(0.001..=0.05).contains(&radius)
+        {
+            return false;
+        }
+        self.strength = strength;
+        self.radius = radius;
+        true
+    }
+    pub fn enabled(&self) -> bool {
+        self.strength > 0.0
+    }
+
+    pub fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        view: RenderView,
+        target: &super::target::RenderTarget<'_>,
+    ) {
+        let color_format = target.color_format;
+        let depth_format = target.depth_format;
+        debug_assert!(target.auxiliary.is_none());
+        let width = target.viewport.width;
+        let height = target.viewport.height;
+        if !self.enabled() || width == 0 || height == 0 {
+            self.active = None;
+            return;
+        }
+        let key = (color_format, depth_format);
+        self.pipelines.entry(key).or_insert_with(|| {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("neon_glow.wgsl"));
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("neon glow pipeline layout"),
+                bind_group_layouts: &[Some(&self.layout)],
+                immediate_size: 0,
+            });
+            let targets = vec![Some(wgpu::ColorTargetState {
+                format: color_format,
+                blend: Some(wgpu::BlendState {
+                    color: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::One,
+                        dst_factor: wgpu::BlendFactor::One,
+                        operation: wgpu::BlendOperation::Max,
+                    },
+                    alpha: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::Zero,
+                        dst_factor: wgpu::BlendFactor::One,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                }),
+                // Preserve alpha via the blend equation, while leaving the WebGL
+                // color mask complete for browser surface presentation/readback.
+                write_mask: wgpu::ColorWrites::ALL,
+            })];
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("neon glow max-blended capsules"),
+                layout: Some(&layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[Some(Vertex::layout()), Some(InstanceData::layout())],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &targets,
+                }),
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: None,
+                    ..Default::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: depth_format,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        });
+        queue.write_buffer(
+            &self.uniform,
+            0,
+            bytemuck::bytes_of(&Uniforms {
+                view_projection: view.view_projection.to_cols_array_2d(),
+                params: [width as f32, height as f32, self.strength, self.radius],
+            }),
+        );
+        self.active = Some(key);
+    }
+
+    pub fn draw<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        mesh: &'a GlowMesh,
+        instance_buffer: &'a wgpu::Buffer,
+        instance_count: u32,
+    ) {
+        if !self.enabled() || instance_count == 0 {
+            return;
+        }
+        let Some(key) = self.active else { return };
+        pass.set_pipeline(&self.pipelines[&key]);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.set_vertex_buffer(0, mesh.buffer.slice(..));
+        pass.set_vertex_buffer(1, instance_buffer.slice(..));
+        pass.draw(0..mesh.vertices, 0..instance_count);
+    }
+}
+impl Drop for NeonGlow {
+    fn drop(&mut self) {
+        self.uniform.destroy();
+    }
+}
+
+
+# File: src/render/neon_glow.wgsl
+struct GlowUniforms {
+    view_projection: mat4x4<f32>,
+    params: vec4<f32>,
+};
+@group(0) @binding(0) var<uniform> glow: GlowUniforms;
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) @interpolate(flat) endpoints: vec4<f32>,
+    @location(1) @interpolate(flat) color_radius: vec4<f32>,
+    @location(2) coord: vec2<f32>,
+    @location(3) @interpolate(flat) depths: vec2<f32>,
+};
+
+@vertex fn vs_main(
+    @builtin(vertex_index) vertex_index: u32,
+    @location(0) edge_a: vec3<f32>,
+    @location(1) color: vec3<f32>,
+    @location(2) edge_b: vec3<f32>,
+    @location(3) model0: vec4<f32>,
+    @location(4) model1: vec4<f32>,
+    @location(5) model2: vec4<f32>,
+    @location(6) model3: vec4<f32>,
+    @location(12) emission: vec4<f32>,
+) -> VertexOutput {
+    var out: VertexOutput;
+    // A clipped degenerate primitive safely suppresses dark/behind-eye edges.
+    out.position = vec4<f32>(0.0, 0.0, -1.0, 1.0);
+    out.endpoints = vec4<f32>(0.0);
+    out.color_radius = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    out.coord = vec2<f32>(0.0);
+    out.depths = vec2<f32>(0.0);
+    let model = mat4x4<f32>(model0, model1, model2, model3);
+    let a = glow.view_projection * model * vec4<f32>(edge_a, 1.0);
+    let b = glow.view_projection * model * vec4<f32>(edge_b, 1.0);
+    let peak = max(max(color.r, color.g), color.b);
+    if a.w <= 0.01 || b.w <= 0.01 || emission.x <= 0.0 || peak < emission.y { return out; }
+    let viewport = glow.params.xy;
+    let screen_scale = viewport * vec2<f32>(0.5, -0.5);
+    let pa = (a.xy / a.w) * screen_scale + viewport * 0.5;
+    let pb = (b.xy / b.w) * screen_scale + viewport * 0.5;
+    let delta = pb - pa;
+    let length_px = length(delta);
+    if length_px < 0.001 { return out; }
+    let tangent = delta / length_px;
+    let side = vec2<f32>(-tangent.y, tangent.x);
+    let vp = glow.view_projection;
+    let projection_x = length(vec3<f32>(vp[0].x, vp[1].x, vp[2].x)) * viewport.x * 0.5;
+    let projection_y = length(vec3<f32>(vp[0].y, vp[1].y, vp[2].y)) * viewport.y * 0.5;
+    // Radius is world-space and independent of object scale. Bound near-eye expansion.
+    let radius = clamp(glow.params.w * max(projection_x, projection_y) / min(a.w, b.w), 0.75, 128.0);
+    var corner = vec2<f32>(-1.0, -1.0);
+    switch vertex_index % 6u {
+        case 1u: { corner = vec2<f32>(1.0, -1.0); }
+        case 2u, 4u: { corner = vec2<f32>(1.0, 1.0); }
+        case 5u: { corner = vec2<f32>(-1.0, 1.0); }
+        default: {}
+    }
+    let t = (corner.x + 1.0) * 0.5;
+    let pixel = mix(pa, pb, t) + tangent * corner.x * radius + side * corner.y * radius;
+    // Interpolate viewport-local pixels instead of reading absolute fragment position.
+    out.coord = pixel;
+    out.depths = vec2<f32>(a.z/a.w,b.z/b.w);
+    // NDC depth varies linearly in screen space, including clamped capsule endcaps.
+    let depth_t = clamp(dot(pixel - pa, tangent) / length_px, 0.0, 1.0);
+    out.position = vec4<f32>((pixel - viewport * 0.5) / screen_scale, mix(a.z / a.w, b.z / b.w, depth_t), 1.0);
+    out.endpoints = vec4<f32>(pa, pb);
+    // Normalize only HDR colors: repeated bright triangle halos should keep their hue.
+    let hue = max(color, vec3<f32>(0.0)) / max(peak, 1.0);
+    // A bright tube profile must be visible along the whole edge, even at low
+    // scene emission; max-compositing prevents this energy accumulating at joins.
+    let energy = sqrt(min(emission.x, 8.0)) * glow.params.z * 0.65;
+    out.color_radius = vec4<f32>(hue * energy, radius);
+    return out;
+}
+
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+};
+@fragment fn fs_main(input: VertexOutput) -> FragmentOutput {
+    let a = input.endpoints.xy;
+    let delta = input.endpoints.zw - a;
+    let t = clamp(dot(input.coord - a, delta) / max(dot(delta, delta), 0.000001), 0.0, 1.0);
+    let d = length(input.coord - (a + delta * t)) / input.color_radius.w;
+    if d >= 1.0 { discard; }
+    // Narrow luminous tube + a broad colored skirt. Their union stays equally
+    // bright at a line midpoint and at a vertex shared by several strokes.
+    let falloff = (0.65 * exp(-40.0*d*d) + 0.35 * exp(-4.0*d*d))
+        * (1.0-smoothstep(0.75,1.0,d));
+    var output: FragmentOutput;
+    output.color = vec4<f32>(input.color_radius.rgb * falloff, 0.0);
+    // Use the original segment length, not the extended quad, for depth.
+    output.depth = clamp(mix(input.depths.x,input.depths.y,t),0.0,1.0);
+    return output;
+}
 
 
 # File: src/render/output.rs
@@ -14419,6 +14958,7 @@ impl CanvasOutput {
             color,
             depth,
             auxiliary: None,
+            material_mask: false,
             color_format: self.config.format.add_srgb_suffix(),
             depth_format: DEPTH_FORMAT,
             width: self.config.width,
@@ -14488,6 +15028,7 @@ pub fn build(
     effects: &BindGroupLayout,
     reflected: bool,
     material_mask: bool,
+    packed_depth: bool,
     double_sided: bool,
 ) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
@@ -14501,7 +15042,7 @@ pub fn build(
         blend: Some(wgpu::BlendState::REPLACE),
         write_mask: wgpu::ColorWrites::ALL,
     })];
-    if material_mask {
+    if packed_depth {
         targets.push(Some(wgpu::ColorTargetState {
             format: TextureFormat::Rgba8Unorm,
             blend: Some(wgpu::BlendState::REPLACE),
@@ -14522,8 +15063,10 @@ pub fn build(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some(if material_mask {
+            entry_point: Some(if packed_depth {
                 "fs_postprocess"
+            } else if material_mask {
+                "fs_material_mask"
             } else {
                 "fs_main"
             }),
@@ -14667,7 +15210,7 @@ use super::{
     target::{RenderTarget, RenderView},
     textures::ColorTarget,
 };
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -14689,9 +15232,11 @@ struct Uniforms {
     sky_cube_half_extents: [f32; 4],
     // Ray steps, refinement steps, quadratic spacing; XR keeps the same range.
     reflection_trace: [f32; 4],
+    receiver_bounds_min: [f32; 4],
+    receiver_bounds_max: [f32; 4],
 }
-// Rust offsets match WGSL matrices and vec4 fields (384 bytes total).
-const _: () = assert!(std::mem::size_of::<Uniforms>() == 384);
+// Rust offsets match WGSL matrices and vec4 fields (416 bytes total).
+const _: () = assert!(std::mem::size_of::<Uniforms>() == 416);
 const _: () = assert!(std::mem::offset_of!(Uniforms, params) == 176);
 const _: () = assert!(std::mem::offset_of!(Uniforms, environment_center) == 288);
 
@@ -14728,7 +15273,7 @@ struct Effect {
     name: &'static str,
     enabled: bool,
     strength: f32,
-    pipeline: wgpu::RenderPipeline,
+    pipelines: Vec<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
     uniform: wgpu::Buffer,
 }
 struct Intermediate {
@@ -14814,11 +15359,24 @@ impl ReflectionMask {
 }
 struct Targets {
     scene: ColorTarget,
-    depth_color: Intermediate,
+    depth_color: Option<Intermediate>,
     ping: [Intermediate; 2],
     bind_groups: Vec<[wgpu::BindGroup; 3]>,
 }
+struct SsrTarget {
+    _target: Intermediate,
+    bind_group: wgpu::BindGroup,
+    width: u32,
+    height: u32,
+}
 pub struct PostProcessor {
+    ssr_resolution_scale: f32,
+    ssr_region: Option<(Vec3, Vec3)>,
+    ssr_work: [f64; 2],
+    ssr_target: Option<SsrTarget>,
+    ssr_layout: wgpu::BindGroupLayout,
+    ssr_trace_pipeline: wgpu::RenderPipeline,
+    ssr_composite_pipelines: Vec<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
     format: wgpu::TextureFormat,
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
@@ -14845,6 +15403,65 @@ pub struct PostProcessor {
     volume_exposure: f32,
 }
 impl PostProcessor {
+    fn pipeline(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        layout: &wgpu::BindGroupLayout,
+        shadow_layout: &wgpu::BindGroupLayout,
+        descriptor: &EffectDescriptor,
+        ssr_layout: Option<&wgpu::BindGroupLayout>,
+    ) -> wgpu::RenderPipeline {
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some(descriptor.name),
+            source: wgpu::ShaderSource::Wgsl(
+                format!(
+                    "{}\n{}",
+                    descriptor.shader_source,
+                    if device.as_webgpu().is_some() {
+                        include_str!("postprocess_depth_native.wgsl")
+                    } else {
+                        include_str!("postprocess_depth_packed.wgsl")
+                    }
+                )
+                .into(),
+            ),
+        });
+        let mut layouts = vec![Some(layout), Some(shadow_layout)];
+        if let Some(layout) = ssr_layout {
+            layouts.push(Some(layout));
+        }
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("postprocess pipeline layout"),
+            bind_group_layouts: &layouts,
+            immediate_size: 0,
+        });
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("depth-aware postprocess"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some(descriptor.entry_point),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        })
+    }
+
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("postprocess layout"),
@@ -14869,7 +15486,11 @@ impl PostProcessor {
                     binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: if device.as_webgpu().is_some() {
+                            wgpu::TextureSampleType::Depth
+                        } else {
+                            wgpu::TextureSampleType::Float { filterable: true }
+                        },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
@@ -14993,47 +15614,51 @@ impl PostProcessor {
             &fallback.view,
             &fallback.view,
         );
+        let ssr_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("SSR trace composite layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            }],
+        });
+        let ssr_trace_pipeline = Self::pipeline(
+            device,
+            format,
+            &layout,
+            &shadow_layout,
+            &EffectDescriptor {
+                name: "SSR half-resolution trace",
+                entry_point: "fs_ssr_trace",
+                shader_source: include_str!("postprocess.wgsl"),
+            },
+            None,
+        );
+        let ssr_composite_pipeline = Self::pipeline(
+            device,
+            format,
+            &layout,
+            &shadow_layout,
+            &EffectDescriptor {
+                name: "SSR depth-aware composite",
+                entry_point: "fs_ssr_composite",
+                shader_source: include_str!("postprocess.wgsl"),
+            },
+            Some(&ssr_layout),
+        );
         let effects = EFFECTS
             .iter()
             .map(|descriptor| {
-                let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: Some(descriptor.name),
-                    source: wgpu::ShaderSource::Wgsl(descriptor.shader_source.into()),
-                });
-                let pipeline_layout =
-                    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                        label: Some("postprocess pipeline layout"),
-                        bind_group_layouts: &[Some(&layout), Some(&shadow_layout)],
-                        immediate_size: 0,
-                    });
-                let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("depth-aware postprocess"),
-                    layout: Some(&pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &shader,
-                        entry_point: Some("vs_main"),
-                        compilation_options: Default::default(),
-                        buffers: &[],
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: Some(descriptor.entry_point),
-                        compilation_options: Default::default(),
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format,
-                            blend: Some(wgpu::BlendState::REPLACE),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
-                    }),
-                    primitive: Default::default(),
-                    depth_stencil: None,
-                    multisample: Default::default(),
-                    multiview_mask: None,
-                    cache: None,
-                });
+                let pipeline =
+                    Self::pipeline(device, format, &layout, &shadow_layout, descriptor, None);
                 Effect {
                     name: descriptor.name,
-                    pipeline,
+                    pipelines: vec![(format, pipeline)],
                     enabled: false,
                     strength: 0.5,
                     uniform: device.create_buffer(&wgpu::BufferDescriptor {
@@ -15068,6 +15693,13 @@ impl PostProcessor {
             });
         let sky_cube_fallback = Self::sky_cube_texture(device, 1);
         Self {
+            ssr_resolution_scale: 1.0,
+            ssr_region: None,
+            ssr_work: [0.0; 2],
+            ssr_target: None,
+            ssr_layout,
+            ssr_trace_pipeline,
+            ssr_composite_pipelines: vec![(format, ssr_composite_pipeline)],
             sky_cube_color: sky_cube_fallback.create_view(&wgpu::TextureViewDescriptor {
                 dimension: Some(wgpu::TextureViewDimension::Cube),
                 ..Default::default()
@@ -15344,11 +15976,211 @@ impl PostProcessor {
         };
         effect.enabled = enabled;
         effect.strength = strength;
+        if !self.ssr_enabled() {
+            self.ssr_target = None;
+        }
         if !self.enabled() {
             self.targets = None;
             self.last_pass_count = 0;
         }
         true
+    }
+    /// Keep 1.0 as the full-resolution quality reference; 0.5 traces a quarter of the pixels.
+    pub fn configure_ssr(&mut self, resolution_scale: f32) -> bool {
+        if !resolution_scale.is_finite() || (resolution_scale != 0.5 && resolution_scale != 1.0) {
+            return false;
+        }
+        if self.ssr_resolution_scale != resolution_scale {
+            self.ssr_resolution_scale = resolution_scale;
+            self.ssr_target = None;
+        }
+        true
+    }
+    /// Receiver bounds are an explicit promise that reflection receivers lie inside this box.
+    pub fn configure_ssr_region(&mut self, min: Vec3, max: Vec3, enabled: bool) -> bool {
+        if !enabled {
+            self.ssr_region = None;
+            return true;
+        }
+        if !min.is_finite()
+            || !max.is_finite()
+            || !min.cmple(max).all()
+            || min.abs().max_element() > 1e6
+            || max.abs().max_element() > 1e6
+        {
+            return false;
+        }
+        self.ssr_region = Some((min, max));
+        true
+    }
+    /// Last submitted eye: scissored trace pixels and unscissored reference pixels.
+    pub fn ssr_work_stats(&self) -> [f64; 2] {
+        if self.ssr_enabled() {
+            self.ssr_work
+        } else {
+            [0.0; 2]
+        }
+    }
+    /// A bounded receiver outside this eye needs no offscreen scene or composite.
+    /// Other enabled effects still require their normal postprocess chain.
+    pub fn needs_render(&self, view: RenderView, width: u32, height: u32) -> bool {
+        if self.sky_cube_enabled
+            || self
+                .effects
+                .iter()
+                .any(|effect| effect.name != "ssr" && effect.enabled && effect.strength > 0.0)
+        {
+            return true;
+        }
+        if !self.ssr_enabled() {
+            return false;
+        }
+        let rect = self.ssr_rect(view, width, height);
+        rect[2] > 0 && rect[3] > 0
+    }
+    pub fn skip_render(&mut self) {
+        self.last_pass_count = 0;
+        self.ssr_work = [0.0; 2];
+    }
+    fn ssr_rect(&self, view: RenderView, width: u32, height: u32) -> [u32; 4] {
+        let full = [0, 0, width, height];
+        let Some((min, max)) = self.ssr_region else {
+            return full;
+        };
+        // A camera inside/on a receiver is a deliberately conservative fallback.
+        if view.camera_position.cmpge(min).all() && view.camera_position.cmple(max).all() {
+            return full;
+        }
+        let vertices: [Vec4; 8] = std::array::from_fn(|i| {
+            view.view_projection
+                * Vec3::new(
+                    if i & 1 == 0 { min.x } else { max.x },
+                    if i & 2 == 0 { min.y } else { max.y },
+                    if i & 4 == 0 { min.z } else { max.z },
+                )
+                .extend(1.0)
+        });
+        if vertices.iter().any(|v| !v.is_finite()) {
+            return full;
+        }
+        let mut lo = Vec2::splat(f32::INFINITY);
+        let mut hi = Vec2::splat(f32::NEG_INFINITY);
+        // Clip all six faces, including the new vertices where near/w planes
+        // intersect a face. Projecting only the original corners is unsafe near the eye.
+        for face in [
+            [0, 2, 6, 4],
+            [1, 3, 7, 5],
+            [0, 1, 5, 4],
+            [2, 3, 7, 6],
+            [0, 1, 3, 2],
+            [4, 5, 7, 6],
+        ] {
+            let mut polygon: Vec<Vec4> = face.iter().map(|&i| vertices[i]).collect();
+            for plane in 0..2 {
+                let input = std::mem::take(&mut polygon);
+                if input.is_empty() {
+                    break;
+                }
+                let distance = |v: Vec4| if plane == 0 { v.z } else { v.w - 0.000001 };
+                let mut previous = *input.last().unwrap();
+                let mut previous_distance = distance(previous);
+                for current in input {
+                    let current_distance = distance(current);
+                    if (previous_distance >= 0.0) != (current_distance >= 0.0) {
+                        polygon.push(previous.lerp(
+                            current,
+                            previous_distance / (previous_distance - current_distance),
+                        ));
+                    }
+                    if current_distance >= 0.0 {
+                        polygon.push(current);
+                    }
+                    previous = current;
+                    previous_distance = current_distance;
+                }
+            }
+            for point in polygon {
+                let uv = Vec2::new(point.x / point.w * 0.5 + 0.5, 0.5 - point.y / point.w * 0.5);
+                if !uv.is_finite() {
+                    return full;
+                }
+                lo = lo.min(uv);
+                hi = hi.max(uv);
+            }
+        }
+        if lo.x > hi.x || lo.y > hi.y {
+            return [0; 4];
+        }
+        // Guard the half-resolution reconstruction taps and raster edge rounding.
+        let size = Vec2::new(width as f32, height as f32);
+        let lo = (lo * size - Vec2::splat(2.0))
+            .floor()
+            .clamp(Vec2::ZERO, size);
+        let hi = (hi * size + Vec2::splat(2.0))
+            .ceil()
+            .clamp(Vec2::ZERO, size);
+        [
+            lo.x as u32,
+            lo.y as u32,
+            (hi.x - lo.x) as u32,
+            (hi.y - lo.y) as u32,
+        ]
+    }
+    fn ssr_enabled(&self) -> bool {
+        self.effects
+            .iter()
+            .any(|effect| effect.name == "ssr" && effect.enabled && effect.strength > 0.0)
+    }
+    pub fn ssr_stats(&self) -> [f64; 3] {
+        if !self.ssr_enabled() {
+            return [0.0; 3];
+        }
+        if self.ssr_resolution_scale == 0.5 {
+            return self.ssr_target.as_ref().map_or([0.0; 3], |target| {
+                [
+                    target.width as f64,
+                    target.height as f64,
+                    target.width as f64 * target.height as f64,
+                ]
+            });
+        }
+        self.targets.as_ref().map_or([0.0; 3], |targets| {
+            [
+                targets.scene.width as f64,
+                targets.scene.height as f64,
+                targets.scene.width as f64 * targets.scene.height as f64,
+            ]
+        })
+    }
+    fn ensure_ssr_target(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        if !self.ssr_enabled() || self.ssr_resolution_scale != 0.5 || width == 0 || height == 0 {
+            self.ssr_target = None;
+            return;
+        }
+        let width = width.div_ceil(2);
+        let height = height.div_ceil(2);
+        if self
+            .ssr_target
+            .as_ref()
+            .is_some_and(|target| target.width == width && target.height == height)
+        {
+            return;
+        }
+        let target = Intermediate::new(device, width, height, self.format);
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SSR trace composite"),
+            layout: &self.ssr_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&target.view),
+            }],
+        });
+        self.ssr_target = Some(SsrTarget {
+            _target: target,
+            bind_group,
+            width,
+            height,
+        });
     }
     pub fn enabled(&self) -> bool {
         self.sky_cube_enabled
@@ -15358,6 +16190,7 @@ impl PostProcessor {
                 .any(|effect| effect.enabled && effect.strength > 0.0)
     }
     pub fn ensure_size(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        self.ensure_ssr_target(device, width, height);
         if !self.enabled() || width == 0 || height == 0 {
             self.targets = None;
             self.last_pass_count = 0;
@@ -15371,7 +16204,10 @@ impl PostProcessor {
             return;
         }
         let scene = ColorTarget::new(device, "postprocess scene", width, height, self.format);
-        let depth_color = Intermediate::new(device, width, height, wgpu::TextureFormat::Rgba8Unorm);
+        let depth_color = device
+            .as_webgpu()
+            .is_none()
+            .then(|| Intermediate::new(device, width, height, wgpu::TextureFormat::Rgba8Unorm));
         let ping: [Intermediate; 2] =
             std::array::from_fn(|_| Intermediate::new(device, width, height, self.format));
         let sources = [&scene.color, &ping[0].view, &ping[1].view];
@@ -15391,7 +16227,13 @@ impl PostProcessor {
                         },
                         wgpu::BindGroupEntry {
                             binding: 2,
-                            resource: wgpu::BindingResource::TextureView(&depth_color.view),
+                            resource: wgpu::BindingResource::TextureView(
+                                if device.as_webgpu().is_some() {
+                                    &scene.depth
+                                } else {
+                                    &depth_color.as_ref().expect("WebGL packed depth").view
+                                },
+                            ),
                         },
                         wgpu::BindGroupEntry {
                             binding: 3,
@@ -15442,7 +16284,8 @@ impl PostProcessor {
             .as_ref()
             .expect("ensure_size before postprocess target");
         let mut target = targets.scene.target();
-        target.auxiliary = Some(&targets.depth_color.view);
+        target.material_mask = true;
+        target.auxiliary = targets.depth_color.as_ref().map(|depth| &depth.view);
         target
     }
     /// Frames count successful queue.submit calls, not GPU completion timestamps.
@@ -15459,7 +16302,8 @@ impl PostProcessor {
                     passes,
                     targets.scene.width as f64,
                     targets.scene.height as f64,
-                    4.0,
+                    3.0 + f64::from(targets.depth_color.is_some())
+                        + f64::from(self.ssr_target.is_some()),
                     self.submitted_frames as f64,
                 ]
             },
@@ -15473,7 +16317,7 @@ impl PostProcessor {
         view: RenderView,
         light_position: Vec3,
         light_color: Vec3,
-        output: &wgpu::TextureView,
+        output: &RenderTarget<'_>,
         shadows_enabled: bool,
         xr_rendering: bool,
     ) -> usize {
@@ -15482,26 +16326,76 @@ impl PostProcessor {
             self.reflection_mask.upload(queue, 1, 1, &[255]);
             self.reflection_mask.needs_white_upload = false;
         }
+        // Cache the final attachment's pipeline separately from sRGB intermediates.
+        // XR compositor slices use the corresponding non-sRGB texture format.
+        for (effect, descriptor) in self.effects.iter_mut().zip(EFFECTS) {
+            // A new XR output format must not compile disabled effect shaders.
+            if !((effect.name == "environment" && self.sky_cube_enabled)
+                || (effect.enabled && effect.strength > 0.0))
+            {
+                continue;
+            }
+            if !effect
+                .pipelines
+                .iter()
+                .any(|(format, _)| *format == output.color_format)
+            {
+                effect.pipelines.push((
+                    output.color_format,
+                    Self::pipeline(
+                        device,
+                        output.color_format,
+                        &self.layout,
+                        &self.shadow_layout,
+                        descriptor,
+                        None,
+                    ),
+                ));
+            }
+        }
+        if self.ssr_enabled()
+            && self.ssr_resolution_scale == 0.5
+            && !self
+                .ssr_composite_pipelines
+                .iter()
+                .any(|(format, _)| *format == output.color_format)
+        {
+            self.ssr_composite_pipelines.push((
+                output.color_format,
+                Self::pipeline(
+                    device,
+                    output.color_format,
+                    &self.layout,
+                    &self.shadow_layout,
+                    &EffectDescriptor {
+                        name: "SSR depth-aware composite",
+                        entry_point: "fs_ssr_composite",
+                        shader_source: include_str!("postprocess.wgsl"),
+                    },
+                    Some(&self.ssr_layout),
+                ),
+            ));
+        }
+        self.ssr_work = [0.0; 2];
         let Some(targets) = &self.targets else {
             return 0;
         };
-        let active: Vec<_> = self
-            .effects
-            .iter()
-            .enumerate()
-            .filter(|(_, effect)| {
-                (effect.name == "environment" && self.sky_cube_enabled)
-                    || (effect.enabled && effect.strength > 0.0)
-            })
-            .collect();
-        if active.is_empty() {
+        // Four fixed effect slots: avoid heap allocation in each eye/frame.
+        let active: [Option<(usize, &Effect)>; EFFECTS.len()] = std::array::from_fn(|index| {
+            let effect = &self.effects[index];
+            ((effect.name == "environment" && self.sky_cube_enabled)
+                || (effect.enabled && effect.strength > 0.0))
+                .then_some((index, effect))
+        });
+        let active_count = active.iter().flatten().count();
+        if active_count == 0 {
             return 0;
         }
         let shadow_matrix = crate::render_math::shadow_view_projection(light_position);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("postprocess chain"),
         });
-        for (index, (effect_index, effect)) in active.iter().enumerate() {
+        for (index, (effect_index, effect)) in active.iter().flatten().enumerate() {
             let uniforms = Uniforms {
                 inverse_view_projection: view.view_projection.inverse().to_cols_array_2d(),
                 view_projection: view.view_projection.to_cols_array_2d(),
@@ -15517,7 +16411,7 @@ impl PostProcessor {
                 light_color: light_color.extend(1.0).to_array(),
                 params: [
                     effect.strength,
-                    if index + 1 == active.len() { 1.0 } else { 0.0 },
+                    if index + 1 == active_count { 1.0 } else { 0.0 },
                     targets.scene.width as f32,
                     targets.scene.height as f32,
                 ],
@@ -15550,6 +16444,12 @@ impl PostProcessor {
                 sky_cube_half_extents: self
                     .sky_cube_projection
                     .map_or([1.0; 4], |(_, extents)| extents.extend(0.0).to_array()),
+                receiver_bounds_min: self
+                    .ssr_region
+                    .map_or([0.0; 4], |(min, _)| min.extend(1.0).to_array()),
+                receiver_bounds_max: self
+                    .ssr_region
+                    .map_or([0.0; 4], |(_, max)| max.extend(0.0).to_array()),
                 reflection_trace: if xr_rendering {
                     [16.0, 3.0, 48.0 / 225.0, 0.0]
                 } else {
@@ -15557,13 +16457,49 @@ impl PostProcessor {
                 },
             };
             queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
-            let destination = if index + 1 == active.len() {
-                output
+            let destination = if index + 1 == active_count {
+                output.color
             } else {
                 &targets.ping[index % 2].view
             };
             let source_index = if index == 0 { 0 } else { 1 + (index - 1) % 2 };
             let bind_group = &targets.bind_groups[*effect_index][source_index];
+            let half_ssr = effect.name == "ssr" && self.ssr_target.is_some();
+            if effect.name == "ssr" {
+                let pixels = targets.scene.width as f64 * targets.scene.height as f64;
+                self.ssr_work = [pixels, pixels];
+            }
+            if half_ssr {
+                let trace = self.ssr_target.as_ref().unwrap();
+                let rect = self.ssr_rect(view, trace.width, trace.height);
+                self.ssr_work = [
+                    rect[2] as f64 * rect[3] as f64,
+                    trace.width as f64 * trace.height as f64,
+                ];
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("SSR half-resolution trace"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &trace._target.view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                if rect[2] > 0 && rect[3] > 0 {
+                    pass.set_pipeline(&self.ssr_trace_pipeline);
+                    pass.set_bind_group(0, bind_group, &[]);
+                    pass.set_bind_group(1, &self.shadow_bind_group, &[]);
+                    pass.set_scissor_rect(rect[0], rect[1], rect[2], rect[3]);
+                    pass.draw(0..3, 0..1);
+                }
+            }
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(effect.name),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -15580,15 +16516,46 @@ impl PostProcessor {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            pass.set_pipeline(&effect.pipeline);
+            let format = if index + 1 == active_count {
+                output.color_format
+            } else {
+                self.format
+            };
+            let pipelines = if half_ssr {
+                &self.ssr_composite_pipelines
+            } else {
+                &effect.pipelines
+            };
+            let pipeline = &pipelines
+                .iter()
+                .find(|(candidate, _)| *candidate == format)
+                .expect("cached postprocess output format")
+                .1;
+            pass.set_pipeline(pipeline);
+            if half_ssr {
+                pass.set_bind_group(2, &self.ssr_target.as_ref().unwrap().bind_group, &[]);
+            }
+            if index + 1 == active_count {
+                let viewport = output.viewport;
+                pass.set_viewport(
+                    viewport.x as f32,
+                    viewport.y as f32,
+                    viewport.width as f32,
+                    viewport.height as f32,
+                    0.0,
+                    1.0,
+                );
+                pass.set_scissor_rect(viewport.x, viewport.y, viewport.width, viewport.height);
+            }
             pass.set_bind_group(0, bind_group, &[]);
             pass.set_bind_group(1, &self.shadow_bind_group, &[]);
             pass.draw(0..3, 0..1);
         }
         queue.submit(Some(encoder.finish()));
-        self.last_pass_count = active.len();
+        self.last_pass_count =
+            active_count + usize::from(self.ssr_target.is_some() && self.ssr_enabled());
         self.submitted_frames = self.submitted_frames.saturating_add(1);
-        active.len()
+        self.last_pass_count
     }
 }
 
@@ -15611,10 +16578,11 @@ struct Uniforms {
     sky_cube_center: vec4<f32>,
     sky_cube_half_extents: vec4<f32>,
     reflection_trace: vec4<f32>,
+    receiver_bounds_min: vec4<f32>,
+    receiver_bounds_max: vec4<f32>,
 };
 @group(0) @binding(0) var scene_texture: texture_2d<f32>;
 @group(0) @binding(1) var scene_sampler: sampler;
-@group(0) @binding(2) var scene_depth: texture_2d<f32>;
 @group(0) @binding(3) var<uniform> uniforms: Uniforms;
 @group(0) @binding(4) var depth_sampler: sampler;
 @group(0) @binding(6) var reflection_mask: texture_2d<f32>;
@@ -15624,6 +16592,7 @@ struct Uniforms {
 @group(1) @binding(0) var volume_static_shadow: texture_depth_2d;
 @group(1) @binding(1) var volume_dynamic_shadow: texture_depth_2d;
 @group(1) @binding(2) var volume_shadow_sampler: sampler_comparison;
+@group(2) @binding(0) var ssr_trace: texture_2d<f32>;
 struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
 @vertex fn vs_main(@builtin(vertex_index) index: u32) -> Output {
     let positions = array<vec2<f32>, 3>(vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -15632,14 +16601,6 @@ struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f3
     output.position = vec4(p, 0.0, 1.0);
     output.uv = vec2((p.x + 1.0) * 0.5, (1.0 - p.y) * 0.5);
     return output;
-}
-fn depth_at(uv: vec2<f32>) -> f32 {
-    let size = vec2<i32>(uniforms.params.zw);
-    let pixel = clamp(vec2<i32>(uv * uniforms.params.zw), vec2<i32>(0), size - vec2<i32>(1));
-    // RGB base-255 depth packing avoids depth-sampler LOD limitations in GLSL ES300.
-    // An auxiliary attachment cleared to white represents untouched far depth.
-    let packed = textureSampleLevel(scene_depth, depth_sampler, (vec2<f32>(pixel) + vec2(0.5)) / uniforms.params.zw, 0.0).rgb;
-    return clamp(dot(packed, vec3(1.0, 1.0 / 255.0, 1.0 / 65025.0)), 0.0, 1.0);
 }
 fn world_at(uv: vec2<f32>, depth: f32) -> vec3<f32> {
     let p = uniforms.inverse_view_projection * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
@@ -15694,10 +16655,15 @@ fn environment_at(position: vec3<f32>, direction: vec3<f32>) -> vec3<f32> {
     let sample_direction = box_projected_direction(position, direction, uniforms.environment_center.xyz, uniforms.environment_half_extents.xyz);
     return textureSampleLevel(environment_texture, scene_sampler, sample_direction, 0.0).rgb;
 }
-fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
+fn inside_receiver(position: vec3<f32>) -> bool {
+    return uniforms.receiver_bounds_min.w < 0.5 || (all(position >= uniforms.receiver_bounds_min.xyz) && all(position <= uniforms.receiver_bounds_max.xyz));
+}
+fn reflection_sample(uv: vec2<f32>, source: vec4<f32>) -> vec4<f32> {
+    if source.a <= 0.001 { return vec4(0.0); }
     let depth = depth_at(uv);
-    if depth >= 0.999999 || source.a <= 0.001 { return source.rgb; }
+    if depth >= 0.999999 { return vec4(0.0); }
     let position = world_at(uv, depth);
+    if !inside_receiver(position) { return vec4(0.0); }
     // Choose the nearer depth neighbour on each axis to reduce silhouette normals.
     let pixel = 1.0 / uniforms.params.zw;
     let left = world_at(uv - vec2(pixel.x, 0.0), depth_at(uv - vec2(pixel.x, 0.0)));
@@ -15707,16 +16673,18 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
     let dx = select(position - left, right - position, distance(right, position) < distance(left, position));
     let dy = select(position - up, down - position, distance(down, position) < distance(up, position));
     let raw_normal = cross(dx, dy);
-    if dot(raw_normal, raw_normal) < 0.000000000001 { return source.rgb; }
+    if dot(raw_normal, raw_normal) < 0.000000000001 { return vec4(0.0); }
     let incident = normalize(position - uniforms.camera.xyz);
     var normal = normalize(raw_normal);
     if dot(normal, incident) > 0.0 { normal = -normal; }
     let direction = reflect(incident, normal);
     let fresnel = 0.2 + 0.8 * pow(1.0 - max(dot(-incident, normal), 0.0), 5.0);
     let weight = clamp(source.a * reflection_mask_at(position) * uniforms.params.x * fresnel, 0.0, 1.0);
-    var fallback = source.rgb;
+    var fallback = vec3(0.0);
+    var fallback_weight = 0.0;
     if uniforms.environment_center.w > 0.5 || uniforms.sky_cube_params.x > 0.5 {
-        fallback = mix(source.rgb, environment_at(position, direction), weight);
+        fallback = environment_at(position, direction);
+        fallback_weight = weight;
     }
     let camera_distance = distance(position, uniforms.camera.xyz);
     let step_length = clamp(camera_distance * 0.025, 0.04, 0.5);
@@ -15766,14 +16734,16 @@ fn reflected_color(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
                 let edge_fade = smoothstep(0.0, 0.08, border);
                 let range_fade = 1.0 - smoothstep(40.0, 64.0, trace_step);
                 // Confidence fades into the environment instead of losing the reflection.
-                let screen_reflection = mix(source.rgb, scene_at(hit_uv).rgb, weight);
-                return mix(fallback, screen_reflection, edge_fade * range_fade);
+                let confidence = edge_fade * range_fade;
+                let combined_weight = mix(fallback_weight, weight, confidence);
+                let radiance = fallback * fallback_weight * (1.0 - confidence) + scene_at(hit_uv).rgb * weight * confidence;
+                return vec4(radiance / max(combined_weight, 0.000001), combined_weight);
             }
         }
         previous_t = t;
         previous_delta = delta;
     }
-    return fallback;
+    return vec4(fallback, fallback_weight);
 }
 // Single-scattering eye-ray integration with shadow-map visibility, inspired by
 // Toth/Umenhoffer (Eurographics 2009). No radial screen emitter or screen-light gating.
@@ -15833,15 +16803,65 @@ fn god_rays(uv: vec2<f32>, source: vec3<f32>) -> vec3<f32> {
     return source + scattering / (vec3(1.0) + scattering);
 }
 // Intermediate alpha remains material metadata; final output alpha is opaque. Keep SSR before color-only effects in EFFECTS by default.
+fn wet_surface(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
+    if uniforms.camera.w < 0.5 || source.a <= 0.001 { return source.rgb; }
+    let depth = depth_at(uv);
+    if uniforms.camera.w > 0.5 && source.a > 0.001 && depth < 0.999999 {
+        return source.rgb * mix(1.0, 0.58, reflection_mask_at(world_at(uv, depth)));
+    }
+    return source.rgb;
+}
 @fragment fn fs_ssr(input: Output) -> @location(0) vec4<f32> {
     let source = scene_at(input.uv);
-    var surface = source;
+    let reflected = reflection_sample(input.uv, source);
+    return vec4(mix(wet_surface(input.uv, source), reflected.rgb, reflected.a), select(source.a, 1.0, uniforms.params.y > 0.5));
+}
+@fragment fn fs_ssr_trace(input: Output) -> @location(0) vec4<f32> {
+    return reflection_sample(input.uv, scene_at(input.uv));
+}
+@fragment fn fs_ssr_composite(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    if source.a <= 0.001 { return vec4(source.rgb, select(source.a, 1.0, uniforms.params.y > 0.5)); }
+    let surface = wet_surface(input.uv, source);
     let depth = depth_at(input.uv);
-    if uniforms.camera.w > 0.5 && source.a > 0.001 && depth < 0.999999 {
-        let wetness = reflection_mask_at(world_at(input.uv, depth));
-        surface = vec4(source.rgb * mix(1.0, 0.58, wetness), source.a);
+    var weighted = vec3(0.0);
+    var confidence = 0.0;
+    var total = 0.0;
+    if source.a > 0.001 && depth < 0.999999 {
+        let position = world_at(input.uv, depth);
+        if !inside_receiver(position) { return vec4(surface, select(source.a, 1.0, uniforms.params.y > 0.5)); }
+        let size = vec2<f32>(textureDimensions(ssr_trace));
+        let grid = input.uv * size - vec2(0.5);
+        let base = floor(grid);
+        let fraction = fract(grid);
+        // Reconstruct each trace receiver from ORIGINAL depth. Reject edges,
+        // material boundaries and dry/grout pixels before interpolating radiance.
+        let footprint = max(distance(world_at(input.uv + vec2(1.0 / uniforms.params.z, 0.0), depth), position), distance(world_at(input.uv + vec2(0.0, 1.0 / uniforms.params.w), depth), position));
+        let eye_direction = normalize(position - uniforms.camera.xyz);
+        for (var y = 0; y < 2; y += 1) {
+            for (var x = 0; x < 2; x += 1) {
+                let tap_pixel = clamp(base + vec2(f32(x), f32(y)), vec2(0.0), size - vec2(1.0));
+                let tap_uv = (tap_pixel + vec2(0.5)) / size;
+                let tap_depth = depth_at(tap_uv);
+                let tap_source = scene_at(tap_uv);
+                let tap_position = world_at(tap_uv, tap_depth);
+                if !inside_receiver(tap_position) { continue; }
+                let separation = abs(dot(tap_position - position, eye_direction));
+                if tap_depth >= 0.999999 || tap_source.a <= 0.001 || abs(tap_source.a - source.a) > 0.08 || separation > max(0.025, footprint * 3.0) { continue; }
+                let tap_mask = reflection_mask_at(tap_position);
+                let mask = reflection_mask_at(position);
+                if tap_mask <= 0.001 || mask <= 0.001 || abs(tap_mask - mask) > 0.2 { continue; }
+                let bilinear = select(1.0 - fraction.x, fraction.x, x == 1) * select(1.0 - fraction.y, fraction.y, y == 1);
+                let sample = textureSampleLevel(ssr_trace, depth_sampler, tap_uv, 0.0);
+                weighted += sample.rgb * sample.a * bilinear;
+                confidence += sample.a * bilinear;
+                total += bilinear;
+            }
+        }
     }
-    return vec4(reflected_color(input.uv, surface), select(source.a, 1.0, uniforms.params.y > 0.5));
+    let weight = confidence / max(total, 0.000001);
+    let color = mix(surface, weighted / max(confidence, 0.000001), weight);
+    return vec4(color, select(source.a, 1.0, uniforms.params.y > 0.5));
 }
 @fragment fn fs_god_rays(input: Output) -> @location(0) vec4<f32> {
     let source = scene_at(input.uv);
@@ -15865,6 +16885,29 @@ fn bloom_bright(uv: vec2<f32>) -> vec3<f32> {
         glow += bloom_bright(input.uv + diagonal * pixel * 2.0) * 0.05;
     }
     return vec4(source.rgb + glow * (uniforms.params.x * 0.22), select(source.a, 1.0, uniforms.params.y > 0.5));
+}
+
+
+# File: src/render/postprocess_depth_native.wgsl
+// WebGPU reads the exact hardware depth without RGB packing or normalized UVs.
+@group(0) @binding(2) var scene_depth: texture_depth_2d;
+fn depth_at(uv: vec2<f32>) -> f32 {
+    let size = vec2<i32>(textureDimensions(scene_depth));
+    let pixel = clamp(vec2<i32>(uv * vec2<f32>(size)), vec2<i32>(0), size - vec2<i32>(1));
+    return textureLoad(scene_depth, pixel, 0);
+}
+
+
+# File: src/render/postprocess_depth_packed.wgsl
+// Portable WebGL depth, paired with the scene MRT attachment.
+@group(0) @binding(2) var scene_depth: texture_2d<f32>;
+fn depth_at(uv: vec2<f32>) -> f32 {
+    let size = vec2<i32>(uniforms.params.zw);
+    let pixel = clamp(vec2<i32>(uv * uniforms.params.zw), vec2<i32>(0), size - vec2<i32>(1));
+    // RGB base-255 depth packing avoids depth-sampler LOD limitations in GLSL ES300.
+    // An auxiliary attachment cleared to white represents untouched far depth.
+    let packed = textureSampleLevel(scene_depth, depth_sampler, (vec2<f32>(pixel) + vec2(0.5)) / uniforms.params.zw, 0.0).rgb;
+    return clamp(dot(packed, vec3(1.0, 1.0 / 255.0, 1.0 / 65025.0)), 0.0, 1.0);
 }
 
 
@@ -15902,7 +16945,7 @@ use crate::render::{
 };
 use std::collections::HashMap;
 
-type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool);
+type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool, bool);
 type ColorPipelines = (
     wgpu::RenderPipeline,
     wgpu::RenderPipeline,
@@ -16066,6 +17109,10 @@ pub struct SceneRenderer {
     plane_mesh: Mesh,
     sphere_mesh: Mesh,
     imported_meshes: HashMap<u32, Mesh>,
+    neon_glow: Option<super::neon_glow::NeonGlow>,
+    neon_meshes: HashMap<u32, Option<super::neon_glow::GlowMesh>>,
+    neon_draws: usize,
+    neon_segments: usize,
     gltf_gpu: super::gltf_gpu::GltfGpu,
     cut_feedback_gpu: Option<super::cut_feedback_gpu::CutFeedbackGpu>,
     gltf_models: HashMap<u32, super::gltf_gpu::GpuModel>,
@@ -16168,6 +17215,10 @@ impl SceneRenderer {
             plane_mesh,
             sphere_mesh,
             imported_meshes: HashMap::new(),
+            neon_glow: None,
+            neon_meshes: HashMap::new(),
+            neon_draws: 0,
+            neon_segments: 0,
             gltf_gpu,
             cut_feedback_gpu: None,
             gltf_models: HashMap::new(),
@@ -16531,10 +17582,157 @@ impl SceneRenderer {
             self.cull_cached = true;
         }
     }
+    pub fn configure_neon_glow(&mut self, strength: f32, radius: f32) -> bool {
+        if !strength.is_finite()
+            || !(0.0..=2.0).contains(&strength)
+            || !radius.is_finite()
+            || !(0.001..=0.05).contains(&radius)
+        {
+            return false;
+        }
+        if strength == 0.0 {
+            self.neon_glow = None;
+            self.neon_meshes.clear();
+            self.neon_draws = 0;
+            self.neon_segments = 0;
+            return true;
+        }
+        self.neon_glow
+            .get_or_insert_with(|| super::neon_glow::NeonGlow::new(&self.device))
+            .configure(strength, radius)
+    }
+    fn prepare_neon_glow(&mut self, target: &RenderTarget<'_>) {
+        let Some(glow) = &mut self.neon_glow else {
+            return;
+        };
+        if !glow.enabled() {
+            return;
+        }
+        let cache = &self.passes[self.active_cache];
+        for (id, instances) in &cache.queue.imported {
+            if self.neon_meshes.contains_key(id) || !instances.iter().any(|i| i.emission[0] > 0.0) {
+                continue;
+            }
+            if let Some(mesh) = self
+                .scene
+                .triangle_meshes()
+                .get(id)
+                .and_then(|object| object.mesh.ready_cpu())
+            {
+                self.neon_meshes.insert(
+                    *id,
+                    super::neon_glow::GlowMesh::new(&self.device, &mesh.render_mesh()),
+                );
+            }
+        }
+        self.neon_meshes
+            .retain(|id, _| self.scene.object_exists(*id));
+        glow.prepare(
+            &self.device,
+            &self.queue,
+            RenderView {
+                view_projection: cache.key.expect("prepared render view").0,
+                camera_position: cache.camera_position,
+            },
+            target,
+        );
+    }
+    fn encode_neon_glow<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        cache_index: usize,
+    ) -> (usize, usize) {
+        let Some(glow) = &self.neon_glow else {
+            return (0, 0);
+        };
+        let cache = &self.passes[cache_index];
+        let mut stats = (0, 0);
+        for (id, instances) in &cache.queue.imported {
+            if instances.is_empty()
+                || !instances.iter().any(|i| i.emission[0] > 0.)
+                || self.scene.is_cut_feedback_ring(*id)
+            {
+                continue;
+            }
+            if let Some(Some(mesh)) = self.neon_meshes.get(id) {
+                glow.draw(
+                    pass,
+                    mesh,
+                    &cache.imported[id].buffer,
+                    instances.len() as u32,
+                );
+                stats.0 += 1;
+                stats.1 += mesh.vertices as usize / 6 * instances.len();
+            }
+        }
+        stats
+    }
+    /// The postprocess chain uses MRT. WebGL lacks independent attachment blends,
+    /// so only that opt-in combination draws glow into its final single-color target.
+    pub fn draw_neon_overlay(&mut self, target: &RenderTarget<'_>) {
+        if self.neon_glow.is_none() {
+            return;
+        }
+        self.active_cache = 0;
+        self.prepare_neon_glow(target);
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("neon postprocess overlay"),
+            });
+        let stats;
+        {
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("neon postprocess overlay"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+                multiview_mask: None,
+            });
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.,
+                1.,
+            );
+            pass.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            stats = self.encode_neon_glow(&mut pass, 0);
+        }
+        self.neon_draws = stats.0;
+        self.neon_segments = stats.1;
+        self.draw_calls += stats.0;
+        self.main_draw_calls += stats.0;
+        self.queue.submit(Some(encoder.finish()));
+    }
     pub fn debug_values(&self) -> serde_json::Value {
         let stats = self.render_stats();
         let bvh = self.passes[0].queue.culling_stats;
         serde_json::json!({
+            "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
+                "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>()).sum::<usize>()},
             "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],
             "cullMs": self.cull_ms, "cullCached": self.cull_cached,
             "total": stats[0], "visible": stats[1], "culled": stats[2],
@@ -16689,6 +17887,7 @@ impl SceneRenderer {
             depth_format: target.format,
             reflected: false,
             material_mask: false,
+            packed_depth: false,
             shadow: true,
         };
         for id in self.passes[self.active_cache].queue.imported.keys() {
@@ -16854,10 +18053,16 @@ impl SceneRenderer {
     ) -> Result<(), String> {
         target.validate()?;
         let rings = self.cut_feedback_rings(self.active_cache);
-        let draw_rings = !reflected && target.auxiliary.is_none();
+        let draw_rings = !reflected && !target.material_mask;
         if draw_rings && rings.iter().any(Option::is_some) {
             self.prepare_cut_feedback(target);
         }
+        if !reflected && !target.material_mask {
+            self.prepare_neon_glow(target);
+        }
+        self.neon_draws = 0;
+        self.neon_segments = 0;
+        let mut neon_stats = (0, 0);
         let mut draws = 0;
         let key = (
             target.color_format,
@@ -16865,6 +18070,7 @@ impl SceneRenderer {
             self.passes[self.active_cache]
                 .key
                 .is_some_and(|k| k.0.determinant() < 0.0),
+            target.material_mask,
             target.auxiliary.is_some(),
         );
         self.pipelines.entry(key).or_insert_with(|| {
@@ -16877,6 +18083,7 @@ impl SceneRenderer {
                     &effects.layout,
                     key.2,
                     key.3,
+                    key.4,
                     false,
                 ),
                 pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
@@ -16888,6 +18095,7 @@ impl SceneRenderer {
                     &effects.layout,
                     !key.2,
                     key.3,
+                    key.4,
                     false,
                 ),
                 pipeline::build(
@@ -16898,6 +18106,7 @@ impl SceneRenderer {
                     &effects.layout,
                     key.2,
                     key.3,
+                    key.4,
                     true,
                 ),
             )
@@ -16908,7 +18117,8 @@ impl SceneRenderer {
             reflected: self.passes[self.active_cache]
                 .key
                 .is_some_and(|k| k.0.determinant() < 0.0),
-            material_mask: target.auxiliary.is_some(),
+            material_mask: target.material_mask,
+            packed_depth: target.auxiliary.is_some(),
             shadow: false,
         };
         for id in self.passes[self.active_cache].queue.imported.keys() {
@@ -17012,7 +18222,7 @@ impl SceneRenderer {
                 }
             }
             for (id, instances) in &cache.queue.imported {
-                // Presentation FX skip probes/reflections; auxiliary targets defer
+                // Presentation FX skip probes/reflections; material-metadata targets defer
                 // their rings to the final transparent overlay.
                 if instances.is_empty() || rings.contains(&Some(*id)) {
                     continue;
@@ -17044,7 +18254,7 @@ impl SceneRenderer {
                             .draw(&mut rp, model, gltf_key, false, cache.camera_position);
                 }
             }
-            if reflected || target.auxiliary.is_none() {
+            if reflected || !target.material_mask {
                 draws += self.gltf_gpu.draw_many(
                     &mut rp,
                     cache
@@ -17057,27 +18267,30 @@ impl SceneRenderer {
                     cache.camera_position,
                 );
             }
+            if !reflected && !target.material_mask {
+                neon_stats = self.encode_neon_glow(&mut rp, self.active_cache);
+                draws += neon_stats.0;
+            }
             if draw_rings {
                 draws += self.draw_cut_feedback(&mut rp, self.active_cache, &rings, target);
             }
-            if !reflected
-                && target.auxiliary.is_none()
-                && (self.draw_grid || self.draw_light_helpers)
-            {
+            if !reflected && !target.material_mask && (self.draw_grid || self.draw_light_helpers) {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
-                if target.auxiliary.is_none() && self.draw_grid {
+                if !target.material_mask && self.draw_grid {
                     rp.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
                     rp.draw(0..self.grid_vertex_count, 0..1);
                     draws += 1;
                 }
-                if target.auxiliary.is_none() && self.draw_light_helpers {
+                if !target.material_mask && self.draw_light_helpers {
                     rp.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
                     rp.draw(0..self.light_vertex_count, 0..1);
                     draws += 1;
                 }
             }
         }
+        self.neon_draws = neon_stats.0;
+        self.neon_segments = neon_stats.1;
         self.queue.submit(Some(encoder.finish()));
         self.draw_calls += draws;
         if !reflected {
@@ -17180,7 +18393,8 @@ impl SceneRenderer {
             format: target.color_format,
             depth_format: target.depth_format,
             reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
-            material_mask: target.auxiliary.is_some(),
+            material_mask: target.material_mask,
+            packed_depth: target.auxiliary.is_some(),
             shadow: false,
         };
         for id in cache.queue.imported.keys() {
@@ -17305,10 +18519,19 @@ use std::ops::{Deref, DerefMut};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 
+struct ComboIndicator {
+    id: u32,
+    kind: String,
+    slot: u32,
+    scale: Vec3,
+}
+
 pub struct State {
     renderer: SceneRenderer,
     output: CanvasOutput,
     postprocess: PostProcessor,
+    xr_depth_resolve: Option<super::depth_resolve::DepthResolve>,
+    xr_present: Option<super::xr_present::XrPresent>,
     environment: Option<super::environment::EnvironmentProbe>,
     background: wgpu::Color,
     pub backend: String,
@@ -17321,6 +18544,8 @@ pub struct State {
     xr_rendering: bool,
     xr_hud_pending: bool,
     xr_cuts: u64,
+    pub combo_score: crate::xr_round::ComboScore,
+    combo_indicators: Vec<ComboIndicator>,
     info_panel_elapsed: f32,
     info_round_dirty: bool,
     xr_round: Option<crate::xr_round::RoundClock>,
@@ -17357,6 +18582,8 @@ impl State {
             renderer,
             output,
             postprocess,
+            xr_depth_resolve: None,
+            xr_present: None,
             environment: None,
             background: wgpu::Color {
                 r: 0.1,
@@ -17373,6 +18600,8 @@ impl State {
             xr_rendering: false,
             xr_hud_pending: false,
             xr_cuts: 0,
+            combo_score: Default::default(),
+            combo_indicators: Vec::new(),
             info_panel_elapsed: 0.25,
             info_round_dirty: true,
             xr_round: None,
@@ -17528,6 +18757,19 @@ impl State {
     }
     pub fn set_postprocess(&mut self, name: &str, enabled: bool, strength: f32) -> bool {
         self.postprocess.set_effect(name, enabled, strength)
+    }
+    pub fn configure_ssr(&mut self, resolution_scale: f32) -> bool {
+        self.postprocess.configure_ssr(resolution_scale)
+    }
+    pub fn ssr_stats(&self) -> [f64; 3] {
+        self.postprocess.ssr_stats()
+    }
+    pub fn configure_ssr_region(&mut self, min: Vec3, max: Vec3, enabled: bool) -> bool {
+        self.postprocess.configure_ssr_region(min, max, enabled)
+    }
+
+    pub fn ssr_work_stats(&self) -> [f64; 2] {
+        self.postprocess.ssr_work_stats()
     }
     pub fn set_reflection_mask(
         &mut self,
@@ -17697,7 +18939,29 @@ impl State {
                 .update_info_panels(PanelKind::Diagnostics, &diagnostics);
         }
         if self.info_round_dirty {
-            let mut rows = vec![("ROZKROJENO", self.xr_cuts.to_string())];
+            let mut rows = if self.combo_score.enabled {
+                vec![
+                    ("SKORE", self.combo_score.score.to_string()),
+                    (
+                        "SERIE",
+                        format!(
+                            "{} {}/3",
+                            if self.combo_score.kind.is_empty() {
+                                if self.combo_score.streak > 0 {
+                                    "WILD"
+                                } else {
+                                    "CEKA"
+                                }
+                            } else {
+                                &self.combo_score.kind
+                            },
+                            self.combo_score.streak
+                        ),
+                    ),
+                ]
+            } else {
+                vec![("ROZKROJENO", self.xr_cuts.to_string())]
+            };
             if let Some(round) = self.xr_round {
                 rows.push(("CAS", format!("{} S", round.remaining.ceil() as u32)));
                 rows.push((
@@ -17723,11 +18987,58 @@ impl State {
     pub fn xr_round_finished(&self) -> bool {
         self.xr_round.is_some_and(|round| round.finished())
     }
+    pub fn clear_combo_indicators(&mut self) {
+        self.combo_indicators.clear();
+    }
+    pub fn bind_combo_indicator(&mut self, id: u32, kind: &str, slot: u32) -> bool {
+        if slot > 2
+            || kind.is_empty()
+            || kind.len() > 16
+            || !kind.bytes().all(|c| c.is_ascii_alphanumeric() || c == b' ')
+        {
+            return false;
+        }
+        let Some(object) = self.renderer.scene.objects().get(&id) else {
+            return false;
+        };
+        let scale = self
+            .combo_indicators
+            .iter()
+            .find(|item| item.id == id)
+            .map_or(object.transform.scale, |item| item.scale);
+        self.combo_indicators.retain(|item| item.id != id);
+        self.combo_indicators.push(ComboIndicator {
+            id,
+            kind: kind.into(),
+            slot,
+            scale,
+        });
+        self.refresh_combo_indicators();
+        true
+    }
+    fn refresh_combo_indicators(&mut self) {
+        let (kind, count) = self.combo_score.display_progress();
+        self.combo_indicators
+            .retain(|item| self.renderer.scene.object_exists(item.id));
+        for item in &self.combo_indicators {
+            let active = item.kind == kind && item.slot < count;
+            self.renderer
+                .scene
+                .set_emission(item.id, if active { 8.0 } else { 0.65 });
+            self.renderer
+                .scene
+                .set_object_scale(item.id, item.scale * if active { 1.32 } else { 1.0 });
+        }
+    }
     pub fn start_xr_round(&mut self, seconds: f32) -> Result<(), JsValue> {
         let round = crate::xr_round::RoundClock::new(seconds)
             .ok_or_else(|| JsValue::from_str("Round duration must be 1..3600 seconds"))?;
         self.xr_round = Some(round);
         self.xr_cuts = 0;
+        self.combo_score.reset();
+        let live: std::collections::BTreeSet<_> =
+            self.renderer.scene.objects().keys().copied().collect();
+        self.combo_score.targets.retain(|id, _| live.contains(id));
         self.invalidate_xr_hud();
         Ok(())
     }
@@ -17737,18 +19048,22 @@ impl State {
                 serde_json::json!({
                     "duration": round.duration, "remaining": round.remaining,
                     "finished": round.finished(), "cuts": self.xr_cuts,
+                    "score": self.combo_score.score, "streak": self.combo_score.streak,
+                    "fruit": self.combo_score.kind, "triples": self.combo_score.triples,
                 })
             })
             .unwrap_or(serde_json::Value::Null)
             .to_string()
     }
     fn invalidate_xr_hud(&mut self) {
+        self.refresh_combo_indicators();
         self.info_round_dirty = true;
         if let Some(hud) = &mut self.debug_hud {
             hud.invalidate();
         }
     }
-    pub fn record_xr_cuts(&mut self, count: usize) {
+    pub fn record_xr_cuts(&mut self, removed: &[u32]) {
+        let count = removed.len();
         if count > 0 {
             // Controller input follows advance_xr; new halves must be visible in
             // this same stereo frame instead of disappearing for one frame.
@@ -17756,6 +19071,9 @@ impl State {
         }
         if count > 0 && !self.xr_round_finished() {
             self.xr_cuts = self.xr_cuts.saturating_add(count as u64);
+            for id in removed {
+                self.combo_score.hit(*id);
+            }
             self.invalidate_xr_hud();
         }
     }
@@ -17773,6 +19091,9 @@ impl State {
             }
         }
         // FPS and the clock use elapsed time; only physics has a bounded step.
+        if let Some(present) = &mut self.xr_present {
+            present.reset_frame();
+        }
         self.renderer.advance_xr_scene(dt);
         self.refresh_info_panels(dt);
     }
@@ -17790,20 +19111,15 @@ impl State {
         result
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
-        self.render_to(None)
+        self.render_to(None, true)
     }
     pub fn xr_gpu_supported(&self) -> bool {
-        self.output.xr_compatible && !self.postprocess.enabled()
+        self.output.xr_compatible
     }
     pub fn xr_device(&self) -> Result<JsValue, JsValue> {
         if !self.output.xr_compatible {
             return Err(JsValue::from_str(
                 "XR-compatible WebGPU adapter unavailable; use WebGL",
-            ));
-        }
-        if self.postprocess.enabled() {
-            return Err(JsValue::from_str(
-                "Direct WebGPU XR requires postprocessing disabled",
             ));
         }
         self.renderer
@@ -17827,22 +19143,89 @@ impl State {
         image: &JsValue,
     ) -> Result<(), JsValue> {
         let attachments = super::xr_output::XrAttachments::new(&self.renderer.device, image)?;
-        self.render_xr_gpu_eye(matrix, position, &attachments.target())
+        // Only an explicit compositor declaration can omit the depth transfer.
+        // Older runtimes and direct SDK callers retain the conservative default.
+        let write_depth = js_sys::Reflect::get(image, &JsValue::from_str("ignoreDepthValues"))?
+            .as_bool()
+            != Some(true);
+        let target = attachments.target();
+        if !self.postprocess.enabled() {
+            self.xr_present = None;
+            return self.render_xr_gpu_eye(matrix, position, &target, write_depth);
+        }
+        let index = js_sys::Reflect::get(
+            &js_sys::Reflect::get(image, &JsValue::from_str("viewDescriptor"))?,
+            &JsValue::from_str("baseArrayLayer"),
+        )?
+        .as_f64()
+        .ok_or_else(|| JsValue::from_str("Missing XR eye layer"))? as usize;
+        // Own the complete output of each eye until both are ready. Browser
+        // attachments are never retained here or touched by intermediate passes.
+        let mut present = self.xr_present.take().unwrap_or_else(|| {
+            super::xr_present::XrPresent::new(&self.renderer.device, target.color_format)
+        });
+        let result = (|| {
+            present
+                .ensure_eye(&self.renderer.device, index, target.width, target.height)
+                .map_err(|e| JsValue::from_str(&e))?;
+            self.render_xr_gpu_eye(
+                matrix,
+                position,
+                &present.target(index).map_err(|e| JsValue::from_str(&e))?,
+                write_depth,
+            )?;
+            present
+                .mark_ready(index, write_depth)
+                .map_err(|e| JsValue::from_str(&e))
+        })();
+        self.xr_present = Some(present);
+        result
+    }
+    pub fn present_xr_gpu_frame(&mut self, images: &js_sys::Array) -> Result<(), JsValue> {
+        let Some(present) = &mut self.xr_present else {
+            return Ok(());
+        };
+        let mut attachments = Vec::with_capacity(images.length() as usize);
+        let mut indices = Vec::with_capacity(images.length() as usize);
+        if images.length() == 0 || images.length() > 2 {
+            return Err(JsValue::from_str(
+                "XR presentation requires one or two eyes",
+            ));
+        }
+        for image in images.iter() {
+            let descriptor = js_sys::Reflect::get(&image, &JsValue::from_str("viewDescriptor"))?;
+            let index = js_sys::Reflect::get(&descriptor, &JsValue::from_str("baseArrayLayer"))?
+                .as_f64()
+                .ok_or_else(|| JsValue::from_str("Missing XR eye layer"))?
+                as usize;
+            if !present.is_ready(index) {
+                return Err(JsValue::from_str("XR eye has not been rendered"));
+            }
+            attachments.push(super::xr_output::XrAttachments::new(
+                &self.renderer.device,
+                &image,
+            )?);
+            indices.push(index);
+        }
+        let targets: Vec<_> = indices
+            .into_iter()
+            .zip(attachments.iter().map(|a| a.target()))
+            .collect();
+        self.renderer.draw_calls += present
+            .present(&self.renderer.device, &self.renderer.queue, &targets)
+            .map_err(|e| JsValue::from_str(&e))?;
+        Ok(())
     }
     pub fn render_xr_gpu_eye(
         &mut self,
         matrix: Mat4,
         position: Vec3,
         target: &super::target::RenderTarget<'_>,
+        write_depth: bool,
     ) -> Result<(), JsValue> {
         if target.color_format != self.output.color_format().remove_srgb_suffix() {
             return Err(JsValue::from_str(
                 "XR layer format must match xr_gpu_color_format",
-            ));
-        }
-        if self.postprocess.enabled() {
-            return Err(JsValue::from_str(
-                "Direct WebGPU XR requires postprocessing disabled",
             ));
         }
         let saved = self.view;
@@ -17852,7 +19235,7 @@ impl State {
             view_projection: matrix,
             camera_position: position,
         };
-        let result = self.render_to(Some(target));
+        let result = self.render_to(Some(target), write_depth);
         self.view = saved;
         self.xr_rendering = saved_xr;
         result
@@ -17860,6 +19243,7 @@ impl State {
     fn render_to(
         &mut self,
         external: Option<&super::target::RenderTarget<'_>>,
+        write_external_depth: bool,
     ) -> Result<(), JsValue> {
         self.refresh_info_panels(0.0);
         self.renderer.draw_calls = 0;
@@ -17889,7 +19273,10 @@ impl State {
             color_load: wgpu::LoadOp::Clear(self.background),
             ..*target
         };
-        if self.postprocess.enabled() {
+        if self
+            .postprocess
+            .needs_render(self.view, target.width, target.height)
+        {
             self.postprocess
                 .ensure_size(&self.renderer.device, target.width, target.height);
             let mut scene_target = self.postprocess.target();
@@ -17912,20 +19299,39 @@ impl State {
                 self.view,
                 position,
                 color,
-                target.color,
+                &target,
                 self.renderer.shadows_enabled(),
                 self.xr_rendering,
             );
             let overlays = super::target::RenderTarget {
                 depth: self.postprocess.target().depth,
                 auxiliary: None,
+                material_mask: false,
                 ..target
             };
             self.renderer
                 .draw_transparent(&overlays)
                 .map_err(|e| JsValue::from_str(&e))?;
+            self.renderer.draw_neon_overlay(&overlays);
             self.renderer.draw_helpers(&overlays);
+            if external.is_some() && write_external_depth {
+                // Postprocessing writes only color. Supply the compositor with the
+                // actual scene depth, including any depth-writing overlays above.
+                let resolve = self.xr_depth_resolve.get_or_insert_with(|| {
+                    super::depth_resolve::DepthResolve::new(&self.renderer.device)
+                });
+                self.renderer.draw_calls += resolve.render(
+                    &self.renderer.device,
+                    &self.renderer.queue,
+                    self.postprocess.target().depth,
+                    target.depth,
+                );
+            }
         } else {
+            self.postprocess.skip_render();
+            if !self.postprocess.enabled() {
+                self.xr_depth_resolve = None;
+            }
             self.renderer
                 .render_view(self.view, &target)
                 .map_err(|e| JsValue::from_str(&e))?;
@@ -18019,6 +19425,8 @@ impl Viewport {
 /// must match this descriptor; wgpu validates the underlying GPU resources.
 pub struct RenderTarget<'a> {
     pub color: &'a wgpu::TextureView,
+    /// Store reflectivity in color alpha and defer presentation overlays.
+    pub material_mask: bool,
     /// Optional packed depth attachment for portable screen-space effects.
     pub auxiliary: Option<&'a wgpu::TextureView>,
     pub depth: &'a wgpu::TextureView,
@@ -18188,6 +19596,7 @@ impl ColorTarget {
             color: &self.color,
             depth: &self.depth,
             auxiliary: None,
+            material_mask: false,
             color_format: self.format,
             depth_format: DepthTarget::FORMAT,
             width: self.width,
@@ -18345,6 +19754,7 @@ impl XrAttachments {
             color: &self.color,
             depth: &self.depth,
             auxiliary: None,
+            material_mask: false,
             color_format: self.format,
             depth_format: wgpu::TextureFormat::Depth32Float,
             width: self.width,
@@ -18354,6 +19764,325 @@ impl XrAttachments {
             depth_load: wgpu::LoadOp::Clear(1.),
         }
     }
+}
+
+
+# File: src/render/xr_present.rs
+//! Stage both eyes in owned textures before touching compositor attachments.
+//! Browser views are used only by `present`, in one final queue submission.
+use super::{target::RenderTarget, textures::ColorTarget};
+
+struct EyeStage {
+    target: ColorTarget,
+    source: wgpu::BindGroup,
+    ready: bool,
+    write_depth: bool,
+}
+
+pub struct XrPresent {
+    format: wgpu::TextureFormat,
+    layout: wgpu::BindGroupLayout,
+    color_pipeline: wgpu::RenderPipeline,
+    depth_pipeline: wgpu::RenderPipeline,
+    eyes: [Option<EyeStage>; 2],
+}
+
+impl XrPresent {
+    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("XR stereo presentation sources"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("XR stereo presentation shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("xr_present.wgsl").into()),
+        });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("XR stereo presentation layout"),
+            bind_group_layouts: &[Some(&layout)],
+            immediate_size: 0,
+        });
+        let pipeline = |write_depth: bool| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("XR stereo presentation"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some(if write_depth { "fs_depth" } else { "fs_color" }),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: Default::default(),
+                depth_stencil: write_depth.then_some(wgpu::DepthStencilState {
+                    format: wgpu::TextureFormat::Depth32Float,
+                    depth_write_enabled: Some(write_depth),
+                    depth_compare: Some(wgpu::CompareFunction::Always),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                }),
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        };
+        Self {
+            format,
+            color_pipeline: pipeline(false),
+            depth_pipeline: pipeline(true),
+            layout,
+            eyes: [None, None],
+        }
+    }
+
+    pub fn ensure_eye(
+        &mut self,
+        device: &wgpu::Device,
+        index: usize,
+        width: u32,
+        height: u32,
+    ) -> Result<(), String> {
+        let eye = self
+            .eyes
+            .get_mut(index)
+            .ok_or("XR presentation eye index must be 0 or 1")?;
+        if width == 0
+            || height == 0
+            || width > device.limits().max_texture_dimension_2d
+            || height > device.limits().max_texture_dimension_2d
+        {
+            return Err("Invalid XR presentation stage dimensions".into());
+        }
+        if eye.as_ref().is_some_and(|eye| eye.ready) {
+            return Err("XR presentation eye is already staged for this frame".into());
+        }
+        if eye
+            .as_ref()
+            .is_none_or(|eye| (eye.target.width, eye.target.height) != (width, height))
+        {
+            let target = ColorTarget::new(
+                device,
+                "XR eye presentation stage",
+                width,
+                height,
+                self.format,
+            );
+            let source = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("XR eye presentation source"),
+                layout: &self.layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&target.color),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&target.depth),
+                    },
+                ],
+            });
+            *eye = Some(EyeStage {
+                target,
+                source,
+                ready: false,
+                write_depth: false,
+            });
+        }
+        Ok(())
+    }
+
+    pub fn target(&self, index: usize) -> Result<RenderTarget<'_>, String> {
+        self.eyes
+            .get(index)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| "XR presentation eye stage is not initialized".into())
+            .map(|eye| eye.target.target())
+    }
+
+    /// Called only after the complete eye render, including postprocessing.
+    pub fn mark_ready(&mut self, index: usize, write_depth: bool) -> Result<(), String> {
+        let eye = self
+            .eyes
+            .get_mut(index)
+            .and_then(Option::as_mut)
+            .ok_or("XR presentation eye stage is not initialized")?;
+        if eye.ready {
+            return Err("XR presentation eye is already staged for this frame".into());
+        }
+        eye.ready = true;
+        eye.write_depth = write_depth;
+        Ok(())
+    }
+
+    pub fn reset_frame(&mut self) {
+        for eye in self.eyes.iter_mut().flatten() {
+            eye.ready = false;
+        }
+    }
+
+    pub fn is_ready(&self, index: usize) -> bool {
+        self.eyes
+            .get(index)
+            .and_then(Option::as_ref)
+            .is_some_and(|eye| eye.ready)
+    }
+
+    /// Validate the complete batch before recording any browser attachment use.
+    /// Each supplied eye writes its color/depth slice once; no COPY_DST is needed.
+    pub fn present(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        targets: &[(usize, RenderTarget<'_>)],
+    ) -> Result<usize, String> {
+        if targets.is_empty() || targets.len() > self.eyes.len() {
+            return Err("XR presentation requires one or two staged eyes".into());
+        }
+        let mut seen = [false; 2];
+        for (index, target) in targets {
+            target.validate()?;
+            let eye = self
+                .eyes
+                .get(*index)
+                .and_then(Option::as_ref)
+                .ok_or("XR presentation eye stage is not initialized")?;
+            if !eye.ready || seen[*index] {
+                return Err("XR presentation requires unique ready eyes".into());
+            }
+            seen[*index] = true;
+            if target.color_format != self.format
+                || target.depth_format != wgpu::TextureFormat::Depth32Float
+                || (target.width, target.height) != (eye.target.width, eye.target.height)
+                || target.viewport.x != 0
+                || target.viewport.y != 0
+                || (target.viewport.width, target.viewport.height) != (target.width, target.height)
+                || target.auxiliary.is_some()
+                || target.material_mask
+            {
+                return Err(
+                    "XR presentation requires matching full-size color/depth slices".into(),
+                );
+            }
+            // No destination may alias either owned source or another destination.
+            if self.eyes.iter().flatten().any(|source| {
+                target.color == &source.target.color || target.depth == &source.target.depth
+            }) || targets.iter().any(|(other_index, other)| {
+                other_index != index && (target.color == other.color || target.depth == other.depth)
+            }) {
+                return Err(
+                    "XR presentation source and destination slices must be distinct".into(),
+                );
+            }
+        }
+        if self
+            .eyes
+            .iter()
+            .enumerate()
+            .any(|(index, eye)| eye.as_ref().is_some_and(|eye| eye.ready) != seen[index])
+        {
+            return Err("XR presentation must include every staged eye".into());
+        }
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("XR final stereo presentation encoder"),
+        });
+        for (index, target) in targets {
+            let eye = self.eyes[*index].as_ref().unwrap();
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("XR final eye presentation"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: eye.write_depth.then_some(
+                    wgpu::RenderPassDepthStencilAttachment {
+                        view: target.depth,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    },
+                ),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_pipeline(if eye.write_depth {
+                &self.depth_pipeline
+            } else {
+                &self.color_pipeline
+            });
+            pass.set_bind_group(0, &eye.source, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        queue.submit(Some(encoder.finish()));
+        self.reset_frame();
+        Ok(targets.len())
+    }
+}
+
+
+# File: src/render/xr_present.wgsl
+@group(0) @binding(0) var scene_color: texture_2d<f32>;
+@group(0) @binding(1) var scene_depth: texture_depth_2d;
+
+@vertex
+fn vs_main(@builtin(vertex_index) index: u32) -> @builtin(position) vec4f {
+    let positions = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+    return vec4f(positions[index], 0.0, 1.0);
+}
+
+@fragment
+fn fs_color(@builtin(position) position: vec4f) -> @location(0) vec4f {
+    return vec4f(textureLoad(scene_color, vec2i(position.xy), 0).rgb, 1.0);
+}
+
+struct DepthOutput {
+    @location(0) color: vec4f,
+    @builtin(frag_depth) depth: f32,
+};
+
+@fragment
+fn fs_depth(@builtin(position) position: vec4f) -> DepthOutput {
+    var output: DepthOutput;
+    output.color = vec4f(textureLoad(scene_color, vec2i(position.xy), 0).rgb, 1.0);
+    output.depth = textureLoad(scene_depth, vec2i(position.xy), 0);
+    return output;
 }
 
 
@@ -21821,6 +23550,9 @@ fn fs_color(input: VertexOutput) -> @location(0) vec4<f32> {
 @fragment fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(shade_surface(input).rgb, 1.0);
 }
+@fragment fn fs_material_mask(input: VertexOutput) -> @location(0) vec4<f32> {
+    return shade_surface(input);
+}
 struct PostSurface {
     @location(0) color: vec4<f32>,
     @location(1) depth: vec4<f32>,
@@ -23353,6 +25085,60 @@ pub fn postprocess_stats() -> Vec<f64> {
 }
 
 #[wasm_bindgen]
+pub fn configure_ssr(resolution_scale: f32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().configure_ssr(resolution_scale))
+    })
+}
+
+#[wasm_bindgen]
+pub fn ssr_stats() -> Vec<f64> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|s| s.borrow().ssr_stats().to_vec())
+            .unwrap_or_default()
+    })
+}
+
+#[wasm_bindgen]
+pub fn configure_ssr_region(bounds: &[f32]) -> bool {
+    if !bounds.is_empty() && bounds.len() != 6 {
+        return false;
+    }
+    let (min, max, enabled) = if bounds.len() == 6 {
+        (
+            glam::Vec3::from_slice(&bounds[..3]),
+            glam::Vec3::from_slice(&bounds[3..]),
+            true,
+        )
+    } else {
+        (glam::Vec3::ZERO, glam::Vec3::ZERO, false)
+    };
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().configure_ssr_region(min, max, enabled))
+    })
+}
+
+#[wasm_bindgen]
+pub fn ssr_work_stats() -> Vec<f64> {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .map(|s| s.borrow().ssr_work_stats().to_vec())
+            .unwrap_or_default()
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_render_effects(shadows: bool, reflections: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {
@@ -23393,6 +25179,15 @@ pub fn set_object_color_cutout(id: u32, threshold: f32) -> bool {
         s.borrow()
             .as_ref()
             .is_some_and(|s| s.borrow_mut().scene.set_color_cutout(id, threshold))
+    })
+}
+/// Optional additive geometry glow; zero disables and releases its GPU cache.
+#[wasm_bindgen]
+pub fn set_neon_glow(strength: f32, radius: f32) -> bool {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().configure_neon_glow(strength, radius))
     })
 }
 #[wasm_bindgen]
@@ -23936,7 +25731,10 @@ pub fn resize(width: u32, height: u32) {
 pub fn clear_scene() {
     STATE.with(|s| {
         if let Some(st) = &*s.borrow() {
-            st.borrow_mut().scene.clear_scene();
+            let mut state = st.borrow_mut();
+            state.scene.clear_scene();
+            state.combo_score = Default::default();
+            state.clear_combo_indicators();
         }
     });
 }
@@ -24205,7 +26003,7 @@ pub fn triangle_mesh_info(id: u32) -> Result<String, JsValue> {
                         .y
                 })
                 .fold(f32::INFINITY, f32::min);
-            return Ok(serde_json::json!({"triangles":panel.mesh.indices.len()/3,"vertices":panel.mesh.vertices.len(),"volume":0.,"cuttable":false,"closed":false,"resident":false,"cpuMaterialized":true,"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom,"cutProgress":0.,"jammedBy":null}).to_string());
+            return Ok(serde_json::json!({"triangles":panel.mesh.indices.len()/3,"vertices":panel.mesh.vertices.len(),"volume":0.,"cuttable":false,"closed":false,"resident":false,"cpuMaterialized":true,"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"scale":transform.scale.to_array(),"emission":scene.objects()[&id].emission,"bottom":bottom,"cutProgress":0.,"jammedBy":null}).to_string());
         }
 
         let object = scene
@@ -24215,7 +26013,7 @@ pub fn triangle_mesh_info(id: u32) -> Result<String, JsValue> {
         let transform = scene.objects()[&id].transform;
         let bottom = object.mesh.bottom(transform)?;
         let (cut_progress, jammed_by) = scene.blade_cut_state(id);
-        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"bottom":bottom,"cutProgress":cut_progress,"jammedBy":jammed_by}).to_string())
+        Ok(serde_json::json!({"triangles":object.mesh.triangle_count(),"vertices":object.mesh.vertex_count(),"volume":object.mesh.volume(),"cuttable":object.cuttable,"closed":true,"resident":object.mesh.is_resident(),"cpuMaterialized":object.mesh.ready_cpu().is_some(),"position":transform.position.to_array(),"rotation":transform.rotation.to_array(),"scale":transform.scale.to_array(),"emission":scene.objects()[&id].emission,"bottom":bottom,"cutProgress":cut_progress,"jammedBy":jammed_by}).to_string())
     })
 }
 /// Explicit diagnostic snapshot, never fetched by the render loop.
@@ -24934,10 +26732,40 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
     // cutting_command's mutable scene borrow must end before borrowing State again.
     STATE.with(|slot| {
         if let Some(state) = slot.borrow().as_ref() {
-            state.borrow_mut().record_xr_cuts(report.removed.len());
+            state.borrow_mut().record_xr_cuts(&report.removed);
         }
     });
     Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts}).to_string())
+}
+
+/// Bind a world object to one of three slots in the currently hit combo row.
+#[wasm_bindgen]
+pub fn bind_combo_indicator(id: u32, kind: &str, slot: u32) -> bool {
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().bind_combo_indicator(id, kind, slot))
+    })
+}
+
+/// Explicit original-target scoring metadata; fragments do not inherit it.
+#[wasm_bindgen]
+pub fn set_combo_target(id: u32, kind: &str, points: u32, wild: bool) -> bool {
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let Some(state) = slot.as_ref() else {
+            return false;
+        };
+        let mut state = state.borrow_mut();
+        if !state.scene.object_exists(id) {
+            return false;
+        }
+        // Keep metadata bounded by live targets, including expired projectiles.
+        let live: std::collections::BTreeSet<_> = state.scene.objects().keys().copied().collect();
+        state.combo_score.targets.retain(|id, _| live.contains(id));
+        state.combo_score.register(id, kind, points, wild)
+    })
 }
 
 /// Opt-in round duration; the application chooses its game length.
@@ -25038,6 +26866,22 @@ pub fn xr_render_gpu_eye(
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
             .borrow_mut();
         state.render_xr_gpu_image(matrix, position, &sub_image)
+    })
+}
+
+/// Present completed stereo effects with one final compositor-facing submission.
+#[wasm_bindgen]
+pub fn xr_present_gpu_frame(images: js_sys::Array) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let mut state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow_mut();
+        state.present_xr_gpu_frame(&images)
     })
 }
 
@@ -28265,9 +30109,260 @@ impl RoundClock {
     }
 }
 
+/// Optional object-tagged triples. Only original targets can award points;
+/// fragments never inherit a target registration.
+#[derive(Default)]
+pub struct ComboScore {
+    pub enabled: bool,
+    pub score: u64,
+    pub triples: u32,
+    pub streak: u32,
+    pub kind: String,
+    pub targets: std::collections::BTreeMap<u32, (String, u32, bool)>,
+    streak_points: u32,
+    display_kind: String,
+    display_count: u32,
+}
+impl ComboScore {
+    pub fn register(&mut self, id: u32, kind: &str, points: u32, wild: bool) -> bool {
+        if kind.is_empty()
+            || kind.len() > 16
+            || !kind.bytes().all(|c| c.is_ascii_alphanumeric() || c == b' ')
+            || !(1..=1_000_000).contains(&points)
+            || self
+                .targets
+                .values()
+                .any(|(k, p, _)| k == kind && *p != points)
+        {
+            return false;
+        }
+        self.enabled = true;
+        self.targets.insert(id, (kind.into(), points, wild));
+        true
+    }
+    pub fn reset(&mut self) {
+        *self = Self {
+            enabled: self.enabled,
+            targets: std::mem::take(&mut self.targets),
+            ..Self::default()
+        };
+    }
+    /// Kind and number of matching icons to highlight in the combo display.
+    /// The completed triple remains visible until the next registered hit.
+    pub fn display_progress(&self) -> (&str, u32) {
+        (&self.display_kind, self.display_count)
+    }
+    pub fn hit(&mut self, id: u32) {
+        let Some((kind, points, wild)) = self.targets.remove(&id) else {
+            return;
+        };
+        if self.streak == 0 {
+            self.display_kind = kind.clone();
+            self.display_count = 0;
+        }
+        if !wild {
+            if !self.kind.is_empty() && self.kind != kind {
+                self.streak = 0;
+            }
+            self.kind = kind;
+            self.display_kind = self.kind.clone();
+            self.streak_points = points;
+        } else if self.kind.is_empty() {
+            // Until ordinary fruit fixes the kind, an all-wild triple uses
+            // the wildcard target's configured reward.
+            self.streak_points = points;
+        }
+        self.streak += 1;
+        self.display_count = self.streak;
+        if self.streak == 3 {
+            self.score = self.score.saturating_add(u64::from(self.streak_points));
+            self.triples = self.triples.saturating_add(1);
+            self.display_count = 3;
+            if !self.kind.is_empty() {
+                self.display_kind = self.kind.clone();
+            }
+            self.streak = 0;
+            self.kind.clear();
+            self.streak_points = 0;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn combo_triples_require_consecutive_original_targets() {
+        let mut score = ComboScore::default();
+        for id in 1..=9 {
+            assert!(score.register(id, "CHERRY", 10, false));
+        }
+        assert!(score.register(10, "MELON", 100, false));
+        score.hit(1);
+        score.hit(2);
+        assert_eq!((score.score, score.streak), (0, 2));
+        score.hit(10); // Wrong fruit starts its own streak.
+        score.hit(3);
+        score.hit(4);
+        assert_eq!((score.score, score.streak), (0, 2));
+        score.hit(5);
+        assert_eq!((score.score, score.streak, score.triples), (10, 0, 1));
+        score.hit(5);
+        score.hit(999); // Repeated source / untagged fragments.
+        assert_eq!((score.score, score.streak), (10, 0));
+        score.hit(6);
+        score.hit(7);
+        score.hit(8);
+        assert_eq!((score.score, score.triples), (20, 2));
+        score.reset();
+        assert!(score.enabled && score.targets.contains_key(&9));
+        assert_eq!((score.score, score.streak, score.triples), (0, 0, 0));
+        score.hit(9); // A live target's metadata survives the round restart.
+        assert_eq!((score.score, score.streak), (0, 1));
+    }
+    #[test]
+    fn combo_validates_tags() {
+        let mut score = ComboScore::default();
+        assert!(!score.register(1, "", 10, false));
+        assert!(!score.register(1, "A", 0, false));
+        assert!(!score.register(1, "A\n", 10, false));
+        assert!(score.register(1, "A", 10, false));
+        assert!(!score.register(2, "A", 20, false));
+    }
+    #[test]
+    fn combo_wildcard_permutations_use_the_ordinary_fruit_reward() {
+        for wild_mask in 0..7 {
+            let mut score = ComboScore::default();
+            for id in 0..3 {
+                let wild = wild_mask & (1 << id) != 0;
+                assert!(score.register(
+                    id,
+                    if wild { "WILD" } else { "CHERRY" },
+                    if wild { 120 } else { 10 },
+                    wild,
+                ));
+                score.hit(id);
+                if id < 2 && wild_mask & ((1 << (id + 1)) - 1) == (1 << (id + 1)) - 1 {
+                    assert!(score.kind.is_empty());
+                }
+            }
+            assert_eq!((score.score, score.triples, score.streak), (10, 1, 0));
+            assert!(score.kind.is_empty());
+        }
+    }
+    #[test]
+    fn combo_three_wildcards_pay_and_start_a_fresh_triple() {
+        let mut score = ComboScore::default();
+        for id in 0..3 {
+            assert!(score.register(id, "WILD", 120, true));
+            score.hit(id);
+        }
+        assert_eq!((score.score, score.triples, score.streak), (120, 1, 0));
+        assert!(score.kind.is_empty());
+        for (id, kind, points, wild) in [
+            (3, "CHERRY", 10, false),
+            (4, "WILD", 120, true),
+            (5, "WILD", 120, true),
+            (6, "WILD", 120, true),
+            (7, "WILD", 120, true),
+            (8, "MELON", 100, false),
+        ] {
+            assert!(score.register(id, kind, points, wild));
+            score.hit(id);
+        }
+        assert_eq!((score.score, score.triples, score.streak), (230, 3, 0));
+        assert!(score.kind.is_empty());
+    }
+    #[test]
+    fn combo_wrong_fruit_breaks_a_wildcard_streak() {
+        let mut score = ComboScore::default();
+        for (id, kind, points, wild) in [
+            (1, "CHERRY", 10, false),
+            (2, "WILD", 120, true),
+            (3, "MELON", 100, false),
+            (4, "WILD", 120, true),
+            (5, "MELON", 100, false),
+        ] {
+            assert!(score.register(id, kind, points, wild));
+        }
+        for id in 1..=3 {
+            score.hit(id);
+        }
+        assert_eq!(
+            (score.score, score.streak, score.kind.as_str()),
+            (0, 1, "MELON")
+        );
+        score.hit(4);
+        score.hit(5);
+        assert_eq!((score.score, score.triples), (100, 1));
+    }
+    #[test]
+    fn combo_reset_keeps_live_wildcards_and_ignores_duplicate_hits() {
+        let mut score = ComboScore::default();
+        for id in 0..5 {
+            assert!(score.register(id, "WILD", 120, true));
+        }
+        for id in 0..3 {
+            score.hit(id);
+        }
+        score.hit(3);
+        score.hit(3);
+        assert_eq!((score.score, score.triples, score.streak), (120, 1, 1));
+        score.reset();
+        assert_eq!((score.score, score.triples, score.streak), (0, 0, 0));
+        assert!(score.enabled && score.kind.is_empty());
+        assert_eq!(score.targets.len(), 1);
+        assert_eq!(score.targets.get(&4), Some(&("WILD".into(), 120, true)));
+        score.hit(3);
+        score.hit(4);
+        score.hit(4);
+        assert_eq!((score.score, score.triples, score.streak), (0, 0, 1));
+    }
+    #[test]
+    fn combo_display_tracks_wildcards_payout_and_reset() {
+        let mut score = ComboScore::default();
+        for (id, kind, wild) in [
+            (1, "ZOLIK", true),
+            (2, "TRESEN", false),
+            (3, "ZOLIK", true),
+            (4, "MELOUN", false),
+            (5, "ZOLIK", true),
+            (6, "ZOLIK", true),
+            (7, "ZOLIK", true),
+            (8, "ZOLIK", true),
+            (9, "ZOLIK", true),
+            (10, "ZOLIK", true),
+        ] {
+            assert!(score.register(id, kind, 10, wild));
+        }
+        assert_eq!(score.display_progress(), ("", 0));
+        score.hit(1);
+        assert_eq!(score.display_progress(), ("ZOLIK", 1));
+        score.hit(2);
+        assert_eq!(score.display_progress(), ("TRESEN", 2));
+        score.hit(3);
+        assert_eq!(score.display_progress(), ("TRESEN", 3));
+        // Payout remains visible through unregistered and duplicate hits.
+        score.hit(999);
+        score.hit(3);
+        assert_eq!(score.display_progress(), ("TRESEN", 3));
+        score.hit(4);
+        assert_eq!(score.display_progress(), ("MELOUN", 1));
+        score.hit(5);
+        assert_eq!(score.display_progress(), ("MELOUN", 2));
+        score.hit(6);
+        assert_eq!(score.display_progress(), ("MELOUN", 3));
+        score.hit(7);
+        assert_eq!(score.display_progress(), ("ZOLIK", 1));
+        let mut all_wild = ComboScore::default();
+        for id in 20..23 {
+            assert!(all_wild.register(id, "ZOLIK", 10, true));
+            all_wild.hit(id);
+        }
+        assert_eq!(all_wild.display_progress(), ("ZOLIK", 3));
+        score.reset();
+        assert_eq!(score.display_progress(), ("", 0));
+    }
     #[test]
     fn validates_duration() {
         for seconds in [f32::NAN, f32::INFINITY, -1.0, 0.0, 0.99, 3600.1] {
