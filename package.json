@@ -16,7 +16,7 @@
     "verify:push": "bash scripts/pre-push",
     "verify:native": "bash scripts/verify.sh native",
     "verify:browser": "bash scripts/verify.sh browser",
-    "test:xr": "node --test tests/xr-simulator-unit.test.mjs",
+    "test:xr": "node --test tests/xr-simulator-unit.test.mjs tests/diagnostics-unit.test.mjs tests/neon-geometry-unit.test.mjs",
     "verify:vr": "npm run test:xr && bash scripts/verify.sh browser --page webxr-contract,webxr,webxr-simulation,neon-arena-xr --backend webgl --capture"
   }
 }

@@ -11,6 +11,21 @@ export interface TriangleMeshOptions {
     /** Area-weighted shared-vertex skin normals; newly cut caps remain flat. Default false. */
     smooth?: boolean;
 }
+/** Shared topology; variants contain flat RGB per triangle in identical order.
+ * Bright neon seam colors (max RGB >= .25) must match in every variant. */
+export interface MeshVariantsOptions {
+    positions: readonly number[] | Float32Array;
+    indices: readonly number[] | Uint32Array;
+    variants: readonly (readonly number[] | Float32Array)[];
+    smooth?: boolean;
+}
+export class MeshVariants {
+    private constructor();
+    readonly id: number;
+    createInstance(variant?: number): SceneObject;
+    /** Releases the handle; live instances keep their resources until removed. */
+    remove(): void;
+}
 export interface CutterAimOptions {center:Vector3;yaw?:number;tilt?:number;height?:number;floorY?:number;guides?:readonly SceneObject[]}
 export interface CameraViewState {position:Vector3;orbitTarget:Vector3|null}
 export interface TriangleMeshInfo {
@@ -88,6 +103,8 @@ export class SceneObject {
     setEmission(intensity: number): this;
     /** Discard fragments below maximum vertex RGB; finite 0..1, zero disables. Triangle meshes show both sides. */
     setColorCutout(threshold: number): this;
+    /** Alpha 0..1 for vertex-color meshes, inherited by cut pieces. Facets with max RGB >= opaqueAbove stay opaque (default 8). variation 0..1 gives stable face-based alpha from opacity towards 1 (default 0). Optional coverage 0..1 switches to a sparse/dense near-clear vs solid facet mask; omit for linear variation. glTF keeps its own materials. */
+    setOpacity(opacity: number, options?: {opaqueAbove?: number; variation?: number; coverage?: number}): this;
     setRenderOptions(options?: {isStatic?: boolean; castsShadow?: boolean; receivesShadow?: boolean; reflectivity?: number}): this;
     spin(radiansPerSecond: Vector3): this;
     /** Rust-owned ballistic motion with ground bounce. */
@@ -131,12 +148,16 @@ export class Scene {
     private constructor();
     readonly objectCount: number;
     readonly lightCount: number;
+    getObject(id: number): SceneObject;
     createCube(position?: Vector3): SceneObject;
     createPlane(position?: Vector3): SceneObject;
     createSphere(position?: Vector3): SceneObject;
     createMesh(options: TriangleMeshOptions): SceneObject;
+    createMeshVariants(options: MeshVariantsOptions): MeshVariants;
     /** Actual world-space text mesh; width/height in metres, facing local +Z. */
-    createInfoPanel(kind: 'scene'|'round'|'restart'|'diagnostics', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
+    createInfoPanel(kind: 'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
+    /** Static inscription of 1..32 ASCII digits using shared 3D tube meshes. */
+    createNumericText(value: string, options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
     createTextPanel(options: {title: string; lines: string[]; position?: Vector3; width?: number; height?: number}): SceneObject;
     playCutFeedback(pieces: SceneObject[], options?: {mirrorText?: boolean; /** Gentle hit size multiplier, 0.01..2; fast tracked attacks retain full size. */ size?: number}): {objects: SceneObject[]; duration: number};
     clearCutFeedback(): void;
@@ -174,6 +195,12 @@ export interface EffectStats {
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
 export interface DebugStats {
+    /** Pooled imported-mesh instance buffers across render passes. */
+    instanceUploadPages: number;
+    numericFont: {glyphMeshes:number;liveGlyphs:number;panels:number;geometryBytes:number;instanceGeometryBytes:number};
+    sharedMeshes: {assets:number;liveInstances:number;gpuMeshes:number;colorTableBytes:number;geometryBytes:number;instanceGeometryBytes:number};
+    /** Alpha index subsets; index counts cover the same frame span as drawCalls. */
+    translucency: {cachedMeshes:number;indexBufferBytes:number;submittedIndices:number;fullIndices:number;draws:number};
     neonGlow: {enabled:boolean;draws:number;segments:number;cachedMeshes:number;bufferBytes:number};
     enabled: boolean; fps: number; frameMs: number; cpuMs: number;
     /** Main-view extraction only, not GPU execution. Cached frames do not run culling. */
@@ -189,12 +216,25 @@ export interface DebugStats {
     xrCuts: number; xrRoundRemaining: number|null;
 }
 export type PostEffectName = "ssr" | "godRays" | "bloom";
+export interface FrameProfile {
+    enabled: boolean;
+    frame: number|null;
+    cpu: Record<string,{lastMs:number;meanMs:number;p95Ms:number;samples:number}>;
+    gpu: {supported:boolean;available:boolean;sampleEveryFrames?:number;skippedSamples?:number;sampleFrame:number|null;ageFrames:number|null;passesMs:Record<string,number>|null;error?:string|null};
+}
+export interface FrameGraphStats {
+    active:boolean; passes:string[]; transientTextures:number; transientBuffers:number; transientBytesEstimate?:number;
+    prunedPassCount?:number; slots?:string[];
+    resources?:Array<{name:string;lifetime:string;slot:number|null;firstUse:number|null;lastUse:number|null}>;
+}
 export interface PostProcessing {
     /** Six square sRGB RGBA8 faces packed +X,-X,+Y,-Y,+Z,-Z, size 1..2048. RGB emission adds before LDR bloom; intensity 0..8 (default 1.2). Pass null to release uploaded maps and disable their background/reflection fallback. */
     setEnvironmentCubeMap(options: { size: number; color: Uint8Array; emission: Uint8Array; intensity?: number; projection?: { center: Vector3; halfExtents: Vector3 } | null } | null): void;
     setEnvironmentIntensity(intensity: number): void;
     configureEnvironment(options?: {enabled?: boolean; center?: Vector3; halfExtents?: Vector3}): void;
     environmentCaptures(): number;
+    /** Compiled native pass/resource plan. Reading never rebuilds it. */
+    graph(): FrameGraphStats;
     /** Strength 0..1. Unknown effects and invalid values throw. Computed in Rust/WGSL. */
     enable(name: PostEffectName, options?: { strength?: number }): void;
     /** Volume density 0..1 and exposure 0..100; independent of surface lighting. */
@@ -236,6 +276,21 @@ export class XRPlayer {
     equip(hand:'left'|'right',object:SceneObject|null,options?:XRHandOptions): this;
     unequip(hand:'left'|'right'): this;
 }
+export interface ComboDisplayOptions {
+    symbols: readonly {kind:string;asset:number;variant:number}[];
+    frameAsset: number;
+    origin: Vector3; spacing: number; rowGap: number; fruitScale: number;
+    frameScale?: Vector3;
+    historySeconds?: number;
+    timerPanel: SceneObject; scorePanel: SceneObject; awardPanels: readonly SceneObject[];
+}
+export interface ComboDisplayRow {
+    kind: string; count: number; icons: number[]; frames: number[];
+}
+export interface ComboDisplayState {
+    current: ComboDisplayRow|null;
+    history: (ComboDisplayRow & {success:boolean;points:number;age:number;opacity:number;label:number})[];
+}
 export interface WebXRHost extends EventTarget {
     readonly player: XRPlayer;
     /** Select a scene button with target ray + trigger or a bound blade strike. Emits buttonhover, select.detail.target and buttonpress. */
@@ -243,6 +298,9 @@ export interface WebXRHost extends EventTarget {
     /** Optional Rust-owned round clock and score; emits roundend at zero. */
     startRound(seconds?: number): void;
     readonly roundState: XRRoundState|null;
+    configureComboDisplay(options: ComboDisplayOptions): void;
+    clearComboDisplay(): void;
+    readonly comboDisplayState: ComboDisplayState|null;
     /** Grip pose is applied in Rust. requireTrigger defaults to true; false enables natural swings. Null unbinds. */
     bindController(hand: 'left'|'right', object: SceneObject|null, options?: XRHandOptions): void;
     readonly isPresenting: boolean;
@@ -256,6 +314,6 @@ export interface WebXRHost extends EventTarget {
 export type Engine = Readonly<RawEngine & {
     setBackgroundColor(color: Vector3): void;
     /** Additive glow radius in world meters; strength 0..2, radius .001.. .05. */
-    setNeonGlow(options?: {strength?:number;radius?:number}): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
+    setNeonGlow(options?: {strength?:number;radius?:number}): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; frameProfile(): FrameProfile; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
-export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl" }): Promise<Engine>;
+export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl"; profiling?: boolean }): Promise<Engine>;

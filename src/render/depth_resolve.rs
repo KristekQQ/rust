@@ -91,6 +91,7 @@ impl DepthResolve {
             label: Some("XR depth resolve encoder"),
         });
         {
+            let stamp = super::profiler::stamp("depth.resolve");
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("XR depth resolve"),
                 color_attachments: &[],
@@ -102,7 +103,7 @@ impl DepthResolve {
                     }),
                     stencil_ops: None,
                 }),
-                timestamp_writes: None,
+                timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });

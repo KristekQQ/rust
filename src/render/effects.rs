@@ -301,7 +301,7 @@ impl Effects {
         renderer: &mut super::renderer::SceneRenderer,
         view: RenderView,
         target: &RenderTarget<'_>,
-    ) -> Result<(), String> {
+    ) -> Result<wgpu::CommandBuffer, String> {
         let light_count = renderer.scene.lights().len().min(MAX_LIGHTS);
         self.ensure(&renderer.device, target.width, target.height, light_count);
         let mut lights = [super::data::EMPTY_LIGHT; MAX_LIGHTS];
@@ -403,7 +403,8 @@ impl Effects {
                     },
                     RenderPassKind::Reflection,
                 );
-                renderer.draw_color(&self.reflection.target(), self, true)?;
+                let reflection = renderer.encode_color(&self.reflection.target(), self, true)?;
+                renderer.queue.submit(Some(reflection));
                 self.stats.reflection_visible = renderer.pass_visible();
                 self.stats.reflection_updates += 1;
                 self.stats.passes += 1;
@@ -415,8 +416,8 @@ impl Effects {
         uniforms.clip_plane = [0.0; 4];
         renderer.upload_bytes += self.write_uniform(&renderer.queue, uniforms);
         renderer.prepare_pass(view, RenderPassKind::Main);
-        renderer.draw_color(target, self, false)?;
+        let main = renderer.encode_color(target, self, false)?;
         self.stats.passes += 1;
-        Ok(())
+        Ok(main)
     }
 }

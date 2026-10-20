@@ -11,6 +11,7 @@ Locate the affected path before editing: JS SDK → WASM export → CPU scene/ru
 
 For object placement and attached text, use [scene-object-layout](../scene-object-layout/SKILL.md) for coordinate conventions, shared transforms and XR layout checks.
 For direct Quest WebGPU XR, feature support, texture imports or headset diagnostics use [quest-webgpu-xr](../quest-webgpu-xr/SKILL.md).
+For pass scheduling, transient textures/buffers, graph invalidation and CPU/GPU profiling use [frame-pipeline](../frame-pipeline/SKILL.md); read its [extension guide](../../../docs/FRAME_PIPELINE.md) before adding resources or changing submission boundaries.
 For the shared XR person and inventory use [xr-player-equipment](../xr-player-equipment/SKILL.md); for cut-hit materials, size and speed response use [cut-feedback-tuning](../cut-feedback-tuning/SKILL.md).
 
 Use the [verification matrix](../../../docs/DEVELOPMENT.md). During iteration run targeted checks and reuse matching evidence. Native tests do not compile the wasm32 renderer; browser acceptance must use fresh matching `pkg/` and the actual Rust page. A build, DOM load, `cube.html` or separate JS graphics demo is not renderer acceptance.
@@ -23,10 +24,30 @@ Read [glTF](../../../docs/GLTF.md), [render passes](../../../docs/RENDER_PASSES.
 
 Decision recorded 2026-10-16: for the current apple/triangle-mesh cutting workload, local end-to-end tests found optimized Rust/WASM CPU cutting faster than both hybrid and GPU-resident WebGPU compute. Keep `auto` on CPU; treat `gpu` and `gpu-resident` as explicit experimental/comparison paths, not recommended acceleration. Do not repeat this migration as an assumed optimization; revisit when the user requests it, the workload changes, or new controlled measurements justify it. This is not a verdict against WebGPU rendering or compute for other workloads. Timings include allocation/queue/readback costs, varied substantially, and Quest 3 has not been measured; control power-saving/frame-rate limits in future benchmarks. Before cutting work read [the example decision](../../../examples/cutting/README.md); detailed limits/evidence are in [CUTTING.md](../../../docs/CUTTING.md).
 
-## Neonové ovoce bez viditelné výplně
+## Neonové ovoce: skleněné plochy nebo otevřené hrany
 
-V neon aréně `cutFaceColor()` vrací `[0,0,0]` a ovoce má `setColorCutout(.25)`.
-Shader tak řezné uzávěry vynechá z barvy i hloubky; uzavřený CPU mesh zůstává pro
-fyziku a řezání. Jde o konkrétní styl arény, ne výchozí chování všech řezatelných
-objektů. Zachovej reálné dělení meshe a neměň kvůli tomu globální triangulaci capů.
-Pixelový test `neon-arena` kontroluje pohled skrz skutečnou půlku na objekt za ní.
+Aréna před vstupem do VR nabízí `solid-fruit`: výchozí skleněné barevné plošky
+mají skutečnou alpha průhlednost (`FRUIT_OPACITY=.06`, `variation:1`): stabilní
+kontrastní řídké/husté masky přes `coverage` od skoro čirých plošek k plným. Jasné neonové hrany zůstávají
+neprůhledné; nezaváděj novou náhodu v každém frame. 15 vybraných seeded variant na druh se připraví před VR, sdílí topologii
+a střídá se bez opakování přes kurzor každého druhu i mezi koly. Výběr a pořadí
+maximalizují rozdíly skutečných masek výplně, nejen rozdílnost barevných dat. Quady mají dvě vnitřní GPU trojúhelníkové
+plochy se stejným krytím a bez neonové úhlopříčky; nekoplanární části a póly
+zůstávají trojúhelníkové. Seed je baked jas facet, shader kombinuje tento jas
+s lokální normálou. Zachovej stejné krytí obou trojúhelníků quadu.
+`cutFaceColor(fruit,true)` dává barevnou dužinu; geometrie půlek zůstává uzavřená.
+Původní otevřený styl používá `setColorCutout(.25)` a černé uzávěry, které shader
+vynechá z barvy i hloubky. Oba styly mají reálný uzavřený CPU mesh pro fyziku.
+Nerozšiřuj tuto prezentaci globálně na všechny řezatelné objekty. Herní rozměr
+řídí `FRUIT_SCALE`; tabulka má vlastní čitelné měřítko. Pixelový test arény
+rozlišuje otevřený řez od skutečné barevné alpha výplně.
+
+## Sdílené varianty meshe
+
+Pro stejné tvary s různými tmavými ploškami použij `Scene.createMeshVariants`
+a `MeshVariants.createInstance`, viz [MESH_VARIANTS.md](../../../docs/MESH_VARIANTS.md).
+Nesdílej jen JS pole a netvrď tím GPU instancování. Zachovej samostatnou identitu
+objektů a CPU řezání, společný render handle, přesné RGB v lookup textuře, sdílené
+glow hrany, union alpha subset a životnost do poslední reference. Průhlednost
+vyžaduje řazení jednotlivých instancí. Ověř barvy obou backendů a skutečné snížení
+počtu GPU meshů/draw calls; FPS v brýlích se měří zvlášť.

@@ -21,6 +21,8 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'neon-font-preview', path: 'examples/neon-font-preview/', status: '#result', button: '#verify' },
+    { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true },
@@ -485,6 +487,14 @@ try {
                     } catch (error) { reject(error); }
                 })));
                 await writeFile(path.join(output, result.screenshot), Buffer.from(png, 'base64'));
+                const fontFrame = await page.evaluate(() => {
+                    const evidence=document.querySelector('#font-evidence');
+                    return evidence instanceof HTMLCanvasElement ? evidence.toDataURL('image/png').split(',')[1] : null;
+                });
+                if(fontFrame){
+                    result.fontScreenshot=`${suite.name}-${backend}-font.png`;
+                    await writeFile(path.join(output,result.fontScreenshot),Buffer.from(fontFrame,'base64'));
+                }
                 const cutFrame = await page.evaluate(() => {
                     const evidence=document.querySelector('#cut-evidence');
                     return evidence instanceof HTMLCanvasElement ? evidence.toDataURL('image/png').split(',')[1] : null;

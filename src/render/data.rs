@@ -441,20 +441,21 @@ mod tests {
     #[test]
     fn instance_material_layout_matches_shader() {
         use crate::visibility::InstanceData;
-        assert_eq!(std::mem::size_of::<InstanceData>(), 160);
+        assert_eq!(std::mem::size_of::<InstanceData>(), 176);
         assert_eq!(std::mem::offset_of!(InstanceData, material), 128);
-        assert_eq!(
-            InstanceData::layout()
-                .attributes
-                .last()
-                .unwrap()
-                .shader_location,
-            12
-        );
-        assert_eq!(
-            InstanceData::layout().attributes.last().unwrap().offset,
-            144
-        );
+        assert_eq!(std::mem::offset_of!(InstanceData, emission), 144);
+        assert_eq!(std::mem::offset_of!(InstanceData, surface_params), 160);
+        let layout = InstanceData::layout();
+        assert_eq!(layout.array_stride, 176);
+        assert_eq!(layout.step_mode, wgpu::VertexStepMode::Instance);
+        assert_eq!(layout.attributes.len(), 11);
+        for (index, attribute) in layout.attributes.iter().enumerate() {
+            assert_eq!(attribute.shader_location, index as u32 + 3);
+            assert_eq!(attribute.offset, index as u64 * 16);
+            assert_eq!(attribute.format, wgpu::VertexFormat::Float32x4);
+        }
+        assert_eq!(layout.attributes.last().unwrap().shader_location, 13);
+        assert_eq!(layout.attributes.last().unwrap().offset, 160);
     }
     #[test]
     fn uniform_offsets_match_wgsl_alignment() {
@@ -467,9 +468,9 @@ mod tests {
 
 impl crate::visibility::InstanceData {
     pub fn layout<'a>() -> VertexBufferLayout<'a> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 10] = wgpu::vertex_attr_array![
+        const ATTRIBUTES: [wgpu::VertexAttribute; 11] = wgpu::vertex_attr_array![
             3 => Float32x4, 4 => Float32x4, 5 => Float32x4, 6 => Float32x4,
-            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4, 11 => Float32x4, 12 => Float32x4
+            7 => Float32x4, 8 => Float32x4, 9 => Float32x4, 10 => Float32x4, 11 => Float32x4, 12 => Float32x4, 13 => Float32x4
         ];
         VertexBufferLayout {
             array_stride: std::mem::size_of::<Self>() as u64,

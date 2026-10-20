@@ -160,6 +160,29 @@ impl CutMesh {
             local_bounds,
         })
     }
+    /// Internal render-only geometry, which may contain touching disconnected solids.
+    /// Never expose this constructor through the cuttable mesh validation API.
+    pub(crate) fn from_render_mesh(mesh: &crate::gltf_loader::ImportedMesh) -> Self {
+        let positions = mesh
+            .vertices
+            .iter()
+            .map(|v| Vec3::from_array(v.position))
+            .collect();
+        let triangles = mesh
+            .indices
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|&indices| Triangle {
+                indices,
+                color: Vec3::from_array(mesh.vertices[indices[0] as usize].color),
+                normals: Some(
+                    indices.map(|index| Vec3::from_array(mesh.vertices[index as usize].normal)),
+                ),
+            })
+            .collect();
+        Self::from_triangles(positions, triangles).expect("internal render mesh budget")
+    }
     /// A newly cut piece is immediately renderable. Build its triangle index
     /// only if it is actually cut again (not for every untouched output half).
     fn spatial_index(&self) -> &Bvh {
@@ -321,6 +344,19 @@ impl CutMesh {
             }
         }
         Self::from_triangles(positions, triangles)
+    }
+    /// Shared topology is validated once; a color variant builds its own BVH lazily.
+    pub(crate) fn recolored(&self, colors: &[Vec3]) -> Self {
+        let mut triangles = self.triangles.clone();
+        for (triangle, &color) in triangles.iter_mut().zip(colors) {
+            triangle.color = color;
+        }
+        Self {
+            positions: self.positions.clone(),
+            triangles,
+            bvh: OnceCell::new(),
+            local_bounds: self.local_bounds,
+        }
     }
     pub fn render_mesh(&self) -> crate::gltf_loader::ImportedMesh {
         let mut vertices = Vec::with_capacity(self.triangles.len() * 3);
@@ -1577,7 +1613,7 @@ mod tests {
     }
 
     #[test]
-    fn color_cutout_validates_extracts_and_survives_closed_mesh_cuts() {
+    fn opacity_and_color_cutout_validate_extract_and_survive_closed_mesh_cuts() {
         use crate::{
             scene::{RenderOptions, SceneManager},
             visibility::{RenderPassKind, RenderQueue},
@@ -1585,6 +1621,16 @@ mod tests {
         let mut scene = SceneManager::default();
         let target = scene.add_triangle_mesh(cube()).unwrap();
         assert_eq!(scene.objects()[&target].color_cutout, 0.);
+        assert_eq!(scene.objects()[&target].opacity, 1.);
+        assert_eq!(scene.objects()[&target].opaque_above, 8.);
+        assert_eq!(scene.objects()[&target].opacity_variation, 0.);
+        assert_eq!(scene.objects()[&target].opacity_coverage, -1.);
+        let mut default_queue = RenderQueue::default();
+        default_queue.extract_pass(&scene, glam::Mat4::IDENTITY, false, RenderPassKind::Main);
+        assert_eq!(
+            default_queue.imported[&target][0].surface_params,
+            [0., -1., 0., 0.]
+        );
         scene.set_render_options(
             target,
             RenderOptions {
@@ -1598,6 +1644,19 @@ mod tests {
             assert!(!scene.set_color_cutout(target, invalid));
         }
         assert!(!scene.set_color_cutout(u32::MAX, 0.5));
+        for invalid in [f32::NAN, f32::INFINITY, -0.1, 1.1] {
+            assert!(!scene.set_opacity(target, invalid, 0.25, 0.7, 0.72));
+        }
+        for invalid in [f32::NAN, f32::INFINITY, -0.1, 8.1] {
+            assert!(!scene.set_opacity(target, 0.6, invalid, 0.7, 0.72));
+        }
+        for invalid in [f32::NAN, f32::INFINITY, -0.1, 1.1] {
+            assert!(!scene.set_opacity(target, 0.6, 0.25, invalid, 0.72));
+        }
+        for invalid in [f32::NAN, f32::INFINITY, -0.1, -1.01, -2.0, 1.1] {
+            assert!(!scene.set_opacity(target, 0.6, 0.25, 0.7, invalid));
+        }
+        assert!(!scene.set_opacity(u32::MAX, 0.6, 0.25, 0.7, 0.72));
         assert_eq!(scene.render_revision(), render);
         assert!(scene.set_color_cutout(target, 1.));
         assert!(scene.set_color_cutout(target, 0.));
@@ -1605,9 +1664,16 @@ mod tests {
         assert!(scene.render_revision() > render);
         assert!(scene.static_revision() > static_revision);
         assert!(scene.set_emission(target, 2.));
+        for coverage in [-1.0, 0.0, 1.0, 0.72] {
+            assert!(scene.set_opacity(target, 0.6, 0.25, 0.7, coverage));
+        }
         let mut queue = RenderQueue::default();
         queue.extract_pass(&scene, glam::Mat4::IDENTITY, false, RenderPassKind::Main);
-        assert_eq!(queue.imported[&target][0].emission[..2], [2., 0.25]);
+        assert_eq!(queue.imported[&target][0].emission, [2., 0.25, 0.6, 0.25]);
+        assert_eq!(
+            queue.imported[&target][0].surface_params,
+            [0.7, 0.72, 0., 0.]
+        );
         let volume = scene.triangle_meshes()[&target].mesh.volume();
         scene.set_cuttable(target, true, Vec3::ONE).unwrap();
         let sword = scene.add_cube(Vec3::new(0., -3., -3.));
@@ -1621,6 +1687,10 @@ mod tests {
         for id in report.pieces {
             assert_eq!(scene.objects()[&id].color_cutout, 0.25);
             assert_eq!(scene.objects()[&id].emission, 2.);
+            assert_eq!(scene.objects()[&id].opacity, 0.6);
+            assert_eq!(scene.objects()[&id].opaque_above, 0.25);
+            assert_eq!(scene.objects()[&id].opacity_variation, 0.7);
+            assert_eq!(scene.objects()[&id].opacity_coverage, 0.72);
             let mesh = scene.triangle_meshes()[&id].mesh.cpu().unwrap();
             mesh.validate().unwrap();
             piece_volume += mesh.volume();

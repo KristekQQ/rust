@@ -1,6 +1,7 @@
 struct GlowUniforms {
     view_projection: mat4x4<f32>,
     params: vec4<f32>,
+    font_profile: vec4<f32>,
 };
 @group(0) @binding(0) var<uniform> glow: GlowUniforms;
 
@@ -21,7 +22,9 @@ struct VertexOutput {
     @location(4) model1: vec4<f32>,
     @location(5) model2: vec4<f32>,
     @location(6) model3: vec4<f32>,
+    @location(11) material: vec4<f32>,
     @location(12) emission: vec4<f32>,
+    @location(13) surface_params: vec4<f32>,
 ) -> VertexOutput {
     var out: VertexOutput;
     // A clipped degenerate primitive safely suppresses dark/behind-eye edges.
@@ -44,16 +47,24 @@ struct VertexOutput {
     if length_px < 0.001 { return out; }
     let tangent = delta / length_px;
     let side = vec2<f32>(-tangent.y, tangent.x);
-    let vp = glow.view_projection;
-    let projection_x = length(vec3<f32>(vp[0].x, vp[1].x, vp[2].x)) * viewport.x * 0.5;
-    let projection_y = length(vec3<f32>(vp[0].y, vp[1].y, vp[2].y)) * viewport.y * 0.5;
-    // Radius is world-space and independent of object scale. Bound near-eye expansion.
-    let radius = clamp(glow.params.w * max(projection_x, projection_y) / min(a.w, b.w), 0.75, 128.0);
+    // Projection scale is constant across all edges in this view; prepared on CPU.
+    // World-space text gets a stronger halo; ordinary scene geometry keeps its profile.
+    let numeric = material.w < -1.5;
+    let text_radius = select(1.0, 1.6, material.w < -0.5);
+    let text_energy = select(select(1.0,1.5,material.w < -0.5),0.9,numeric);
+    var projected_radius = glow.params.w*text_radius;
+    if numeric {
+        let base_world_radius = glow.font_profile.x;
+        let glyph_world_radius = length(model0.xyz)*glow.font_profile.y;
+        let projected_scale = glow.params.w/max(base_world_radius,0.000001);
+        projected_radius = (base_world_radius+glyph_world_radius)*projected_scale;
+    }
+    let radius = clamp(projected_radius/min(a.w,b.w),0.75,128.0);
     var corner = vec2<f32>(-1.0, -1.0);
-    switch vertex_index % 6u {
+    switch vertex_index % 4u {
         case 1u: { corner = vec2<f32>(1.0, -1.0); }
-        case 2u, 4u: { corner = vec2<f32>(1.0, 1.0); }
-        case 5u: { corner = vec2<f32>(-1.0, 1.0); }
+        case 2u: { corner = vec2<f32>(1.0, 1.0); }
+        case 3u: { corner = vec2<f32>(-1.0, 1.0); }
         default: {}
     }
     let t = (corner.x + 1.0) * 0.5;
@@ -69,7 +80,7 @@ struct VertexOutput {
     let hue = max(color, vec3<f32>(0.0)) / max(peak, 1.0);
     // A bright tube profile must be visible along the whole edge, even at low
     // scene emission; max-compositing prevents this energy accumulating at joins.
-    let energy = sqrt(min(emission.x, 8.0)) * glow.params.z * 0.65;
+    let energy = sqrt(min(emission.x, 8.0)) * glow.params.z * 0.65 * text_energy;
     out.color_radius = vec4<f32>(hue * energy, radius);
     return out;
 }

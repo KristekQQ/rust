@@ -1,10 +1,130 @@
 const BOARD_Y = 0.2;
+export const FRUIT_PATTERN_COUNT = 15;
+const FRUIT_PATTERN_CANDIDATES = 40;
+
+/** Authored sparse/dense coverage levels. @param {number} seed */
+export function fruitPatternCoverage(seed) {
+    return [.35,1,.55,.90,.70,.98,.80,.45][seed%8];
+}
+
+/** Compact filled-panel mask matching fs_translucent's quantized facet key.
+ * One byte per polygon (both center triangles of a quad count once); seams and
+ * solid stalks are excluded. Float32 operations follow the shader hash; GPU
+ * contraction/normal rounding can still differ slightly at soft thresholds.
+ * @param {import('../../js/engine.d.ts').TriangleMeshOptions} mesh
+ * @param {number} coverage
+ * @returns {Uint8Array} */
+export function fruitPatternDescriptor(mesh, coverage) {
+    const f = Math.fround;
+    /** @param {number} x */
+    const fract = x => f(x - Math.floor(x));
+    const colors = mesh.triangleColors ?? [];
+    const weights = [];
+    for (let i = 0; i < mesh.indices.length;) {
+        if (Math.max(colors[i], colors[i+1], colors[i+2]) >= .25) { i += 3; continue; }
+        const start = i;
+        while (i < colors.length && Math.max(colors[i], colors[i+1], colors[i+2]) < .25) i += 3;
+        const centerTriangles = (i-start)/3;
+        const [a,b,c] = Array.from(mesh.indices.slice(start,start+3), vertex =>
+            Array.from(mesh.positions.slice(vertex*3,vertex*3+3), f));
+        const u=b.map((v,j)=>f(v-a[j])), v=c.map((value,j)=>f(value-a[j]));
+        const cross=[f(f(u[1]*v[2])-f(u[2]*v[1])),f(f(u[2]*v[0])-f(u[0]*v[2])),f(f(u[0]*v[1])-f(u[1]*v[0]))];
+        const inverse=f(1/f(Math.sqrt(f(f(f(cross[0]*cross[0])+f(cross[1]*cross[1]))+f(cross[2]*cross[2])))));
+        const normal=cross.map(n=>Math.round(f(f(n*inverse)*4096))/4096);
+        const brightness=Math.round(f(f(Math.max(colors[start],colors[start+1],colors[start+2]))*65536))/65536;
+        const seed=normal.map((n,j)=>fract(f(f(f(n*f([.1031,.1030,.0973][j]))+f(brightness*f(17.37)))+f([.37,.61,.83][j]))));
+        const products=seed.map((n,j)=>f(n*f(seed[(j+1)%3]+f(33.33))));
+        const dot=f(f(products[0]+products[1])+products[2]);
+        const mixed=seed.map(n=>f(n+dot));
+        const hash=fract(f(f(mixed[0]+mixed[1])*mixed[2]));
+        const threshold=f(1-coverage), low=f(threshold-f(.06)), high=f(threshold+f(.06));
+        const t=Math.max(0,Math.min(1,f(f(hash-low)/f(high-low))));
+        const weight=coverage===1?1:coverage===0?0:f(f(t*t)*f(3-f(2*t)));
+        weights.push(Math.round(weight*255));
+        i += 6*(centerTriangles+2);
+    }
+    return Uint8Array.from(weights);
+}
+
+/** Mean absolute difference of actual polygon fill, rather than seed/RGB.
+ * @param {Uint8Array} a @param {Uint8Array} b */
+function patternDistance(a,b) {
+    return a.reduce((sum,value,i)=>sum+Math.abs(value-b[i]),0)/(255*a.length);
+}
+
+/** Retain base, fullest and sparsest, then maximize distance to the nearest
+ * selected mask. Near-identical dense candidates lose to distinct panel masks.
+ * Order by farthest next neighbor, then improve cyclic adjacency with bounded
+ * segment reversals. Index zero remains the original base/gallery object.
+ * @param {ReturnType<typeof fruitGeometries>} candidates */
+function selectFruitPatterns(candidates) {
+    const masks=candidates.map(fruit=>fruitPatternDescriptor(fruit.geometry,fruit.coverage ?? 1));
+    const distances=masks.map(a=>masks.map(b=>patternDistance(a,b)));
+    const filled=masks.map(mask=>mask.reduce((sum,value)=>sum+value,0));
+    const selected=[0];
+    for(const value of [Math.max(...filled),Math.min(...filled)]) {
+        const index=filled.indexOf(value);
+        if(!selected.includes(index)) selected.push(index);
+    }
+    while(selected.length<FRUIT_PATTERN_COUNT) {
+        let best=-1,score=-1;
+        for(let i=0;i<candidates.length;i++)if(!selected.includes(i)) {
+            const nearest=Math.min(...selected.map(j=>distances[i][j]));
+            if(nearest>score){best=i;score=nearest;}
+        }
+        selected.push(best);
+    }
+    const order=[0], remaining=selected.filter(i=>i!==0);
+    while(remaining.length) {
+        let best=0;
+        for(let i=1;i<remaining.length;i++)if(distances[order.at(-1) ?? 0][remaining[i]]>distances[order.at(-1) ?? 0][remaining[best]])best=i;
+        order.push(remaining.splice(best,1)[0]);
+    }
+    /** Prefer improving the weakest cyclic transition, then total distance.
+     * @param {number[]} cycle */
+    const score=cycle=>{
+        const edges=cycle.map((value,i)=>distances[value][cycle[(i+1)%cycle.length]]);
+        return Math.min(...edges)*1000+edges.reduce((sum,d)=>sum+d,0);
+    };
+    for(let pass=0;pass<8;pass++) {
+        let best=order, bestScore=score(order);
+        for(let a=1;a<order.length-1;a++)for(let b=a+1;b<order.length;b++) {
+            const trial=[...order.slice(0,a),...order.slice(a,b+1).reverse(),...order.slice(b+1)];
+            const trialScore=score(trial);
+            if(trialScore>bestScore+1e-9){best=trial;bestScore=trialScore;}
+        }
+        if(best===order)break;
+        order.splice(0,order.length,...best);
+    }
+    return order.map(i=>candidates[i]);
+}
+
+/** Fifteen diverse static panel patterns per kind, selected once before VR
+ * from forty candidates. Variants share immutable positions/indices.
+ * @returns {{fruits:ReturnType<typeof fruitGeometries>,wild:ReturnType<typeof wildSymbol>,variants:Record<string,ReturnType<typeof fruitGeometries>>}} */
+export function createFruitPatternCatalog() {
+    const fruits=fruitGeometries(),wild=wildSymbol();
+    for(const fruit of [...fruits,wild])fruit.coverage=fruitPatternCoverage(0);
+    /** @type {Record<string,ReturnType<typeof fruitGeometries>>} */
+    const variants=Object.fromEntries([...fruits,wild].map(fruit=>[fruit.name,[fruit]]));
+    for(let seed=1;seed<FRUIT_PATTERN_CANDIDATES;seed++)for(const fruit of [...fruitGeometries({seed}),wildSymbol({seed})]){
+        const base=variants[fruit.name][0];
+        fruit.geometry.positions=base.geometry.positions;
+        fruit.geometry.indices=base.geometry.indices;
+        fruit.coverage=fruitPatternCoverage(seed);
+        variants[fruit.name].push(fruit);
+    }
+    for(const name of Object.keys(variants))variants[name]=selectFruitPatterns(variants[name]);
+    return {fruits,wild,variants};
+}
 
 /** Closed, origin-centered fruit meshes. Neon seams subdivide the actual
  * surface, so cutting sees closed solids rather than overlapping wire meshes.
- * The renderer discards dark centers; both sides of the luminous seams remain visible.
- * @returns {{name: string, geometry: import('../../js/engine.d.ts').TriangleMeshOptions, capColor: import('../../js/engine.d.ts').Vector3}[]} */
-export function fruitGeometries() {
+ * Colored facets stay below the optional .25 cutout threshold. The same mesh
+ * supports solid neon fruit and the original open-seam presentation.
+ * @param {{seed?: number}} [options]
+ * @returns {{name: string, geometry: import('../../js/engine.d.ts').TriangleMeshOptions, capColor: import('../../js/engine.d.ts').Vector3,coverage?:number}[]} */
+export function fruitGeometries({seed = 0} = {}) {
     /** @type {ReturnType<typeof fruitGeometries>} */
     const fruits = [
         {
@@ -70,13 +190,17 @@ export function fruitGeometries() {
             capColor: [.91,.53,1],
         },
     ];
-    for (const fruit of fruits) accentColors(fruit.name, fruit.geometry);
+    for (const fruit of fruits) {
+        accentColors(fruit.name, fruit.geometry);
+        seedFacetShades(fruit.geometry, seed);
+    }
     return fruits;
 }
 
 /** Closed three-pronged jester crown. Its two-sided volume can be genuinely sliced.
+ * @param {{seed?: number}} [options]
  * @returns {ReturnType<typeof fruitGeometries>[number]} */
-export function wildSymbol() {
+export function wildSymbol({seed = 0} = {}) {
     const outline=[[-.8,-.65],[.8,-.65],[.95,.9],[.34,.45],[0,1.15],[-.34,.45],[-.95,.9]];
     const positions=[0,0,.30,0,0,-.30,...outline.flatMap(([x,y])=>[x,y,0])];
     const indices=[];
@@ -89,7 +213,8 @@ export function wildSymbol() {
     for(let i=0;i<colors.length;i+=3)if(Math.max(...colors.slice(i,i+3))>.25 && i%12===0)
         colors.splice(i,3,1,.05,.8);
     geometry.triangleColors=colors;
-    return {name:'wild',geometry,capColor:[0,0,0]};
+    seedFacetShades(geometry, seed);
+    return {name:'wild',geometry,capColor:[1,.35,.72]};
 }
 
 // Spatial palettes are baked once into the mesh; no runtime recoloring, textures or extra draws.
@@ -102,10 +227,21 @@ const PALETTE = {
 /** @param {string} name @param {import('../../js/engine.d.ts').TriangleMeshOptions} mesh */
 function accentColors(name, mesh) {
     const colors = Array.from(mesh.triangleColors ?? []);
-    for (let i=0;i<mesh.indices.length;i+=3) {
-        if (Math.max(colors[i],colors[i+1],colors[i+2])<.25) continue;
+    for (let i=0;i<mesh.indices.length;) {
+        const start=i;
+        let centerEnd=i+3,end=i+3;
+        if(Math.max(colors[i],colors[i+1],colors[i+2])<.25){
+            // A polygon is authored as its center fan then two seam triangles
+            // per boundary edge. Choose ONE palette at the whole center's
+            // centroid, never separately for the GPU triangles of a quad.
+            centerEnd=i;
+            while(centerEnd<colors.length&&Math.max(colors[centerEnd],colors[centerEnd+1],colors[centerEnd+2])<.25)centerEnd+=3;
+            const centerTriangles=(centerEnd-start)/3;
+            end=centerEnd+6*(centerTriangles+2);
+        }
+        const vertices=[...new Set(Array.from(mesh.indices.slice(start,centerEnd)))];
         let x=0,y=0;
-        for(let j=0;j<3;j++) {const vertex=mesh.indices[i+j]*3;x+=mesh.positions[vertex]/3;y+=mesh.positions[vertex+1]/3;}
+        for(const vertex of vertices){x+=mesh.positions[vertex*3]/vertices.length;y+=mesh.positions[vertex*3+1]/vertices.length;}
         let color;
         switch(name) {
             case 'cherry': color=y>.18?PALETTE.green:x>0?PALETTE.pink:PALETTE.red;break;
@@ -117,7 +253,12 @@ function accentColors(name, mesh) {
             case 'banana': color=Math.abs(x)>.72?PALETTE.green:y<-.08?PALETTE.gold:PALETTE.yellow;break;
             case 'orange': color=y>.5?PALETTE.green:PALETTE.orange;break;
         }
-        if(color) {colors[i]=color[0];colors[i+1]=color[1];colors[i+2]=color[2];}
+        for(let triangle=start;triangle<end;triangle+=3)if(color) {
+            // Preserve the baked facet key across both center triangles of a quad.
+            const shade=Math.max(colors[triangle],colors[triangle+1],colors[triangle+2]);
+            for(let c=0;c<3;c++)colors[triangle+c]=shade>=.25?color[c]*.80+.20:color[c]*shade;
+        }
+        i=end;
     }
     mesh.triangleColors=colors;
 }
@@ -128,7 +269,7 @@ function accentColors(name, mesh) {
 function solidNeon(mesh,color) {
     const triangleColors=[];
     for(let i=0;i<mesh.indices.length;i+=3)triangleColors.push(...color);
-    return {...mesh,triangleColors,smooth:false};
+    return {positions:mesh.positions,indices:mesh.indices,triangleColors,smooth:false};
 }
 
 /** @param {number[][]} profile Bottom pole, seven latitude rings, top pole.
@@ -143,6 +284,7 @@ function neonFruit(profile, neon, dark, scale, striped = false) {
     const positions = [0, (profile[0][0] - centerY) * scale[1], 0,
         0, (profile[profile.length - 1][0] - centerY) * scale[1], 0];
     /** @type {number[]} */ const baseIndices = [];
+    const faces = [];
     for (let ring = 1; ring < profile.length - 1; ring++) {
         const [y, radius] = profile[ring];
         for (let i = 0; i < segments; i++) {
@@ -155,39 +297,68 @@ function neonFruit(profile, neon, dark, scale, striped = false) {
     for (let i = 0; i < segments; i++) {
         const next = (i + 1) % segments;
         baseIndices.push(0, 2 + i, 2 + next);
+        faces.push([0, 2 + i, 2 + next]);
         const top = 2 + (ringCount - 1) * segments;
         baseIndices.push(1, top + next, top + i);
+        faces.push([1, top + next, top + i]);
         for (let ring = 0; ring < ringCount - 1; ring++) {
             const b = 2 + ring * segments + i, bn = 2 + ring * segments + next;
             baseIndices.push(b, b + segments, bn + segments, b, bn + segments, bn);
+            faces.push([b, b + segments, bn + segments, bn]);
         }
     }
-    return neonSurface({positions, indices: baseIndices}, neon, dark, striped);
+    return neonSurface({positions, indices: baseIndices, faces}, neon, dark, striped);
 }
 
-/** Apply coplanar luminous seams without adding overlapping surface shells.
- * @param {{positions: number[], indices: number[]}} mesh
+/** Bake seeded per-facet brightness into maxRGB, which the shader uses as a
+ * stable opacity key. Center triangles of one polygon retain the same key.
+ * @param {import('../../js/engine.d.ts').TriangleMeshOptions} mesh @param {number} seed */
+function seedFacetShades(mesh, seed) {
+    const colors = Array.from(mesh.triangleColors ?? []);
+    for (let i = 0; i < colors.length; i += 3) {
+        const brightness = Math.max(colors[i], colors[i + 1], colors[i + 2]);
+        if (brightness >= .25) continue;
+        const shade = .15 + .08 * facetRandom(Math.round(brightness * 1e9) ^ (seed | 0));
+        for (let axis = 0; axis < 3; axis++) colors[i + axis] *= shade / brightness;
+    }
+    mesh.triangleColors = colors;
+}
+
+/** Integer hash, evaluated only while generating a mesh. @param {number} value */
+function facetRandom(value) {
+    value = Math.imul(value ^ (value >>> 16), 0x21f0aaad);
+    value = Math.imul(value ^ (value >>> 15), 0x735a2d97);
+    return ((value ^ (value >>> 15)) >>> 0) / 4294967296;
+}
+
+/** Apply coplanar luminous polygon outlines without overlapping surface shells.
+ * A quad has two equally shaded center triangles and no luminous diagonal.
+ * @param {{positions: number[], indices: number[], faces?: number[][]}} mesh
  * @param {number[]} neon @param {number[]} dark @param {boolean} [striped]
  * @returns {import('../../js/engine.d.ts').TriangleMeshOptions} */
 function neonSurface(mesh, neon, dark, striped = false) {
-    const positions = [...mesh.positions], baseIndices = mesh.indices;
+    const positions = [...mesh.positions];
+    const faces = mesh.faces ?? Array.from({length: mesh.indices.length / 3},
+        (_, face) => mesh.indices.slice(face * 3, face * 3 + 3));
     /** @type {number[]} */ const indices = [];
     /** @type {number[]} */ const triangleColors = [];
-    for (let face = 0; face < baseIndices.length; face += 3) {
-        const outer = baseIndices.slice(face, face + 3);
+    for (let face = 0; face < faces.length; face++) {
+        const outer = faces[face];
         const inner = positions.length / 3;
-        const centroid = [0, 1, 2].map(axis => outer.reduce((sum, v) => sum + positions[v * 3 + axis], 0) / 3);
+        const centroid = [0, 1, 2].map(axis => outer.reduce((sum, v) => sum + positions[v * 3 + axis], 0) / outer.length);
         for (const vertex of outer) {
             for (let axis = 0; axis < 3; axis++) {
                 positions.push(centroid[axis] + (positions[vertex * 3 + axis] - centroid[axis]) * .88);
             }
         }
-        // One dark center and three luminous, coplanar edge trapezoids.
-        indices.push(inner, inner + 1, inner + 2);
-        const stripe = striped && Math.floor(face / 42) % 2 === 0;
-        triangleColors.push(...dark.map(value => value * (stripe ? 2.2 : 1)));
-        for (let edge = 0; edge < 3; edge++) {
-            const next = (edge + 1) % 3;
+        const stripe = striped && Math.floor(face / 14) % 2 === 0;
+        const shade = .15 + .08 * facetRandom(face + 1);
+        for (let vertex = 1; vertex < outer.length - 1; vertex++) {
+            indices.push(inner, inner + vertex, inner + vertex + 1);
+            triangleColors.push(...neon.map(value => value * shade));
+        }
+        for (let edge = 0; edge < outer.length; edge++) {
+            const next = (edge + 1) % outer.length;
             indices.push(outer[edge], outer[next], inner + next,
                 outer[edge], inner + next, inner + edge);
             const seam = stripe ? [.48,1,.08] : neon;
@@ -197,14 +368,26 @@ function neonSurface(mesh, neon, dark, striped = false) {
     return {positions, indices, triangleColors, smooth: false};
 }
 
+/** A curved tube cell can stay a quad only if all four vertices are coplanar.
+ * @param {number[]} positions @param {number[]} face */
+function planarQuad(positions, face) {
+    /** @param {number} vertex */
+    const point = vertex => positions.slice(vertex * 3, vertex * 3 + 3);
+    const [a, b, c, d] = face.map(point);
+    const ab = b.map((v, i) => v - a[i]), ac = c.map((v, i) => v - a[i]);
+    const normal = [ab[1]*ac[2]-ab[2]*ac[1], ab[2]*ac[0]-ab[0]*ac[2], ab[0]*ac[1]-ab[1]*ac[0]];
+    const length = Math.hypot(...normal);
+    return length > 1e-12 && Math.abs(normal.reduce((sum, v, i) => sum + v * (d[i] - a[i]), 0)) <= length * 1e-9;
+}
+
 /** A capped, planar curved tube; endpoint radii must be zero.
  * The ring frame follows the centerline tangent, keeping the banana curved in 3D.
  * @param {number[][]} centers @param {number[]} radii @param {number} segments
- * @returns {{positions: number[], indices: number[]}} */
+ * @returns {{positions: number[], indices: number[], faces: number[][]}} */
 function curvedSolid(centers, radii, segments) {
     const positions = [centers[0][0], centers[0][1], 0,
         centers[centers.length - 1][0], centers[centers.length - 1][1], 0];
-    const indices = [];
+    const indices = [], faces = [];
     for (let ring = 1; ring < centers.length - 1; ring++) {
         const dx = centers[ring + 1][0] - centers[ring - 1][0];
         const dy = centers[ring + 1][1] - centers[ring - 1][1];
@@ -221,12 +404,16 @@ function curvedSolid(centers, radii, segments) {
         const next = (i + 1) % segments;
         const top = 2 + (ringCount - 1) * segments;
         indices.push(0, 2 + i, 2 + next, 1, top + next, top + i);
+        faces.push([0, 2 + i, 2 + next], [1, top + next, top + i]);
         for (let ring = 0; ring < ringCount - 1; ring++) {
             const a = 2 + ring * segments + i, b = 2 + ring * segments + next;
             indices.push(a, a + segments, b + segments, a, b + segments, b);
+            const quad = [a, a + segments, b + segments, b];
+            if (planarQuad(positions, quad)) faces.push(quad);
+            else faces.push([a, a + segments, b + segments], [a, b + segments, b]);
         }
     }
-    return {positions, indices};
+    return {positions, indices, faces};
 }
 
 /** @returns {import('../../js/engine.d.ts').TriangleMeshOptions} */
@@ -326,4 +513,31 @@ export function swordGeometry() {
     box([0.18,0.025,0.025],[0,0,-0.095],[0.7,0.43,0.09]);
     box([0.035,0.035,0.15],[0,0,0],[0.14,0.07,0.03]);
     return {positions, indices, triangleColors};
+}
+
+/** Closed rounded rectangle swept with a circular neon tube, in physical metres.
+ * Bright front bands supply continuous glow boundaries without polygon ribs.
+ * @returns {import('../../js/engine.d.ts').TriangleMeshOptions} */
+export function neonFrameGeometry() {
+    const positions=[],indices=[],triangleColors=[];
+    const half=.15,bend=.035,tube=.006,sides=24;
+    const centers=[[half-bend,half-bend],[-half+bend,half-bend],[-half+bend,-half+bend],[half-bend,-half+bend]];
+    const points=[];
+    for(let corner=0;corner<4;corner++)for(let step=0;step<=8;step++){
+        const angle=(corner+step/8)*Math.PI/2;
+        points.push([centers[corner][0]+bend*Math.cos(angle),centers[corner][1]+bend*Math.sin(angle),Math.cos(angle),Math.sin(angle)]);
+    }
+    for(const [x,y,nx,ny] of points)for(let side=0;side<sides;side++){
+        const angle=side/sides*Math.PI*2;
+        positions.push(x+nx*tube*Math.cos(angle),y+ny*tube*Math.cos(angle),tube*Math.sin(angle));
+    }
+    for(let ring=0;ring<points.length;ring++)for(let side=0;side<sides;side++){
+        const a=ring*sides+side,b=((ring+1)%points.length)*sides+side;
+        const c=((ring+1)%points.length)*sides+(side+1)%sides,d=ring*sides+(side+1)%sides;
+        indices.push(a,b,c,a,c,d);
+        const front=Math.max(0,Math.sin((side+.5)/sides*Math.PI*2))**12;
+        const color=[.003+.32*front,.035+.52*front,.20+.80*front];
+        triangleColors.push(...color,...color);
+    }
+    return {positions,indices,triangleColors,smooth:true};
 }

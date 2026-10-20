@@ -536,3 +536,91 @@ test('XRPlayer exposes native tracking and generic inventory without weapon assu
     assert.throws(()=>player.state,/ukončen/);
     assert.throws(()=>player.equip('right',tool),/ukončen/);
 });
+
+
+test('profiling is opt-in and initialization cannot silently change its device features', async t => {
+    const canvas=environment(t);
+    globalThis.__sdkImport=async()=>wasmMock({dispose(){}});
+    const {initEngine}=await sdk();
+    await assert.rejects(initEngine(canvas,{profiling:'yes'}),/profiling/);
+    const ordinary=await initEngine(canvas);
+    assert.equal(canvas.dataset.frameProfile,'false');
+    await assert.rejects(initEngine(canvas,{profiling:true}),/profiling/);
+    ordinary.dispose();
+    const measured=await initEngine(canvas,{profiling:true});
+    assert.equal(canvas.dataset.frameProfile,'true');
+    assert.equal(await initEngine(canvas,{profiling:true}),measured);
+    measured.dispose();
+});
+
+
+test('WASM initialization explicitly bypasses the HTTP cache',async t=>{
+    const canvas=environment(t);let request;
+    globalThis.__sdkImport=async()=>wasmMock({default:async options=>{request=options.module_or_path;},dispose(){}});
+    const {initEngine}=await sdk();const engine=await initEngine(canvas);
+    assert(request instanceof Request);
+    assert.equal(request.cache,'no-store');
+    assert.match(request.url,/webgpu_wasm_bg\.wasm\?v=\d+$/);
+    engine.dispose();
+});
+
+
+test('mesh opacity is a thin native command with an optional opaque facet threshold', async () => {
+    const {SceneObject}=await sdk();
+    const calls=[];
+    const wasm={set_object_opacity(...args){calls.push(args);return Number.isFinite(args[1])&&args[1]>=0&&args[1]<=1;}};
+    const mesh=new SceneObject(wasm,17);
+    assert.equal(mesh.setOpacity(.06,{opaqueAbove:.25,variation:1,coverage:.12}),mesh);
+    mesh.setOpacity(1);
+    assert.deepEqual(calls,[[17,.06,.25,1,.12],[17,1,8,0,-1]]);
+    assert.throws(()=>mesh.setOpacity(NaN),/odmítl/);
+});
+
+test('shared mesh assets forward immutable color tables and independent variant instance commands', async () => {
+    const {Scene,SceneObject,MeshVariants}=await sdk();
+    const calls=[];
+    const wasm={
+        register_mesh_variants(...args){calls.push(['register',...args]);return 41;},
+        add_mesh_variant(...args){calls.push(['instance',...args]);return args[1]===15?0xffffffff:101+args[1];},
+        remove_mesh_variants(...args){calls.push(['release',...args]);return true;},
+    };
+    const scene=new Scene(wasm);
+    const options={positions:[0,0,0,1,0,0,0,1,0],indices:[0,1,2],variants:[[.1,.2,.1],[.2,.1,.1]]};
+    const asset=scene.createMeshVariants(options);
+    assert(asset instanceof MeshVariants);
+    assert.equal(asset.id,41);
+    assert(calls[0][1] instanceof Float32Array);
+    assert(calls[0][2] instanceof Uint32Array);
+    assert.deepEqual(calls[0][3],new Float32Array(options.variants.flat()));
+    assert.equal(calls[0][4],false);
+    const first=asset.createInstance(),second=asset.createInstance(1);
+    assert(first instanceof SceneObject);assert(second instanceof SceneObject);
+    assert.equal(first.id,101);assert.equal(second.id,102);
+    assert.deepEqual(calls.slice(1),[['instance',41,0],['instance',41,1]]);
+    assert.throws(()=>asset.createInstance(-1),/varianty/);
+    assert.throws(()=>asset.createInstance(.5),/varianty/);
+    assert.throws(()=>asset.createInstance(15),/odmítl/);
+    assert.throws(()=>scene.createMeshVariants({...options,variants:[[1,0]]}),/variant/);
+    assert.throws(()=>scene.createMeshVariants({...options,variants:[]}),/variant/);
+    asset.remove();assert.deepEqual(calls.at(-1),['release',41]);
+    wasm.register_mesh_variants=()=>0xffffffff;
+    assert.throws(()=>scene.createMeshVariants(options),/odmítl/);
+});
+
+
+test('numeric text forwards static digits and transforms to Rust shared glyph instances', async () => {
+    const {Scene, SceneObject} = await sdk();
+    const calls = [];
+    const scene = new Scene({
+        add_numeric_text(...args) { calls.push(['numeric', ...args]); return 81; },
+        set_object_position(...args) { calls.push(['position', ...args]); return true; },
+    });
+    const text = scene.createNumericText('01234', {width:3, height:.7, position:[0,1,0]});
+    assert(text instanceof SceneObject);
+    assert.equal(text.id,81);
+    assert.deepEqual(calls[0], ['numeric','01234',3,.7]);
+    assert.deepEqual(calls[1], ['position',81,0,1,0]);
+    scene.createNumericText('6789');
+    assert.deepEqual(calls[2], ['numeric','6789',1.2,.72]);
+    assert.deepEqual(calls[3], ['position',81,0,0,0]);
+});

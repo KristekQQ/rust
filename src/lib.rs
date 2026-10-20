@@ -1,23 +1,28 @@
 pub mod blade_physics;
 pub mod collision;
+pub mod combo_display;
 pub mod cutting;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod cutting_bench;
 pub mod cutting_mesh;
 pub mod cutting_tool;
 pub mod debug_overlay;
+pub mod frame_graph;
 pub mod frame_metrics;
 pub mod gltf_animation;
 pub mod gltf_loader;
 pub mod gltf_model;
 pub mod info_panel;
 pub mod input;
+pub mod postprocess_plan;
 mod projectile;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod render_math;
 pub mod scene;
 mod spatial;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod translucency;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;

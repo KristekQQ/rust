@@ -31,9 +31,13 @@ pub struct State {
     frame_dt: f32,
     xr_rendering: bool,
     xr_hud_pending: bool,
+    xr_scene_pending: bool,
+    xr_view_slot: u32,
+    xr_eye_count: u32,
     xr_cuts: u64,
     pub combo_score: crate::xr_round::ComboScore,
     combo_indicators: Vec<ComboIndicator>,
+    combo_display: Option<crate::combo_display::ComboDisplay>,
     info_panel_elapsed: f32,
     info_round_dirty: bool,
     xr_round: Option<crate::xr_round::RoundClock>,
@@ -62,6 +66,10 @@ impl State {
         let (output, device, queue, backend) = CanvasOutput::new(canvas, &check_current).await?;
         check_current()?;
         let aspect = output.aspect();
+        super::profiler::reset();
+        if canvas.get_attribute("data-frame-profile").as_deref() == Some("true") {
+            super::profiler::initialize(&device);
+        }
         let renderer = SceneRenderer::new(device, queue);
         let mut postprocess = PostProcessor::new(&renderer.device, output.color_format());
         let (static_map, dynamic_map) = renderer.shadow_maps();
@@ -87,9 +95,13 @@ impl State {
             frame_dt: 0.0,
             xr_rendering: false,
             xr_hud_pending: false,
+            xr_scene_pending: false,
+            xr_view_slot: 0,
+            xr_eye_count: 0,
             xr_cuts: 0,
             combo_score: Default::default(),
             combo_indicators: Vec::new(),
+            combo_display: None,
             info_panel_elapsed: 0.25,
             info_round_dirty: true,
             xr_round: None,
@@ -277,6 +289,15 @@ impl State {
             size,
         )
     }
+    pub fn postprocess_graph(&self) -> serde_json::Value {
+        self.postprocess.graph_stats()
+    }
+    pub fn graph_probe_handles(&self) -> (wgpu::Device, wgpu::Queue) {
+        (self.renderer.device.clone(), self.renderer.queue.clone())
+    }
+    pub fn finish_xr_frame(&self) {
+        super::profiler::end_frame(&self.renderer.device, &self.renderer.queue);
+    }
     pub fn postprocess_stats(&self) -> [f64; 5] {
         self.postprocess.stats()
     }
@@ -289,7 +310,11 @@ impl State {
         true
     }
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        super::profiler::begin_frame();
         self.frame_dt = dt;
+        if let Some(display) = &mut self.combo_display {
+            display.advance(&mut self.renderer.scene, dt);
+        }
         self.renderer.advance_scene(dt);
         self.refresh_info_panels(dt);
         self.view = RenderView {
@@ -426,6 +451,19 @@ impl State {
                 .scene
                 .update_info_panels(PanelKind::Diagnostics, &diagnostics);
         }
+        self.renderer.scene.update_info_panels(
+            PanelKind::Countdown,
+            &[(
+                "",
+                self.xr_round
+                    .map_or(30, |r| r.remaining.ceil() as u32)
+                    .to_string(),
+            )],
+        );
+        self.renderer.scene.update_info_panels(
+            PanelKind::Score,
+            &[("", self.combo_score.score.to_string())],
+        );
         if self.info_round_dirty {
             let mut rows = if self.combo_score.enabled {
                 vec![
@@ -462,6 +500,7 @@ impl State {
                 .update_info_panels(PanelKind::Round, &rows);
             self.info_round_dirty = false;
         }
+        self.renderer.sync_numeric_font_meshes();
     }
     pub fn debug_stats(&self) -> String {
         let mut value = self.renderer.debug_values();
@@ -474,6 +513,27 @@ impl State {
     }
     pub fn xr_round_finished(&self) -> bool {
         self.xr_round.is_some_and(|round| round.finished())
+    }
+    pub fn configure_combo_display(&mut self, input: &str) -> bool {
+        let Some(mut display) =
+            crate::combo_display::ComboDisplay::configure(&self.renderer.scene, input)
+        else {
+            return false;
+        };
+        self.clear_combo_display();
+        display.reset(&mut self.renderer.scene);
+        self.combo_display = Some(display);
+        true
+    }
+    pub fn clear_combo_display(&mut self) {
+        if let Some(mut display) = self.combo_display.take() {
+            display.reset(&mut self.renderer.scene);
+        }
+    }
+    pub fn combo_display_state(&self) -> String {
+        self.combo_display
+            .as_ref()
+            .map_or_else(|| "null".into(), |d| d.state())
     }
     pub fn clear_combo_indicators(&mut self) {
         self.combo_indicators.clear();
@@ -524,6 +584,9 @@ impl State {
         self.xr_round = Some(round);
         self.xr_cuts = 0;
         self.combo_score.reset();
+        if let Some(display) = &mut self.combo_display {
+            display.reset(&mut self.renderer.scene);
+        }
         let live: std::collections::BTreeSet<_> =
             self.renderer.scene.objects().keys().copied().collect();
         self.combo_score.targets.retain(|id, _| live.contains(id));
@@ -555,12 +618,16 @@ impl State {
         if count > 0 {
             // Controller input follows advance_xr; new halves must be visible in
             // this same stereo frame instead of disappearing for one frame.
-            self.renderer.sync_triangle_meshes();
+            self.xr_scene_pending = true;
         }
         if count > 0 && !self.xr_round_finished() {
             self.xr_cuts = self.xr_cuts.saturating_add(count as u64);
             for id in removed {
-                self.combo_score.hit(*id);
+                if let Some(event) = self.combo_score.hit_event(*id) {
+                    if let Some(display) = &mut self.combo_display {
+                        display.event(&mut self.renderer.scene, event);
+                    }
+                }
             }
             self.invalidate_xr_hud();
         }
@@ -571,6 +638,7 @@ impl State {
     pub fn advance_xr(&mut self, dt: f32) {
         self.frame_dt = dt;
         self.xr_hud_pending = true;
+        self.xr_eye_count = 0;
         if let Some(round) = &mut self.xr_round {
             let before = round.remaining.ceil();
             round.advance(dt);
@@ -582,10 +650,21 @@ impl State {
         if let Some(present) = &mut self.xr_present {
             present.reset_frame();
         }
+        super::profiler::begin_frame();
+        if let Some(display) = &mut self.combo_display {
+            display.advance(&mut self.renderer.scene, dt);
+        }
         self.renderer.advance_xr_scene(dt);
+        self.xr_scene_pending = true;
         self.refresh_info_panels(dt);
     }
     pub fn render_xr_eye(&mut self, matrix: Mat4, position: Vec3) -> Result<(), JsValue> {
+        self.xr_view_slot = self.xr_eye_count.min(1) + 1;
+        self.xr_eye_count += 1;
+        if self.xr_scene_pending {
+            self.renderer.finish_scene_updates();
+            self.xr_scene_pending = false;
+        }
         let saved = self.view;
         let saved_xr = self.xr_rendering;
         self.xr_rendering = true;
@@ -630,31 +709,24 @@ impl State {
         position: Vec3,
         image: &JsValue,
     ) -> Result<(), JsValue> {
-        let attachments = super::xr_output::XrAttachments::new(&self.renderer.device, image)?;
-        // Only an explicit compositor declaration can omit the depth transfer.
-        // Older runtimes and direct SDK callers retain the conservative default.
+        // Validate the frame-scoped image without importing browser textures:
+        // the staged path only needs dimensions/format until final presentation.
         let write_depth = js_sys::Reflect::get(image, &JsValue::from_str("ignoreDepthValues"))?
             .as_bool()
             != Some(true);
-        let target = attachments.target();
-        if !self.postprocess.enabled() {
-            self.xr_present = None;
-            return self.render_xr_gpu_eye(matrix, position, &target, write_depth);
-        }
-        let index = js_sys::Reflect::get(
-            &js_sys::Reflect::get(image, &JsValue::from_str("viewDescriptor"))?,
-            &JsValue::from_str("baseArrayLayer"),
-        )?
-        .as_f64()
-        .ok_or_else(|| JsValue::from_str("Missing XR eye layer"))? as usize;
+        // Even without effects, keep linear blending + sRGB output encoding in
+        // owned targets; browser UNORM views cannot safely be reinterpreted.
+        let info = super::xr_output::XrAttachments::inspect(image)?;
+        let index = info.layer as usize;
+        self.xr_view_slot = index as u32 + 1;
         // Own the complete output of each eye until both are ready. Browser
         // attachments are never retained here or touched by intermediate passes.
         let mut present = self.xr_present.take().unwrap_or_else(|| {
-            super::xr_present::XrPresent::new(&self.renderer.device, target.color_format)
+            super::xr_present::XrPresent::new(&self.renderer.device, info.format)
         });
         let result = (|| {
             present
-                .ensure_eye(&self.renderer.device, index, target.width, target.height)
+                .ensure_eye(&self.renderer.device, index, info.width, info.height)
                 .map_err(|e| JsValue::from_str(&e))?;
             self.render_xr_gpu_eye(
                 matrix,
@@ -711,10 +783,16 @@ impl State {
         target: &super::target::RenderTarget<'_>,
         write_depth: bool,
     ) -> Result<(), JsValue> {
-        if target.color_format != self.output.color_format().remove_srgb_suffix() {
+        if target.color_format.remove_srgb_suffix()
+            != self.output.color_format().remove_srgb_suffix()
+        {
             return Err(JsValue::from_str(
                 "XR layer format must match xr_gpu_color_format",
             ));
+        }
+        if self.xr_scene_pending {
+            self.renderer.finish_scene_updates();
+            self.xr_scene_pending = false;
         }
         let saved = self.view;
         let saved_xr = self.xr_rendering;
@@ -736,6 +814,7 @@ impl State {
         self.refresh_info_panels(0.0);
         self.renderer.draw_calls = 0;
         self.renderer.main_draw_calls = 0;
+        self.renderer.reset_translucency_metrics();
         if let Some(probe) = &mut self.environment {
             probe
                 .update(&mut self.renderer)
@@ -761,17 +840,24 @@ impl State {
             color_load: wgpu::LoadOp::Clear(self.background),
             ..*target
         };
+        // Collect only the main view. Auxiliary shadow/reflection passes still
+        // submit before shared uniforms are rewritten for this view.
+        let mut commands = Vec::with_capacity(3);
+        let mut postprocessed = false;
         if self
             .postprocess
             .needs_render(self.view, target.width, target.height)
         {
             self.postprocess
-                .ensure_size(&self.renderer.device, target.width, target.height);
+                .ensure_size(&self.renderer.device, target.width, target.height)
+                .map_err(|e| JsValue::from_str(&e))?;
             let mut scene_target = self.postprocess.target();
             scene_target.color_load = wgpu::LoadOp::Clear(self.background);
-            self.renderer
-                .render_view(self.view, &scene_target)
-                .map_err(|e| JsValue::from_str(&e))?;
+            commands.push(
+                self.renderer
+                    .render_view(self.view, &scene_target)
+                    .map_err(|e| JsValue::from_str(&e))?,
+            );
             // Effects lazily replaces fallback maps when shadows are first enabled.
             // Rebind by resource identity; unchanged maps do not allocate a new bind group.
             let (static_map, dynamic_map) = self.renderer.shadow_maps();
@@ -781,7 +867,7 @@ impl State {
             let (position, color) = light
                 .map(|l| (l.position, l.color))
                 .unwrap_or((Vec3::ZERO, Vec3::ZERO));
-            self.renderer.draw_calls += self.postprocess.render(
+            let (passes, postprocess_command) = self.postprocess.render(
                 &self.renderer.device,
                 &self.renderer.queue,
                 self.view,
@@ -790,39 +876,59 @@ impl State {
                 &target,
                 self.renderer.shadows_enabled(),
                 self.xr_rendering,
+                if self.xr_rendering {
+                    self.xr_view_slot
+                } else {
+                    0
+                },
             );
+            self.renderer.draw_calls += passes;
+            if let Some(command) = postprocess_command {
+                commands.push(command);
+                postprocessed = true;
+            }
             let overlays = super::target::RenderTarget {
                 depth: self.postprocess.target().depth,
                 auxiliary: None,
                 material_mask: false,
                 ..target
             };
-            self.renderer
-                .draw_transparent(&overlays)
-                .map_err(|e| JsValue::from_str(&e))?;
-            self.renderer.draw_neon_overlay(&overlays);
-            self.renderer.draw_helpers(&overlays);
-            if external.is_some() && write_external_depth {
-                // Postprocessing writes only color. Supply the compositor with the
-                // actual scene depth, including any depth-writing overlays above.
-                let resolve = self.xr_depth_resolve.get_or_insert_with(|| {
-                    super::depth_resolve::DepthResolve::new(&self.renderer.device)
-                });
-                self.renderer.draw_calls += resolve.render(
-                    &self.renderer.device,
-                    &self.renderer.queue,
-                    self.postprocess.target().depth,
-                    target.depth,
-                );
+            if let Some(command) = self
+                .renderer
+                .draw_postprocess_overlays(&overlays)
+                .map_err(|e| JsValue::from_str(&e))?
+            {
+                commands.push(command);
             }
         } else {
             self.postprocess.skip_render();
             if !self.postprocess.enabled() {
                 self.xr_depth_resolve = None;
             }
-            self.renderer
-                .render_view(self.view, &target)
-                .map_err(|e| JsValue::from_str(&e))?;
+            commands.push(
+                self.renderer
+                    .render_view(self.view, &target)
+                    .map_err(|e| JsValue::from_str(&e))?,
+            );
+        }
+        // Flush before depth resolve, HUD, presentation or preparing another eye:
+        // those steps may read these attachments or overwrite shared uniforms.
+        self.renderer.queue.submit(commands);
+        if postprocessed {
+            self.postprocess.record_submission();
+        }
+        if postprocessed && external.is_some() && write_external_depth {
+            // Postprocessing writes only color. Supply the compositor with the
+            // actual scene depth, including any depth-writing overlays above.
+            let resolve = self.xr_depth_resolve.get_or_insert_with(|| {
+                super::depth_resolve::DepthResolve::new(&self.renderer.device)
+            });
+            self.renderer.draw_calls += resolve.render(
+                &self.renderer.device,
+                &self.renderer.queue,
+                self.postprocess.target().depth,
+                target.depth,
+            );
         }
         // Include the imminent HUD and final texture blit in the displayed total.
         self.renderer.draw_calls +=
@@ -858,6 +964,9 @@ impl State {
         if let Some(frame) = frame {
             self.output
                 .present(frame, &self.renderer.device, &self.renderer.queue);
+        }
+        if !self.xr_rendering {
+            super::profiler::end_frame(&self.renderer.device, &self.renderer.queue);
         }
         Ok(())
     }

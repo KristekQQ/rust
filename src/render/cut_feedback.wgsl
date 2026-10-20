@@ -18,6 +18,7 @@ struct VertexOutput {
     @location(5) model2: vec4<f32>,
     @location(6) model3: vec4<f32>,
     @location(12) emission: vec4<f32>,
+    @location(13) surface_params: vec4<f32>,
 ) -> VertexOutput {
     var out: VertexOutput;
     let world = mat4x4<f32>(model0, model1, model2, model3) * vec4<f32>(position, 1.0);

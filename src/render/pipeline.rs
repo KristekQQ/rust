@@ -15,6 +15,55 @@ pub fn build(
     packed_depth: bool,
     double_sided: bool,
 ) -> RenderPipeline {
+    build_surface(
+        device,
+        format,
+        depth_format,
+        layout,
+        effects,
+        reflected,
+        material_mask,
+        packed_depth,
+        double_sided,
+        None,
+    )
+}
+
+pub fn build_translucent(
+    device: &Device,
+    format: TextureFormat,
+    depth_format: TextureFormat,
+    layout: &BindGroupLayout,
+    effects: &BindGroupLayout,
+    cull: wgpu::Face,
+) -> RenderPipeline {
+    build_surface(
+        device,
+        format,
+        depth_format,
+        layout,
+        effects,
+        false,
+        false,
+        false,
+        true,
+        Some(cull),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_surface(
+    device: &Device,
+    format: TextureFormat,
+    depth_format: TextureFormat,
+    layout: &BindGroupLayout,
+    effects: &BindGroupLayout,
+    reflected: bool,
+    material_mask: bool,
+    packed_depth: bool,
+    double_sided: bool,
+    translucent_cull: Option<wgpu::Face>,
+) -> RenderPipeline {
     let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
@@ -23,7 +72,11 @@ pub fn build(
     });
     let mut targets = vec![Some(wgpu::ColorTargetState {
         format,
-        blend: Some(wgpu::BlendState::REPLACE),
+        blend: Some(if translucent_cull.is_some() {
+            wgpu::BlendState::ALPHA_BLENDING
+        } else {
+            wgpu::BlendState::REPLACE
+        }),
         write_mask: wgpu::ColorWrites::ALL,
     })];
     if packed_depth {
@@ -47,7 +100,9 @@ pub fn build(
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: Some(if packed_depth {
+            entry_point: Some(if translucent_cull.is_some() {
+                "fs_translucent"
+            } else if packed_depth {
                 "fs_postprocess"
             } else if material_mask {
                 "fs_material_mask"
@@ -61,7 +116,9 @@ pub fn build(
             topology: wgpu::PrimitiveTopology::TriangleList,
             // The left-handed camera projection reverses outward CCW meshes
             // in screen space. Cull CCW here and keep their visible CW faces.
-            cull_mode: if double_sided {
+            cull_mode: if let Some(cull) = translucent_cull {
+                Some(cull)
+            } else if double_sided {
                 None
             } else {
                 Some(if reflected {
@@ -75,7 +132,7 @@ pub fn build(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: depth_format,
-            depth_write_enabled: Some(true),
+            depth_write_enabled: Some(translucent_cull.is_none()),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: Default::default(),
             bias: Default::default(),

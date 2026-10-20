@@ -1,6 +1,7 @@
 // Optional development-page diagnostics. No engine state or simulation lives here.
 let installed=false;
 const sent=new Set();
+let streamed=0;
 /** @param {string} stage @param {unknown} [error] @param {Record<string,unknown>} [details] */
 export function reportDiagnostic(stage,error,details={}) {
     const detail=error instanceof Error ? {name:error.name,message:error.message,stack:error.stack} : {message:error===undefined?'':String(error)};
@@ -8,8 +9,15 @@ export function reportDiagnostic(stage,error,details={}) {
         renderer:document.documentElement.dataset.rendererBackend??null,secure:isSecureContext,
         webgpu:!!navigator.gpu,webxr:!!Reflect.get(navigator,'xr'),gpuBinding:typeof Reflect.get(globalThis,'XRGPUBinding'),userAgent:navigator.userAgent};
     const key=JSON.stringify([stage,detail.message]);
-    if(sent.has(key)||sent.size>=20)return;
-    sent.add(key);
+    // Performance and effect changes need successive samples, including after a
+    // toggle or XR reentry. Bound them separately from one-off error messages.
+    if(stage==='xr-performance'||stage==='ssr-changed'){
+        if(streamed>=80)return;
+        streamed++;
+    }else{
+        if(sent.has(key)||sent.size>=20)return;
+        sent.add(key);
+    }
     if(error!==undefined) {
         const status=document.getElementById('status');
         if(status)status.textContent=`Chyba (${stage}): ${detail.message}`;

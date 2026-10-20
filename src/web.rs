@@ -41,6 +41,7 @@ impl Drop for Runtime {
 /// Release the frame loop, input listeners, camera and GPU scene resources.
 #[wasm_bindgen]
 pub fn dispose() {
+    crate::render::profiler::reset();
     XR_ACTIVE.with(|active| active.set(false));
     XR_PLAYER.with(|player| *player.borrow_mut() = Default::default());
     GENERATION.with(|generation| generation.set(generation.get().wrapping_add(1)));
@@ -282,6 +283,38 @@ pub fn postprocess_stats() -> Vec<f64> {
     })
 }
 
+/// Maintained GPU acceptance probe: execute a compiled storage-buffer graph.
+#[wasm_bindgen]
+pub async fn verify_frame_graph_resources() -> Result<String, JsValue> {
+    let (device, queue) = STATE.with(|slot| {
+        let state = slot.borrow();
+        let state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow();
+        Ok::<_, JsValue>(state.graph_probe_handles())
+    })?;
+    crate::render::graph_probe::run(device, queue)
+        .await
+        .map(|report| report.to_string())
+        .map_err(|e| JsValue::from_str(&e))
+}
+
+/// Read-only native frame profiling; GPU data is asynchronous and may be absent.
+#[wasm_bindgen]
+pub fn frame_profile_stats() -> String {
+    crate::render::profiler::stats().to_string()
+}
+#[wasm_bindgen]
+pub fn postprocess_graph() -> String {
+    STATE.with(|slot| {
+        slot.borrow().as_ref().map_or_else(
+            || "null".into(),
+            |s| s.borrow().postprocess_graph().to_string(),
+        )
+    })
+}
+
 #[wasm_bindgen]
 pub fn configure_ssr(resolution_scale: f32) -> bool {
     STATE.with(|state| {
@@ -369,6 +402,22 @@ pub fn set_object_emission(id: u32, intensity: f32) -> bool {
         s.borrow()
             .as_ref()
             .is_some_and(|s| s.borrow_mut().scene.set_emission(id, intensity))
+    })
+}
+#[wasm_bindgen]
+pub fn set_object_opacity(
+    id: u32,
+    opacity: f32,
+    opaque_above: f32,
+    variation: f32,
+    coverage: f32,
+) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|s| {
+            s.borrow_mut()
+                .scene
+                .set_opacity(id, opacity, opaque_above, variation, coverage)
+        })
     })
 }
 #[wasm_bindgen]
@@ -930,6 +979,7 @@ pub fn clear_scene() {
     STATE.with(|s| {
         if let Some(st) = &*s.borrow() {
             let mut state = st.borrow_mut();
+            state.clear_combo_display();
             state.scene.clear_scene();
             state.combo_score = Default::default();
             state.clear_combo_indicators();
@@ -948,6 +998,12 @@ pub fn add_info_panel(kind: &str, width: f32, height: f32) -> Result<u32, JsValu
         let result = state.borrow_mut().add_info_panel(kind, width, height);
         result
     })
+}
+
+/// Static numeric tube inscription, sharing cached digit meshes with native HUDs.
+#[wasm_bindgen]
+pub fn add_numeric_text(value: &str, width: f32, height: f32) -> Result<u32, JsValue> {
+    cutting_command(|scene| scene.add_numeric_text(value, width, height))
 }
 
 /// Static bitmap inscription with no backing rectangle.
@@ -1028,6 +1084,31 @@ pub fn add_triangle_mesh(
         mesh.smooth_normals();
     }
     cutting_command(|scene| scene.add_triangle_mesh(mesh))
+}
+
+#[wasm_bindgen]
+pub fn register_mesh_variants(
+    positions: &[f32],
+    indices: &[u32],
+    colors: &[f32],
+    smooth: bool,
+) -> u32 {
+    cutting_command(|scene| scene.register_mesh_variants(positions, indices, colors, smooth))
+        .unwrap_or_else(|error| {
+            web_sys::console::error_1(&error);
+            crate::scene::INVALID_ID
+        })
+}
+#[wasm_bindgen]
+pub fn add_mesh_variant(handle: u32, variant: u32) -> u32 {
+    cutting_command(|scene| scene.add_mesh_variant(handle, variant)).unwrap_or_else(|error| {
+        web_sys::console::error_1(&error);
+        crate::scene::INVALID_ID
+    })
+}
+#[wasm_bindgen]
+pub fn remove_mesh_variants(handle: u32) -> bool {
+    cutting_command(|scene| Ok(scene.remove_mesh_variants(handle))).unwrap_or(false)
 }
 
 #[wasm_bindgen]
@@ -1901,6 +1982,7 @@ pub fn xr_panel_blade_hit(panel_id: u32, cutter_id: u32, from: &[f32], to: &[f32
 /// Raw platform grip matrix; all pose/sweep/geometry calculations remain in Rust.
 #[wasm_bindgen]
 pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Result<String, JsValue> {
+    let _scope = crate::render::profiler::cpu_scope("input.contacts.cutting");
     if hand > 1 || !XR_ACTIVE.with(|active| active.get()) {
         return Err(JsValue::from_str("Invalid XR controller frame"));
     }
@@ -1934,6 +2016,31 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
         }
     });
     Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts}).to_string())
+}
+
+#[wasm_bindgen]
+pub fn configure_combo_display(input: &str) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|s| s.borrow_mut().configure_combo_display(input))
+    })
+}
+#[wasm_bindgen]
+pub fn clear_combo_display() {
+    STATE.with(|s| {
+        if let Some(s) = s.borrow().as_ref() {
+            s.borrow_mut().clear_combo_display();
+        }
+    });
+}
+#[wasm_bindgen]
+pub fn combo_display_state() -> String {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .map_or_else(|| "null".into(), |s| s.borrow().combo_display_state())
+    })
 }
 
 /// Bind a world object to one of three slots in the currently hit combo row.
@@ -2081,6 +2188,16 @@ pub fn xr_present_gpu_frame(images: js_sys::Array) -> Result<(), JsValue> {
             .borrow_mut();
         state.present_xr_gpu_frame(&images)
     })
+}
+
+/// Close CPU/GPU profiling after both eyes, including the final XR presentation.
+#[wasm_bindgen]
+pub fn xr_finish_frame() {
+    STATE.with(|slot| {
+        if let Some(state) = slot.borrow().as_ref() {
+            state.borrow().finish_xr_frame();
+        }
+    });
 }
 
 /// Advance once per XR frame, never once per eye.

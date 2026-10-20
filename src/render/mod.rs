@@ -11,7 +11,9 @@ pub mod pipeline;
 pub mod state;
 
 pub mod gltf_gpu;
+pub mod graph_resources;
 pub mod output;
+pub mod profiler;
 pub mod renderer;
 pub mod target;
 
@@ -25,3 +27,6 @@ pub mod environment;
 
 pub mod xr_output;
 pub mod xr_present;
+
+pub mod graph_probe;
+mod view_uniforms;

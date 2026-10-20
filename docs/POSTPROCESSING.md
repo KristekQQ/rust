@@ -1,8 +1,11 @@
 # Postprocessing v Rustu a WebGPU / WebGL
 
-Scéna, depth a přenosná RGB depth kopie se jednou vykreslí do offscreen cíle. `PostProcessor` poté spustí
-zapnuté efekty v pořadí registru `EFFECTS`, střídá dva barevné ping-pong cíle
-a poslední průchod zapisuje do výstupu. Není tu další JS frame loop.
+Scéna a depth se vykreslí do offscreen cíle; WebGL přidává přenosnou RGB depth kopii.
+`PostProcessor` sestaví plán aktivních efektů v pořadí registru `EFFECTS` a poslední
+průchod zapisuje do výstupu. Mezivýsledky sdílejí sloty podle životnosti; samostatný
+efekt nepotřebuje plnorozměrný ping-pong cíl, dva efekty potřebují jeden.
+Není tu další JS frame loop. Kontrakt a přidávání bufferů popisuje
+[FRAME_PIPELINE.md](FRAME_PIPELINE.md).
 
 ```js
 engine.postprocessing.enable('ssr', { strength: 0.85 });
@@ -13,7 +16,8 @@ engine.postprocessing.disable('godRays');
 Síla je 0…1. Neplatné hodnoty a neznámé efekty se odmítají. Statistika vrací
 naposledy submitované `passes`, rozlišení, počet barevných `targets` a monotonní
 `frames` (počet submitů řetězce, nikoli dokončení GPU). Vypnutí posledního efektu
-uvolní základní barevné cíle (tři ve WebGPU, čtyři ve WebGL), případný SSR trace cíl, jejich depth a bind groups. Pipelines a případná malá
+uvolní cíle, jejich depth a bind groups. Změna aktivního řetězce rovněž invaliduje
+starý plán; další render přidělí jen potřebné sloty. Pipelines a případná malá
 maskovací textura se ponechávají pro další použití. Resize obnovuje cíle a bind
 groups společně; při stabilním rozlišení se GPU prostředky každý frame netvoří.
 
@@ -125,9 +129,10 @@ Ve vysoce kontrastních hranách jsou možné šum / aliasing; není to záruka 
 3. Rozšiř `PostEffectName` v `js/engine.d.ts` a případné UI. Další WASM export
    pro efekt není potřeba, protože příkaz je obecný.
 
-Společné vstupy: předchozí barva, původní packed depth, uniformy kamery/světla a maska.
+Společné vstupy: předchozí barva, původní depth (WebGPU nativní, WebGL packed), uniformy kamery/světla a maska.
 Speciální efekty vyžadující historii, HDR nebo více vstupů potřebují rozšířit
-kontrakt; současný registr není libovolný render graph. Efekty zachovávají
+kontrakt v `PostprocessPlan` a skutečném encoderu; obecný graf již umí textury
+i buffery, ale sám shaderové příkazy nekóduje. Efekty zachovávají
 metadata alpha mezi průchody a finální průchod vynutí alpha 1.
 
 Ukázka a integrační kontroly: `/examples/postprocessing/`, `?backend=webgl`,
@@ -195,6 +200,76 @@ Geometrie se cachuje podle stabilních ID a po odstranění objektů se uvolní.
 Nejde o HDR bloom ani objemový rozptyl; glTF, resident GPU cutting a probe captures
 nemají tento automatický glow. Headsetový výkon je třeba změřit na zařízení.
 
+## Průsvitné barevné plošky
+
+`mesh.setOpacity(.06,{opaqueAbove:.25,variation:1,coverage:.3})` nastaví skutečné alpha blending pro
+vertex-color primitive/triangle meshes. Jasné plošky s max RGB alespoň `.25`
+zůstanou neprůhledné (neonové hrany); ostatní mají zadanou opacity 0–1.
+Volitelné `variation` 0–1 (výchozí 0) zvedá alpha od zadané opacity směrem k 1
+podle lokální normály a předpočítaného jasu plošky. I stejně barevné plošky na
+jednom ovoci se liší; seeded data navíc rozlišují varianty stejného druhu.
+Flat interpolace drží jednu alpha na trojúhelník. Dva trojúhelníky jednoho
+čtyřúhelníku sdílejí normálu, celou RGB paletu i baked jas, takže mají stejné krytí bez viditelné
+úhlopříčky. Nejde o novou náhodu v každém snímku; klíč se při pohybu nemění.
+Volitelné `coverage` 0–1 mění podíl skoro plných ploch: používá úzký smoothstep
+nad stejným stabilním hashem, zbytek panelů má základní nízkou alfu. Krajní
+hodnoty 0/1 dávají přesně základní/maximální alfu. Vynechané coverage (nativně -1)
+zachovává původní lineární variation. Aréna střídá řídké a husté masky
+(.35/1/.55/.90/.70/.98/.80/.45) se základní alfou .06; nejde jen o drobné
+odchylky všech podobně vyplněných kusů.
+Bez `opaqueAbove` je práh 8. Výchozí opacity 1 zachovává původní rendering;
+glTF používá dál vlastní materiály. Nastavení dědí CPU i resident řezné kusy.
+
+Neprůhledné části vstupují do hlavní barvy/hloubky a SSR. Průsvitná výplň se
+skládá až do finálního barevného cíle před glow, s depth testem bez zápisu
+hloubky; nevstupuje do SSR ani shadow mapy. Bez postprocessingu proběhne ve
+stávajícím hlavním passu. Nevzniká další submit ani framebuffer. Pipeline se
+cachují podle formátu barvy a hloubky, instance používají stávající GPU buffery.
+`Instance.emission.zw` nesou opacity a práh, `surface_params.xy` variaci a coverage (-1 výchozí). Instance
+má 176 B a atribut 13 na offsetu 160; layout sdílejí main/shadow/glow/cut FX.
+Nevzniká nový uniform buffer; jde o 16 B navíc na instanci.
+
+Objekty se třídí odzadu, u každého se kreslí zadní a přední povrch. To je
+vhodné pro zdejší drobné ovoce; nejde o obecné OIT pro navzájem se protínající
+průsvitné meshe ani fyzikální refrakci. Cena navíc jsou alpha draw calls a
+overdraw. Aréna před VR nabízí skleněné plošky nebo původní otevřený styl;
+barevné řezné uzávěry skleněného stylu mají průsvitnou výplň.
+Lathe ovoce používá čtyřúhelníkové plochy mezi prstenci, u pólů trojúhelníky;
+zakřivené segmenty se spojují jen při koplanaritě. GPU a řezání používají
+triangulované uzavřené těleso, svítí jen obvod panelu. `fruitGeometries({seed})`
+a `wildSymbol({seed})` připraví data jednou; 15 vybraných variant na druh se připraví při načtení scény před VR a za hry se pouze vybírají.
+Varianty sdílejí immutable pozice/indices, liší se jen barevnými daty facet.
+Každý druh má vlastní kurzor, který přežije restart kola; všech 15 vzorů se
+vystřídá před opakováním. Výběr a pořadí maximalizují rozdíly skutečných masek
+vyplněných plošek, včetně přechodu poslední → první varianta. Generování meshů ani nová náhoda neběží v render loopu.
+Globální glow arény zůstává na 25 % dřívější síly (`strength:.4`).
+`neon-arena` pixelově porovnává barevný průhled řezu proti opacity 1 na obou
+backendech; `neon-arena-xr` řeže skutečný produkční plod poloviční velikosti.
+
+### Podmnožina indexů pro průhlednou výplň
+
+CPU triangle meshes mají cache alpha indexů pro aktuální `opaqueAbove`. Vertex
+buffer se sdílí s hlavním průchodem; dva alpha draws používají jen potenciálně
+průhledné trojúhelníky, místo všech neonových okrajů a výplní dohromady.
+Trojúhelník se vynechá pouze při společném RGB kanálu nad prahem ve všech
+vrcholech. Různobarevné vrcholy mohou uvnitř interpolovat pod práh, proto se
+konzervativně ponechávají. Původní pořadí a shaderové discard podmínky platí dál.
+
+Cache obsahuje nejvýše jeden u32 index buffer na CPU mesh a práh. Změna prahu
+jej nahradí, změna identity zdroje/geometrie invaliduje, odstranění objektu nebo
+clear uvolní při `finish_scene_updates`. Resident bez odpovídajícího CPU zdroje,
+primitiva a nekompatibilní instance používají původní plný index buffer; glTF
+materiály zůstávají samostatné. Prázdná podmnožina přeskočí oba alpha draws.
+Nevzniká nový render pass, submit ani kopie vertex bufferu.
+
+`debugStats().translucency` vrací `cachedMeshes`, `indexBufferBytes`, `draws`,
+`submittedIndices` a referenční `fullIndices`; oba počty indexů zahrnují zadní
+i přední povrch a stejný interval jako `drawCalls`. Nejde o GPU dobu ani FPS.
+Aréna ověřuje méně než 35 % původních alpha indexů, zachování obrazu a uvolnění
+cache po dočasných testovacích objektech. Quest přínos je nutné změřit zvlášť.
+Periodická lokální diagnostika přidává tyto živé čítače a revizi; statický graf
+se posílá při prvním XR snímku, neopakuje se v každé performance zprávě.
+
 ## Obrazová cubemapa se samostatnou emisí
 
 `setEnvironmentCubeMap({size,color,emission,intensity:1.2})` nahraje dvě sady
@@ -241,3 +316,9 @@ po zahřátí dalších osm stereo snímků nesmí volat `createRenderPipeline`,
 `createTexture` ani `createBindGroup`. Browserové XR view wrappers zůstávají
 frame-scoped. Změna výstupního formátu vytváří jen aktivní varianty efektů;
 seznam aktivních efektů je pevné pole bez heap alokace na každé oko.
+
+
+Neonové edge kapsle používají čtyři sdílené vrcholy a šest indexů na úsek,
+se stejnými dvěma trojúhelníky a stejným fragmentovým profilem. Projekční měřítko
+poloměru se počítá jednou při přípravě pohledu, nikoli v každém vertex invocation.
+Při srovnávání výkonu rozlišuj `?profile=1` (diagnostické měření) od běžného běhu.

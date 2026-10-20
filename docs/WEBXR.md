@@ -369,8 +369,13 @@ změny rendereru vyžadují vlastní následné ověření.
 Při `ignoreDepthValues === true` kompozitor hloubku nečte; postprocess vynechá její
 přenos do externího attachmentu (interní hloubka pro SSR a overlays zůstává).
 Chybějící nebo false hodnota zachová depth resolve. XR host po zahřátí pošle
-nejvýše tři události `performance`: skutečnou kadenci XR callbacků, průměrný
-CPU submission čas a rozměry očí. Nejde o GPU timestamp ani čas kompozitoru.
+nejvýše 60 událostí `performance` po 180 snímcích: skutečnou kadenci XR callbacků,
+průměrný CPU submission čas, rozměry očí, aktuální `frameRate`, podporované
+frekvence, `fixedFoveation` a druh vrstvy pro oba backendy. Chybějící hodnoty jsou
+`null`, nikoli odhad. Diagnostický transport uchová opakovaná měření a změny SSR
+s odděleným limitem 80 záznamů na načtení stránky; běžné chyby dál deduplikuje.
+Po přepnutí SSR vyhodnocuj až následující celé měřicí okno, první může obsahovat
+oba režimy. Nejde o GPU timestamp ani čas kompozitoru.
 
 ### Quest Browser 152.1: dokončené stereo před kompozitorem
 

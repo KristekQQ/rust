@@ -58,6 +58,11 @@ struct MeshNode {
 }
 enum MeshSource {
     Cpu(CutMesh),
+    Colored {
+        parent: MeshData,
+        colors: Vec<Vec3>,
+        mesh: OnceCell<CutMesh>,
+    },
     Resident {
         recipe: Rc<SplitRecipe>,
         side: usize,
@@ -101,6 +106,17 @@ impl From<CutMesh> for MeshData {
     }
 }
 impl MeshData {
+    pub(crate) fn colored(&self, colors: Vec<Vec3>) -> Self {
+        Self(Rc::new(MeshNode {
+            stats: self.0.stats,
+            support: None,
+            source: MeshSource::Colored {
+                parent: self.clone(),
+                colors,
+                mesh: OnceCell::new(),
+            },
+        }))
+    }
     pub fn resident(
         stats: MeshStats,
         recipe: Rc<SplitRecipe>,
@@ -112,6 +128,10 @@ impl MeshData {
             source: MeshSource::Resident { recipe, side },
             support: Some(support),
         }))
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
     pub fn stats(&self) -> MeshStats {
         self.0.stats
@@ -134,15 +154,33 @@ impl MeshData {
     pub fn support(&self) -> Option<&SupportCurve> {
         self.0.support.as_ref()
     }
+    /// Geometry-only queries share the original topology without realizing colors.
+    pub(crate) fn geometry_cpu(&self) -> Option<&CutMesh> {
+        match &self.0.source {
+            MeshSource::Colored { parent, .. } => parent.geometry_cpu(),
+            _ => self.ready_cpu(),
+        }
+    }
     pub fn ready_cpu(&self) -> Option<&CutMesh> {
         match &self.0.source {
             MeshSource::Cpu(mesh) => Some(mesh),
+            MeshSource::Colored { mesh, .. } => mesh.get(),
             MeshSource::Resident { recipe, side } => recipe.result.get()?.as_ref().ok()?.get(*side),
         }
     }
     pub fn cpu(&self) -> Result<&CutMesh, String> {
         match &self.0.source {
             MeshSource::Cpu(mesh) => Ok(mesh),
+            MeshSource::Colored {
+                parent,
+                colors,
+                mesh,
+            } => {
+                if mesh.get().is_none() {
+                    let _ = mesh.set(parent.cpu()?.recolored(colors));
+                }
+                Ok(mesh.get().expect("initialized color recipe"))
+            }
             MeshSource::Resident { recipe, side } => {
                 let result = recipe.result.get_or_init(|| {
                     let result = recipe
@@ -164,6 +202,9 @@ impl MeshData {
         }
     }
     pub fn bottom(&self, transform: Transform) -> Result<f32, String> {
+        if let MeshSource::Colored { parent, .. } = &self.0.source {
+            return parent.bottom(transform);
+        }
         if let Some(value) = self.support().and_then(|s| s.at_transform(transform)) {
             return Ok(value);
         }
@@ -260,9 +301,17 @@ mod tests {
         let mut options = scene.objects()[&source].render_options;
         options.casts_shadow = false;
         scene.set_render_options(source, options);
+        scene.set_opacity(source, 0.58, 0.25, 0.7, 0.72);
         let report = scene
             .commit_resident(cutter, motion, 0., None, vec![(candidate, data)], 1)
             .unwrap();
+        assert!(report
+            .pieces
+            .iter()
+            .all(|id| scene.objects()[id].opacity == 0.58
+                && scene.objects()[id].opaque_above == 0.25
+                && scene.objects()[id].opacity_variation == 0.7
+                && scene.objects()[id].opacity_coverage == 0.72));
         assert!(report
             .pieces
             .iter()

@@ -1,9 +1,12 @@
 //! Depth-aware fragment postprocessing, independent of a browser or surface.
+use super::graph_resources::GraphResources;
 use super::{
     data::as_bytes,
     target::{RenderTarget, RenderView},
     textures::ColorTarget,
 };
+use crate::frame_graph::ResourceId;
+use crate::postprocess_plan::{EffectSpec, PostprocessPlan};
 use glam::{Vec2, Vec3, Vec4};
 
 #[repr(C)]
@@ -68,7 +71,7 @@ struct Effect {
     enabled: bool,
     strength: f32,
     pipelines: Vec<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
-    uniform: wgpu::Buffer,
+    uniform: super::view_uniforms::ViewUniforms,
 }
 struct Intermediate {
     _texture: wgpu::Texture,
@@ -154,11 +157,13 @@ impl ReflectionMask {
 struct Targets {
     scene: ColorTarget,
     depth_color: Option<Intermediate>,
-    ping: [Intermediate; 2],
-    bind_groups: Vec<[wgpu::BindGroup; 3]>,
+    key: (u64, bool),
+    plan: PostprocessPlan,
+    resources: GraphResources,
+    bind_groups: Vec<wgpu::BindGroup>,
 }
 struct SsrTarget {
-    _target: Intermediate,
+    resource: ResourceId,
     bind_group: wgpu::BindGroup,
     width: u32,
     height: u32,
@@ -295,7 +300,7 @@ impl PostProcessor {
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
+                        has_dynamic_offset: true,
                         min_binding_size: wgpu::BufferSize::new(
                             std::mem::size_of::<Uniforms>() as u64
                         ),
@@ -455,12 +460,12 @@ impl PostProcessor {
                     pipelines: vec![(format, pipeline)],
                     enabled: false,
                     strength: 0.5,
-                    uniform: device.create_buffer(&wgpu::BufferDescriptor {
-                        label: Some(descriptor.name),
-                        size: std::mem::size_of::<Uniforms>() as u64,
-                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                        mapped_at_creation: false,
-                    }),
+                    uniform: super::view_uniforms::ViewUniforms::new(
+                        device,
+                        descriptor.name,
+                        std::mem::size_of::<Uniforms>() as u64,
+                        3,
+                    ),
                 }
             })
             .collect();
@@ -768,8 +773,14 @@ impl PostProcessor {
         else {
             return false;
         };
+        let was_active = effect.enabled && effect.strength > 0.0;
         effect.enabled = enabled;
         effect.strength = strength;
+        if was_active != (enabled && strength > 0.0) {
+            self.targets = None;
+            self.ssr_target = None;
+            self.last_pass_count = 0;
+        }
         if !self.ssr_enabled() {
             self.ssr_target = None;
         }
@@ -787,6 +798,8 @@ impl PostProcessor {
         if self.ssr_resolution_scale != resolution_scale {
             self.ssr_resolution_scale = resolution_scale;
             self.ssr_target = None;
+            self.targets = None;
+            self.last_pass_count = 0;
         }
         true
     }
@@ -946,36 +959,6 @@ impl PostProcessor {
             ]
         })
     }
-    fn ensure_ssr_target(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-        if !self.ssr_enabled() || self.ssr_resolution_scale != 0.5 || width == 0 || height == 0 {
-            self.ssr_target = None;
-            return;
-        }
-        let width = width.div_ceil(2);
-        let height = height.div_ceil(2);
-        if self
-            .ssr_target
-            .as_ref()
-            .is_some_and(|target| target.width == width && target.height == height)
-        {
-            return;
-        }
-        let target = Intermediate::new(device, width, height, self.format);
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("SSR trace composite"),
-            layout: &self.ssr_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&target.view),
-            }],
-        });
-        self.ssr_target = Some(SsrTarget {
-            _target: target,
-            bind_group,
-            width,
-            height,
-        });
-    }
     pub fn enabled(&self) -> bool {
         self.sky_cube_enabled
             || self
@@ -983,37 +966,80 @@ impl PostProcessor {
                 .iter()
                 .any(|effect| effect.enabled && effect.strength > 0.0)
     }
-    pub fn ensure_size(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-        self.ensure_ssr_target(device, width, height);
+    pub fn ensure_size(
+        &mut self,
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+    ) -> Result<(), String> {
         if !self.enabled() || width == 0 || height == 0 {
             self.targets = None;
+            self.ssr_target = None;
             self.last_pass_count = 0;
-            return;
+            return Ok(());
         }
-        if self
-            .targets
-            .as_ref()
-            .is_some_and(|targets| targets.scene.width == width && targets.scene.height == height)
-        {
-            return;
+        let mask = self
+            .effects
+            .iter()
+            .enumerate()
+            .fold(0u64, |mask, (index, effect)| {
+                if (effect.name == "environment" && self.sky_cube_enabled)
+                    || (effect.enabled && effect.strength > 0.0)
+                {
+                    mask | (1 << index)
+                } else {
+                    mask
+                }
+            });
+        let key = (mask, self.ssr_resolution_scale == 0.5);
+        if self.targets.as_ref().is_some_and(|targets| {
+            targets.scene.width == width && targets.scene.height == height && targets.key == key
+        }) {
+            return Ok(());
         }
+        let _scope = super::profiler::cpu_scope("graph.compile.allocate");
+        let specs: Vec<_> = self
+            .effects
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| mask & (1 << index) != 0)
+            .map(|(index, effect)| EffectSpec {
+                index,
+                name: effect.name,
+                reads_depth: effect.name != "bloom",
+                half_trace: effect.name == "ssr" && key.1,
+            })
+            .collect();
+        let plan = PostprocessPlan::new(
+            &specs,
+            width,
+            height,
+            self.format,
+            std::mem::size_of::<Uniforms>() as u64,
+        )?;
+        let resources = GraphResources::new(device, &plan.compiled)?;
         let scene = ColorTarget::new(device, "postprocess scene", width, height, self.format);
         let depth_color = device
             .as_webgpu()
             .is_none()
             .then(|| Intermediate::new(device, width, height, wgpu::TextureFormat::Rgba8Unorm));
-        let ping: [Intermediate; 2] =
-            std::array::from_fn(|_| Intermediate::new(device, width, height, self.format));
-        let sources = [&scene.color, &ping[0].view, &ping[1].view];
-        let bind_groups = self.effects.iter().map(|effect| {
-            std::array::from_fn(|source_index| {
+        let mut bind_groups = Vec::with_capacity(plan.steps.len());
+        let mut ssr_target = None;
+        for step in &plan.steps {
+            let effect = &self.effects[step.effect];
+            let source = if step.source == plan.scene_color {
+                &scene.color
+            } else {
+                resources.view(step.source)?
+            };
+            bind_groups.push(
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some(effect.name),
                     layout: &self.layout,
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
-                            resource: wgpu::BindingResource::TextureView(sources[source_index]),
+                            resource: wgpu::BindingResource::TextureView(source),
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
@@ -1031,7 +1057,7 @@ impl PostProcessor {
                         },
                         wgpu::BindGroupEntry {
                             binding: 3,
-                            resource: effect.uniform.as_entire_binding(),
+                            resource: effect.uniform.binding(),
                         },
                         wgpu::BindGroupEntry {
                             binding: 4,
@@ -1060,16 +1086,44 @@ impl PostProcessor {
                             resource: wgpu::BindingResource::TextureView(&self.sky_cube_emission),
                         },
                     ],
-                })
-            })
-        });
-        let bind_groups = bind_groups.collect();
+                }),
+            );
+            if let Some(trace) = step.trace {
+                ssr_target = Some(SsrTarget {
+                    resource: trace,
+                    width: width.div_ceil(2),
+                    height: height.div_ceil(2),
+                    bind_group: device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("SSR trace composite"),
+                        layout: &self.ssr_layout,
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(resources.view(trace)?),
+                        }],
+                    }),
+                });
+            }
+        }
+        self.ssr_target = ssr_target;
         self.targets = Some(Targets {
             scene,
             depth_color,
-            ping,
+            key,
+            plan,
+            resources,
             bind_groups,
         });
+        Ok(())
+    }
+    pub fn graph_stats(&self) -> serde_json::Value {
+        self.targets.as_ref().map_or_else(|| serde_json::json!({"active":false,"passes":[],"transientTextures":0,"transientBuffers":0}), |targets| {
+            let mut summary = targets.plan.graph.debug_summary(&targets.plan.compiled);
+            summary["active"] = true.into();
+            summary["transientTextures"] = targets.resources.texture_count().into();
+            summary["transientBuffers"] = targets.resources.buffer_count().into();
+            summary["transientBytesEstimate"] = targets.resources.allocated_bytes_estimate().into();
+            summary
+        })
     }
     /// Call ensure_size before requesting the scene render attachments.
     pub fn target(&self) -> RenderTarget<'_> {
@@ -1081,6 +1135,10 @@ impl PostProcessor {
         target.material_mask = true;
         target.auxiliary = targets.depth_color.as_ref().map(|depth| &depth.view);
         target
+    }
+    /// Called after the owning view's command batch is actually submitted.
+    pub fn record_submission(&mut self) {
+        self.submitted_frames = self.submitted_frames.saturating_add(1);
     }
     /// Frames count successful queue.submit calls, not GPU completion timestamps.
     pub fn stats(&self) -> [f64; 5] {
@@ -1096,8 +1154,8 @@ impl PostProcessor {
                     passes,
                     targets.scene.width as f64,
                     targets.scene.height as f64,
-                    3.0 + f64::from(targets.depth_color.is_some())
-                        + f64::from(self.ssr_target.is_some()),
+                    1.0 + f64::from(targets.depth_color.is_some())
+                        + targets.resources.texture_count() as f64,
                     self.submitted_frames as f64,
                 ]
             },
@@ -1114,7 +1172,8 @@ impl PostProcessor {
         output: &RenderTarget<'_>,
         shadows_enabled: bool,
         xr_rendering: bool,
-    ) -> usize {
+        view_slot: u32,
+    ) -> (usize, Option<wgpu::CommandBuffer>) {
         // new() has no queue; initialize its white fallback once, before sampling.
         if self.reflection_mask.needs_white_upload {
             self.reflection_mask.upload(queue, 1, 1, &[255]);
@@ -1127,6 +1186,9 @@ impl PostProcessor {
             if !((effect.name == "environment" && self.sky_cube_enabled)
                 || (effect.enabled && effect.strength > 0.0))
             {
+                continue;
+            }
+            if effect.name == "ssr" && self.ssr_target.is_some() {
                 continue;
             }
             if !effect
@@ -1172,24 +1234,19 @@ impl PostProcessor {
         }
         self.ssr_work = [0.0; 2];
         let Some(targets) = &self.targets else {
-            return 0;
+            return (0, None);
         };
-        // Four fixed effect slots: avoid heap allocation in each eye/frame.
-        let active: [Option<(usize, &Effect)>; EFFECTS.len()] = std::array::from_fn(|index| {
-            let effect = &self.effects[index];
-            ((effect.name == "environment" && self.sky_cube_enabled)
-                || (effect.enabled && effect.strength > 0.0))
-                .then_some((index, effect))
-        });
-        let active_count = active.iter().flatten().count();
+        let active_count = targets.plan.steps.len();
         if active_count == 0 {
-            return 0;
+            return (0, None);
         }
+        let _scope = super::profiler::cpu_scope("postprocess.encode");
         let shadow_matrix = crate::render_math::shadow_view_projection(light_position);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("postprocess chain"),
         });
-        for (index, (effect_index, effect)) in active.iter().flatten().enumerate() {
+        for (index, step) in targets.plan.steps.iter().enumerate() {
+            let effect = &self.effects[step.effect];
             let uniforms = Uniforms {
                 inverse_view_projection: view.view_projection.inverse().to_cols_array_2d(),
                 view_projection: view.view_projection.to_cols_array_2d(),
@@ -1250,15 +1307,19 @@ impl PostProcessor {
                     [64.0, 5.0, 0.0, 0.0]
                 },
             };
-            queue.write_buffer(&effect.uniform, 0, as_bytes(&[uniforms]));
-            let destination = if index + 1 == active_count {
+            let uniform_offset = effect
+                .uniform
+                .write(queue, view_slot, as_bytes(&[uniforms]));
+            let destination = if step.destination == targets.plan.output {
                 output.color
             } else {
-                &targets.ping[index % 2].view
+                targets
+                    .resources
+                    .view(step.destination)
+                    .expect("compiled color resource")
             };
-            let source_index = if index == 0 { 0 } else { 1 + (index - 1) % 2 };
-            let bind_group = &targets.bind_groups[*effect_index][source_index];
-            let half_ssr = effect.name == "ssr" && self.ssr_target.is_some();
+            let bind_group = &targets.bind_groups[index];
+            let half_ssr = step.trace.is_some();
             if effect.name == "ssr" {
                 let pixels = targets.scene.width as f64 * targets.scene.height as f64;
                 self.ssr_work = [pixels, pixels];
@@ -1270,10 +1331,14 @@ impl PostProcessor {
                     rect[2] as f64 * rect[3] as f64,
                     trace.width as f64 * trace.height as f64,
                 ];
+                let stamp = super::profiler::stamp("ssr.trace");
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("SSR half-resolution trace"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &trace._target.view,
+                        view: targets
+                            .resources
+                            .view(trace.resource)
+                            .expect("compiled SSR trace"),
                         depth_slice: None,
                         resolve_target: None,
                         ops: wgpu::Operations {
@@ -1282,18 +1347,19 @@ impl PostProcessor {
                         },
                     })],
                     depth_stencil_attachment: None,
-                    timestamp_writes: None,
+                    timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
                 if rect[2] > 0 && rect[3] > 0 {
                     pass.set_pipeline(&self.ssr_trace_pipeline);
-                    pass.set_bind_group(0, bind_group, &[]);
+                    pass.set_bind_group(0, bind_group, &[uniform_offset]);
                     pass.set_bind_group(1, &self.shadow_bind_group, &[]);
                     pass.set_scissor_rect(rect[0], rect[1], rect[2], rect[3]);
                     pass.draw(0..3, 0..1);
                 }
             }
+            let stamp = super::profiler::stamp(effect.name);
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(effect.name),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1306,7 +1372,7 @@ impl PostProcessor {
                     },
                 })],
                 depth_stencil_attachment: None,
-                timestamp_writes: None,
+                timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
@@ -1341,14 +1407,12 @@ impl PostProcessor {
                 );
                 pass.set_scissor_rect(viewport.x, viewport.y, viewport.width, viewport.height);
             }
-            pass.set_bind_group(0, bind_group, &[]);
+            pass.set_bind_group(0, bind_group, &[uniform_offset]);
             pass.set_bind_group(1, &self.shadow_bind_group, &[]);
             pass.draw(0..3, 0..1);
         }
-        queue.submit(Some(encoder.finish()));
         self.last_pass_count =
             active_count + usize::from(self.ssr_target.is_some() && self.ssr_enabled());
-        self.submitted_frames = self.submitted_frames.saturating_add(1);
-        self.last_pass_count
+        (self.last_pass_count, Some(encoder.finish()))
     }
 }

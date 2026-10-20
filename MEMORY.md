@@ -9,6 +9,7 @@ Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current co
 | Rendering and canvas output | `src/render/renderer.rs`, `state.rs`, `output.rs`, `target.rs` |
 | Shadows/reflection/targets | `src/render/effects.rs`, `textures.rs`; `docs/RENDER_PASSES.md` |
 | Postprocessing | `src/render/postprocess.rs`; `docs/POSTPROCESSING.md` |
+| Frame graph, transient buffers/textures, profiling | `src/frame_graph.rs`, `src/postprocess_plan.rs`, `src/render/graph_resources.rs`, `src/render/profiler.rs`; [FRAME_PIPELINE.md](docs/FRAME_PIPELINE.md) |
 | glTF asset/animation/PBR | `src/gltf_model.rs`, `gltf_loader.rs`, `gltf_animation.rs`, `src/render/gltf_gpu.rs`, `gltf_pbr.wgsl`; `docs/GLTF.md` |
 | Authored JS scenes, optional tools | `examples/<name>/main.js`, `scene.js`, `examples/shared/tools.js`; `examples/README.md` |
 | Local build/server and verification | `scripts/run-local.sh [port]`, `scripts/serve-local.py`; `docs/DEVELOPMENT.md` |
@@ -22,5 +23,8 @@ Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current co
 
 ## Current Quest / neon decisions — 2026-10-19
 
-- User confirmed direct WebGPU VR works on Quest 3 / Browser 149.1 after WebXR Experiments was enabled and opaque color texture metadata was handled. Route new XR renderer/support work through [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md); details and limits: [WEBXR.md](docs/WEBXR.md). No headset FPS or WebGPU/WebGL color parity measurement was made.
-- `examples/neon-arena` keeps sliced wire/neon fruit visually open: black cap color + `.25` color cutout discard the filling from color/depth. CPU pieces remain closed for physics; ordinary cuttable objects retain their filled-cap behavior. Pixel checks cover an object visible behind the real cut half.
+- Stable XR baseline `b07ae09b`: user confirmed SSR artifacts fixed on Quest 3 / Browser 152.1 with owned per-eye color/depth staging and one final stereo submit. Keep that presentation boundary; Browser 149.1's zero-color-metadata normalization is an earlier, separate workaround. New frame-pipeline code has desktop GPU/WebGL and simulated XR checks; actual headset validation is pending. No headset performance or WebGPU/WebGL color-parity measurement is established. Route XR support through [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md); details: [WEBXR.md](docs/WEBXR.md).
+- Generic frame planning uses single-writer logical resources and exact-descriptor transient aliasing. Rust encodes actual passes; JS exposes graph/profile diagnostics. See [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md) for extension and invalidation rules. GPU physics migration and fixed-step simulation changes are not part of this implementation.
+- `examples/neon-arena` offers glass-like colored facets with opaque neon seams (default) or the original open wire style before VR entry. `FRUIT_SCALE=.105` halves gameplay fruit, independently of gallery icons. Glass cuts retain colored translucent caps; open style uses black caps + `.25` cutout. Both retain closed CPU solids. Restart is at Z=-1.45 m; glass uses stable high-contrast facet masks (base .06, variation 1, per-variant coverage .35–1). Fifteen diverse fill masks per kind are selected and ordered before VR, share topology and cycle without repeats across rounds. See the project skill for presentation rules.
+
+- WebGPU XR color contract: all eye output uses owned sRGB render targets and compatible UNORM source views for byte-preserving final stereo presentation. Browser UNORM views cannot be reinterpreted as sRGB; direct linear output was darker. Quantitative gray tests pass with effects on/off; actual Quest color parity/performance still needs user validation. See docs/FRAME_PIPELINE.md.

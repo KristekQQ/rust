@@ -8,6 +8,8 @@ use wgpu::util::DeviceExt;
 pub struct GlowMesh {
     pub buffer: wgpu::Buffer,
     pub vertices: u32,
+    pub index_buffer: wgpu::Buffer,
+    pub indices: u32,
 }
 struct GlowEdge {
     color_sum: Vec3,
@@ -18,6 +20,7 @@ struct GlowEdge {
 impl GlowMesh {
     pub fn new(device: &wgpu::Device, mesh: &ImportedMesh) -> Option<Self> {
         let mut vertices = Vec::new();
+        let mut indices = Vec::<u32>::new();
         let mut edges = BTreeMap::<[[u32; 3]; 2], GlowEdge>::new();
         let max_vertices = (device.limits().max_buffer_size / std::mem::size_of::<Vertex>() as u64)
             .min(u32::MAX as u64) as usize;
@@ -87,10 +90,14 @@ impl GlowMesh {
                 color: (edge.color_sum / edge.count as f32).to_array(),
                 normal: ends[1].map(f32::from_bits),
             };
-            if vertices.len().checked_add(6)? > max_vertices {
+            if vertices.len().checked_add(4)? > max_vertices
+                || indices.len().checked_add(6)? > u32::MAX as usize
+            {
                 return None;
             }
-            vertices.extend_from_slice(&[vertex; 6]);
+            let base = u32::try_from(vertices.len()).ok()?;
+            vertices.extend_from_slice(&[vertex; 4]);
+            indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
         }
         if vertices.is_empty() {
             return None;
@@ -103,12 +110,19 @@ impl GlowMesh {
                 usage: wgpu::BufferUsages::VERTEX,
             }),
             vertices: count,
+            indices: u32::try_from(indices.len()).ok()?,
+            index_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("neon glow capsule indices"),
+                contents: bytemuck::cast_slice(&indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }),
         })
     }
 }
 impl Drop for GlowMesh {
     fn drop(&mut self) {
         self.buffer.destroy();
+        self.index_buffer.destroy();
     }
 }
 
@@ -116,8 +130,10 @@ impl Drop for GlowMesh {
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
     view_projection: [[f32; 4]; 4],
-    // Pixel viewport dimensions, strength, world-space radius.
+    // Pixel viewport dimensions, strength, projected radius at unit clip w.
     params: [f32; 4],
+    // Base halo world radius and canonical glyph radius, shared with CPU geometry.
+    font_profile: [f32; 4],
 }
 type PipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat);
 
@@ -259,33 +275,50 @@ impl NeonGlow {
                 cache: None,
             })
         });
+        let vp = view.view_projection;
+        let projection_x =
+            Vec3::new(vp.x_axis.x, vp.y_axis.x, vp.z_axis.x).length() * width as f32 * 0.5;
+        let projection_y =
+            Vec3::new(vp.x_axis.y, vp.y_axis.y, vp.z_axis.y).length() * height as f32 * 0.5;
         queue.write_buffer(
             &self.uniform,
             0,
             bytemuck::bytes_of(&Uniforms {
                 view_projection: view.view_projection.to_cols_array_2d(),
-                params: [width as f32, height as f32, self.strength, self.radius],
+                params: [
+                    width as f32,
+                    height as f32,
+                    self.strength,
+                    self.radius * projection_x.max(projection_y),
+                ],
+                font_profile: [self.radius, crate::info_panel::TUBE_RADIUS, 0., 0.],
             }),
         );
         self.active = Some(key);
+    }
+
+    /// Bind once for the contiguous glow mesh batch.
+    pub fn bind<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>) -> bool {
+        if !self.enabled() {
+            return false;
+        }
+        let Some(key) = self.active else { return false };
+        pass.set_pipeline(&self.pipelines[&key]);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        true
     }
 
     pub fn draw<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
         mesh: &'a GlowMesh,
-        instance_buffer: &'a wgpu::Buffer,
+        instance_buffer: wgpu::BufferSlice<'a>,
         instance_count: u32,
     ) {
-        if !self.enabled() || instance_count == 0 {
-            return;
-        }
-        let Some(key) = self.active else { return };
-        pass.set_pipeline(&self.pipelines[&key]);
-        pass.set_bind_group(0, &self.bind_group, &[]);
         pass.set_vertex_buffer(0, mesh.buffer.slice(..));
-        pass.set_vertex_buffer(1, instance_buffer.slice(..));
-        pass.draw(0..mesh.vertices, 0..instance_count);
+        pass.set_vertex_buffer(1, instance_buffer);
+        pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        pass.draw_indexed(0..mesh.indices, 0, 0..instance_count);
     }
 }
 impl Drop for NeonGlow {

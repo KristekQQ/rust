@@ -57,6 +57,18 @@ impl ColorTarget {
         height: u32,
         format: wgpu::TextureFormat,
     ) -> Self {
+        Self::new_with_view_formats(device, label, width, height, format, &[])
+    }
+    /// Owned targets may explicitly allow compatible views (e.g. sRGB render /
+    /// UNORM byte-preserving presentation). Browser XR textures do not allow this.
+    pub fn new_with_view_formats(
+        device: &wgpu::Device,
+        label: &str,
+        width: u32,
+        height: u32,
+        format: wgpu::TextureFormat,
+        view_formats: &[wgpu::TextureFormat],
+    ) -> Self {
         assert!(width > 0 && height > 0);
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some(label),
@@ -70,7 +82,7 @@ impl ColorTarget {
             dimension: wgpu::TextureDimension::D2,
             format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
+            view_formats,
         });
         let color = texture.create_view(&Default::default());
         let (depth_texture, depth) =

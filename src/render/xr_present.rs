@@ -120,20 +120,29 @@ impl XrPresent {
             .as_ref()
             .is_none_or(|eye| (eye.target.width, eye.target.height) != (width, height))
         {
-            let target = ColorTarget::new(
+            // Match canvas/PBR linear blending and hardware sRGB encoding.
+            // The second UNORM view reads the encoded bytes without decoding them
+            // again before the XR compositor consumes its UNORM texture.
+            let target = ColorTarget::new_with_view_formats(
                 device,
                 "XR eye presentation stage",
                 width,
                 height,
-                self.format,
+                self.format.add_srgb_suffix(),
+                &[self.format],
             );
+            let encoded_color = target.texture.create_view(&wgpu::TextureViewDescriptor {
+                label: Some("XR encoded color source"),
+                format: Some(self.format),
+                ..Default::default()
+            });
             let source = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("XR eye presentation source"),
                 layout: &self.layout,
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&target.color),
+                        resource: wgpu::BindingResource::TextureView(&encoded_color),
                     },
                     wgpu::BindGroupEntry {
                         binding: 1,
@@ -247,6 +256,7 @@ impl XrPresent {
         });
         for (index, target) in targets {
             let eye = self.eyes[*index].as_ref().unwrap();
+            let stamp = super::profiler::stamp("xr.present");
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("XR final eye presentation"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -268,7 +278,7 @@ impl XrPresent {
                         stencil_ops: None,
                     },
                 ),
-                timestamp_writes: None,
+                timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });

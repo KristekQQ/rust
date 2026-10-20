@@ -154,6 +154,22 @@ export class WebXRHost extends EventTarget {
     }
     get isPresenting() { return this.#session !== null; }
     get roundState() { return JSON.parse(this.#engine.xr_round_state()); }
+    /** Bind a Rust-owned spatial triple display; no JS animation or score state. */
+    configureComboDisplay({timerPanel,scorePanel,awardPanels,...options}) {
+        if(this.#disposed||!this.#owns(timerPanel)||!this.#owns(scorePanel)||!Array.isArray(awardPanels)||awardPanels.length!==3||awardPanels.some(panel=>!this.#owns(panel)))
+            throw new Error('Panely combo ukazatele musí patřit tomuto enginu.');
+        if(!this.#engine.configure_combo_display(JSON.stringify({...options,timerPanel:timerPanel.id,scorePanel:scorePanel.id,awardPanels:awardPanels.map(panel=>panel.id)})))
+            throw new Error('Rust odmítl nastavení combo ukazatele.');
+    }
+    clearComboDisplay() {
+        if(this.#disposed)throw new Error('WebXR byl ukončen.');
+        this.#engine.clear_combo_display();
+    }
+    get comboDisplayState() {
+        if(this.#disposed)throw new Error('WebXR byl ukončen.');
+        return JSON.parse(this.#engine.combo_display_state());
+    }
+
     startRound(seconds = 30) {
         if (this.#disposed || !this.#session) throw new Error('Kolo vyžaduje aktivní VR.');
         this.#engine.xr_start_round(seconds);
@@ -234,6 +250,15 @@ export class WebXRHost extends EventTarget {
             // Bounded diagnostics: measure delivered XR cadence and CPU submission,
             // never stall the GPU or confuse CPU time with GPU execution time.
             let warmupFrames=60,perfFrames=0,perfElapsed=0,perfCpu=0,perfReports=0;
+            const sessionId=Date.now();
+            const runtimeSettings=()=>({
+                sessionId,
+                frameRate:Number.isFinite(session.frameRate)?session.frameRate:null,
+                supportedFrameRates:session.supportedFrameRates?Array.from(session.supportedFrameRates):null,
+                fixedFoveation:(gpu?this.#gpuLayer:layer)?.fixedFoveation??null,
+                antialias:gpu?false:layer?.antialias??null,
+                layerKind:gpu?'XRProjectionLayer':'XRWebGLLayer',
+            });
             let eyeViewports=[];
             const frame = (time, xrFrame) => {
                 this.#frame = null;
@@ -294,17 +319,18 @@ export class WebXRHost extends EventTarget {
                             gl.drawArrays(gl.TRIANGLES, 0, 3);
                         }
                     }
+                    this.#engine.xr_finish_frame();
                     if (firstFrame && pose?.views.length) {
                         firstFrame = false;
-                        this.dispatchEvent(new CustomEvent('firstframe',{detail:{enabledFeatures:Array.from(session.enabledFeatures??[]),
+                        this.dispatchEvent(new CustomEvent('firstframe',{detail:{...runtimeSettings(),enabledFeatures:Array.from(session.enabledFeatures??[]),
                             ...(gpu?{presentation:'stereo-final-submit-v1',usesDepthValues:this.#gpuBinding.usesDepthValues,ignoreDepthValues:this.#gpuLayer.ignoreDepthValues,fixedFoveation:this.#gpuLayer.fixedFoveation,eyes:firstGpuEyes}:{})}}));
                     }
-                    if(tracked&&elapsed>0&&elapsed<250&&perfReports<3){
+                    if(tracked&&elapsed>0&&elapsed<250&&perfReports<60){
                         if(warmupFrames>0)warmupFrames--;
                         else {
                             perfFrames++;perfElapsed+=elapsed;perfCpu+=performance.now()-cpuStart;
                             if(perfFrames===180){
-                                this.dispatchEvent(new CustomEvent('performance',{detail:{frames:perfFrames,fps:1000*perfFrames/perfElapsed,frameMs:perfElapsed/perfFrames,cpuSubmitMs:perfCpu/perfFrames,eyeViewports}}));
+                                this.dispatchEvent(new CustomEvent('performance',{detail:{...runtimeSettings(),sample:perfReports+1,frames:perfFrames,fps:1000*perfFrames/perfElapsed,frameMs:perfElapsed/perfFrames,cpuSubmitMs:perfCpu/perfFrames,eyeViewports}}));
                                 perfReports++;perfFrames=0;perfElapsed=0;perfCpu=0;
                             }
                         }

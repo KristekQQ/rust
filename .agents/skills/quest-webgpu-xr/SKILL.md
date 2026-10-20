@@ -11,6 +11,11 @@ Kořen projektu je o tři adresáře výš. Použij [workflow enginu](../rust-we
 - Uživatel 2026-10-18 potvrdil funkční WebGPU VR v neon aréně na Quest 3 / Browser 149.1.
   Potvrzení následovalo po zapnutí **WebXR Experiments** a opravě importu barevné XR textury.
   Verze prohlížeče ani desktopový WebGPU nejsou důkazem podpory konkrétní XR relace.
+- Uživatel potvrdil baseline `b07ae09b` s opravou SSR artefaktů na Browser 152.1.
+  Dokonči efekty v engine-owned per-eye color/depth cílech a obě browserové slices
+  předej jedním finálním stereo submit. Depth attach respektuje `ignoreDepthValues`.
+  Nový frame graph/profiler sám nepředstavuje nové potvrzení z headsetu;
+  pro rozšíření prostředků použij [frame-pipeline](../frame-pipeline/SKILL.md).
 - `?backend=auto` používá WebGPU, pokud je dostupné; `?backend=webgl` zůstává kompatibilní cesta.
   Pro headset použij důvěryhodné HTTPS. Nezaměňuj vykreslený desktopový canvas za VR.
 - Při chybě nejprve čti čerstvé Quest záznamy `output/diagnostics/browser.jsonl`,
@@ -28,6 +33,11 @@ Kořen projektu je o tři adresáře výš. Použij [workflow enginu](../rust-we
   `getViewDescriptor()` jako jediný 2D řez texture array. Browserové textury nedrž
   přes snímky a nenič je. Přímá cesta vyžaduje celé řezy. Postprocessing běží přes per-eye mezicíle;
   finální pipeline musí odpovídat skutečnému formátu XR řezu (bez sRGB suffixu).
+- Výstupní barvy XR: engine-owned eye stage má sRGB render view a UNORM source
+  view. Finální copy čte zakódované bajty z UNORM view, bez další gamma korekce.
+  Používej stage i bez efektů; přímý lineární zápis do browser UNORM ztmavoval obraz.
+  Browser textury nemají povolené sRGB view reinterpretace. Ověř kvantitativní
+  šedé v `webxr-webgpu`, ne jen přítomnost pixelů; podrobnosti ve frame-pipeline.
 - Quest 149.1 vrací u barevné XR textury někdy mip/sample/usage = **0/0/0**.
   `src/render/xr_output.rs` nahrazuje pouze tuto přesnou trojici u barevné přílohy
   známým nastavením projekční vrstvy 1/1/RENDER_ATTACHMENT. Zachovej ostatní validaci

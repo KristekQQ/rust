@@ -1,11 +1,29 @@
-import { swordGeometry, fruitGeometries, wildSymbol } from './geometry.js';
-export const NEON_GLOW=Object.freeze({strength:1.6,radius:.045});
+import { swordGeometry, neonFrameGeometry, fruitGeometries, createFruitPatternCatalog, FRUIT_PATTERN_COUNT } from './geometry.js';
+export const NEON_GLOW=Object.freeze({strength:.4,radius:.045});
+export const PAYTABLE_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([-2.75,1.2,-.40]);
+export const PAYTABLE_YAW=Math.PI/2;
+export const COMBO_DISPLAY_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([0,1.42,-2.15]);
+export const FRUIT_SCALE=.105; // Half of the original .21 gameplay scale.
+export const FRUIT_OPACITY=.06;
+export const FRUIT_OPACITY_VARIATION=1;
+export const RESTART_POSITION=/** @type {import('../../js/engine.d.ts').Vector3} */([0,.20,-1.45]);
 export const FLOOR_SSR=Object.freeze({strength:.92});
 export const FLOOR_SSR_BOUNDS={min:/** @type {import('../../js/engine.d.ts').Vector3} */([-1.5,-.03,-3]),max:/** @type {import('../../js/engine.d.ts').Vector3} */([1.5,.03,.75])};
 // Gentle hits only; fast attacks keep their full effect. Tune from the Quest URL (?hitSize=0.08) without rebuilding WASM.
 const requestedHitSize=Number(new URLSearchParams(location.search).get('hitSize')??'0.15');
 export const CUT_EFFECT_SIZE=Number.isFinite(requestedHitSize)&&requestedHitSize>=.01&&requestedHitSize<=2?requestedHitSize:.15;
 
+
+/** Scene-scoped handles only; geometry, palettes and simulation belong to Rust.
+ * @type {WeakMap<import('../../js/engine.js').Scene,WeakMap<object,{asset:import('../../js/engine.js').MeshVariants,index:number}>>} */
+const fruitAssets=new WeakMap();
+/** Use the shared asset when this fruit belongs to the scene's catalog.
+ * @param {import('../../js/engine.js').Scene} scene
+ * @param {ReturnType<typeof fruitGeometries>[number]} fruit */
+export function createFruitMesh(scene,fruit) {
+    const recipe=fruitAssets.get(scene)?.get(fruit.geometry);
+    return recipe?recipe.asset.createInstance(recipe.index):scene.createMesh(fruit.geometry);
+}
 
 /** Vlastní scéna v metrech. Černé okolí a lesklá kachličková podlaha.
  * @param {import('../../js/engine.js').Scene} scene */
@@ -34,35 +52,57 @@ export async function createScene(scene) {
         indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7],color:[.006,.012,.020]})
         .setPosition([0,-.025,0])
         .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false});
-    const fruits = fruitGeometries();
+    const {fruits,wild,variants:fruitPatterns}=createFruitPatternCatalog();
+    const recipes=new WeakMap();
+    fruitAssets.set(scene,recipes);
+    for(const patterns of Object.values(fruitPatterns)) {
+        const base=patterns[0].geometry;
+        const asset=scene.createMeshVariants({positions:base.positions,indices:base.indices,
+            variants:patterns.map(pattern=>pattern.geometry.triangleColors??[]),smooth:base.smooth});
+        patterns.forEach((pattern,index)=>recipes.set(pattern.geometry,{asset,index}));
+    }
     const geometry = fruits[0].geometry;
     const playOrder=['cherry','lime','lemon','orange','banana','plum','pear','grapes','watermelon'];
-    const wild=wildSymbol();
+    // Catalog order separates similar fill masks, including the wraparound.
+    // Per-kind cursors survive round restarts and visit all fifteen patterns.
+    const patternCursors=new Map();
+    /** @param {ReturnType<typeof fruitGeometries>[number]} fruit */
+    const nextFruitVariant=fruit=>{
+        const cursor=patternCursors.get(fruit.name)??0;
+        patternCursors.set(fruit.name,(cursor+1)%FRUIT_PATTERN_COUNT);
+        return fruitPatterns[fruit.name][cursor];
+    };
     // Each readable wave has five matching fruit and a wildcard as its third target.
-    const playFruits=playOrder.flatMap(name=>{
+    const playFruits=playOrder.flatMap(name=>[0,1,2,3,4,5].map(slot=>{
+        if(slot===2)return wild;
         const fruit=fruits.find(f=>f.name===name);
         if(!fruit)throw new Error(`Missing fruit: ${name}`);
-        return [fruit,fruit,wild,fruit,fruit,fruit];
-    });
+        return fruit;
+    }));
     // One shared authoring plane: upper edge leans away, face tilts toward the eyes.
     const boardTilt=-Math.PI/10;
     /** @param {number} x @param {number} y @param {number} [depth]
      * @returns {import('../../js/engine.d.ts').Vector3} */
-    const onBoard=(x,y,depth=0)=>[x,1.2+Math.cos(boardTilt)*(y-1.2)-Math.sin(boardTilt)*depth,
-        -2.65+Math.sin(boardTilt)*(y-1.2)+Math.cos(boardTilt)*depth];
-    const comboRules = scene.createTextPanel({title:'3 STEJNE - BODY',lines:['WILD NAHRADI KAZDE OVOCE'],position:onBoard(0,2.36,-.05),width:1.65,height:.13}).setRotation([boardTilt,0,0]);
+    const onBoard=(x,y,depth=0)=>{
+        const localZ=Math.sin(boardTilt)*(y-1.2)+Math.cos(boardTilt)*depth;
+        return [PAYTABLE_ORIGIN[0]+Math.cos(PAYTABLE_YAW)*x+Math.sin(PAYTABLE_YAW)*localZ,
+            PAYTABLE_ORIGIN[1]+Math.cos(boardTilt)*(y-1.2)-Math.sin(boardTilt)*depth,
+            PAYTABLE_ORIGIN[2]-Math.sin(PAYTABLE_YAW)*x+Math.cos(PAYTABLE_YAW)*localZ];
+    };
+    const comboRules = scene.createTextPanel({title:'3 STEJNE - BODY',lines:['WILD NAHRADI KAZDE OVOCE'],position:onBoard(0,2.36,-.05),width:1.65,height:.13}).setRotation([boardTilt,PAYTABLE_YAW,0]);
     const catalog=[...fruits].sort((a,b)=>FRUIT_POINTS[a.name].points-FRUIT_POINTS[b.name].points).concat(wild);
     const rowPositions=catalog.map((_,i)=>/** @type {import('../../js/engine.d.ts').Vector3} */ ([0,2.15-i*.215,-2.65]));
     const galleryPositions=catalog.flatMap((_,row)=>[-.46,-.16,.14].map(x=>
         /** @type {import('../../js/engine.d.ts').Vector3} */ (onBoard(x,rowPositions[row][1]))));
-    const galleryIcons=catalog.flatMap((fruit,row)=>[0,1,2].map(slot=>scene.createMesh(fruit.geometry)
-        .setPosition(galleryPositions[row*3+slot]).setRotation([boardTilt,0,0]).setScale([.073,.073,.073]).setColorCutout(.25).spin([0,.65,0])
+    const galleryPatterns=catalog.flatMap(fruit=>[0,1,2].map(pattern=>fruitPatterns[fruit.name][pattern]));
+    const galleryIcons=catalog.flatMap((fruit,row)=>[0,1,2].map(slot=>createFruitMesh(scene,galleryPatterns[row*3+slot])
+        .setPosition(galleryPositions[row*3+slot]).setRotation([boardTilt,PAYTABLE_YAW,0]).setScale([.073,.073,.073]).setColorCutout(.25).spin([0,.65,0])
         .setRenderOptions({castsShadow:false,receivesShadow:false})
         .bindComboIndicator(FRUIT_POINTS[fruit.name].label,/** @type {0|1|2} */(slot))));
     const galleryRows=catalog.map((fruit,i)=>({name:fruit.name,kind:FRUIT_POINTS[fruit.name].label,icons:galleryIcons.slice(i*3,i*3+3)}));
     const galleryLabels=catalog.map((fruit,i)=>{
         const [,y,z]=rowPositions[i],rule=FRUIT_POINTS[fruit.name];
-        return scene.createTextPanel({title:String(rule.points),lines:[],position:onBoard(.57,y-.125,.04),width:.33,height:.44}).setRotation([boardTilt,0,0]);
+        return scene.createTextPanel({title:String(rule.points),lines:[],position:onBoard(.57,y-.125,.04),width:.33,height:.44}).setRotation([boardTilt,PAYTABLE_YAW,0]);
     });
     // Rectangular neon rings frame each rotating sculpture without obscuring it.
     const ring=[-.82,-.10,.82,-.10,.82,.10,-.82,.10,-.812,-.092,.812,-.092,.812,.092,-.812,.092];
@@ -75,13 +115,18 @@ export async function createScene(scene) {
         const n=(i+1)%4;
         frameIndices.push(i,n+8,n,i,i+8,n+8,4+i,4+n,12+n,4+i,12+n,12+i);
     }
-    const galleryFrames=rowPositions.map(([x,y,z])=>scene.createMesh(frameGeometry)
-        .setPosition(onBoard(x,y,-.08)).setRotation([boardTilt,0,0]).setEmission(1.4)
+    const frameAsset=scene.createMeshVariants({positions:frameGeometry.positions,indices:frameIndices,
+        variants:[frameIndices.map((_,i)=>(frameGeometry.color??[0,0,0])[i%3])]});
+    const galleryFrames=rowPositions.map(([x,y,z])=>frameAsset.createInstance()
+        .setPosition(onBoard(x,y,-.08)).setRotation([boardTilt,PAYTABLE_YAW,0]).setEmission(1.4)
         .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false}));
-    const earnedFrameGeometry={...frameGeometry,color:/** @type {import('../../js/engine.d.ts').Vector3} */ ([.5,.30,.015])};
-    const galleryEarnedFrames=catalog.flatMap((fruit,row)=>[0,1,2].map(slot=>scene.createMesh(earnedFrameGeometry)
+    // One shared circular tube frame in metres, avoiding flattened cross-sections.
+    const earnedFrameGeometry=neonFrameGeometry();
+    const earnedFrameAsset=scene.createMeshVariants({positions:earnedFrameGeometry.positions,indices:earnedFrameGeometry.indices,
+        variants:[earnedFrameGeometry.triangleColors??[]],smooth:true});
+    const galleryEarnedFrames=catalog.flatMap((fruit,row)=>[0,1,2].map(slot=>earnedFrameAsset.createInstance()
         .setPosition(onBoard([-.46,-.16,.14][slot],rowPositions[row][1],-.015))
-        .setRotation([boardTilt,0,0]).setScale([.128,.75,1])
+        .setRotation([boardTilt,PAYTABLE_YAW,0]).setScale([.62,.62,.62])
         .setRenderOptions({castsShadow:false,receivesShadow:false})
         .bindComboIndicator(FRUIT_POINTS[fruit.name].label,/** @type {0|1|2} */(slot))));
     // Existing preview/verification handles refer to the actual gallery fruit.
@@ -102,7 +147,7 @@ export async function createScene(scene) {
     const monumentScale = /** @type {import('../../js/engine.d.ts').Vector3} */ ([1.05,.6,1.05]);
     const monumentYaw = Math.atan2(-monumentOrigin[0],-monumentOrigin[2]);
     monument.setPosition(monumentOrigin).setRotation([0,monumentYaw,0]).setScale(monumentScale).setRenderOptions({isStatic:true,castsShadow:false});
-    scoreDisplay.setPosition(onBoard(0,2.65,-.25)).setRotation([boardTilt,0,0]).setRenderOptions({isStatic:true,castsShadow:false});
+    scoreDisplay.setPosition(onBoard(0,2.65,-.25)).setRotation([boardTilt,PAYTABLE_YAW,0]).setRenderOptions({isStatic:true,castsShadow:false});
     /** Keep the plaque and inscription on the stone's front surface, in metres.
      * @param {number} y @param {number} z @returns {import('../../js/engine.d.ts').Vector3} */
     const onStone=(y,z)=>[monumentOrigin[0]+Math.sin(monumentYaw)*z*monumentScale[2],y*monumentScale[1],monumentOrigin[2]+Math.cos(monumentYaw)*z*monumentScale[2]];
@@ -110,15 +155,30 @@ export async function createScene(scene) {
         .setRotation([0,monumentYaw,0]);
     const credits = scene.createTextPanel({title:'CODEX',lines:['POSTAVENO SPOLECNE','S HONZOU'],position:onStone(2.01,.228),width:1.08*monumentScale[0],height:.48*monumentScale[1]})
         .setRotation([0,monumentYaw,0]);
-    const scorePanel = scene.createInfoPanel('round', {position:onBoard(0,2.65,-.158),width:1.42,height:.65}).setRotation([boardTilt,0,0]);
-    const logo = scene.createTextPanel({title:'APOLLO GAMES',lines:[],position:onBoard(0,3.11,-.158),width:2.20,height:.65}).setRotation([boardTilt,0,0]);
-    const restartButton = scene.createInfoPanel('restart', {position:[0,.20,-1.65],width:.75,height:.22});
+    const timerPanel=scene.createInfoPanel('countdown',{position:[0,2.36,-2.15],width:1.18,height:.50})
+        .setEmission(8).setRenderOptions({castsShadow:false,receivesShadow:false});
+    const scorePanel=scene.createInfoPanel('score',{position:[0,1.90,-2.15],width:1.55,height:.25})
+        .setEmission(4).setRenderOptions({castsShadow:false,receivesShadow:false});
+    const scoreLabel=scene.createTextPanel({title:'SKORE',lines:[],position:[0,2.075,-2.15],width:.50,height:.10})
+        .setRenderOptions({castsShadow:false,receivesShadow:false});
+    const currentLabel=scene.createTextPanel({title:'3 STEJNE',lines:[],position:[0,1.70,-2.15],width:.70,height:.12})
+        .setEmission(1.2).setRenderOptions({castsShadow:false,receivesShadow:false});
+    const awardPanels=[0,1,2].map(row=>scene.createInfoPanel('combo-award',{
+        position:[.90,COMBO_DISPLAY_ORIGIN[1]-(row+1)*.35,-2.15],width:.55,height:.18})
+        .setRenderOptions({castsShadow:false,receivesShadow:false}));
+    const comboDisplay={symbols:[...fruits,wild].map(fruit=>({kind:FRUIT_POINTS[fruit.name].label,
+        asset:recipes.get(fruit.geometry).asset.id,variant:0})),frameAsset:earnedFrameAsset.id,
+        origin:COMBO_DISPLAY_ORIGIN,spacing:.34,rowGap:.35,fruitScale:.085,
+        frameScale:/** @type {import('../../js/engine.d.ts').Vector3} */([1,1,1]),
+        historySeconds:2,timerPanel,scorePanel,awardPanels};
+    const logo = scene.createTextPanel({title:'APOLLO GAMES',lines:[],position:onBoard(0,3.11,-.158),width:2.20,height:.65}).setRotation([boardTilt,PAYTABLE_YAW,0]);
+    const restartButton = scene.createInfoPanel('restart', {position:RESTART_POSITION,width:.75,height:.22});
     /** @type {import("../../js/engine.d.ts").TriangleMeshOptions} */
     const pointerGeometry={positions:[0,1,0,0,-1,0,-1,0,0,1,0,0,0,0,1,0,0,-1],
         indices:[0,4,3,0,3,5,0,5,2,0,2,4,1,3,4,1,5,3,1,2,5,1,4,2],color:[.15,1,.35]};
     const pointers = ['left','right'].map(()=>scene.createMesh(pointerGeometry).setPosition([100,100,100]).setScale([.012,.012,.012])
         .setRenderOptions({castsShadow:false,receivesShadow:false}));
-    return {floorTiles, floorGrout, apples, fruits, playFruits, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
+    return {scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
 }
 
 // Points per completed triple; adapted ranking, not the slot's cash payouts.
@@ -134,30 +194,30 @@ export const FRUIT_POINTS = /** @type {Record<string, {label:string,points:numbe
  * Start je ve výšce rukou: plod musí být v obou očích vidět již v prvním snímku.
  * @param {import('../../js/engine.js').Scene} scene
  * @param {ReturnType<typeof fruitGeometries>[number]} fruit
- * @param {number} side */
-export function launchApple(scene, fruit, side) {
-    return scene.createMesh(fruit.geometry).setPosition([side*.38,1.15,-1.10]).setScale([.21,.21,.21])
-        .setEmission(2.4).setColorCutout(.25).setRenderOptions({castsShadow:false,receivesShadow:false})
-        .setCuttable(true,{capColor:cutFaceColor(fruit)})
+ * @param {number} side @param {boolean} [solid] */
+export function launchApple(scene, fruit, side, solid=true) {
+    return createFruitMesh(scene,fruit).setPosition([side*.38,1.15,-1.10]).setScale([FRUIT_SCALE,FRUIT_SCALE,FRUIT_SCALE])
+        .setEmission(2.4).setColorCutout(solid?0:.25).setOpacity(solid?FRUIT_OPACITY:1,{opaqueAbove:.25,variation:solid?FRUIT_OPACITY_VARIATION:0,coverage:fruit.coverage??.5}).setRenderOptions({castsShadow:false,receivesShadow:false})
+        .setCuttable(true,{capColor:cutFaceColor(fruit,solid)})
         .setComboTarget(FRUIT_POINTS[fruit.name].label,FRUIT_POINTS[fruit.name].points,{wild:fruit.name==='wild'})
         .projectile([-side*.035,1.2,.08],{gravity:1.6,bounce:0})
         .spin([.12,.45,.06]).removeAfter(1.9);
 }
 
-/** Neon fruit has no visible cut filling. The existing .25 color cutout
- * discards these caps before color/depth writes; CPU physics keeps a closed solid.
- * @param {ReturnType<typeof fruitGeometries>[number]} _fruit
+/** Open style discards dark caps; solid style renders the fruit's colored flesh.
+ * Both styles keep closed CPU meshes for physics.
+ * @param {ReturnType<typeof fruitGeometries>[number]} fruit @param {boolean} [solid]
  * @returns {import('../../js/engine.d.ts').Vector3} */
-export function cutFaceColor(_fruit) {
-    return [0,0,0];
+export function cutFaceColor(fruit,solid=false) {
+    return solid?[fruit.capColor[0]*.22,fruit.capColor[1]*.22,fruit.capColor[2]*.22]:[0,0,0];
 }
 
 /** A real desktop mesh split, using the same fruit and presentation as XR.
  * @param {import('../../js/engine.js').Scene} scene
- * @param {ReturnType<typeof fruitGeometries>[number]} fruit @param {number} [size] */
-export function previewSlice(scene,fruit,size=CUT_EFFECT_SIZE) {
-    const source=scene.createMesh(fruit.geometry).setPosition([0,1.35,-1.15]).setScale([.25,.25,.25])
-        .setEmission(2.4).setColorCutout(.25).setCuttable(true,{capColor:cutFaceColor(fruit)})
+ * @param {ReturnType<typeof fruitGeometries>[number]} fruit @param {number} [size] @param {boolean} [solid] */
+export function previewSlice(scene,fruit,size=CUT_EFFECT_SIZE,solid=true) {
+    const source=createFruitMesh(scene,fruit).setPosition([0,1.35,-1.15]).setScale([.125,.125,.125])
+        .setEmission(2.4).setColorCutout(solid?0:.25).setOpacity(solid?FRUIT_OPACITY:1,{opaqueAbove:.25,variation:solid?FRUIT_OPACITY_VARIATION:0,coverage:fruit.coverage??.5}).setCuttable(true,{capColor:cutFaceColor(fruit,solid)})
         .setRenderOptions({castsShadow:false,receivesShadow:false});
     const cutter=scene.createCube([0,1.75,-.45]).setScale([.01,.01,.01])
         .setCutter({base:[0,0,-10],tip:[0,0,-95]});

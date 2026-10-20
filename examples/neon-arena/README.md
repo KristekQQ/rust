@@ -2,8 +2,7 @@
 
 Aktuální ukázka používá čisté černé pozadí. Obsahuje devět druhů ovoce včetně dvojice třešní, banánu, hroznů,
 pomeranče a limetky; dvě katany,
-45sekundové kolo a skutečné Rust řezy. Pod nápisem APOLLO GAMES je bitmapový
-3D displej se skóre. Nízký žulový náhrobek vpravo mimo prostor galerie nese kredit CODEX a živou
+30sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Nízký žulový náhrobek vpravo mimo prostor galerie nese kredit CODEX a živou
 diagnostiku FPS, FRAME MS, CPU MS, CULL MS, VISIBLE, CULLED, OBJECTS a DRAWS.
 
 Aplikace neimportuje `environment.js`, nestahuje barevné/emisní stěny cubemapy,
@@ -23,7 +22,7 @@ build skripty zůstávají uložené v příkladu, ale herní stránka je nepou�
 
 ## Neonová záře
 
-Aréna zapíná `engine.setNeonGlow({strength:1.6,radius:.045})`. Rust vykresluje
+Aréna zapíná `engine.setNeonGlow({strength:.4,radius:.045})`. Rust vykresluje
 souvislé neonové jádro s měkkým barevným lemem podél hranic svítících pásků
 a ostrých hran ovoce a dalších emissive triangle meshes. Koplanární diagonály
 triangulace vynechá. Maximum RGB místo sčítání brání světlým boulím ve vrcholech.
@@ -55,15 +54,60 @@ zvýrazněním prvního symbolu svého řádku. Fragmenty zvýraznění nemění
 vše zhasne. Žolíky na začátku ukazuje řádek žolíka; po určení druhu se postup
 přenese na dané ovoce. Rotaci a zvýraznění přes `bindComboIndicator(kind, slot)`
 (slot 0–2) vlastní Rust, JS pouze vytvoří a naváže objekty.
-Celá tabulka, její rámečky, hodnoty a horní skóre sdílejí sklon −18° kolem X:
-horní hrana je dál od hráče, spodní blíž, plocha míří mírně vzhůru.
+Celá výherní tabulka, její rámečky a hodnoty sdílejí sklon −18° kolem X
+a otočení +90° kolem Y. Její střed je vlevo na [−2,75;1,2;−0,4]; při pohledu
+dopředu je mimo zorné pole, zobrazí se při otočení hlavy doleva.
 Získané symboly i jejich samostatné zlaté rámečky používají emisi 8,0 místo
 klidové 0,65; zvýraznění stále řídí skutečný postup série v Rustu.
-Galerie zůstává viditelná v obou očích během hry; diagnostický kámen je vpravo
-na X=3 m, aby ji nezakrýval. Restart je pod galerií ve výšce 0,20 m.
-Každých 650 ms startuje plod přímo před hráčem ve výšce rukou. Rust vlastní fyziku, řezy,
+Galerie je viditelná v obou očích po otočení doleva; diagnostický kámen je vpravo
+na X=3 m, aby ji nezakrýval. Restart zůstává před hráčem na [0;0,20;−1,45].
+Každých 550 ms startuje plod přímo před hráčem ve výšce rukou. Rust vlastní fyziku, řezy,
 čas i skóre. Objekt DALSI KOLO lze aktivovat mečem nebo namířením a triggerem.
 Při odchodu z XR se výstřely zastaví a náhledové ovoce se vrátí.
+
+## Přední ukazatel a historie
+
+`countdown` a `score` jsou centrované číslice z oblých 3D trubic bez podkladové desky.
+Oblé křivky mají světlé bílo-modré jádro, modré boky a měkké modré halo.
+Technické tvary se zkosenými rohy a rozdělenými tahy ukazuje samostatná
+[sada 0–9](../neon-font-preview/), včetně ovládání glow a pohledu zešikma.
+Trubice mají střední tloušťku a vlastní neonový shader: analytický světelný profil podle normály a pohledu, modré okraje a jasné jádro s plynulým převodem HDR. Znaky jsou lehce nakloněné doprava. Používají rozšířené sci-fi
+proporce; rozestupy a fitting vycházejí ze skutečných mezí glyphů, aby zůstaly
+oddělené i v dlouhých skóre. Čas má větší výšku a intenzitu než širší skóre,
+aby delší bodové částky nezabíraly celý ukazatel. Rámečky symbolů
+sdílejí jednu geometrii kruhové neonové trubice se zaoblenými rohy; jejich
+měřítko je jednotné v každé ose.
+Principy světelného profilu: [Neon Light Shader](https://shaders.orels.sh/docs/orl-standard/neon-light) a [Three-layer neon glow](https://andrewdetwiler.com/sdf/notes/three-layer-glow).
+Vizuální reference: [skutečné skleněné neony AOOS](https://www.aoos.com/products/custom-real-glass-neon-signs).
+Číslice 0–9 mají jednou připravenou 3D geometrii a GPU buffery. Odpočet a skóre
+je skládají ze sdílených instancí; opakované nuly nekopírují mesh. Při změně čísla
+se mění sestava a rozmístění znaků, nikoli GPU geometrie. CPU snapshot panelu
+zůstává dostupný pro diagnostiku.
+Materiál `-2` je vyhrazený numerickým trubicím (`-1` je běžný bitmapový text).
+Jejich kanonický vertex RGB nese zakódovanou jednotkovou osu segmentu, nikoliv
+barvu. Vertex shader ji převede do světa, fragment shader promítne pohled do
+průřezu trubice. Tím jádro nehasne při pohledu podél tahu; CPU snapshot panelu
+nadále vrací modrou diagnostickou barvu. Záře používá stávající průchod a šířku
+odvozenou ze skutečného poloměru instance, bez nového full-screen efektu.
+Souvislé tahy navazují přes přesné kruhové oblouky s analytickými tečnami.
+Samostatné části číslic mají skutečné mezery, aby se světelný profil ve spojích
+nelámal přes překrývající se koncové kapsle.
+Výchozí odpočet je 30 s; skutečný Rust round clock postupuje jednou za platformní
+snímek, nikoli jednou na oko. Vlastní font nevyžaduje síťové načítání.
+
+`engine.xr.configureComboDisplay(world.comboDisplay)` naváže registrované sdílené
+assety symbolů a rámečku, timer/score panely a tři panely odměn. Rust vytváří pouze
+aktuální trojici na [0;1,42;−2,15] a nejvýše tři historické trojice pod ní. V každém řádku jsou tři širší modré rámečky. Ovoce vzniká pouze pro získané
+sloty; zbývající místa jsou prázdná, bez tlumených kopií ovoce. Jiný druh přesune
+přerušenou trojici do historie, úspěch ji doplní o `+body`. Historie a její záře
+plynule slábnou 2 s, pak Rust odstraní instance. Žolík zachovává pravidla skórování.
+Restart maže historii i skóre, `scene.clear()` ruší binding.
+
+SDK drží pouze handles/config; žádný další JS RAF nebo polling skóre. Stav pro
+cílené testy je `engine.xr.comboDisplayState`, veřejné nastavení je popsáno v
+`js/engine.d.ts`. `src/combo_display.rs` vlastní životnost a fade, `src/xr_round.rs`
+události úspěchu/přerušení, `src/info_panel.rs` trubicové číslice a zbývající bitmapové texty. Po vypnutí/zapnutí
+glow se fontová cache obnoví bez přegenerování stejného textu každým snímkem.
 
 ## Trojice a skóre
 
@@ -72,14 +116,14 @@ novou sérii 1/3. Po vyplacení trojice se série vrátí na 0/3; šest zásahů
 stejného druhu tedy vyplatí dvě trojice. Minutí série nepřerušuje, fragmenty
 nepřidávají body. Restart vymaže body i sérii, po konci kola body nepřibývají.
 
-Každá vlna je `[ovoce, ovoce, wild, ovoce, ovoce, ovoce]` po 650 ms,
-od třešní až po meloun. Všech devět druhů se vystřídá za 35,1 s během 45s kola.
+Každá vlna je `[ovoce, ovoce, wild, ovoce, ovoce, ovoce]` po 550 ms,
+od třešní až po meloun. Všech devět druhů se vystřídá za 29,7 s během 30s kola při průběžném zasahování cílů.
 Žolík má vlastní uzavřený neonový mesh třícípé šaškovské koruny a lze ho skutečně
 rozkrojit. `setComboTarget(kind, points, {wild:true})` jej označí jako náhradu
 jakéhokoliv druhu: ovoce–wild–ovoce i wild–wild–ovoce vyplatí cenu ovoce.
 Tři wild vyplatí 120 bodů; po výplatě další trojice začíná samostatně.
 
-Plody jsou větší (scale 0,21), startují v `[±0,38;1,15;−1,10]`, mají pomalý
+Plody mají poloviční původní měřítko (scale 0,105), startují v `[±0,38;1,15;−1,10]`, mají pomalý
 oblouk (vy=1,2 m/s, gravitace 1,6 m/s²), mírně se přibližují a po 1,9 s zmizí
 bez odrazů. V dosahu 1,10–1,65 m na výšku zůstávají přes sekundu; nejvýš tři
 současné cíle brání zahlcení i při ručním vystřelování. Jde o návrh hratelnosti,

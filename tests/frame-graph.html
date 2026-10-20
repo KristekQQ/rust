@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Frame graph – skutečné GPU buffery</title>
+<style>
+body { background: #191924; color: #eee; font: 15px system-ui; padding: 20px; }
+canvas { width: 320px; height: 180px; }
+button { padding: 8px 12px; } pre { white-space: pre-wrap; }
+</style>
+<h1>Frame graph: storage buffery</h1>
+<p>Compute producer → consumer, dva exporty, skutečný readback a opětovné použití slotu.</p>
+<button id="check" disabled>Ověřit GPU buffery</button>
+<pre id="result" role="status">Inicializace skutečného Rust rendereru…</pre>
+<canvas id="gpu-canvas" width="320" height="180"></canvas>
+<script type="module">
+import init, * as wasm from '../pkg/webgpu_wasm.js';
+const output = document.querySelector('#result');
+const button = document.querySelector('#check');
+try {
+    await init();
+    await wasm.start();
+    const backend = wasm.renderer_backend();
+    document.documentElement.dataset.rendererBackend = backend;
+    if (backend !== 'BrowserWebGpu') throw new Error(`GPU buffer test requires WebGPU; observed ${backend}`);
+    button.disabled = false;
+    output.textContent = `${backend}: připraveno`;
+    button.onclick = async () => {
+        button.disabled = true;
+        output.textContent = 'Probíhá GPU compute a asynchronní readback…';
+        try {
+            const report = JSON.parse(await wasm.verify_frame_graph_resources());
+            if (!report.supported || report.verifiedValues !== 128 || report.physicalBuffers !== 3
+                || report.logicalBuffers !== 4 || !report.overlapSeparated
+                || !report.nonoverlapAliased || !report.exportRetained) {
+                throw new Error(`Neúplný GPU výsledek: ${JSON.stringify(report)}`);
+            }
+            output.textContent = `PASS: ${backend} · 128 hodnot ze dvou GPU exportů; 4 logické / 3 fyzické buffery; překryvy oddělené, nepřekryvy aliasované, export zachovaný.\n${JSON.stringify(report, null, 2)}`;
+        } catch (error) {
+            output.textContent = `FAIL: ${error.message ?? error}`;
+            console.error(error);
+        } finally {
+            button.disabled = false;
+        }
+    };
+} catch (error) {
+    output.textContent = `FAIL: ${error.message ?? error}`;
+    console.error(error);
+}
+</script>
+</html>

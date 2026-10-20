@@ -98,6 +98,7 @@ impl DebugHud {
             label: Some("debug HUD"),
         });
         {
+            let stamp = super::profiler::stamp("hud");
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("debug HUD"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -110,7 +111,7 @@ impl DebugHud {
                     },
                 })],
                 depth_stencil_attachment: None,
-                timestamp_writes: None,
+                timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                 occlusion_query_set: None,
                 multiview_mask: None,
             });

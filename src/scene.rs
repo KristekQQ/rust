@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 #[path = "cut_feedback.rs"]
 pub(crate) mod cut_feedback;
+#[path = "numeric_font.rs"]
+mod numeric_font;
 
 pub const MAX_LIGHTS: usize = 4;
 pub const INVALID_ID: u32 = u32::MAX;
@@ -12,6 +14,41 @@ pub struct TriangleObject {
     pub mesh: crate::cutting_mesh::MeshData,
     pub cuttable: bool,
     pub cap_color: Vec3,
+}
+pub(crate) struct MeshVariants {
+    pub variants: Vec<crate::cutting_mesh::MeshData>,
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    pub colors: Vec<[f32; 4]>,
+    pub registered: bool,
+    pub varying_triangles: Vec<usize>,
+}
+impl MeshVariants {
+    /// Only the specialized shared GPU buffer gets negative red slot markers.
+    /// CPU topology/colors remain untouched for glow extraction and cutting.
+    #[cfg(any(test, target_arch = "wasm32"))]
+    pub(crate) fn gpu_mesh(&self) -> crate::gltf_loader::ImportedMesh {
+        let mut mesh = self.variants[0]
+            .ready_cpu()
+            .expect("CPU mesh asset base")
+            .render_mesh();
+        for (slot, &triangle) in self.varying_triangles.iter().enumerate() {
+            for vertex in &mut mesh.vertices[triangle * 3..triangle * 3 + 3] {
+                vertex.color[0] = -(slot as f32 + 1.0);
+            }
+        }
+        mesh
+    }
+    #[cfg(any(test, target_arch = "wasm32"))]
+    pub(crate) fn gpu_colors(&self) -> Vec<[f32; 4]> {
+        self.colors
+            .chunks_exact(self.variants[0].triangle_count())
+            .flat_map(|variant| {
+                self.varying_triangles
+                    .iter()
+                    .map(|&triangle| variant[triangle])
+            })
+            .collect()
+    }
 }
 #[derive(Default)]
 pub struct CutReport {
@@ -163,6 +200,10 @@ pub struct SceneObject {
     pub render_options: RenderOptions,
     pub emission: f32,
     pub color_cutout: f32,
+    pub opacity: f32,
+    pub opaque_above: f32,
+    pub opacity_variation: f32,
+    pub opacity_coverage: f32,
     cut_assist: f32,
     blade_contact_response: bool,
     local_bounds: Option<(Vec3, Vec3)>,
@@ -217,8 +258,11 @@ struct BoxCollider {
 #[derive(Default)]
 pub struct SceneManager {
     feedback: cut_feedback::Feedback,
+    numeric_font: numeric_font::NumericFont,
     objects: BTreeMap<u32, SceneObject>,
     triangle_meshes: BTreeMap<u32, TriangleObject>,
+    pub(crate) mesh_variants: BTreeMap<u32, MeshVariants>,
+    pub(crate) variant_instances: BTreeMap<u32, (u32, u32)>,
     pub(crate) info_panels: BTreeMap<u32, crate::info_panel::InfoPanel>,
     cutters: BTreeMap<u32, [Vec3; 2]>,
     blade_physics: BTreeMap<u32, crate::blade_physics::BladePhysics>,
@@ -316,6 +360,36 @@ impl SceneManager {
             return false;
         };
         object.emission = intensity;
+        self.changed(id);
+        true
+    }
+    /// Alpha of vertex-colored surfaces below the opaque brightness threshold.
+    pub fn set_opacity(
+        &mut self,
+        id: u32,
+        opacity: f32,
+        opaque_above: f32,
+        variation: f32,
+        coverage: f32,
+    ) -> bool {
+        if !opacity.is_finite()
+            || !(0.0..=1.0).contains(&opacity)
+            || !opaque_above.is_finite()
+            || !(0.0..=8.0).contains(&opaque_above)
+            || !variation.is_finite()
+            || !(0.0..=1.0).contains(&variation)
+            || !coverage.is_finite()
+            || (coverage != -1.0 && !(0.0..=1.0).contains(&coverage))
+        {
+            return false;
+        }
+        let Some(object) = self.objects.get_mut(&id) else {
+            return false;
+        };
+        object.opacity = opacity;
+        object.opaque_above = opaque_above;
+        object.opacity_variation = variation;
+        object.opacity_coverage = coverage;
         self.changed(id);
         true
     }
@@ -432,6 +506,8 @@ impl SceneManager {
         self.projectiles.get(&id).map(|state| state.0)
     }
     fn update_projectiles(&mut self, dt: f32) {
+        #[cfg(target_arch = "wasm32")]
+        let _scope = crate::render::profiler::cpu_scope("physics.projectiles");
         if self.projectiles.is_empty() {
             return;
         }
@@ -613,6 +689,10 @@ impl SceneManager {
                 transform,
                 render_options: RenderOptions::default(),
                 emission: 0.0,
+                opacity: 1.0,
+                opaque_above: 8.0,
+                opacity_variation: 0.0,
+                opacity_coverage: -1.0,
                 color_cutout: 0.0,
                 cut_assist: 0.0,
                 blade_contact_response: false,
@@ -647,6 +727,16 @@ impl SceneManager {
         )?;
         self.insert_info_panel(panel)
     }
+    /// Static digit inscription sharing the scene's numeric glyph library.
+    pub fn add_numeric_text(
+        &mut self,
+        value: &str,
+        width: f32,
+        height: f32,
+    ) -> Result<u32, String> {
+        let panel = crate::info_panel::InfoPanel::numeric_text(value, width, height)?;
+        self.insert_info_panel(panel)
+    }
     pub fn add_text_panel(
         &mut self,
         title: &str,
@@ -674,6 +764,9 @@ impl SceneManager {
                 ..Default::default()
             },
         );
+        if panel.kind.neon() {
+            self.set_emission(id, 4.0);
+        }
         self.info_panels.insert(id, panel);
         Ok(id)
     }
@@ -687,6 +780,115 @@ impl SceneManager {
         for panel in self.info_panels.values_mut().filter(|p| p.kind == kind) {
             panel.update(rows.to_vec());
         }
+    }
+    /// Stable render handles are separate from instance identities.
+    pub fn mesh_exists(&self, id: u32) -> bool {
+        self.object_exists(id) || self.mesh_variants.contains_key(&id)
+    }
+    pub fn register_mesh_variants(
+        &mut self,
+        positions: &[f32],
+        indices: &[u32],
+        colors: &[f32],
+        smooth: bool,
+    ) -> Result<u32, String> {
+        if positions.len() > crate::cutting::MAX_TRIANGLES * 9
+            || !positions.len().is_multiple_of(3)
+            || indices.is_empty()
+            || colors.is_empty()
+            || !colors.len().is_multiple_of(indices.len())
+            || colors.len() / indices.len() > 64
+            || colors
+                .iter()
+                .any(|c| !c.is_finite() || !(0.0..=1.0).contains(c))
+        {
+            return Err("Invalid shared mesh variant buffers or budget".into());
+        }
+        let positions: Vec<_> = positions
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|&p| Vec3::from_array(p))
+            .collect();
+        let mut base = crate::cutting::CutMesh::new(positions, indices, Vec3::ONE)?;
+        for (triangle, color) in base.triangles.iter_mut().zip(colors.as_chunks::<3>().0) {
+            triangle.color = Vec3::from_slice(color);
+        }
+        if smooth {
+            base.smooth_normals();
+        }
+        let base = crate::cutting_mesh::MeshData::from(base);
+        let mut variants = Vec::new();
+        let mut table = Vec::new();
+        for (variant_index, variant) in colors.chunks_exact(indices.len()).enumerate() {
+            let mut variant_colors = Vec::new();
+            for (index, color) in variant.as_chunks::<3>().0.iter().enumerate() {
+                let color = Vec3::from_slice(color);
+                let first = Vec3::from_slice(&colors[index * 3..index * 3 + 3]);
+                if (first.max_element() >= 0.25 || color.max_element() >= 0.25) && first != color {
+                    return Err("Shared variants require identical bright/glow facets".into());
+                }
+                variant_colors.push(color);
+                table.push([color.x, color.y, color.z, 1.0]);
+            }
+            variants.push(if variant_index == 0 {
+                base.clone()
+            } else {
+                base.colored(variant_colors)
+            });
+        }
+        let triangles = base.triangle_count();
+        let varying_triangles = (0..triangles)
+            .filter(|&triangle| {
+                table
+                    .chunks_exact(triangles)
+                    .skip(1)
+                    .any(|variant| variant[triangle] != table[triangle])
+            })
+            .collect();
+        let id = self.allocate_id().ok_or("Mesh asset IDs exhausted")?;
+        self.mesh_variants.insert(
+            id,
+            MeshVariants {
+                variants,
+                colors: table,
+                registered: true,
+                varying_triangles,
+            },
+        );
+        Ok(id)
+    }
+    pub fn add_mesh_variant(&mut self, handle: u32, variant: u32) -> Result<u32, String> {
+        let mesh = self
+            .mesh_variants
+            .get(&handle)
+            .filter(|asset| asset.registered)
+            .and_then(|asset| asset.variants.get(variant as usize))
+            .ok_or("Invalid mesh variant handle/index")?
+            .clone();
+        let id = self.add_mesh_data(mesh)?;
+        self.variant_instances.insert(id, (handle, variant));
+        let object = self.objects.get_mut(&id).unwrap();
+        object.mesh = MeshKind::Imported(handle);
+        object.refresh_render_data();
+        Ok(id)
+    }
+    pub fn remove_mesh_variants(&mut self, handle: u32) -> bool {
+        let Some(asset) = self
+            .mesh_variants
+            .get_mut(&handle)
+            .filter(|asset| asset.registered)
+        else {
+            return false;
+        };
+        asset.registered = false;
+        self.collect_mesh_variants();
+        true
+    }
+    fn collect_mesh_variants(&mut self) {
+        self.mesh_variants.retain(|handle, asset| {
+            asset.registered || self.variant_instances.values().any(|(h, _)| h == handle)
+        });
     }
     pub fn triangle_meshes(&self) -> &BTreeMap<u32, TriangleObject> {
         &self.triangle_meshes
@@ -1065,7 +1267,7 @@ impl SceneManager {
                 .entry(target)
                 .or_insert_with(|| {
                     let scale = object.transform.scale;
-                    let radius = mesh.mesh.ready_cpu().map_or_else(
+                    let radius = mesh.mesh.geometry_cpu().map_or_else(
                         || ((max - min) * 0.5 * scale.abs()).length(),
                         |cpu| {
                             cpu.positions
@@ -1443,7 +1645,17 @@ impl SceneManager {
             .iter()
             .map(|id| {
                 let object = &self.objects[id];
-                (*id, (object.emission, object.color_cutout))
+                (
+                    *id,
+                    (
+                        object.emission,
+                        object.color_cutout,
+                        object.opacity,
+                        object.opaque_above,
+                        object.opacity_variation,
+                        object.opacity_coverage,
+                    ),
+                )
             })
             .collect();
         for &id in &removed {
@@ -1471,9 +1683,11 @@ impl SceneManager {
                     transform.scale,
                 );
                 self.set_render_options(id, candidate.options);
-                let (emission, cutoff) = materials[&candidate.id];
+                let (emission, cutoff, opacity, opaque_above, variation, coverage) =
+                    materials[&candidate.id];
                 self.set_emission(id, emission);
                 self.set_color_cutout(id, cutoff);
+                self.set_opacity(id, opacity, opaque_above, variation, coverage);
                 self.set_cuttable(id, true, candidate.color)?;
                 report.pieces.push(id);
                 report.piece_directions.push(direction);
@@ -1810,7 +2024,17 @@ impl SceneManager {
             .iter()
             .map(|id| {
                 let object = &self.objects[id];
-                (*id, (object.emission, object.color_cutout))
+                (
+                    *id,
+                    (
+                        object.emission,
+                        object.color_cutout,
+                        object.opacity,
+                        object.opaque_above,
+                        object.opacity_variation,
+                        object.opacity_coverage,
+                    ),
+                )
             })
             .collect();
         for &id in &report.removed {
@@ -1863,9 +2087,10 @@ impl SceneManager {
             let id = self.add_triangle_mesh(piece)?;
             self.set_object_transform(id, transform.position, transform.rotation, transform.scale);
             self.set_render_options(id, options);
-            let (emission, cutoff) = materials[&source];
+            let (emission, cutoff, opacity, opaque_above, variation, coverage) = materials[&source];
             self.set_emission(id, emission);
             self.set_color_cutout(id, cutoff);
+            self.set_opacity(id, opacity, opaque_above, variation, coverage);
             self.set_cuttable(id, eligible, cap_color)?;
             if let Some((velocity, gravity, bounce)) = projectile {
                 self.set_projectile(id, velocity, gravity, bounce);
@@ -2004,7 +2229,10 @@ impl SceneManager {
         self.projectile_pairs.clear();
         self.projectile_contacts = 0;
         self.triangle_meshes.clear();
+        self.variant_instances.clear();
+        self.mesh_variants.clear();
         self.info_panels.clear();
+        self.numeric_font = Default::default();
         self.cutters.clear();
         self.blade_physics.clear();
         self.blade_cut_states.clear();
@@ -2038,6 +2266,7 @@ impl SceneManager {
         self.paused = false;
     }
     pub fn remove_object(&mut self, id: u32) -> bool {
+        self.remove_numeric_panel(id);
         self.remove_blade_trail_binding(id);
         let was_static = self
             .objects
@@ -2049,6 +2278,8 @@ impl SceneManager {
         self.collision_dirty |= self.colliders.remove(&id).is_some();
         self.models.remove(&id);
         self.triangle_meshes.remove(&id);
+        self.variant_instances.remove(&id);
+        self.collect_mesh_variants();
         self.info_panels.remove(&id);
         self.cutters.remove(&id);
         self.blade_physics.remove(&id);
@@ -3034,6 +3265,49 @@ mod tests {
 mod info_panel_tests {
     use super::*;
     #[test]
+    fn numeric_text_is_validated_static_shared_and_released() {
+        let mut scene = SceneManager::default();
+        for value in ["", "12A", "1 2", "１２", &"0".repeat(33)] {
+            assert!(scene.add_numeric_text(value, 3., 0.7).is_err());
+        }
+        assert!(scene.add_numeric_text("012", f32::NAN, 0.7).is_err());
+        assert!(crate::info_panel::InfoPanel::numeric_text(&"0".repeat(32), 3., 0.7).is_ok());
+        assert!(crate::info_panel::PanelKind::parse("numeric-text").is_err());
+        let text = scene.add_numeric_text("0123456789", 5., 0.7).unwrap();
+        let timer = scene.add_info_panel("countdown", 1., 0.3).unwrap();
+        scene.sync_numeric_font();
+        assert_eq!(scene.numeric_font_stats(), (10, 12, 2));
+        assert_eq!(
+            scene.info_panels[&text].kind,
+            crate::info_panel::PanelKind::NumericText
+        );
+        let revision = scene.info_panels[&text].revision;
+        let bounds = scene.info_panels[&text].mesh.bounds_min;
+        scene.update_info_panels(
+            crate::info_panel::PanelKind::Countdown,
+            &[("", "29".into())],
+        );
+        scene.update_info_panels(
+            crate::info_panel::PanelKind::NumericText,
+            &[("", "9".into())],
+        );
+        scene.sync_numeric_font();
+        assert_eq!(scene.info_panels[&text].revision, revision);
+        assert_eq!(scene.info_panels[&text].mesh.bounds_min, bounds);
+        assert_eq!(scene.numeric_font_stats(), (10, 12, 2));
+        assert!(scene.remove_object(text));
+        assert_eq!(scene.numeric_font_stats(), (10, 2, 1));
+        assert!(scene.remove_object(timer));
+        assert_eq!(scene.numeric_font_stats(), (0, 0, 0));
+        let long = scene.add_numeric_text(&"8".repeat(32), 10., 0.7).unwrap();
+        scene.sync_numeric_font();
+        assert_eq!(scene.numeric_font_stats(), (10, 32, 1));
+        assert!(scene.remove_object(long));
+        assert_eq!(scene.numeric_font_stats(), (0, 0, 0));
+        assert!(scene.mesh_variants.is_empty());
+        assert!(scene.variant_instances.is_empty());
+    }
+    #[test]
     fn text_panel_preserves_transform_and_static_text_during_info_updates() {
         let mut scene = SceneManager::default();
         assert!(scene.add_text_panel("TITLE", &[], f32::NAN, 1.).is_err());
@@ -3086,5 +3360,182 @@ mod info_panel_tests {
         scene.clear_scene();
         assert!(scene.info_panels.is_empty());
         assert!(!scene.object_exists(next));
+    }
+}
+
+#[cfg(test)]
+mod shared_mesh_variant_tests {
+    use super::*;
+    fn asset(scene: &mut SceneManager, smooth: bool) -> u32 {
+        let positions = [0., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 1.];
+        let indices = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+        let mut colors = vec![0.1; 12];
+        colors.extend(vec![0.2; 12]);
+        scene
+            .register_mesh_variants(&positions, &indices, &colors, smooth)
+            .unwrap()
+    }
+    #[test]
+    fn shared_variants_lifetime_and_cpu_colors_are_independent_of_source_instance() {
+        let mut scene = SceneManager::default();
+        let handle = asset(&mut scene, true);
+        assert_ne!(handle, scene.add_cube(Vec3::ZERO));
+        let first = scene.add_mesh_variant(handle, 0).unwrap();
+        let second = scene.add_mesh_variant(handle, 1).unwrap();
+        let third = scene.add_mesh_variant(handle, 1).unwrap();
+        assert!(scene.triangle_meshes[&second].mesh.ready_cpu().is_none());
+        assert!(scene.triangle_meshes[&third].mesh.ready_cpu().is_none());
+        assert!(scene.triangle_meshes[&second].mesh.geometry_cpu().is_some());
+        assert_eq!(
+            scene.triangle_meshes[&second]
+                .mesh
+                .bottom(Transform::new(Vec3::ZERO, Vec3::ZERO, Vec3::ONE))
+                .unwrap(),
+            0.
+        );
+        assert!(scene.triangle_meshes[&second].mesh.ready_cpu().is_none());
+        assert!(matches!(scene.objects[&second].mesh, MeshKind::Imported(id) if id == handle));
+        assert!(scene.remove_object(first));
+        assert!(scene.remove_mesh_variants(handle));
+        assert!(!scene.remove_mesh_variants(handle));
+        assert!(scene.add_mesh_variant(handle, 0).is_err());
+        let cpu = scene.triangle_meshes[&second].mesh.cpu().unwrap();
+        assert!(cpu
+            .triangles
+            .iter()
+            .all(|triangle| triangle.color == Vec3::splat(0.2)));
+        assert!(cpu
+            .triangles
+            .iter()
+            .all(|triangle| triangle.normals.is_some()));
+        assert!(scene.triangle_meshes[&third].mesh.ready_cpu().is_some());
+        assert!(scene.mesh_exists(handle));
+        let mut queue = crate::visibility::RenderQueue::default();
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        assert_eq!(queue.imported[&handle].len(), 2);
+        assert!(queue.imported[&handle]
+            .iter()
+            .all(|data| data.surface_params[2..] == [1., 4.]));
+        scene.remove_object(second);
+        assert!(scene.mesh_exists(handle));
+        scene.remove_object(third);
+        assert!(!scene.mesh_exists(handle));
+    }
+    #[test]
+    fn shared_variants_cut_detaches_pieces_and_preserves_selected_facet_colors() {
+        let mut scene = SceneManager::default();
+        let handle = asset(&mut scene, false);
+        let target = scene.add_mesh_variant(handle, 1).unwrap();
+        scene.set_cuttable(target, true, Vec3::ONE).unwrap();
+        let cutter = scene.add_cube(Vec3::ZERO);
+        scene
+            .set_cutter(
+                cutter,
+                Some([Vec3::new(0.2, -1., -1.), Vec3::new(0.2, 2., -1.)]),
+            )
+            .unwrap();
+        let result = scene.cut_with(cutter, Vec3::new(0., 0., 3.), 0.).unwrap();
+        assert_eq!(result.removed, vec![target]);
+        assert_eq!(result.pieces.len(), 2);
+        for id in result.pieces {
+            assert!(!scene.variant_instances.contains_key(&id));
+            assert!(matches!(scene.objects[&id].mesh, MeshKind::Imported(mesh) if mesh == id));
+            let mesh = scene.triangle_meshes[&id].mesh.cpu().unwrap();
+            mesh.validate().unwrap();
+            assert!(mesh
+                .triangles
+                .iter()
+                .any(|triangle| triangle.color == Vec3::splat(0.2)));
+            assert!(mesh
+                .triangles
+                .iter()
+                .all(|triangle| triangle.color == Vec3::splat(0.2) || triangle.color == Vec3::ONE));
+        }
+    }
+    #[test]
+    fn shared_variants_compact_gpu_colors_skip_unchanged_facets() {
+        let mut scene = SceneManager::default();
+        let p = [0., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 1.];
+        let i = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+        let first = [0.8, 0., 0., 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.1, 0.1, 0.1];
+        let second = [
+            0.8, 0., 0., 0.2, 0.2, 0.2, 0.05, 0.05, 0.05, 0.15, 0.15, 0.15,
+        ];
+        let handle = scene
+            .register_mesh_variants(&p, &i, &[first, second].concat(), true)
+            .unwrap();
+        let asset = &scene.mesh_variants[&handle];
+        assert_eq!(asset.varying_triangles, vec![1, 3]);
+        assert_eq!(
+            asset.gpu_colors(),
+            vec![
+                [0.1, 0.1, 0.1, 1.],
+                [0.1, 0.1, 0.1, 1.],
+                [0.2, 0.2, 0.2, 1.],
+                [0.15, 0.15, 0.15, 1.]
+            ]
+        );
+        let gpu = asset.gpu_mesh();
+        let cpu = asset.variants[0].ready_cpu().unwrap().render_mesh();
+        for (triangle, vertices) in gpu.vertices.as_chunks::<3>().0.iter().enumerate() {
+            for (corner, vertex) in vertices.iter().enumerate() {
+                let original = &cpu.vertices[triangle * 3 + corner];
+                assert_eq!(vertex.position, original.position);
+                assert_eq!(vertex.normal, original.normal);
+                let marker = match triangle {
+                    1 => Some(-1.),
+                    3 => Some(-2.),
+                    _ => None,
+                };
+                assert_eq!(
+                    vertex.color,
+                    marker.map_or(original.color, |r| [
+                        r,
+                        original.color[1],
+                        original.color[2]
+                    ])
+                );
+                assert!(original.color.iter().all(|channel| *channel >= 0.));
+            }
+        }
+        assert_eq!(gpu.indices, cpu.indices);
+        let unchanged = scene
+            .register_mesh_variants(&p, &i, &[first, first].concat(), false)
+            .unwrap();
+        let asset = &scene.mesh_variants[&unchanged];
+        assert!(asset.varying_triangles.is_empty());
+        assert!(asset.gpu_colors().is_empty());
+        assert!(asset
+            .gpu_mesh()
+            .vertices
+            .iter()
+            .all(|vertex| vertex.color[0] >= 0.));
+        let object = scene.add_mesh_variant(handle, 1).unwrap();
+        let mut queue = crate::visibility::RenderQueue::default();
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        assert_eq!(queue.imported[&handle][0].surface_params[2..], [1., 2.]);
+        assert_eq!(
+            scene.triangle_meshes[&object].mesh.cpu().unwrap().triangles[1].color,
+            Vec3::splat(0.2)
+        );
+    }
+    #[test]
+    fn shared_variants_reject_malformed_colors_and_changed_glow() {
+        let mut scene = SceneManager::default();
+        let p = [0., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 1.];
+        let i = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+        assert!(scene.register_mesh_variants(&p, &i, &[], false).is_err());
+        assert!(scene
+            .register_mesh_variants(&p, &i, &[0.1; 11], false)
+            .is_err());
+        let mut c = vec![0.1; 24];
+        c[12] = 0.25;
+        assert!(scene.register_mesh_variants(&p, &i, &c, false).is_err());
+        c[12] = f32::NAN;
+        assert!(scene.register_mesh_variants(&p, &i, &c, false).is_err());
+        let h = asset(&mut scene, false);
+        assert!(scene.add_mesh_variant(h, 2).is_err());
+        scene.clear_scene();
+        assert!(!scene.mesh_exists(h));
     }
 }

@@ -3,9 +3,11 @@
 <canvas id="gpu-canvas"></canvas><button id="enter"></button><button id="exit" hidden></button><button id="shoot"></button><span id="cuts">0</span><p id="status">Inicializace…</p><pre id="result">RUNNING</pre>
 <figure><figcaption>Skutečné obrazy obou očí v simulovaném XR: prostředí a prostorové panely</figcaption><canvas id="stereo" style="width:100%;height:auto"></canvas></figure>
 <figure><figcaption>Skutečný zásah: neonový výboj a rozříznuté kusy</figcaption><canvas id="hit" style="width:100%;height:auto"></canvas></figure>
+<figure><figcaption>Aktuální trojice a předchozí výhra +120</figcaption><canvas id="cut-evidence" style="width:100%;height:auto"></canvas></figure>
 <figure><figcaption>Konec kola: skóre a čas uvnitř scény</figcaption><canvas id="score" style="width:100%;height:auto"></canvas></figure><ol id="checks"></ol>
 <script type="module">
-import {cutFaceColor,FRUIT_POINTS,launchApple,NEON_GLOW} from '../examples/neon-arena/scene.js';
+import {cutFaceColor,FRUIT_POINTS,launchApple,NEON_GLOW,FRUIT_SCALE,RESTART_POSITION,PAYTABLE_YAW,COMBO_DISPLAY_ORIGIN} from '../examples/neon-arena/scene.js';
+import {FRUIT_PATTERN_COUNT} from '../examples/neon-arena/geometry.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
 import {assertForeground} from './pixels.js';
@@ -25,7 +27,11 @@ const report=await run.execute(async test=>{
     engine.xr.addEventListener('cut',event=>reports.push({...event.detail,info:event.detail.pieces.map(p=>p.meshInfo),colors:event.detail.pieces.map(p=>p.meshSnapshot.colors)}));
     await engine.xr.enter();
     test.assert(app.gameState().shots===1 && sim.timerCount===1,'VR starts one automatic fruit launch timer');
-    test.assert(engine.xr.roundState.duration===45,'Rust owns a 45 second round');
+    test.assert(app.gameState().liveApples[0].meshInfo.scale.every(value=>Math.abs(value-FRUIT_SCALE)<1e-6)&&Math.abs(FRUIT_SCALE-.105)<1e-6,'production fruit has half the previous linear size');
+    test.assert(world.restartButton.meshInfo.position[2]>-1.55&&world.restartButton.meshInfo.position[2]<-1.35,'restart stays beyond the main sword swing area');
+    test.assert(engine.xr.roundState.duration===30,'Rust owns a 30 second round');
+    const fontInitial=engine.debugStats().numericFont;
+    test.assert(fontInitial.glyphMeshes===10&&fontInitial.liveGlyphs===3&&fontInitial.panels===2,'timer30 and score0 use three instances from ten cached digit meshes');
     const still={dt:0,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{
         right:{position:[1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false},
         left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false}
@@ -80,12 +86,17 @@ const report=await run.execute(async test=>{
     test.assert(['cherry','lime','banana','orange','plum','grapes','watermelon'].every(name=>world.fruits.some(f=>f.name===name)),'all seven Midnight Fruits fruit types exist as distinct neon meshes');
     test.assert(world.playFruits[0].name==='cherry','a new round starts with cherries');
     test.assert(world.playFruits.length===54 && world.playFruits.every((fruit,i)=>i%6===2?fruit.name==='wild':fruit.name===world.playFruits[Math.floor(i/6)*6].name),'each six-target wave offers five matching fruit plus a wildcard');
+    test.assert([...world.fruits,world.wild].every(fruit=>{
+        const choices=Array.from({length:FRUIT_PATTERN_COUNT},()=>world.nextFruitVariant(fruit));
+        return choices.length===15&&new Set(choices.map(choice=>JSON.stringify(choice.geometry.triangleColors))).size===15;
+    }),'every kind visits all fifteen distinct cached panel patterns before repeating');
     test.assert(new Set(world.fruits.map(fruit=>FRUIT_POINTS[fruit.name].points)).size===world.fruits.length,'every fruit has a distinct triple reward');
-    test.assert(world.comboRules.meshInfo.position[0]===0 && world.comboRules.meshInfo.triangles>20,'triple rules and fruit values are a real central world panel');
+    test.assert(world.comboRules.meshInfo.position[0]<-2.4 && world.comboRules.meshInfo.triangles>20,'triple rules and fruit values belong to the left world panel');
+    test.assert(world.galleryRows.every((_,row)=>new Set(world.galleryPatterns.slice(row*3,row*3+3).map(fruit=>JSON.stringify(fruit.geometry.triangleColors))).size===3),'each three-symbol row visibly previews different fill coverage of the same fruit');
     test.assert(world.galleryIcons.length===30 && world.galleryLabels.length===10 && world.galleryFrames.length===10,'each fruit and wild has its own vertical row of three symbols and a reward');
     test.assert(world.galleryRows.every((row,i)=>row.icons.length===3 && row.icons.every((icon,slot)=>{
         const pos=icon.meshInfo.position;
-        return Math.abs(pos[1]-row.icons[0].meshInfo.position[1])<1e-5 && (slot===0||pos[0]>row.icons[slot-1].meshInfo.position[0]);
+        return Math.abs(pos[1]-row.icons[0].meshInfo.position[1])<1e-5 && (slot===0||pos[2]<row.icons[slot-1].meshInfo.position[2]);
     }) && (i===0||row.icons[0].meshInfo.position[1]<world.galleryRows[i-1].icons[0].meshInfo.position[1])), 'three identical symbols run horizontally in each row, with rows stacked vertically');
     const assertProgress=(name,count)=>{
         test.assert(world.galleryRows.every(row=>row.icons.every((icon,slot)=>{
@@ -98,37 +109,53 @@ const report=await run.execute(async test=>{
     };
     assertProgress('',0);
     test.assert(world.boardTilt<-.25 && world.galleryFrames.every(frame=>Math.abs(frame.meshInfo.rotation[0]-world.boardTilt)<1e-5), 'reward board and row frames tilt toward the player as a single plane');
-    test.assert(world.galleryPositions[0][2]<world.galleryPositions[27][2]-.5 && world.galleryLabels.every(label=>Math.abs(label.meshInfo.rotation[0]-world.boardTilt)<1e-5), 'top edge leans away while the lower edge and aligned labels face upward');
+    test.assert(world.galleryPositions[0][0]<world.galleryPositions[27][0]-.5 && world.galleryLabels.every(label=>Math.abs(label.meshInfo.rotation[0]-world.boardTilt)<1e-5), 'top edge leans away while the lower edge and aligned labels face upward');
     test.assert(world.galleryEarnedFrames.length===30,'every earned fruit slot has a separate golden frame');
     const galleryPose=world.galleryIcons[0].meshInfo.rotation;
     sim.frame({...still,dt:250});
     test.assert(world.galleryIcons[0].meshInfo.rotation.some((v,i)=>Math.abs(v-galleryPose[i])>.01),'gallery fruit rotates through the Rust simulation');
+    const frontGalleryLeft=sim.pixels('left'),frontGalleryRight=sim.pixels('right');
+    const leftLook={...still,head:{position:[0,1.55,0],orientation:[0,Math.SQRT1_2,0,Math.SQRT1_2]}};
+    test.assert(world.galleryIcons.every(icon=>icon.meshInfo.position[0]<-2.4)&&world.galleryFrames.every(frame=>Math.abs(frame.meshInfo.rotation[1]-PAYTABLE_YAW)<1e-5),'paytable is left of the player, facing their leftward view');
+    sim.frame(leftLook);
     const galleryLeft=sim.pixels('left'),galleryRight=sim.pixels('right');
     const galleryOrigins=world.galleryIcons.map(icon=>icon.meshInfo.position);
-    world.galleryIcons.forEach(icon=>icon.setPosition([100,100,100]));sim.frame(still);
-    test.assert(pixelDifference(galleryLeft,sim.pixels('left'),3)>150 && pixelDifference(galleryRight,sim.pixels('right'),3)>150,'rotating 3D reward fruit is visibly present in BOTH eyes during play');
-    world.galleryIcons.forEach((icon,i)=>icon.setPosition(galleryOrigins[i]));
+    world.galleryIcons.forEach(icon=>icon.setPosition([100,100,100]));sim.frame(leftLook);
+    test.assert(pixelDifference(galleryLeft,sim.pixels('left'),3)>150 && pixelDifference(galleryRight,sim.pixels('right'),3)>150,'turning left reveals rotating reward fruit in BOTH eyes');
+    sim.frame(still);
+    test.assert(pixelDifference(frontGalleryLeft,sim.pixels('left'),3)<20&&pixelDifference(frontGalleryRight,sim.pixels('right'),3)<20,'paytable fruit stays outside the forward field of view');
+    world.galleryIcons.forEach((icon,i)=>icon.setPosition(galleryOrigins[i]));sim.frame(still);
     // Isolate subsequent physics/score cases from the production launch timer.
     app.stopLaunches();
-    // From inside the fruit, its back-facing neon seams must still render in both eyes.
-    const inside={...still,head:{position:[fruitOrigin[0]+.49*.19,fruitOrigin[1]-.32*.19,fruitOrigin[2]]}};
+    // Enlarge only this controlled interior probe so the rear surface stays beyond XR near clipping.
+    visibleFruit.setScale([.30,.30,.30]);
+    const inside={...still,head:{position:[fruitOrigin[0]+.49*.30,fruitOrigin[1]-.32*.30,fruitOrigin[2]]}};
     sim.frame(inside);const innerLeft=sim.pixels('left'),innerRight=sim.pixels('right');
     visibleFruit.setPosition([100,100,100]);sim.frame(inside);
     test.assert(pixelDifference(innerLeft,sim.pixels('left'),3)>100 && pixelDifference(innerRight,sim.pixels('right'),3)>100,'transparent mesh retains visible rear-facing seams in both eyes');
-    visibleFruit.setPosition(fruitOrigin);sim.frame(still);
+    visibleFruit.setScale([FRUIT_SCALE,FRUIT_SCALE,FRUIT_SCALE]).setPosition(fruitOrigin);sim.frame(still);
     snapshot('stereo');
-    const panels=[world.infoPanel,world.scorePanel],origins=panels.map(p=>p.meshInfo.position);
-    test.assert(origins[0][0]>1.2 && origins[0][2]>-3.1 && origins[0][2]<-2.4 && origins[0][1]<.75,'diagnostic gravestone is closer for reading, still right and low in world space');
+    const clockGeometry=JSON.stringify(world.timerPanel.meshSnapshot.positions),clockBefore=engine.xr.roundState.remaining;
+    sim.frame({...still,dt:1000});
+    test.assert(Math.abs(engine.xr.roundState.remaining-(clockBefore-1))<.001&&clockGeometry!==JSON.stringify(world.timerPanel.meshSnapshot.positions),'one elapsed second updates the real bitmap countdown once, not once per eye');
+    const fontTick=engine.debugStats().numericFont;
+    test.assert(fontTick.glyphMeshes===10&&fontTick.geometryBytes===fontInitial.geometryBytes&&fontTick.liveGlyphs===3,'countdown changes reuse the digit geometry without growing the font cache');
+    const panels=[world.timerPanel,world.scorePanel],origins=panels.map(p=>p.meshInfo.position);
+    const diagnosticOrigin=world.infoPanel.meshInfo.position;
+    test.assert(diagnosticOrigin[0]>1.2 && diagnosticOrigin[2]>-3.1 && diagnosticOrigin[2]<-2.4 && diagnosticOrigin[1]<.75,'diagnostic gravestone remains right and low');
+    test.assert(origins.every(pos=>Math.abs(pos[0])<.01&&pos[2]<-2)&&origins[0][1]>origins[1][1]&&origins[1][1]>COMBO_DISPLAY_ORIGIN[1],'front countdown is above score and active triple');
     test.assert(world.monument.info.primitives>=2 && world.monument.info.textures===1,'diagnostics have a real textured stone monument');
     test.assert(world.scoreDisplay.info.textures===0 && world.logo.meshInfo.triangles>20,'central score housing and bitmap APOLLO GAMES lettering');
     const creditsGeometry=JSON.stringify(world.credits.meshSnapshot.positions);
     const creditsPosition=world.credits.meshInfo.position,logoPosition=world.logo.meshInfo.position;
-    world.credits.setPosition([100,100,100]);world.logo.setPosition([100,100,100]);sim.frame(still);
-    test.assert(pixelDifference(left,sim.pixels('left'),3)>50,'bitmap credit and logo visibly render on the 3D objects');
-    world.credits.setPosition(creditsPosition);world.logo.setPosition(logoPosition);
+    sim.frame(leftLook);const sideLogo=sim.pixels('left');
+    world.logo.setPosition([100,100,100]);sim.frame(leftLook);
+    test.assert(pixelDifference(sideLogo,sim.pixels('left'),3)>50,'bitmap logo visibly renders above the left paytable');
+    world.credits.setPosition(creditsPosition);world.logo.setPosition(logoPosition);sim.frame(still);
     test.assert(!engine.debugStats().enabled && panels.every(p=>p.meshInfo.triangles>20),'scene info and score are real world meshes');
+    const frontPanelsLeft=sim.pixels('left'),frontPanelsRight=sim.pixels('right');
     panels.forEach(p=>p.setPosition([100,100,100]));sim.frame(still);
-    test.assert(pixelDifference(left,sim.pixels('left'))>100 && pixelDifference(right,sim.pixels('right'))>100,'info and score visibly render in both eyes');
+    test.assert(pixelDifference(frontPanelsLeft,sim.pixels('left'))>100 && pixelDifference(frontPanelsRight,sim.pixels('right'))>100,'countdown and score visibly render in both eyes');
     panels.forEach((p,i)=>p.setPosition(origins[i]));
     sim.frame({...still,head:{position:[.25,1.55,0]}});
     test.assert(panels.every((p,i)=>p.meshInfo.position.every((v,j)=>Math.abs(v-origins[i][j])<1e-5)),'head motion preserves world panel positions');
@@ -252,6 +279,16 @@ const report=await run.execute(async test=>{
     }
     }
     test.assert(hitEvidence,'a real isolated fruit cut proved spatial feedback placement and visibility');
+    // Cut an actual half-sized production glass projectile with the equipped sword.
+    const glassFruit=world.fruits[0];
+    const productionGlass=launchApple(engine.scene,glassFruit,1,true).projectile([0,0,0],{gravity:0});
+    for(let i=0;i<=40&&productionGlass.exists;i++)sim.frame({...still,dt:1000/72,controllers:{...still.controllers,
+        right:{position:[.38,.80+i*.02,-.45],orientation:[0,0,0,1],pressed:false}}});
+    const productionHit=reports.find(report=>report.removed.includes(productionGlass.id));
+    const glassCap=cutFaceColor(glassFruit,true);
+    test.assert(productionHit?.pieces.length===2&&productionHit.info.every(info=>info.closed)&&productionHit.colors.every(colors=>colors.some(color=>color.every((c,i)=>Math.abs(c-glassCap[i])<1e-5))),
+        'half-sized production glass fruit really cuts into closed pieces with colored flesh');
+    productionHit?.pieces.forEach(piece=>{if(piece.exists)piece.remove();});
     const short=engine.scene.createMesh(world.fruits[0].geometry).setPosition([.45,1.35,-1.1])
         .setScale([.19,.19,.19]).setColorCutout(.25).setEmission(1.1).setCuttable(true,{capColor:cutFaceColor(world.fruits[0])});
     for(let i=0;i<=16;i++)sim.frame({...still,dt:1000/72,controllers:{...still.controllers,
@@ -321,19 +358,32 @@ const report=await run.execute(async test=>{
     };
     hitCombo('watermelon');assertProgress('watermelon',1);
     sim.frame(still);const earnedPixel=sim.pixels('left');
-    const firstEarned=world.galleryRows.find(row=>row.name==='watermelon').icons[0];
+    const currentFirst=engine.xr.comboDisplayState?.current;
+    test.assert(currentFirst?.kind==='MELOUN'&&currentFirst.count===1&&currentFirst.icons.length===1&&currentFirst.frames.length===3,'one earned fruit appears inside three blue slots without ghost fruit');
+    const earnedFrame=engine.scene.getObject(currentFirst.frames[0]);
+    const frameColors=earnedFrame.meshSnapshot.colors;
+    const frameShape=earnedFrame.meshSnapshot;
+    const frameDepth=frameShape.positions.map(p=>p[2]);
+    test.assert(frameColors.some(color=>color[2]>.8)&&frameColors.some(color=>color[2]<.25)&&Math.max(...frameDepth)-Math.min(...frameDepth)>.01&&earnedFrame.meshInfo.scale.every(s=>Math.abs(s-1)<1e-5),'fruit uses a shared circular neon tube frame with a bright core and uniform scale');
+    const firstEarned=engine.scene.getObject(currentFirst.icons[0]);
     firstEarned.setEmission(.08);sim.frame(still);const dimPixel=sim.pixels('left');
     firstEarned.setEmission(8);sim.frame(still);
     test.assert(pixelDifference(earnedPixel,dimPixel,3)>10,'earned fruit illumination changes actual world-space pixels');
     hitCombo('watermelon');assertProgress('watermelon',2);
     test.assert(engine.xr.roundState.score===0 && engine.xr.roundState.streak===2,'two matching hits award no points');
     hitCombo('lemon');assertProgress('lemon',1);
+    const failed=engine.xr.comboDisplayState?.history[0];
+    test.assert(failed?.kind==='MELOUN'&&!failed.success&&failed.count===2&&failed.icons.length===2,'wrong fruit archives previous target triple as failed');
     test.assert(engine.xr.roundState.score===0 && engine.xr.roundState.streak===1 && engine.xr.roundState.fruit==='CITRON','different fruit resets streak and starts its own sequence');
     hitCombo('watermelon');hitCombo('watermelon');hitCombo('watermelon');
     assertProgress('watermelon',3);
+    const won=engine.xr.comboDisplayState?.history[0];
+    test.assert(!engine.xr.comboDisplayState?.current&&won?.success&&won.kind==='MELOUN'&&won.points===120&&won.count===3,'successful triple moves below the current row with its exact reward');
+    test.assert(won.frames.every(id=>engine.scene.getObject(id).meshInfo.emission>2)&&engine.scene.getObject(won.label).meshInfo.triangles>0,'successful row has bright neon frames and actual reward text geometry');
     test.assert(engine.xr.roundState.score===120 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===1,'three original watermelons award exactly their configured reward');
     const scorePixels=sim.pixels('left'),scoreGeometry=JSON.stringify(world.scorePanel.meshSnapshot.positions);
-    hitCombo('lemon');hitCombo('lemon');hitCombo('lemon');
+    hitCombo('lemon');sim.frame(still);snapshot('cut-evidence');
+    hitCombo('lemon');hitCombo('lemon');
     assertProgress('lemon',3);
     test.assert(engine.xr.roundState.score===140 && engine.xr.roundState.triples===2,'another fruit adds its different reward');
     test.assert(scoreGeometry!==JSON.stringify(world.scorePanel.meshSnapshot.positions) && pixelDifference(scorePixels,sim.pixels('left'))>50,'Rust updates the real world score mesh and visible stereo pixels');
@@ -344,6 +394,14 @@ const report=await run.execute(async test=>{
     hitCombo('wild');hitCombo('wild');hitCombo('wild');
     assertProgress('wild',3);
     test.assert(engine.xr.roundState.score===400,'three real wildcard slices award the configured top reward');
+    const historyFull=engine.xr.comboDisplayState;
+    test.assert(historyFull.history.length<=3&&historyFull.history.every(row=>row.icons.length===row.count&&row.frames.length===3),'history is bounded to three shared-mesh triple rows');
+    const fadeStart=sim.pixels('left'),fadeObjects=historyFull.history.flatMap(row=>[...row.icons,...row.frames]).map(id=>engine.scene.getObject(id));
+    sim.frame({...still,dt:1000});const fading=engine.xr.comboDisplayState;
+    test.assert(fading.history.length>0&&fading.history.every(row=>row.opacity>0&&row.opacity<.6),'completed rows slowly fade during the first second');
+    test.assert(pixelDifference(fadeStart,sim.pixels('left'),3)>20,'history fading changes visible pixels');
+    sim.frame({...still,dt:1100});
+    test.assert(engine.xr.comboDisplayState.history.length===0&&fadeObjects.every(object=>!object.exists),'all expired rows and their geometry instances disappear after two seconds');
     for(let i=0;i<460 && !engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
     test.assert(engine.xr.roundState.finished && sim.timerCount===0 && !app.gameState().launching,'round finishes and stops automatic launches');
     const finishedScore=engine.xr.roundState.score;
@@ -353,9 +411,9 @@ const report=await run.execute(async test=>{
     const aim=pressed=>({...still,dt:1000/72,controllers:{...still.controllers,
         left:{...still.controllers.left,targetRayMatrix:sim.gripX(0,[0,.20,-.2]),pressed}}});
     sim.frame(aim(false));
-    test.assert(Math.abs(world.pointers[0].meshInfo.position[2]+1.65)<.02,'target ray cursor reaches real restart object');
+    test.assert(Math.abs(world.pointers[0].meshInfo.position[2]-RESTART_POSITION[2])<.02,'target ray cursor reaches real restart object');
     sim.frame(aim(true));
-    test.assert(engine.xr.roundState.remaining===45 && engine.xr.roundState.score===0 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===0 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
+    test.assert(engine.xr.roundState.remaining===30 && engine.xr.roundState.score===0 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===0 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
     assertProgress('',0);
     sim.frame(aim(true));test.assert(app.gameState().shots===1,'held trigger never repeatedly restarts');
     test.assert(!engine.xr.lastError,'real stereo rendering completes without XR error',engine.xr.lastError);

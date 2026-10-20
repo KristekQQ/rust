@@ -42,7 +42,7 @@ test('XR host reuses eye storage and provides optional contact-onset and cut hap
         viewport:(...value)=>{viewport=value;},drawArrays:()=>draws.push({viewport,texture:boundTexture,eye:canvas.eye}),
         deleteTexture:texture=>deleted.push(texture),deleteFramebuffer:()=>{},deleteRenderbuffer:()=>{},
     });
-    const engine={renderer_backend:()=> 'Gl',xr_set_presenting:()=>{},xr_begin_frame:()=>{},xr_round_state:()=> 'null',xr_update_head:()=>{},xr_bind_controller:()=>{},xr_update_controller:()=> '{"removed":[]}',
+    const engine={renderer_backend:()=> 'Gl',xr_set_presenting:()=>{},xr_begin_frame:()=>{},xr_finish_frame:()=>{},xr_round_state:()=> 'null',xr_update_head:()=>{},xr_bind_controller:()=>{},xr_update_controller:()=> '{"removed":[]}',
         xr_render_eye(projection,transform,width,height){canvas.width=width;canvas.height=height;canvas.eye=transform[12]<0?'left':'right';renders.push({projection,transform,width,height});},
         resize(width,height){canvas.width=width;canvas.height=height;},
     };
@@ -92,6 +92,14 @@ test('XR host reuses eye storage and provides optional contact-onset and cut hap
         source.gamepad.hapticActuators[0].pulse=()=>{throw new Error('optional actuator threw');};
         sim.frame();assert.equal(host.lastError,undefined);
         delete source.gamepad.hapticActuators;sim.frame();assert.equal(host.lastError,undefined);
+        const performanceSamples=[];
+        host.addEventListener('performance',event=>performanceSamples.push(event.detail));
+        sim.session.frameRate=90;sim.session.supportedFrameRates=[72,90];
+        layer.fixedFoveation=.5;
+        for(let i=0;i<810;i++)sim.frame();
+        assert.ok(performanceSamples.length>=4,'later performance windows remain available after the original three');
+        assert.ok(performanceSamples.every(sample=>sample.frameRate===90&&sample.fixedFoveation===.5&&sample.layerKind==='XRWebGLLayer'),'actual runtime settings accompany every sample');
+        assert.deepEqual(performanceSamples[0].supportedFrameRates,[72,90]);
         await host.exit();assert.equal(sim.session.pendingFrameCount,0);assert.equal(canvas.width,640);assert.equal(canvas.height,480);
         for(const {texture} of uploads.slice(0,2))assert.equal(deleted.filter(value=>value===texture).length,1);
         // A new session must allocate fresh storage; stale size caches cannot survive disposal.
@@ -319,3 +327,17 @@ test('WebGPU XR rejects unsupported session feature clearly, without caching per
         assert.equal(requests,2,'unsupported GPU session is not requested repeatedly');
     } finally {host.dispose();for(const restore of restores.reverse())restore();}
 }));
+
+test('combo display binding forwards only handles and configuration to Rust',()=>{
+    const calls=[],timer={id:11},score={id:12},awards=[{id:13},{id:14},{id:15}],owned=new Set([timer,score,...awards]);
+    const host=new WebXRHost({configure_combo_display:json=>{calls.push(JSON.parse(json));return true;},
+        combo_display_state:()=>JSON.stringify({current:null,history:[]}),clear_combo_display:()=>calls.push('clear')}, {}, object=>owned.has(object));
+    const options={symbols:[{kind:'LEMON',asset:1,variant:0}],frameAsset:2,origin:[0,1.42,-2.15],spacing:.29,rowGap:.31,fruitScale:.085,historySeconds:2,
+        timerPanel:timer,scorePanel:score,awardPanels:awards};
+    host.configureComboDisplay(options);
+    assert.deepEqual(calls[0],{...options,timerPanel:11,scorePanel:12,awardPanels:[13,14,15]});
+    assert.deepEqual(host.comboDisplayState,{current:null,history:[]});
+    assert.throws(()=>host.configureComboDisplay({...options,timerPanel:{id:11}}),/tomuto enginu/);
+    assert.throws(()=>host.configureComboDisplay({...options,awardPanels:awards.slice(1)}),/tomuto enginu/);
+    host.clearComboDisplay();assert.equal(calls.at(-1),'clear');
+});

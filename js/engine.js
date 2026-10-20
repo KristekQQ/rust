@@ -4,7 +4,7 @@ export { XRPlayer };
 // The current Rust API supports one canvas with the id "gpu-canvas" per page.
 /** @typedef {import('./engine.d.ts').Vector3} Vector3 */
 /** @typedef {typeof import('../pkg/webgpu_wasm.js') & {dispose(): void}} Wasm */
-/** @typedef {{canvas: HTMLCanvasElement, backend: 'auto'|'webgl', promise: Promise<import('./engine.d.ts').Engine> | null}} Initialization */
+/** @typedef {{canvas: HTMLCanvasElement, backend: 'auto'|'webgl', profiling: boolean, promise: Promise<import('./engine.d.ts').Engine> | null}} Initialization */
 /** @param {boolean} ok */
 function accepted(ok) {
     if (!ok) throw new Error("Rust engine odmítl příkaz: neplatný objekt nebo parametry.");
@@ -81,6 +81,9 @@ export class SceneObject {
     setEmission(intensity) { accepted(this.#wasm.set_object_emission(this.id, intensity)); return this; }
     /** Discard fragments below this maximum vertex RGB; finite 0..1, zero disables. Triangle meshes show both sides. @param {number} threshold */
     setColorCutout(threshold) { accepted(this.#wasm.set_object_color_cutout(this.id, threshold)); return this; }
+    /** Vertex-color mesh alpha; brighter facets can stay opaque (neon seams).
+     * @param {number} opacity @param {{opaqueAbove?:number,variation?:number,coverage?:number}} [options] */
+    setOpacity(opacity, {opaqueAbove=8,variation=0,coverage=-1} = {}) { accepted(this.#wasm.set_object_opacity(this.id,opacity,opaqueAbove,variation,coverage)); return this; }
     /** @param {{isStatic?: boolean, castsShadow?: boolean, receivesShadow?: boolean, reflectivity?: number}} [options] */
     setRenderOptions({isStatic=false, castsShadow=true, receivesShadow=true, reflectivity=0} = {}) {
         accepted(this.#wasm.set_object_render_options(this.id,isStatic,castsShadow,receivesShadow,reflectivity)); return this;
@@ -92,6 +95,23 @@ export class SceneObject {
     /** @param {number} seconds */
     removeAfter(seconds) { accepted(this.#wasm.schedule_remove_object(this.id, seconds)); return this; }
     remove() { accepted(this.#wasm.remove_object(this.id)); }
+}
+
+/** Immutable shared geometry and face-color tables owned by Rust. */
+export class MeshVariants {
+    #wasm;
+    /** @param {Wasm} wasm @param {number} id */
+    constructor(wasm,id) { this.#wasm=wasm; this.id=id; Object.freeze(this); }
+    /** Independent scene object sharing this asset's GPU geometry.
+     * @param {number} variant */
+    createInstance(variant=0) {
+        if(!Number.isInteger(variant)||variant<0||variant>0xffffffff)throw new Error('Neplatné číslo varianty.');
+        const id=this.#wasm.add_mesh_variant(this.id,variant);
+        accepted(id!==0xffffffff);
+        return new SceneObject(this.#wasm,id);
+    }
+    /** Release the asset handle; existing instances remain valid. */
+    remove() { accepted(this.#wasm.remove_mesh_variants(this.id)); }
 }
 
 export class SceneLight {
@@ -145,6 +165,12 @@ export class Scene {
     constructor(wasm) { this.#wasm = wasm; Object.freeze(this); }
     get objectCount() { return this.#wasm.scene_object_count(); }
     get lightCount() { return this.#wasm.scene_light_count(); }
+    /** Resolve a live Rust-owned object ID returned by diagnostics or bindings.
+     * @param {number} id */
+    getObject(id) {
+        if(!Number.isInteger(id)||id<0||id>=0xffffffff||!this.#wasm.object_exists(id))throw new Error('Objekt ve scéně neexistuje.');
+        return new SceneObject(this.#wasm,id);
+    }
     /** @param {Vector3} [position] */
     createCube(position = [0, 0, 0]) { return this.#create(this.#wasm.add_cube(...position)); }
     /** @param {Vector3} [position] */
@@ -152,10 +178,16 @@ export class Scene {
     /** @param {Vector3} [position] */
     createSphere(position = [0, 0, 0]) { return this.#create(this.#wasm.add_sphere(...position)); }
     /** World-space Rust text geometry, updated from native scene/round data.
-     * @param {'scene'|'round'|'restart'|'diagnostics'} kind
+     * @param {'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award'} kind
      * @param {{position?: Vector3, width?: number, height?: number}} [options] */
     createInfoPanel(kind, {position = [0,0,0], width = 1.2, height = .72} = {}) {
         return this.#create(this.#wasm.add_info_panel(kind, width, height)).setPosition(position);
+    }
+    /** Static Rust-owned numeric tubes sharing cached digit meshes with the HUD.
+     * @param {string} value 1..32 ASCII digits.
+     * @param {{position?: Vector3, width?: number, height?: number}} [options] */
+    createNumericText(value, {position = [0,0,0], width = 1.2, height = .72} = {}) {
+        return this.#create(this.#wasm.add_numeric_text(value, width, height)).setPosition(position);
     }
     /** Static world-space bitmap inscription built by Rust, without a background.
      * @param {{title: string, lines: string[], position?: Vector3, width?: number, height?: number}} options */
@@ -172,6 +204,18 @@ export class Scene {
         return this.#create(triangleColors
             ? this.#wasm.add_colored_triangle_mesh(new Float32Array(positions),new Uint32Array(indices),new Float32Array(triangleColors),smooth)
             : this.#wasm.add_triangle_mesh(new Float32Array(positions), new Uint32Array(indices), ...color,smooth));
+    }
+    /** One GPU geometry, immutable per-face color variants and independent instances.
+     * @param {import('./engine.d.ts').MeshVariantsOptions} options */
+    createMeshVariants({positions,indices,variants,smooth=false}) {
+        if(!variants.length||variants.length>64||indices.length===0||indices.length>60000||positions.length>180000||
+            !Array.from(indices).every(i=>Number.isInteger(i)&&i>=0&&i<=0xffffffff)||
+            variants.some(colors=>colors.length!==indices.length))throw new Error('Neplatná geometrie nebo tabulka variant.');
+        const colors=new Float32Array(variants.length*indices.length);
+        variants.forEach((variant,index)=>colors.set(variant,index*indices.length));
+        const id=this.#wasm.register_mesh_variants(new Float32Array(positions),new Uint32Array(indices),colors,smooth);
+        accepted(id!==0xffffffff);
+        return new MeshVariants(this.#wasm,id);
     }
     /** @param {SceneObject} cutter @param {import('./engine.d.ts').CutterAimOptions} options @returns {Vector3} */
     aimCutter(cutter,{center,yaw=0,tilt=0,height=3.6,floorY=0.2,guides=[]}) {
@@ -313,8 +357,8 @@ export class Scene {
 const initializationKey = Symbol.for('webgpu_wasm.engine.initialization');
 const ownership = /** @type {Record<symbol, Initialization | undefined>} */ (/** @type {unknown} */ (globalThis));
 
-/** @param {HTMLCanvasElement} canvas @param {{backend?: "auto"|"webgl"}} [options] @returns {Promise<import("./engine.d.ts").Engine>} */
-export async function initEngine(canvas, { backend = "auto" } = {}) {
+/** @param {HTMLCanvasElement} canvas @param {{backend?: "auto"|"webgl", profiling?: boolean}} [options] @returns {Promise<import("./engine.d.ts").Engine>} */
+export async function initEngine(canvas, { backend = "auto", profiling = false } = {}) {
     if (!(canvas instanceof HTMLCanvasElement) || canvas.id !== "gpu-canvas") {
         throw new Error('Engine vyžaduje canvas s id="gpu-canvas".');
     }
@@ -322,15 +366,16 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
         throw new Error('Engine vyžaduje canvas připojený k aktuálnímu dokumentu.');
     }
     if (backend !== 'auto' && backend !== 'webgl') throw new Error('Neplatný backend enginu.');
+    if (typeof profiling !== 'boolean') throw new Error('Neplatné nastavení profiling.');
     const current = ownership[initializationKey];
     if (current) {
-        if (current.canvas !== canvas || current.backend !== backend) {
-            throw new Error('Engine již inicializuje nebo používá jiný canvas či backend.');
+        if (current.canvas !== canvas || current.backend !== backend || current.profiling !== profiling) {
+            throw new Error('Engine již inicializuje nebo používá jiný canvas či backend nebo profiling.');
         }
         return /** @type {Promise<import("./engine.d.ts").Engine>} */ (current.promise);
     }
     /** @type {Initialization} */
-    const initialization = { canvas, backend, promise: null };
+    const initialization = { canvas, backend, profiling, promise: null };
     ownership[initializationKey] = initialization;
     initialization.promise = initializeEngine(canvas, backend, initialization);
     try {
@@ -344,6 +389,7 @@ export async function initEngine(canvas, { backend = "auto" } = {}) {
 /** @param {HTMLCanvasElement} canvas @param {"auto"|"webgl"} backend @param {Initialization} initialization */
 async function initializeEngine(canvas, backend, initialization) {
     canvas.dataset.backend = backend;
+    canvas.dataset.frameProfile = String(initialization.profiling);
     // wgpu must request an XR-compatible adapter before the GPUDevice exists.
     canvas.dataset.xrWebgpu = String(backend !== 'webgl' && typeof Reflect.get(globalThis, 'XRGPUBinding') === 'function');
     canvas.width = window.innerWidth;
@@ -351,7 +397,7 @@ async function initializeEngine(canvas, backend, initialization) {
 
     const version = Date.now();
     const bindings = /** @type {Wasm} */ (await import(`../pkg/webgpu_wasm.js?v=${version}`));
-    await bindings.default({ module_or_path: new URL(`../pkg/webgpu_wasm_bg.wasm?v=${version}`, import.meta.url) });
+    await bindings.default({ module_or_path: new Request(new URL(`../pkg/webgpu_wasm_bg.wasm?v=${version}`, import.meta.url), {cache:"no-store"}) });
     await bindings.start();
     let disposed = false;
     // All commands, including raw exports and old handles, share a runtime lifetime.
@@ -431,6 +477,7 @@ async function initializeEngine(canvas, backend, initialization) {
                 accepted(wasm.set_environment_intensity(intensity));
             },
             environmentCaptures() { return wasm.environment_captures(); },
+            graph() { return JSON.parse(wasm.postprocess_graph()); },
             stats() {
                 const [passes, width, height, targets, frames] = wasm.postprocess_stats();
                 const [ssrWidth,ssrHeight,ssrPixels] = wasm.ssr_stats();
@@ -519,6 +566,7 @@ async function initializeEngine(canvas, backend, initialization) {
         /** @param {boolean} enabled */
         setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },
         debugStats() { return JSON.parse(wasm.debug_stats()); },
+        frameProfile() { return JSON.parse(wasm.frame_profile_stats()); },
         projectileContacts() { return wasm.projectile_contacts(); },
         renderer_stats() {
             const [total, visible, culled, drawCalls, uploadBytes, prepareMs, fps, frameMs] = wasm.renderer_stats();

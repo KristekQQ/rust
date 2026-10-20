@@ -9,6 +9,7 @@ pub struct InstanceData {
     pub normal_matrix: [[f32; 4]; 4],
     pub material: [f32; 4],
     pub emission: [f32; 4],
+    pub surface_params: [f32; 4],
 }
 
 pub(crate) struct ObjectRenderData {
@@ -42,7 +43,8 @@ impl ObjectRenderData {
                 model: model.to_cols_array_2d(),
                 normal_matrix: crate::scene::normal_matrix(model).to_cols_array_2d(),
                 material: [0.0, 1.0, 0.0, 0.0],
-                emission: [0.0; 4],
+                emission: [0.0, 0.0, 1.0, 8.0],
+                surface_params: [0.0, -1.0, 0.0, 0.0],
             },
             center: model.transform_point3((max + min) * 0.5),
             half_extent: model.x_axis.truncate().abs() * local.x
@@ -206,6 +208,9 @@ fn included(
     object: &crate::scene::SceneObject,
     pass: RenderPassKind,
 ) -> bool {
+    if scene.is_numeric_panel(id) {
+        return false;
+    }
     let options = object.render_options;
     match pass {
         RenderPassKind::Main => true,
@@ -239,7 +244,7 @@ impl RenderQueue {
         for batch in &mut self.batches {
             batch.clear();
         }
-        self.imported.retain(|id, _| scene.object_exists(*id));
+        self.imported.retain(|id, _| scene.mesh_exists(*id));
         for batch in self.imported.values_mut() {
             batch.clear();
         }
@@ -287,6 +292,15 @@ impl RenderQueue {
             let mut instance = data.instance;
             instance.emission[0] = object.emission;
             instance.emission[1] = object.color_cutout;
+            instance.emission[2] = object.opacity;
+            instance.emission[3] = object.opaque_above;
+            instance.surface_params[0] = object.opacity_variation;
+            instance.surface_params[1] = object.opacity_coverage;
+            if let Some(&(handle, variant)) = scene.variant_instances.get(id) {
+                instance.surface_params[2] = variant as f32;
+                instance.surface_params[3] =
+                    scene.mesh_variants[&handle].varying_triangles.len() as f32;
+            }
             instance.material = [
                 options.reflectivity,
                 if options.receives_shadow { 1.0 } else { 0.0 },
@@ -295,8 +309,10 @@ impl RenderQueue {
                 } else {
                     0.0
                 },
-                // Negative guide flag selects opaque unlit world-space text.
-                if scene.info_panels.contains_key(id) {
+                // Negative material flag selects text; numeric tubes use their own profile.
+                if scene.is_numeric_glyph(*id) {
+                    -2.0
+                } else if scene.is_text_object(*id) {
                     -1.0
                 } else if scene.is_cuttable(*id) {
                     1.0
@@ -333,13 +349,16 @@ mod tests {
         let mut expected = RenderQueue::default();
         for (&id, object) in scene.objects() {
             let options = object.render_options;
-            let eligible = match pass {
-                RenderPassKind::Main => true,
-                RenderPassKind::Environment => options.is_static && Some(id) != scene.mirror_object,
-                RenderPassKind::Reflection => Some(id) != scene.mirror_object,
-                RenderPassKind::ShadowStatic => options.is_static && options.casts_shadow,
-                RenderPassKind::ShadowDynamic => !options.is_static && options.casts_shadow,
-            };
+            let eligible = !scene.is_numeric_panel(id)
+                && match pass {
+                    RenderPassKind::Main => true,
+                    RenderPassKind::Environment => {
+                        options.is_static && Some(id) != scene.mirror_object
+                    }
+                    RenderPassKind::Reflection => Some(id) != scene.mirror_object,
+                    RenderPassKind::ShadowStatic => options.is_static && options.casts_shadow,
+                    RenderPassKind::ShadowDynamic => !options.is_static && options.casts_shadow,
+                };
             if !eligible {
                 continue;
             }
@@ -358,7 +377,9 @@ mod tests {
                 } else {
                     0.0
                 },
-                if scene.info_panels.contains_key(&id) {
+                if scene.is_numeric_glyph(id) {
+                    -2.0
+                } else if scene.is_text_object(id) {
                     -1.0
                 } else if scene.is_cuttable(id) {
                     1.0
@@ -734,7 +755,8 @@ mod tests {
             object.render_data.instance.normal_matrix,
             crate::scene::normal_matrix(object.transform.model()).to_cols_array_2d()
         );
-        assert_eq!(std::mem::size_of::<InstanceData>(), 160);
+        assert_eq!(std::mem::size_of::<InstanceData>(), 176);
+        assert_eq!(std::mem::offset_of!(InstanceData, surface_params), 160);
     }
     #[test]
     fn render_revision_invalidates_on_commands_and_animation_but_not_idle_frames() {
@@ -866,6 +888,37 @@ mod tests {
         q.extract(&scene, camera(), true);
         assert_eq!((q.total, q.visible), (0, 0));
         assert_eq!(capacity, q.batches[0].capacity());
+    }
+    #[test]
+    fn numeric_glyph_material_stays_distinct_from_bitmap_and_lit_meshes() {
+        let mut scene = SceneManager::default();
+        let numeric = scene.add_numeric_text("0", 0.5, 0.5).unwrap();
+        let bitmap = scene.add_info_panel("scene", 0.5, 0.5).unwrap();
+        scene.add_cube(Vec3::ZERO);
+        scene.set_object_position(numeric, Vec3::new(0., 0., 0.5));
+        scene.set_object_position(bitmap, Vec3::new(0., 0., 0.5));
+        scene.sync_numeric_font();
+        let children: Vec<_> = scene
+            .objects()
+            .iter()
+            .filter_map(|(&id, object)| scene.is_numeric_glyph(id).then_some((id, object.mesh)))
+            .collect();
+        assert_eq!(children.len(), 1);
+        let MeshKind::Imported(handle) = children[0].1 else {
+            panic!("numeric glyph needs shared imported mesh")
+        };
+        for culling in [false, true] {
+            for pass in [RenderPassKind::Main, RenderPassKind::Reflection] {
+                let mut queue = RenderQueue::default();
+                queue.extract_pass(&scene, Mat4::IDENTITY, culling, pass);
+                assert_eq!(queue.imported[&handle][0].material[3], -2.);
+                assert_eq!(queue.imported[&bitmap][0].material[3], -1.);
+                assert_eq!(queue.batches[0][0].material[3], 0.);
+                assert!(!queue.imported.contains_key(&numeric));
+                assert_brute_force(&scene, Mat4::IDENTITY, pass, culling);
+            }
+        }
+        compare_passes(&scene);
     }
     #[test]
     fn info_panel_unlit_flag_survives_all_visibility_paths() {

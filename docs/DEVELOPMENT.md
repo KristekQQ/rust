@@ -55,6 +55,7 @@ Následující matice určuje pokrytí pro závěrečnou kontrolu. Při iteraci 
 | Canvas/output/targets | `tests/render-target.html` and its verify button on WebGPU + WebGL |
 | Shadow/reflection/pass cache | `tests/render-effects.html` verify button + SDK integration on WebGPU + WebGL |
 | Postprocessing/PBR interaction | Affected example and its verify control on WebGPU + WebGL; inspect real effect on/off or pose change |
+| Frame graph / transient allocation / profiler | `cargo test frame_graph --lib` and `cargo test postprocess_plan --lib`; matching WASM + `frame-graph` (actual storage-buffer compute/readback), `postprocessing`, `webxr-webgpu` (including SSR pixels) on WebGPU and affected shared paths on WebGL. Check graph slot/lifetime diagnostics, stable-frame allocations, effect toggles/resize and both eye pixels; GPU timestamps may be unsupported. See [FRAME_PIPELINE.md](FRAME_PIPELINE.md). |
 | glTF runtime/PBR | `tests/gltf-full.html`, `tests/gltf-sdk.html` on WebGPU + WebGL; actual textured/animated model for rendering changes |
 | Mirrored transforms / winding | `tests/render-mirrored.html` pixel assertions and `tests/render-effects.html` verify on WebGPU + WebGL |
 | SDK lifecycle/loading | `npm run test:sdk`; `tests/lifecycle.html`, `tests/scene-sdk.html` and `tests/gltf-sdk.html` on both backends |

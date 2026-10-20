@@ -1,3 +1,5 @@
+// scene_color is an UNORM view of our sRGB render target: already encoded bytes.
+// Do not sample the sRGB view or apply another transfer function here.
 @group(0) @binding(0) var scene_color: texture_2d<f32>;
 @group(0) @binding(1) var scene_depth: texture_depth_2d;
 

@@ -65,9 +65,12 @@ impl ComboScore {
         (&self.display_kind, self.display_count)
     }
     pub fn hit(&mut self, id: u32) {
-        let Some((kind, points, wild)) = self.targets.remove(&id) else {
-            return;
-        };
+        self.hit_event(id);
+    }
+    pub fn hit_event(&mut self, id: u32) -> Option<ComboEvent> {
+        let (kind, points, wild) = self.targets.remove(&id)?;
+        let previous = (self.display_kind.clone(), self.streak);
+        let mismatch = !wild && !self.kind.is_empty() && self.kind != kind;
         if self.streak == 0 {
             self.display_kind = kind.clone();
             self.display_count = 0;
@@ -86,7 +89,9 @@ impl ComboScore {
         }
         self.streak += 1;
         self.display_count = self.streak;
-        if self.streak == 3 {
+        let completed = self.streak == 3;
+        let award = self.streak_points;
+        if completed {
             self.score = self.score.saturating_add(u64::from(self.streak_points));
             self.triples = self.triples.saturating_add(1);
             self.display_count = 3;
@@ -97,7 +102,22 @@ impl ComboScore {
             self.kind.clear();
             self.streak_points = 0;
         }
+        Some(ComboEvent {
+            failed: mismatch.then_some(previous),
+            kind: self.display_kind.clone(),
+            count: self.display_count,
+            success: completed,
+            points: if completed { award } else { 0 },
+        })
     }
+}
+#[derive(Debug)]
+pub struct ComboEvent {
+    pub failed: Option<(String, u32)>,
+    pub kind: String,
+    pub count: u32,
+    pub success: bool,
+    pub points: u32,
 }
 
 #[cfg(test)]

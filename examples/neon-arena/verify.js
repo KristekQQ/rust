@@ -1,11 +1,14 @@
-import {NEON_GLOW,FLOOR_SSR} from './scene.js';
+import {NEON_GLOW,FLOOR_SSR,FRUIT_OPACITY,FRUIT_OPACITY_VARIATION,createFruitMesh} from './scene.js';
 /** @param {import('../../js/engine.d.ts').Engine} engine
  * @param {Awaited<ReturnType<typeof import('./scene.js').createScene>>} world
- * @param {HTMLCanvasElement} canvas */
-export async function verifyArena(engine, world, canvas) {
+ * @param {HTMLCanvasElement} canvas
+ * @param {typeof import('./main.js').previewCut} previewCut */
+export async function verifyArena(engine, world, canvas, previewCut) {
     const {capturePixels,assertForeground,assertChanged} = await import('../../tests/pixels.js');
     const wait=async()=>{for(let i=0;i<5;i++)await new Promise(requestAnimationFrame);};
     const originalView=engine.cameraViewState();
+    const style=document.getElementById('solid-fruit');
+    if(!(style instanceof HTMLInputElement)||!style.checked)throw new Error('Solid fruit must be selectable and enabled by default');
     engine.set_simulation_paused(true);
     /** @type {import('../../js/engine.js').SceneObject | undefined} */
     let marker;
@@ -13,13 +16,83 @@ export async function verifyArena(engine, world, canvas) {
     const alphaMarkers=[];
     try {
         await wait();
+        const toggle=document.getElementById('ssr');
+        const build=document.getElementById('build');
+        if(!(toggle instanceof HTMLInputElement)||!build?.textContent?.includes('cyber-neon-shader-25'))throw new Error('Missing loaded-version or SSR control');
+        const mainModules=performance.getEntriesByType('resource').filter(resource=>new URL(resource.name).pathname.endsWith('/neon-arena/main.js'));
+        if(mainModules.length!==1||!new URL(mainModules[0].name).searchParams.has('reload'))throw new Error('Entry module must have a fresh URL and initialize exactly once');
+        toggle.click();await wait();
+        if(engine.postprocessing.stats().targets!==0||!build.textContent.includes('vypnuto'))throw new Error('SSR control did not release offscreen targets');
+        toggle.click();await wait();
+        if(engine.postprocessing.stats().passes!==2||!build.textContent.includes('zapnuto'))throw new Error('SSR control did not restore reflections');
+        engine.setNeonGlow({strength:0});await wait();const plainFont=await capturePixels(canvas);
+        engine.setNeonGlow(NEON_GLOW);await wait();
+        const forwardImage=await capturePixels(canvas);
+        const tp=world.timerPanel.meshInfo.position;
+        const fontCorners=[[-.55,.28],[.55,-.28]].map(([x,y])=>engine.worldToScreen([tp[0]+x,tp[1]+y,tp[2]]));
+        if(!fontCorners[0]||!fontCorners[1])throw new Error('Countdown must be inside the forward camera');
+        let fontHalo=0,fontCore=0;
+        for(let y=Math.max(0,Math.floor(Math.min(fontCorners[0][1],fontCorners[1][1])*canvas.height));y<Math.min(canvas.height,Math.ceil(Math.max(fontCorners[0][1],fontCorners[1][1])*canvas.height));y++)
+            for(let x=Math.max(0,Math.floor(Math.min(fontCorners[0][0],fontCorners[1][0])*canvas.width));x<Math.min(canvas.width,Math.ceil(Math.max(fontCorners[0][0],fontCorners[1][0])*canvas.width));x++){
+                const i=(y*canvas.width+x)*4;
+                if(Math.max(plainFont.data[i],plainFont.data[i+1],plainFont.data[i+2])<6&&forwardImage.data[i+2]>12&&forwardImage.data[i+1]>forwardImage.data[i]*1.2&&forwardImage.data[i+2]>forwardImage.data[i]*1.2)fontHalo++;
+                if(plainFont.data[i]>160&&plainFont.data[i+1]>190&&plainFont.data[i+2]>220)fontCore++;
+            }
+        if(fontHalo<20)throw new Error(`Countdown has no actual neon halo outside glyph pixels (${fontHalo})`);
+        if(fontCore<3)throw new Error(`Countdown lacks a rendered white-hot tube core (${fontCore})`);
+        assertForeground(forwardImage,'forward neon countdown and score');
+        const stats=engine.postprocessing.stats();
+        if(stats.passes!==2||stats.targets===0)throw new Error('Tiled floor SSR is not active in forward view');
+        if(world.timerPanel.meshInfo.position[0]!==0||world.timerPanel.meshInfo.position[1]<=world.scorePanel.meshInfo.position[1]||world.galleryIcons.some(icon=>icon.meshInfo.position[0]>-2.4))
+            throw new Error('Countdown/score are not ahead with the paytable to the left');
+        const timer=world.timerPanel.meshSnapshot;
+        if(timer.positions.length<12||world.scorePanel.meshInfo.triangles<10)throw new Error('Neon HUD lacks real glyph geometry');
+        // Keep actual frontal and oblique font renders for visual inspection.
+        const fontEvidence=document.createElement('canvas');fontEvidence.id='font-evidence';fontEvidence.hidden=true;
+        document.getElementById(fontEvidence.id)?.remove();
+        fontEvidence.width=canvas.width*2;fontEvidence.height=canvas.height;
+        const fontContext=fontEvidence.getContext('2d');
+        if(!fontContext)throw new Error('Font evidence canvas unavailable');
+        for(const [view,position] of [[0,2.1,-.75],[.85,2.15,-.9]].entries()){
+            engine.setOrbitView(/** @type {[number,number,number]} */(position),[0,2.1,-2.15]);
+            fontContext.putImageData(await capturePixels(canvas),view*canvas.width,0);
+        }
+        document.body.append(fontEvidence);
+        // Inspect the off-axis paytable intentionally rather than requiring it
+        // to remain in the forward field of view.
+        engine.setOrbitView([.25,1.3,-.4],[-2.75,1.3,-.4]);await wait();
         const image=await capturePixels(canvas);
+        const font=engine.debugStats().numericFont;
+        if(!font||font.glyphMeshes!==10||font.liveGlyphs!==3||font.panels!==2||font.geometryBytes<=0)
+            throw new Error(`Countdown/score do not use cached instanced digits: ${JSON.stringify(font)}`);
+        for(const panel of [world.timerPanel,world.scorePanel]) {
+            const glyphs=panel.meshSnapshot;
+            const zs=glyphs.positions.map(point=>point[2]);
+            if(Math.max(...zs)-Math.min(...zs)<.01)throw new Error('Numeric font is still a flat billboard');
+            const blues=glyphs.colors.filter(color=>color[2]>.5&&color[0]<.15&&color[1]<.5);
+            if(!blues.length||!glyphs.normals.some(normal=>normal[2]>.1&&normal[2]<.9))
+                throw new Error('Neon tubes need a blue base and a rounded surface for the shader profile');
+        }
+        const shared=engine.debugStats().sharedMeshes;
+        if(!shared||shared.assets!==12+font.glyphMeshes||shared.gpuMeshes!==12+font.glyphMeshes||shared.liveInstances!==70+font.liveGlyphs||shared.colorTableBytes<=0)
+            throw new Error(`Fruit geometry is not shared by kind: ${JSON.stringify(shared)}`);
+        // Thirty fruit icons use ten groups; forty frames use two more.
+        // Their independent transforms and combo highlights remain instanced.
+        const expectedGlowDraws=shared.gpuMeshes-font.glyphMeshes;
+        if(engine.debugStats().neonGlow.draws!==expectedGlowDraws)
+            throw new Error(`Gallery glow did not batch shared fruit (${engine.debugStats().neonGlow.draws} / ${expectedGlowDraws})`);
+        if(shared.geometryBytes<=0||shared.instanceGeometryBytes-font.instanceGeometryBytes<(shared.geometryBytes-font.geometryBytes)*3)
+            throw new Error(`Gallery does not share repeated geometry: ${JSON.stringify(shared)}`);
+        if(shared.colorTableBytes>=shared.geometryBytes)
+            throw new Error(`Palette table still duplicates unchanged seams: ${JSON.stringify(shared)}`);
+        const alpha=engine.debugStats().translucency;
+        if(!alpha||alpha.cachedMeshes<1||alpha.fullIndices<=0||alpha.submittedIndices>=alpha.fullIndices*.35)
+            throw new Error(`Alpha rendering still processes the opaque seam triangles: ${JSON.stringify(alpha)}`);
         assertForeground(image,'fruit and world bitmap panels');
         let black=0;
         for(let i=0;i<image.data.length;i+=4)if(image.data[i]<3&&image.data[i+1]<3&&image.data[i+2]<3)black++;
         if(black<image.width*image.height*.25)throw new Error('Background is not black');
-        const stats=engine.postprocessing.stats();
-        if(stats.passes!==2||stats.targets===0)throw new Error('Tiled floor SSR is not active');
+
         if(performance.getEntriesByType('resource').some(r=>/\/(?:color|emission)-(?:px|nx|py|ny|pz|nz)\.png/.test(r.name)))throw new Error('Environment images were loaded');
         if(!engine.debugStats().neonGlow.enabled||engine.debugStats().neonGlow.draws===0)throw new Error('Neon edge glow is not being drawn');
         // Compare only the floor under a real fruit: moving the source must move
@@ -127,17 +200,22 @@ export async function verifyArena(engine, world, canvas) {
                 if(pixels.data[i+2]>pixels.data[i]*1.5+20 && pixels.data[i+2]>pixels.data[i+1]*1.4)count++;
             return count;
         };
-        target.setColorCutout(0);await wait();const opaqueBlue=blue(await capturePixels(canvas));
+        target.setOpacity(1).setColorCutout(0);await wait();const opaqueBlue=blue(await capturePixels(canvas));
         target.setColorCutout(.25);await wait();const openBlue=blue(await capturePixels(canvas));
         if(openBlue<opaqueBlue+100)throw new Error(`Neon mesh does not reveal the object behind it (${opaqueBlue} -> ${openBlue})`);
         marker.remove();marker=undefined;
         engine.setNeonGlow(NEON_GLOW);
         if(originalView.orbitTarget)engine.setOrbitView(originalView.position,originalView.orbitTarget);
         await wait();
+        engine.setOrbitView([.25,1.3,-.4],[-2.75,1.3,-.4]);await wait();
+        const galleryBefore=await capturePixels(canvas);
         world.apples.forEach(apple=>apple.setPosition([100,100,100]));await wait();
-        assertChanged(image,await capturePixels(canvas),'actual fruit preview',100);
-        const {previewCut}=await import('./main.js');
-        const demo=previewCut(1); // Verify the alpha material at full diagnostic size.
+        assertChanged(galleryBefore,await capturePixels(canvas),'actual left fruit preview',100);
+        if(originalView.orbitTarget)engine.setOrbitView(originalView.position,originalView.orbitTarget);
+        // Exercise the UI before the open-style occlusion probes below.
+        style.click();await wait();
+        if(style.checked)throw new Error('Fruit style did not switch to open seams');
+        const demo=previewCut(1,false); // Verify the alpha material at full diagnostic size.
         // Warm the first-use texture pipeline while native effect time is frozen.
         await wait();
         engine.set_simulation_paused(false);await wait();engine.set_simulation_paused(true);
@@ -154,6 +232,7 @@ export async function verifyArena(engine, world, canvas) {
         halves.filter(half=>half!==openHalf).forEach(half=>half.piece.setPosition([100,100,100]));
         marker=engine.scene.createMesh({positions:geometry.positions,indices:geometry.indices,color:[0,0,1]}).setPosition([-.6,1.35,-1.15]).setScale([.2,.4,.4]).setEmission(2);
         engine.setCameraView([1.2,1.35,-1.15],[0,1.35,-1.15]);await wait();
+        engine.setNeonGlow({strength:0});await wait();
         const openFace=await capturePixels(canvas);
         let throughCut=0,totalCut=0;
         const radius=Math.max(3,Math.floor(Math.min(openFace.width,openFace.height)*.01));
@@ -164,6 +243,7 @@ export async function verifyArena(engine, world, canvas) {
             }
         if(throughCut<totalCut*.7)throw new Error(`Cut face still occludes the object behind it (${throughCut}/${totalCut})`);
         marker.remove();marker=undefined;
+        engine.setNeonGlow(NEON_GLOW);
         halves.forEach(half=>half.piece.setPosition(half.position));
         engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         demo.feedback.objects.forEach((object,i)=>object.setPosition(effectPositions[i]));
@@ -198,16 +278,150 @@ export async function verifyArena(engine, world, canvas) {
         evidence.width=hitFrame.width;evidence.height=hitFrame.height;
         evidence.getContext('2d')?.putImageData(hitFrame,0,0);
         engine.scene.clearCutFeedback();
+        style.click();await wait();
+        const solidDemo=previewCut(1);
+        const solidHalves=solidDemo.report.pieces;
+        if(solidHalves.length!==2||!solidHalves.every(piece=>piece.meshInfo.closed))throw new Error('Solid style lost closed cut halves');
+        const flesh=[1,.075,.18].map(c=>c*.22);
+        if(!solidHalves.every(piece=>piece.meshSnapshot.colors.some(color=>color.every((c,i)=>Math.abs(c-flesh[i])<1e-5))))throw new Error('Solid cut has no colored flesh');
+        const leftHalf=solidHalves.reduce((a,b)=>a.meshInfo.position[0]<b.meshInfo.position[0]?a:b);
+        solidHalves.filter(piece=>piece!==leftHalf).forEach(piece=>piece.setPosition([100,100,100]));
+        solidDemo.feedback.objects.forEach(object=>object.setPosition([100,100,100]));
+        marker=engine.scene.createMesh({positions:geometry.positions,indices:geometry.indices,color:[0,0,1]}).setPosition([-.6,1.35,-1.15]).setScale([.2,.4,.4]).setEmission(2);
+        engine.setCameraView([1.2,1.35,-1.15],[0,1.35,-1.15]);await wait();
+        engine.setNeonGlow({strength:0});await wait();
+        // Keep a controlled alpha here, independently of the artistic facet range.
+        leftHalf.setOpacity(.58,{opaqueAbove:.25});await wait();
+        const filledFace=await capturePixels(canvas);
+        leftHalf.setOpacity(1);await wait();const opaqueFace=await capturePixels(canvas);
+        let transmitted=0,tinted=0;
+        for(let y=Math.floor(filledFace.height/2)-radius;y<=Math.floor(filledFace.height/2)+radius;y++)
+            for(let x=Math.floor(filledFace.width/2)-radius;x<=Math.floor(filledFace.width/2)+radius;x++){
+                const i=(y*filledFace.width+x)*4;
+                if(filledFace.data[i+2]>opaqueFace.data[i+2]+20)transmitted++;
+                if(filledFace.data[i]>25)tinted++;
+            }
+        if(transmitted<totalCut*.35||tinted<totalCut*.5)throw new Error(`Cut flesh is not colored translucent glass (${transmitted} transmitted, ${tinted} tinted / ${totalCut})`);
+        leftHalf.setOpacity(FRUIT_OPACITY,{opaqueAbove:.25});await wait();
+        const uniformAlpha=await capturePixels(canvas);
+        leftHalf.setOpacity(FRUIT_OPACITY,{opaqueAbove:.25,variation:FRUIT_OPACITY_VARIATION});await wait();
+        const variedAlpha=await capturePixels(canvas);await wait();const stableAlpha=await capturePixels(canvas);
+        let variationPixels=0,unstablePixels=0;
+        for(let y=Math.floor(variedAlpha.height/2)-radius;y<=Math.floor(variedAlpha.height/2)+radius;y++)
+            for(let x=Math.floor(variedAlpha.width/2)-radius;x<=Math.floor(variedAlpha.width/2)+radius;x++){
+                const i=(y*variedAlpha.width+x)*4;
+                if(Math.abs(variedAlpha.data[i+2]-uniformAlpha.data[i+2])>3)variationPixels++;
+                if(Math.abs(variedAlpha.data[i+2]-stableAlpha.data[i+2])>1)unstablePixels++;
+            }
+        if(variationPixels<totalCut*.3||unstablePixels>0)throw new Error(`Facet alpha variation is missing or flickers (${variationPixels} varied, ${unstablePixels} unstable)`);
+        engine.setNeonGlow(NEON_GLOW);
+        marker.remove();marker=undefined;
+        solidHalves.forEach(piece=>piece.remove());
+        await wait();const alphaCacheBefore=engine.debugStats().translucency;
+        // One uniformly colored solid: different faces must transmit different
+        // amounts of background, independently of surface color and lighting.
+        engine.setNeonGlow({strength:0});
+        const facetProbe=engine.scene.createMesh({
+            positions:[-.5,-.5,-.5,.5,-.5,-.5,.5,.5,-.5,-.5,.5,-.5,-.5,-.5,.5,.5,-.5,.5,.5,.5,.5,-.5,.5,.5],
+            indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5],
+            color:[.025,.025,.025],smooth:false,
+        }).setPosition([8,1.35,-1.15]).setScale([.5,.5,.5]).setOpacity(.25,{opaqueAbove:.25});
+        alphaMarkers.push(facetProbe);
+        engine.setCameraView([9.2,2.15,.05],[8,1.35,-1.15]);await wait();
+        const faceSamples=[[8.25,1.35,-1.15],[8,1.35,-.90],[8,1.60,-1.15]].map(p=>engine.worldToScreen(/** @type {[number,number,number]} */(p)));
+        const transmission=async()=>{
+            engine.setBackgroundColor([0,0,0]);await wait();const blackFrame=await capturePixels(canvas);
+            engine.setBackgroundColor([1,1,1]);await wait();const whiteFrame=await capturePixels(canvas);
+            const linear=(/** @type {number} */ byte)=>{const v=byte/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;};
+            return faceSamples.map(point=>{
+                if(!point)throw new Error('Facet sample projection unavailable');
+                const x=Math.round(point[0]*whiteFrame.width),y=Math.round(point[1]*whiteFrame.height);
+                let sum=0;
+                for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+                    const i=((y+dy)*whiteFrame.width+x+dx)*4+2;
+                    sum+=linear(whiteFrame.data[i])-linear(blackFrame.data[i]);
+                }
+                return sum/9;
+            });
+        };
+        const uniformTransmission=await transmission();
+        facetProbe.setOpacity(.25,{opaqueAbove:.25,variation:1});
+        const variedTransmission=await transmission();
+        const spread=(/** @type {number[]} */ values)=>Math.max(...values)-Math.min(...values);
+        if(spread(uniformTransmission)>.035||spread(variedTransmission)<.06)throw new Error(`Same-color faces lack independent alpha: ${uniformTransmission} -> ${variedTransmission}`);
+        facetProbe.setOpacity(.06,{opaqueAbove:.25,variation:1,coverage:0});
+        const sparseTransmission=await transmission();
+        facetProbe.setOpacity(.06,{opaqueAbove:.25,variation:1,coverage:1});
+        const denseTransmission=await transmission();
+        if(sparseTransmission.some(value=>value<.65)||denseTransmission.some(value=>value>.03))throw new Error(`Panel coverage has no clear sparse/dense contrast: ${sparseTransmission} -> ${denseTransmission}`);
+        engine.setBackgroundColor([0,0,0]);facetProbe.remove();
+        // Compare actual transmission of three consecutive precomputed variants
+        // of ONE fruit. RGB differences alone must not satisfy this check.
+        engine.setCameraView([8,1.35,1.3],[8,1.35,-1.15]);
+        const fruitTransmissions=[];
+        for(const pattern of world.fruitPatterns.lemon.slice(0,3)){
+            const fruit=createFruitMesh(engine.scene,pattern).setPosition([8,1.35,-1.15]).setScale([.28,.28,.28])
+                .setEmission(1.1).setOpacity(FRUIT_OPACITY,{opaqueAbove:.25,variation:FRUIT_OPACITY_VARIATION,coverage:pattern.coverage??.5});
+            alphaMarkers.push(fruit);
+            engine.setBackgroundColor([0,0,0]);await wait();const black=await capturePixels(canvas);
+            fruit.setPosition([100,100,100]);
+            const original=engine.scene.createMesh(pattern.geometry).setPosition([8,1.35,-1.15]).setScale([.28,.28,.28])
+                .setEmission(1.1).setOpacity(FRUIT_OPACITY,{opaqueAbove:.25,variation:FRUIT_OPACITY_VARIATION,coverage:pattern.coverage??.5});
+            alphaMarkers.push(original);await wait();const reference=await capturePixels(canvas);
+            let pixelError=0;
+            for(let i=0;i<black.data.length;i++)pixelError+=Math.abs(black.data[i]-reference.data[i]);
+            if(pixelError/black.data.length>.15)throw new Error(`Shared palette differs from original CPU mesh (${pixelError/black.data.length})`);
+            original.remove();fruit.setPosition([8,1.35,-1.15]);
+            engine.setBackgroundColor([1,1,1]);await wait();const white=await capturePixels(canvas);
+            const values=new Float32Array(white.width*white.height);
+            const linear=(/** @type {number} */ byte)=>{const v=byte/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;};
+            for(let pixel=0;pixel<values.length;pixel++)values[pixel]=linear(white.data[pixel*4+2])-linear(black.data[pixel*4+2]);
+            fruitTransmissions.push(values);fruit.remove();
+        }
+        for(let variant=1;variant<fruitTransmissions.length;variant++){
+            const a=fruitTransmissions[variant-1],b=fruitTransmissions[variant];
+            let changed=0,foreground=0;
+            for(let pixel=0;pixel<a.length;pixel++)if(Math.min(a[pixel],b[pixel])<.9){changed+=Math.abs(a[pixel]-b[pixel]);foreground++;}
+            if(!foreground||changed/foreground<.06)throw new Error(`Consecutive fruit variants look too similar on GPU (${variant}: ${changed/foreground})`);
+        }
+        engine.setBackgroundColor([0,0,0]);
+        const sourcePatterns=world.fruitPatterns.lemon.slice(0,2);
+        const sourceMesh=sourcePatterns[0].geometry;
+        const temporaryAsset=engine.scene.createMeshVariants({positions:sourceMesh.positions,indices:sourceMesh.indices,
+            variants:sourcePatterns.map(pattern=>pattern.geometry.triangleColors??[])});
+        const survivor=temporaryAsset.createInstance(1).setPosition([8,1.35,-1.15]).setScale([.28,.28,.28]).setEmission(1.1);
+        alphaMarkers.push(survivor);
+        await wait();const sharedAllocated=engine.debugStats().sharedMeshes;
+        if(sharedAllocated.assets!==shared.assets+1||sharedAllocated.gpuMeshes!==shared.gpuMeshes+1)throw new Error('Shared asset did not allocate once');
+        const beforeRelease=await capturePixels(canvas);
+        temporaryAsset.remove();await wait();
+        if(!survivor.exists||engine.debugStats().sharedMeshes.gpuMeshes!==shared.gpuMeshes+1)throw new Error('Releasing asset invalidated live instance');
+        const afterRelease=await capturePixels(canvas);
+        assertForeground(afterRelease,'shared instance after asset handle release');
+        let releasedPixelError=0;
+        for(let i=0;i<beforeRelease.data.length;i++)releasedPixelError+=Math.abs(beforeRelease.data[i]-afterRelease.data[i]);
+        if(releasedPixelError/beforeRelease.data.length>.01)throw new Error('Releasing asset changed surviving instance pixels');
+        survivor.remove();await wait();const sharedClean=engine.debugStats().sharedMeshes;
+        if(sharedClean.assets!==shared.assets||sharedClean.gpuMeshes!==shared.gpuMeshes||sharedClean.liveInstances!==shared.liveInstances||sharedClean.colorTableBytes!==shared.colorTableBytes)
+            throw new Error(`Shared asset leaked after final instance: ${JSON.stringify(sharedClean)}`);
+        engine.setBackgroundColor([0,0,0]);
+        await wait();const alphaCacheAfter=engine.debugStats().translucency;
+        if(alphaCacheAfter.cachedMeshes!==alphaCacheBefore.cachedMeshes||alphaCacheAfter.indexBufferBytes!==alphaCacheBefore.indexBufferBytes)
+            throw new Error(`Temporary alpha index caches leaked: ${JSON.stringify(alphaCacheBefore)} -> ${JSON.stringify(alphaCacheAfter)}`);
+        engine.setNeonGlow(NEON_GLOW);
         engine.resize(640,480);await wait();
         if(engine.postprocessing.stats().targets!==0)throw new Error('Resize allocated postprocess targets');
+        return {sharedMeshes:shared,alpha};
     } finally {
         if(originalView.orbitTarget)engine.setOrbitView(originalView.position,originalView.orbitTarget);
         alphaMarkers.forEach(object=>{if(object.exists)object.remove();});
         if(marker?.exists)marker.remove();
+        engine.setBackgroundColor([0,0,0]);
         engine.scene.clearCutFeedback();
         engine.setNeonGlow(NEON_GLOW);
         engine.postprocessing.enable('ssr',FLOOR_SSR);
-        world.apples.forEach(fruit=>fruit.setColorCutout(.25));
+        if(!style.checked)style.click();
+        world.galleryIcons.forEach((fruit,index)=>fruit.setColorCutout(0).setOpacity(FRUIT_OPACITY,{opaqueAbove:.25,variation:FRUIT_OPACITY_VARIATION,coverage:world.galleryPatterns[index].coverage??.5}));
         world.apples.forEach((apple,index)=>apple.setPosition(world.previewPositions[index]));
         engine.resize(Math.max(1,canvas.clientWidth),Math.max(1,canvas.clientHeight));
         engine.set_simulation_paused(false);await wait();

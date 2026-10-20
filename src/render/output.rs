@@ -84,7 +84,13 @@ impl CanvasOutput {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::empty(),
+                required_features: if canvas.get_attribute("data-frame-profile").as_deref()
+                    == Some("true")
+                {
+                    adapter.features() & wgpu::Features::TIMESTAMP_QUERY
+                } else {
+                    wgpu::Features::empty()
+                },
                 required_limits: (if backend == "BrowserWebGpu" {
                     wgpu::Limits::default()
                 } else {
