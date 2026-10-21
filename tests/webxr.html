@@ -5,6 +5,7 @@ import {initEngine} from '../js/engine.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport} from './xr/testkit.js';
 import {capturePixels,assertForeground} from './pixels.js';
+import {verifyMainViewCaches} from './xr/view-cache-checks.js';
 const sim=installXRSimulator(),run=new XRTestRun('webxr-backend',sim,publishXRReport);
 let engine;
 const report=await run.execute(async test=>{
@@ -27,6 +28,7 @@ const report=await run.execute(async test=>{
     await engine.xr.enter();sim.frame({head:{position:[0,1.6,0]}});
     test.assert(!engine.xr.lastError,'actual XR rendering');assertForeground(sim.pixels(),'actual stereo framebuffer');
     test.assert(true,'actual stereo geometry');
+    verifyMainViewCaches(engine,sim,test,{singleImported:true});
     const session=sim.session;
     engine.dispose();
     test.assert(!engine.xr.isPresenting&&session.pendingFrameCount===0,'dispose cancels active XR');

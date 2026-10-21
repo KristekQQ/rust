@@ -14,6 +14,10 @@ use crate::render::{
 };
 use std::collections::HashMap;
 
+// Existing reflection, shadow and environment indices remain stable. XR main
+// caches are appended only when their logical view slot is first rendered.
+const BASE_PASS_CACHE_COUNT: usize = 3 + MAX_LIGHTS * 2;
+
 type ColorPipelineKey = (wgpu::TextureFormat, wgpu::TextureFormat, bool, bool, bool);
 type ColorPipelines = (
     wgpu::RenderPipeline,
@@ -25,7 +29,10 @@ type ColorPipelines = (
 struct InstanceBatch {
     buffer: wgpu::Buffer,
     capacity: usize,
+    // Always describes this batch's private buffer, even while drawing an alias.
     uploaded: Vec<InstanceData>,
+    draw_alias: Option<wgpu::Buffer>,
+    alias_instances: Vec<InstanceData>,
     label: &'static str,
 }
 impl InstanceBatch {
@@ -39,8 +46,66 @@ impl InstanceBatch {
             }),
             capacity,
             uploaded: Vec::new(),
+            draw_alias: None,
+            alias_instances: Vec::new(),
             label,
         }
+    }
+    fn instances(&self) -> &[InstanceData] {
+        if self.draw_alias.is_some() {
+            &self.alias_instances
+        } else {
+            &self.uploaded
+        }
+    }
+    fn draw_buffer(&self) -> &wgpu::Buffer {
+        self.draw_alias.as_ref().unwrap_or(&self.buffer)
+    }
+    fn upload_shared(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        instances: &[InstanceData],
+        left: Option<&Self>,
+    ) -> usize {
+        // Only the right main view receives a left source. The source never
+        // aliases another buffer, so its uploaded data describes its GPU bytes.
+        if self.uploaded != instances && !instances.is_empty() {
+            if let Some(left) = left.filter(|left| left.uploaded == instances) {
+                self.draw_alias = Some(left.buffer.clone());
+                if self.alias_instances != instances {
+                    self.alias_instances.clear();
+                    self.alias_instances.extend_from_slice(instances);
+                }
+                return 0;
+            }
+        }
+        self.draw_alias = None;
+        self.alias_instances.clear();
+        self.upload(device, queue, instances)
+    }
+    fn refresh_alias(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        left: Option<&Self>,
+    ) -> usize {
+        if self.draw_alias.is_none() {
+            return 0;
+        }
+        if let Some(left) = left.filter(|left| left.uploaded == self.alias_instances) {
+            // Refresh the handle too: left may have replaced its private buffer.
+            self.draw_alias = Some(left.buffer.clone());
+            return 0;
+        }
+        // A left-only camera change can invalidate an alias while the right
+        // visibility key still hits. Restore its saved payload before drawing.
+        self.draw_alias = None;
+        let mut instances = std::mem::take(&mut self.alias_instances);
+        let bytes = self.upload(device, queue, &instances);
+        instances.clear();
+        self.alias_instances = instances;
+        bytes
     }
     fn upload(
         &mut self,
@@ -80,12 +145,23 @@ impl ImportedInstances {
             scratch: Vec::new(),
         }
     }
-    fn flush(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, page: usize) -> usize {
+    fn flush(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        page: usize,
+        left: Option<&Self>,
+    ) -> usize {
         if self.pages.len() <= page {
             self.pages
                 .push(InstanceBatch::new(device, 1, "imported instance page"));
         }
-        self.pages[page].upload(device, queue, &self.scratch)
+        self.pages[page].upload_shared(
+            device,
+            queue,
+            &self.scratch,
+            left.and_then(|left| left.pages.get(page)),
+        )
     }
     fn upload(
         &mut self,
@@ -93,6 +169,7 @@ impl ImportedInstances {
         queue: &wgpu::Queue,
         imported: &std::collections::BTreeMap<u32, Vec<InstanceData>>,
         meshes: &HashMap<u32, Mesh>,
+        left: Option<&Self>,
     ) -> usize {
         self.scratch.clear();
         let mut page = 0;
@@ -108,7 +185,7 @@ impl ImportedInstances {
             if !self.scratch.is_empty()
                 && self.scratch.len().saturating_add(instances.len()) > page_limit
             {
-                uploaded += self.flush(device, queue, page);
+                uploaded += self.flush(device, queue, page, left);
                 page += 1;
                 self.scratch.clear();
             }
@@ -118,7 +195,7 @@ impl ImportedInstances {
             self.ranges.insert(*id, (page, start as u64..end as u64));
         }
         if !self.scratch.is_empty() {
-            uploaded += self.flush(device, queue, page);
+            uploaded += self.flush(device, queue, page, left);
         }
         uploaded
     }
@@ -137,7 +214,7 @@ impl ImportedInstances {
     }
     fn slice(&self, id: &u32) -> wgpu::BufferSlice<'_> {
         let (page, range) = &self.ranges[id];
-        self.pages[*page].buffer.slice(range.clone())
+        self.pages[*page].draw_buffer().slice(range.clone())
     }
 }
 
@@ -359,8 +436,13 @@ pub struct SceneRenderer {
     _default_colors: VariantColors,
     variant_colors: HashMap<u32, VariantColors>,
     pub scene: SceneManager,
-    passes: [PassCache; 3 + MAX_LIGHTS * 2],
+    passes: Vec<PassCache>,
     active_cache: usize,
+    main_view_slot: u32,
+    last_main_cache: usize,
+    main_cache_hits: u64,
+    main_cache_misses: u64,
+    main_instance_upload_bytes: u64,
     translucent_pipelines:
         HashMap<(wgpu::TextureFormat, wgpu::TextureFormat), [wgpu::RenderPipeline; 2]>,
     helper_pipelines: HashMap<(wgpu::TextureFormat, wgpu::TextureFormat), wgpu::RenderPipeline>,
@@ -447,7 +529,9 @@ impl SceneRenderer {
             &[[1.0; 4]],
         );
         let grid_bind_group = default_colors.group.clone();
-        let passes = std::array::from_fn(|_| PassCache::new(&device));
+        let passes = (0..BASE_PASS_CACHE_COUNT)
+            .map(|_| PassCache::new(&device))
+            .collect();
         let effects = Some(Effects::new(&device));
         let gltf_gpu = super::gltf_gpu::GltfGpu::new(
             &device,
@@ -488,6 +572,11 @@ impl SceneRenderer {
             scene: SceneManager::default(),
             passes,
             active_cache: 0,
+            main_view_slot: 0,
+            last_main_cache: 0,
+            main_cache_hits: 0,
+            main_cache_misses: 0,
+            main_instance_upload_bytes: 0,
             shadow_pipelines: HashMap::new(),
             translucent_pipelines: HashMap::new(),
             helper_pipelines: HashMap::new(),
@@ -666,6 +755,17 @@ impl SceneRenderer {
         self.neon_meshes.retain(|id, _| self.scene.mesh_exists(*id));
         self.variant_colors
             .retain(|id, _| self.scene.mesh_variants.contains_key(id));
+        if self.scene.objects().is_empty() && self.passes.iter().any(|cache| cache.queue.total != 0)
+        {
+            self.passes.truncate(BASE_PASS_CACHE_COUNT);
+            self.active_cache = 0;
+            self.last_main_cache = 0;
+            for cache in &mut self.passes {
+                cache.key = None;
+                cache.queue = RenderQueue::default();
+            }
+            self.passes[0].queue.collect_stats = self.debug_enabled;
+        }
         for cache in &mut self.passes {
             cache.imported.retain(&self.scene);
         }
@@ -749,18 +849,29 @@ impl SceneRenderer {
     }
 
     pub fn prepare_view(&mut self, view: RenderView) {
+        self.main_view_slot = 0;
         self.prepare_pass(view, RenderPassKind::Main);
     }
     pub(super) fn prepare_pass(&mut self, view: RenderView, pass: RenderPassKind) {
-        self.prepare_pass_cache(
-            view,
-            pass,
-            if pass == RenderPassKind::Environment {
-                2 + MAX_LIGHTS * 2
+        let index = if pass == RenderPassKind::Main {
+            let index = if self.main_view_slot == 0 {
+                0
             } else {
-                pass.index()
-            },
-        );
+                BASE_PASS_CACHE_COUNT + self.main_view_slot as usize - 1
+            };
+            while self.passes.len() <= index {
+                let mut cache = PassCache::new(&self.device);
+                cache.queue.collect_stats = self.debug_enabled;
+                self.passes.push(cache);
+            }
+            self.last_main_cache = index;
+            index
+        } else if pass == RenderPassKind::Environment {
+            2 + MAX_LIGHTS * 2
+        } else {
+            pass.index()
+        };
+        self.prepare_pass_cache(view, pass, index);
     }
     pub(super) fn prepare_shadow_pass(
         &mut self,
@@ -777,7 +888,14 @@ impl SceneRenderer {
     fn prepare_pass_cache(&mut self, view: RenderView, pass: RenderPassKind, index: usize) {
         let _cpu_scope = super::profiler::cpu_scope("scene.prepare");
         self.active_cache = index;
-        let cache = &mut self.passes[index];
+        let is_main = pass == RenderPassKind::Main;
+        let instance_upload_start = self.upload_bytes;
+        let (cache, left) = if is_main && index == BASE_PASS_CACHE_COUNT + 1 {
+            let (earlier, right) = self.passes.split_at_mut(index);
+            (&mut right[0], Some(&earlier[BASE_PASS_CACHE_COUNT]))
+        } else {
+            (&mut self.passes[index], None)
+        };
         cache.camera_position = view.camera_position;
         let camera_matrix = view.view_projection;
         let camera_pos = view.camera_position;
@@ -804,10 +922,17 @@ impl SceneRenderer {
         );
 
         // No additional clock reads or BVH counters when diagnostics are off.
-        let clock = (self.debug_enabled && index == 0)
+        let clock = (self.debug_enabled && is_main)
             .then(|| web_sys::window().and_then(|w| w.performance()))
             .flatten();
-        if index == 0 && self.debug_enabled {
+        if is_main {
+            if cache.key == Some(key) {
+                self.main_cache_hits += 1;
+            } else {
+                self.main_cache_misses += 1;
+            }
+        }
+        if is_main && self.debug_enabled {
             self.cull_cached = cache.key == Some(key);
             self.cull_ms = 0.0;
         }
@@ -824,10 +949,18 @@ impl SceneRenderer {
                     .iter()
                     .any(|i| Mat4::from_cols_array_2d(&i.model).determinant() < 0.0)
                 {
-                    self.upload_bytes +=
-                        cache.batches[index].upload(&self.device, &self.queue, instances);
-                    self.upload_bytes +=
-                        cache.mirrored_batches[index].upload(&self.device, &self.queue, &[]);
+                    self.upload_bytes += cache.batches[index].upload_shared(
+                        &self.device,
+                        &self.queue,
+                        instances,
+                        left.map(|left| &left.batches[index]),
+                    );
+                    self.upload_bytes += cache.mirrored_batches[index].upload_shared(
+                        &self.device,
+                        &self.queue,
+                        &[],
+                        left.map(|left| &left.mirrored_batches[index]),
+                    );
                     continue;
                 }
                 // A negative determinant reverses triangle winding. Keep instancing
@@ -836,10 +969,18 @@ impl SceneRenderer {
                     .iter()
                     .copied()
                     .partition(|i| Mat4::from_cols_array_2d(&i.model).determinant() < 0.0);
-                self.upload_bytes +=
-                    cache.batches[index].upload(&self.device, &self.queue, &normal);
-                self.upload_bytes +=
-                    cache.mirrored_batches[index].upload(&self.device, &self.queue, &mirrored);
+                self.upload_bytes += cache.batches[index].upload_shared(
+                    &self.device,
+                    &self.queue,
+                    &normal,
+                    left.map(|left| &left.batches[index]),
+                );
+                self.upload_bytes += cache.mirrored_batches[index].upload_shared(
+                    &self.device,
+                    &self.queue,
+                    &mirrored,
+                    left.map(|left| &left.mirrored_batches[index]),
+                );
             }
             cache.imported.retain(&self.scene);
             self.upload_bytes += cache.imported.upload(
@@ -847,8 +988,28 @@ impl SceneRenderer {
                 &self.queue,
                 &cache.queue.imported,
                 &self.imported_meshes,
+                left.map(|left| &left.imported),
             );
             cache.key = Some(key);
+        } else if let Some(left) = left {
+            for (index, batch) in cache.batches.iter_mut().enumerate() {
+                self.upload_bytes +=
+                    batch.refresh_alias(&self.device, &self.queue, Some(&left.batches[index]));
+            }
+            for (index, batch) in cache.mirrored_batches.iter_mut().enumerate() {
+                self.upload_bytes += batch.refresh_alias(
+                    &self.device,
+                    &self.queue,
+                    Some(&left.mirrored_batches[index]),
+                );
+            }
+            for (index, batch) in cache.imported.pages.iter_mut().enumerate() {
+                self.upload_bytes +=
+                    batch.refresh_alias(&self.device, &self.queue, left.imported.pages.get(index));
+            }
+        }
+        if is_main {
+            self.main_instance_upload_bytes += (self.upload_bytes - instance_upload_start) as u64;
         }
         let mut grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
         // Surface-only preview in the main color pass, never shadows/reflections.
@@ -880,18 +1041,19 @@ impl SceneRenderer {
         self.passes[self.active_cache].queue.visible
     }
     pub fn render_stats(&self) -> [f64; 8] {
+        let cache = &self.passes[self.last_main_cache];
         [
-            self.passes[0].queue.total as f64,
-            self.passes[0].queue.visible as f64,
-            (self.passes[0].queue.total - self.passes[0].queue.visible) as f64,
-            (self.passes[0].queue.draw_calls()
-                + self.passes[0]
+            cache.queue.total as f64,
+            cache.queue.visible as f64,
+            (cache.queue.total - cache.queue.visible) as f64,
+            (cache.queue.draw_calls()
+                + cache
                     .batches
                     .iter()
-                    .zip(&self.passes[0].mirrored_batches)
-                    .filter(|(a, b)| !a.uploaded.is_empty() && !b.uploaded.is_empty())
+                    .zip(&cache.mirrored_batches)
+                    .filter(|(a, b)| !a.instances().is_empty() && !b.instances().is_empty())
                     .count()
-                + self.passes[0]
+                + cache
                     .queue
                     .imported
                     .keys()
@@ -900,7 +1062,7 @@ impl SceneRenderer {
                         super::gltf_gpu::draw_count(m, false) + super::gltf_gpu::draw_count(m, true)
                     })
                     .sum::<usize>()
-                - self.passes[0]
+                - cache
                     .queue
                     .imported
                     .keys()
@@ -919,9 +1081,15 @@ impl SceneRenderer {
         }
         self.debug_enabled = enabled;
         // Only the main-view HUD reports traversal; auxiliary passes need no counters.
-        self.passes[0].queue.collect_stats = enabled;
+        for (index, cache) in self.passes.iter_mut().enumerate() {
+            if index == 0 || index >= BASE_PASS_CACHE_COUNT {
+                cache.queue.collect_stats = enabled;
+                if !enabled {
+                    cache.queue.culling_stats = Default::default();
+                }
+            }
+        }
         if !enabled {
-            self.passes[0].queue.culling_stats = Default::default();
             self.cull_ms = 0.0;
             self.cull_cached = true;
         }
@@ -1054,7 +1222,7 @@ impl SceneRenderer {
     }
     pub fn debug_values(&self) -> serde_json::Value {
         let stats = self.render_stats();
-        let bvh = self.passes[0].queue.culling_stats;
+        let bvh = self.passes[self.last_main_cache].queue.culling_stats;
         serde_json::json!({
             "numericFont": {
                 "glyphMeshes": self.scene.numeric_font_stats().0,
@@ -1080,6 +1248,13 @@ impl SceneRenderer {
                 "fullIndices": self.translucent_full_indices.get(),
                 "draws": self.translucent_draws.get(),
             },
+            "mainViewCache": {
+                "slot": if self.last_main_cache == 0 { 0 } else { self.last_main_cache - BASE_PASS_CACHE_COUNT + 1 },
+                "hits": self.main_cache_hits,
+                "misses": self.main_cache_misses,
+                "instanceUploadBytes": self.main_instance_upload_bytes,
+                "slots": 1 + self.passes.len() - BASE_PASS_CACHE_COUNT,
+            },
             "instanceUploadPages": self.passes.iter().map(|cache| cache.imported.pages.len()).sum::<usize>(),
             "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],
             "cullMs": self.cull_ms, "cullCached": self.cull_cached,
@@ -1090,7 +1265,7 @@ impl SceneRenderer {
         })
     }
     pub fn info_diagnostic_rows(&self) -> Vec<(&'static str, String)> {
-        let queue = &self.passes[0].queue;
+        let queue = &self.passes[self.last_main_cache].queue;
         vec![
             ("FPS", format!("{:.1}", self.frame_metrics.fps)),
             ("FRAME MS", format!("{:.2}", self.frame_metrics.frame_ms)),
@@ -1115,7 +1290,10 @@ impl SceneRenderer {
                 ("FPS", format!("{:.1}", self.frame_metrics.fps)),
                 ("FRAME MS", format!("{:.2}", self.frame_metrics.frame_ms)),
                 ("CPU MS", format!("{:.2}", self.prepare_ms)),
-                ("OBJEKTY", self.passes[0].queue.total.to_string()),
+                (
+                    "OBJEKTY",
+                    self.passes[self.last_main_cache].queue.total.to_string(),
+                ),
                 ("DRAWS", self.draw_calls.to_string()),
             ],
             cuts,
@@ -1126,7 +1304,7 @@ impl SceneRenderer {
         }
     }
     pub fn debug_lines(&self) -> Vec<String> {
-        let q = &self.passes[0].queue;
+        let q = &self.passes[self.last_main_cache].queue;
         vec![
             format!(
                 "FPS {:.1} FRAME {:.2} MS",
@@ -1191,7 +1369,20 @@ impl SceneRenderer {
         view: RenderView,
         target: &RenderTarget<'_>,
     ) -> Result<wgpu::CommandBuffer, String> {
+        self.render_view_slot(view, target, 0)
+    }
+    /// Logical main views: desktop 0, XR left 1 and XR right 2.
+    pub fn render_view_slot(
+        &mut self,
+        view: RenderView,
+        target: &RenderTarget<'_>,
+        slot: u32,
+    ) -> Result<wgpu::CommandBuffer, String> {
+        if slot > 2 {
+            return Err("Main view slot must be desktop 0 or XR eye 1..2".into());
+        }
         target.validate()?;
+        self.main_view_slot = slot;
         self.refresh_info_panel_meshes();
         let mut effects = self.effects.take().unwrap();
         let result = effects.render(self, view, target);
@@ -1298,12 +1489,12 @@ impl SceneRenderer {
             {
                 let mesh = self.mesh(kind);
                 for batch in [&cache.batches[index], &cache.mirrored_batches[index]] {
-                    let count = batch.uploaded.len() as u32;
+                    let count = batch.instances().len() as u32;
                     if count == 0 {
                         continue;
                     }
                     pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    pass.set_vertex_buffer(1, batch.buffer.slice(..));
+                    pass.set_vertex_buffer(1, batch.draw_buffer().slice(..));
                     pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                     pass.draw_indexed(0..mesh.index_count, 0, 0..count);
                     draws += 1;
@@ -1525,7 +1716,7 @@ impl SceneRenderer {
                     (&cache.batches[index], 0, &pipelines.0),
                     (&cache.mirrored_batches[index], 2, &pipelines.2),
                 ] {
-                    let count = batch.uploaded.len() as u32;
+                    let count = batch.instances().len() as u32;
                     if count == 0 {
                         continue;
                     }
@@ -1534,7 +1725,7 @@ impl SceneRenderer {
                         active_pipeline = pipeline_index;
                     }
                     rp.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    rp.set_vertex_buffer(1, batch.buffer.slice(..));
+                    rp.set_vertex_buffer(1, batch.draw_buffer().slice(..));
                     rp.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
                     rp.draw_indexed(0..mesh.index_count, 0, 0..count);
                     draws += 1;
@@ -1727,7 +1918,7 @@ impl SceneRenderer {
             .batches
             .iter()
             .chain(cache.mirrored_batches.iter())
-            .any(|b| b.uploaded.iter().any(|i| i.emission[2] < 1.0))
+            .any(|b| b.instances().iter().any(|i| i.emission[2] < 1.0))
             || cache.queue.imported.iter().any(|(id, instances)| {
                 self.imported_meshes.contains_key(id)
                     && instances.iter().any(|i| i.emission[2] < 1.0)
@@ -1847,7 +2038,7 @@ impl SceneRenderer {
                 (false, &cache.batches[index]),
                 (true, &cache.mirrored_batches[index]),
             ] {
-                for (instance, data) in batch.uploaded.iter().enumerate() {
+                for (instance, data) in batch.instances().iter().enumerate() {
                     if data.emission[2] >= 1.0
                         || (data.emission[2] <= 0.0 && data.surface_params[0] <= 0.0)
                     {
@@ -1921,7 +2112,7 @@ impl SceneRenderer {
                     } else {
                         &cache.batches[index]
                     };
-                    pass.set_vertex_buffer(1, batch.buffer.slice(..));
+                    pass.set_vertex_buffer(1, batch.draw_buffer().slice(..));
                 }
             }
             if let Some(buffer) = subset.and_then(|entry| entry.buffer.as_ref()) {
@@ -1953,35 +2144,42 @@ impl SceneRenderer {
         if target.auxiliary.is_some() || target.material_mask {
             return Err("Postprocess overlays require a final single-color target".into());
         }
-        self.active_cache = 0;
-        let rings = self.cut_feedback_rings(0);
+        self.active_cache = self.last_main_cache;
+        let cache_index = self.last_main_cache;
+        let rings = self.cut_feedback_rings(cache_index);
         let has_rings = rings.iter().any(Option::is_some);
-        let has_transparent = self.passes[0]
+        let has_transparent = self.passes[self.last_main_cache]
             .queue
             .imported
             .keys()
             .filter_map(|id| self.gltf_models.get(id))
             .any(|model| super::gltf_gpu::draw_count(model, true) > 0);
-        let has_mesh_transparency = self.has_translucent(0);
+        let has_mesh_transparency = self.has_translucent(cache_index);
         let has_helpers = self.draw_grid || self.draw_light_helpers;
-        let may_have_neon = self.neon_glow.as_ref().is_some_and(|glow| glow.enabled())
-            && self.passes[0].queue.imported.iter().any(|(id, instances)| {
-                !instances.is_empty()
-                    && instances.iter().any(|instance| instance.emission[0] > 0.)
-                    && !self.scene.is_cut_feedback_ring(*id)
-                    && self.has_neon_geometry(*id)
-                    && !matches!(self.neon_meshes.get(id), Some(None))
-            });
+        let may_have_neon =
+            self.neon_glow.as_ref().is_some_and(|glow| glow.enabled())
+                && self.passes[self.last_main_cache].queue.imported.iter().any(
+                    |(id, instances)| {
+                        !instances.is_empty()
+                            && instances.iter().any(|instance| instance.emission[0] > 0.)
+                            && !self.scene.is_cut_feedback_ring(*id)
+                            && self.has_neon_geometry(*id)
+                            && !matches!(self.neon_meshes.get(id), Some(None))
+                    },
+                );
         if may_have_neon {
             self.prepare_neon_glow(target);
         }
-        let has_neon = may_have_neon
-            && self.passes[0].queue.imported.iter().any(|(id, instances)| {
-                !instances.is_empty()
-                    && instances.iter().any(|instance| instance.emission[0] > 0.)
-                    && !self.scene.is_cut_feedback_ring(*id)
-                    && self.neon_meshes.get(id).is_some_and(Option::is_some)
-            });
+        let has_neon =
+            may_have_neon
+                && self.passes[self.last_main_cache].queue.imported.iter().any(
+                    |(id, instances)| {
+                        !instances.is_empty()
+                            && instances.iter().any(|instance| instance.emission[0] > 0.)
+                            && !self.scene.is_cut_feedback_ring(*id)
+                            && self.neon_meshes.get(id).is_some_and(Option::is_some)
+                    },
+                );
         if !has_transparent && !has_mesh_transparency && !has_rings && !has_neon && !has_helpers {
             self.neon_draws = 0;
             self.neon_segments = 0;
@@ -2006,7 +2204,7 @@ impl SceneRenderer {
             self.prepare_translucent(target, &effects.layout);
             self.effects = Some(effects);
         }
-        let cache = &self.passes[0];
+        let cache = &self.passes[self.last_main_cache];
         let key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
             depth_format: target.depth_format,
@@ -2086,11 +2284,11 @@ impl SceneRenderer {
             if has_mesh_transparency {
                 pass.set_bind_group(0, &self.grid_bind_group, &[]);
                 pass.set_bind_group(1, &self.effects.as_ref().unwrap().scene_group, &[]);
-                draws += self.draw_translucent(&mut pass, 0, target);
+                draws += self.draw_translucent(&mut pass, cache_index, target);
             }
-            draws += self.draw_cut_feedback(&mut pass, 0, &rings, target);
+            draws += self.draw_cut_feedback(&mut pass, cache_index, &rings, target);
             if has_neon {
-                neon_stats = self.encode_neon_glow(&mut pass, 0);
+                neon_stats = self.encode_neon_glow(&mut pass, cache_index);
                 draws += neon_stats.0;
             }
             if has_helpers {

@@ -36,6 +36,12 @@ diagnostics and selects established effects. This is not an arbitrary WGSL edito
   until shared uniform writes have been audited or given independent ranges.
 - Keep scene finalization after controller mutations and before either eye. Adding
   a profiler scope must not change simulation stepping or force GPU readback waits.
+- Main view cache identity is desktop 0 / XR left 1 / right 2. Keep auxiliary
+  pass slots independent. Per-eye caches must not double-upload identical animated
+  instance data; a right-to-left draw-buffer alias must be revalidated on cache hits
+  without lying about the right private buffer contents. Overlays/HUD use the last
+  main slot. Test asymmetric eye visibility, identical animated payloads, left-only
+  projection changes, scene/camera/culling invalidation and clear/dispose cleanup.
 - Vertex-color `setOpacity` defers translucent facets to the existing final overlay
   (before glow), while bright opaque facets remain in main/depth/SSR. Preserve
   `Instance.emission.zw` opacity/opaque-threshold, `surface_params.x` stable facet

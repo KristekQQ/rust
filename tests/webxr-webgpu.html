@@ -6,6 +6,7 @@ import {initEngine} from '../js/engine.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
 import {assertForeground,capturePixels} from './pixels.js';
+import {verifyMainViewCaches} from './xr/view-cache-checks.js';
 
 const profiling=new URLSearchParams(location.search).has('profile');
 const width=profiling?1024:192,height=profiling?1024:208,sim=installXRSimulator({clockTimers:false,profile:{eyeWidth:width,eyeHeight:height}});
@@ -59,6 +60,7 @@ class SimulatedGPUBinding {
                 const pose=frame.getViewerPose(space);if(!pose)return null;
                 return {...pose,views:pose.views.map(view=>{
                     const projectionMatrix=view.projectionMatrix.slice();
+                    if(view.eye==='left')projectionMatrix[8]+=this.leftProjectionShift??0;
                     for(let column=0;column<4;column++)projectionMatrix[column*4+2]=(projectionMatrix[column*4+2]+projectionMatrix[column*4+3])/2;
                     return {...view,projectionMatrix};
                 })};
@@ -228,6 +230,20 @@ const report=await run.execute(async test=>{
         if(originalFactories[name])Object.defineProperty(binding.device,name,originalFactories[name]);else delete binding.device[name];
     }}
     test.assert(Object.values(creations).every(count=>count===0),'steady stereo SSR reuses all render pipelines, textures and bind groups',creations);
+    if(!profiling){
+        let leftVisible=0;
+        const getSubImage=binding.getViewSubImage.bind(binding);
+        binding.getViewSubImage=(layer,view)=>{if(view.eye==='right')leftVisible=engine.debugStats().visible;return getSubImage(layer,view);};
+        try{verifyMainViewCaches(engine,sim,test,{cullingWasEnabled:false,observeLeft:()=>leftVisible,readImportedWrites:()=>binding.instanceUploads});}
+        finally{binding.getViewSubImage=getSubImage;}
+        engine.set_frustum_culling(true);frame();
+        const aliasRight=await binding.pixels(1),cacheBeforeLeftShift=engine.debugStats().mainViewCache;
+        binding.leftProjectionShift=3;frame();
+        const cacheAfterLeftShift=engine.debugStats().mainViewCache;
+        test.assert(cacheAfterLeftShift.misses===cacheBeforeLeftShift.misses+1&&cacheAfterLeftShift.hits===cacheBeforeLeftShift.hits+1,'left-only projection change preserves the right cache hit',{cacheBeforeLeftShift,cacheAfterLeftShift});
+        test.assert(pixelDifference(aliasRight,await binding.pixels(1))===0,'changed left instance buffer cannot corrupt cached right-eye pixels');
+        binding.leftProjectionShift=0;engine.set_frustum_culling(false);frame();
+    }
 
     const graph=engine.postprocessing.graph();
     test.assert(graph.active&&graph.transientTextures===2&&graph.passes.join(',')==='ssr.trace,ssr.compose,bloom.compose','compiled graph matches encoded half SSR and bloom chain',graph);

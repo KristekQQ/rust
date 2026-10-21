@@ -639,6 +639,7 @@ impl State {
         self.frame_dt = dt;
         self.xr_hud_pending = true;
         self.xr_eye_count = 0;
+        self.xr_view_slot = 0;
         if let Some(round) = &mut self.xr_round {
             let before = round.remaining.ceil();
             round.advance(dt);
@@ -659,7 +660,10 @@ impl State {
         self.refresh_info_panels(dt);
     }
     pub fn render_xr_eye(&mut self, matrix: Mat4, position: Vec3) -> Result<(), JsValue> {
-        self.xr_view_slot = self.xr_eye_count.min(1) + 1;
+        if self.xr_eye_count >= 2 {
+            return Err(JsValue::from_str("XR frame supports at most two eyes"));
+        }
+        self.xr_view_slot = self.xr_eye_count + 1;
         self.xr_eye_count += 1;
         if self.xr_scene_pending {
             self.renderer.finish_scene_updates();
@@ -718,6 +722,9 @@ impl State {
         // owned targets; browser UNORM views cannot safely be reinterpreted.
         let info = super::xr_output::XrAttachments::inspect(image)?;
         let index = info.layer as usize;
+        if index >= 2 {
+            return Err(JsValue::from_str("XR frame supports at most two eyes"));
+        }
         self.xr_view_slot = index as u32 + 1;
         // Own the complete output of each eye until both are ready. Browser
         // attachments are never retained here or touched by intermediate passes.
@@ -842,6 +849,11 @@ impl State {
         };
         // Collect only the main view. Auxiliary shadow/reflection passes still
         // submit before shared uniforms are rewritten for this view.
+        let main_view_slot = if self.xr_rendering {
+            self.xr_view_slot
+        } else {
+            0
+        };
         let mut commands = Vec::with_capacity(3);
         let mut postprocessed = false;
         if self
@@ -855,7 +867,7 @@ impl State {
             scene_target.color_load = wgpu::LoadOp::Clear(self.background);
             commands.push(
                 self.renderer
-                    .render_view(self.view, &scene_target)
+                    .render_view_slot(self.view, &scene_target, main_view_slot)
                     .map_err(|e| JsValue::from_str(&e))?,
             );
             // Effects lazily replaces fallback maps when shadows are first enabled.
@@ -907,7 +919,7 @@ impl State {
             }
             commands.push(
                 self.renderer
-                    .render_view(self.view, &target)
+                    .render_view_slot(self.view, &target, main_view_slot)
                     .map_err(|e| JsValue::from_str(&e))?,
             );
         }

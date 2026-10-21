@@ -210,6 +210,7 @@ export interface DebugStats {
     drawCalls: number;
     /** Main-view geometry, transparency and grid/light helpers; excludes HUD/postprocessing. */
     mainDrawCalls: number;
+    mainViewCache: {slot:number;hits:number;misses:number;instanceUploadBytes:number;slots:number};
     bvhNodes: number; objectTests: number; staticRebuilds: number; dynamicRebuilds: number;
     /** Cumulative counters, unchanged while the HUD is disabled. */
     hudFrames: number; hudRefreshes: number;

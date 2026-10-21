@@ -24,6 +24,25 @@ Simulace a vstupy upraví Rust scénu. V XR proběhnou i změny od ovladačů a 
 Další oko používá stejný publikovaný stav. Finalizace neposouvá simulaci znovu.
 Desktop ji volá po své aktualizaci scény.
 
+Hlavní pohled má stabilní identitu: desktop `0`, levé XR oko `1`, pravé `2`.
+Každé oko má vlastní cache cullingu, seznamů instancí a jejich GPU stránek;
+nevytlačuje druhé oko pouhým střídáním projekčních matic. XR cache vznikají líně.
+Klíč stále obsahuje matici, revizi scény a nastavení cullingu: pohyb ani změny
+scény se nesmějí skrýt za cache. Overlay, průhlednost, glow a diagnostika čtou
+poslední hlavní slot, nikoli vždy desktopový slot.
+
+Při přesně shodných datech instancí může pravé oko pro daný draw použít levý
+buffer bez druhého uploadu. Vlastní obsah pravého bufferu se tím nesmí označit
+jako přepsaný. Alias se znovu ověřuje i při cache hitu: levé oko mohlo mezitím
+změnit svoji viditelnost. Změna levého bufferu nesmí poškodit obraz pravého oka.
+Sdílení dat instancí nemění pořadí submitů ani sdílené view uniformy.
+
+`engine.debugStats().mainViewCache` ukazuje poslední logický `slot`, počet
+alokovaných hlavních `slots`, kumulativní `hits`/`misses` a skutečné
+`instanceUploadBytes` hlavních pohledů. Nejde o GPU čas ani o uniform/texture
+uploady. Desktopové testy dokazují cache a správnost obrazu; FPS přínos Questu
+je samostatné měření, zvlášť u dynamické hry a pohybující se hlavy.
+
 Scénové průchody zachovávají své nezávislé visibility/cache rozhodování.
 Postprocessing používá deklarovaný řetězec; výsledné transparentní objekty,
 cut rings, glow a helpers sdílejí finální overlay pass při zachovaném pořadí.
