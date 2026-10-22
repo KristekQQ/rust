@@ -21,6 +21,8 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify' },
+    { name: 'neon-robot', path: 'examples/neon-robot/?verify=1', status: '#result', button: '#verify' },
     { name: 'postprocess-fusion', path: 'tests/postprocess-fusion.html', status: '#result' },
     { name: 'cynatar', path: 'examples/cynatar/?verify=1', status: '#result', button: '#verify' },
     { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },

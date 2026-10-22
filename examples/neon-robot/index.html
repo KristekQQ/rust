@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon Sentinel · Modelář</title>
+<style>
+:root{color-scheme:dark;font:14px/1.5 system-ui;color:#f5f2ff;background:#060610}*{box-sizing:border-box}body{margin:0}main{height:100dvh;min-height:650px;position:relative;overflow:hidden}canvas{display:block;width:calc(100% - 290px);height:100%;touch-action:none}header{position:absolute;left:36px;top:28px;pointer-events:none}.eyebrow{font-size:11px;letter-spacing:.22em;color:#9b93b8}h1{font-size:clamp(30px,4vw,56px);line-height:1.05;letter-spacing:-.06em;font-weight:650;margin:14px 0}h1 span{color:#ef52ce}header p{max-width:250px;color:#a7a2bc;margin:0;font-size:12px}.back{pointer-events:auto;color:#c9c4de;text-decoration:none;font-size:12px}.panel{position:absolute;right:20px;bottom:20px;width:250px;padding:20px;border:1px solid #353047;border-radius:18px;background:#0c0b18e8;backdrop-filter:blur(15px)}.label{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:#a59cb8}.clips{display:grid;gap:7px;margin:12px 0}button,a.download{font:inherit;color:inherit;border:1px solid #363145;border-radius:8px;background:#191525;padding:10px 12px;cursor:pointer;text-align:left;text-decoration:none}button:hover,a.download:hover{border-color:#d15abd;background:#291b36}button[aria-pressed=true]{background:#3b1740;border-color:#f052d0;color:#ffd5f5}button:disabled{opacity:.4;cursor:wait}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #68e8ff;outline-offset:3px}.clips button{display:flex;justify-content:space-between;align-items:center}.clips small{font-size:10px;color:#aa9dbb}.row{display:flex;gap:7px;margin:10px 0}.row button{flex:1;min-width:0;padding:8px 4px;font-size:11px;text-align:center}label{display:flex;gap:10px;align-items:center;font-size:12px;color:#bcb4d1}input[type=range]{width:110px;accent-color:#f052d0}output{min-width:32px}.download{display:block;text-align:center!important;margin-top:16px;color:#8fe8ff!important}#status{font-size:11px;color:#a6a0b7;min-height:32px;margin:12px 0 0}.hint{position:absolute;left:36px;bottom:28px;font-size:11px;color:#8b859f}.hint strong{display:block;color:#c4bdd9;font-weight:500;margin-bottom:3px}details{margin-top:10px;font-size:10px;color:#9a91ad}pre{white-space:pre-wrap;overflow-wrap:anywhere}details button{font-size:11px;padding:6px;margin-top:8px}@media(max-width:650px){main{height:auto;min-height:100dvh;overflow:visible;display:flex;flex-direction:column}canvas{width:100%;height:66dvh;min-height:420px}header{left:20px;top:18px}header h1{font-size:29px}header p{display:none}.panel{position:relative;inset:auto;width:auto;margin:0 16px 16px;padding:16px}.clips{grid-template-columns:repeat(3,1fr)}.clips button{display:block;text-align:center;padding:9px 4px}.clips small{display:block}.hint{display:none}}
+</style>
+<main>
+  <canvas id="gpu-canvas" tabindex="0" aria-label="Interaktivní 3D model neonového robota s energetickou čepelí a mechanickým drápem"></canvas>
+  <header><a class="back" href="../">← Modelář / galerie</a><h1>NEON<br><span>SENTINEL.</span></h1><p>Kov, mosaz a živé světlo.<br>Modelováno v Blenderu podle předlohy.</p></header>
+  <section class="panel" aria-label="Ovládání modelu">
+    <div class="label">Pohybové sekvence</div>
+    <div class="clips">
+      <button data-clip="Idle" aria-pressed="true" disabled>V pohotovosti <small>01 / IDLE</small></button>
+      <button data-clip="Attack" aria-pressed="false" disabled>Energetický útok <small>02 / ATTACK</small></button>
+      <button data-clip="Victory" aria-pressed="false" disabled>Vítězné gesto <small>03 / VICTORY</small></button>
+    </div>
+    <div class="row"><button id="pause" disabled>Pozastavit</button><button id="front" disabled>Zepředu</button><button id="back" disabled>Zezadu</button></div>
+    <label>Rychlost <input id="speed" type="range" min="0.5" max="1.5" step="0.25" value="1" disabled><output id="speed-value">1×</output></label>
+    <a class="download" href="../../assets/models/neon-robot/neon-robot.glb" download="neon-sentinel.glb">Stáhnout animovaný model GLB ↓</a>
+    <p id="status" role="status">Sestavuji neonového strážce…</p>
+    <details><summary>Ověření modelu</summary><button id="verify" disabled>Ověřit vykreslení</button><pre id="result">Připravuji…</pre></details>
+  </section>
+  <div class="hint"><strong>Prohlédni si ho ze všech stran.</strong>Táhni myší pro otočení · kolečko pro přiblížení</div>
+</main>
+<script type="module" src="main.js"></script>
+</html>
