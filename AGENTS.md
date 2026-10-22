@@ -4,6 +4,8 @@ Reply in Czech. Rust owns scene state, calculations, simulation and rendering; J
 
 Project-owned skills live in versioned `.agents/skills/`, not personal `~/.codex/skills`. Use [rust-webgpu-project](.agents/skills/rust-webgpu-project/SKILL.md) for engine/SDK/example work; keep its links portable. Generic personal/tool skills stay outside the project.
 
+At Honza's request, [honza-intent](.agents/skills/honza-intent/SKILL.md) is also project-owned so other instances share his intent-clarification workflow. Use it for unresolved ambiguity or corrections after misunderstanding, not typos alone.
+
 For scene placement, rotations, scale and attached world-space labels, use [scene-object-layout](.agents/skills/scene-object-layout/SKILL.md); verify requested sides in XR coordinates, not only the desktop preview.
 
 For direct Quest WebGPU XR, runtime support, projection textures and headset diagnostics use [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md).
