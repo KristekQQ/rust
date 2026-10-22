@@ -55,6 +55,7 @@ struct MeshNode {
     stats: MeshStats,
     source: MeshSource,
     support: Option<SupportCurve>,
+    contact: Option<Rc<crate::contact_shape::ContactShape>>,
 }
 enum MeshSource {
     Cpu(CutMesh),
@@ -99,6 +100,11 @@ impl From<CutMesh> for MeshData {
             volume: mesh.volume(),
         };
         Self(Rc::new(MeshNode {
+            contact: Some(Rc::new(crate::contact_shape::ContactShape::new(
+                &mesh.positions,
+                (min, max),
+                mesh.centroid(),
+            ))),
             stats,
             source: MeshSource::Cpu(mesh),
             support: None,
@@ -108,6 +114,7 @@ impl From<CutMesh> for MeshData {
 impl MeshData {
     pub(crate) fn colored(&self, colors: Vec<Vec3>) -> Self {
         Self(Rc::new(MeshNode {
+            contact: self.0.contact.clone(),
             stats: self.0.stats,
             support: None,
             source: MeshSource::Colored {
@@ -124,6 +131,7 @@ impl MeshData {
         support: SupportCurve,
     ) -> Self {
         Self(Rc::new(MeshNode {
+            contact: None,
             stats,
             source: MeshSource::Resident { recipe, side },
             support: Some(support),
@@ -135,6 +143,13 @@ impl MeshData {
     }
     pub fn stats(&self) -> MeshStats {
         self.0.stats
+    }
+    pub(crate) fn contact_shape(&self) -> Option<&crate::contact_shape::ContactShape> {
+        self.0.contact.as_deref()
+    }
+    pub(crate) fn contact_center(&self) -> Vec3 {
+        self.contact_shape()
+            .map_or((self.0.stats.min + self.0.stats.max) * 0.5, |s| s.center)
     }
     pub fn bounds(&self) -> (Vec3, Vec3) {
         (self.0.stats.min, self.0.stats.max)
@@ -153,13 +168,6 @@ impl MeshData {
     }
     pub fn support(&self) -> Option<&SupportCurve> {
         self.0.support.as_ref()
-    }
-    /// Geometry-only queries share the original topology without realizing colors.
-    pub(crate) fn geometry_cpu(&self) -> Option<&CutMesh> {
-        match &self.0.source {
-            MeshSource::Colored { parent, .. } => parent.geometry_cpu(),
-            _ => self.ready_cpu(),
-        }
     }
     pub fn ready_cpu(&self) -> Option<&CutMesh> {
         match &self.0.source {
@@ -240,6 +248,19 @@ mod tests {
         )
         .unwrap()
     }
+    #[test]
+    fn contact_shape_is_eager_and_shared_without_materializing_variant_colors() {
+        let base = MeshData::from(tetrahedron());
+        let colored = base.colored(vec![Vec3::X; base.triangle_count()]);
+        assert!(Rc::ptr_eq(
+            base.0.contact.as_ref().unwrap(),
+            colored.0.contact.as_ref().unwrap()
+        ));
+        assert!(colored.ready_cpu().is_none());
+        assert_eq!(colored.contact_shape().unwrap().points.len(), 4);
+        assert!(colored.ready_cpu().is_none());
+    }
+
     #[test]
     fn resident_metadata_queries_never_replay_geometry_and_explicit_fallback_does() {
         let parent = MeshData::from(tetrahedron());

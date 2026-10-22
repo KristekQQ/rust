@@ -1,6 +1,6 @@
 //! Opt-in one-sided sharp edge and finite kinematic blade contacts.
-//! Fruit contacts use a cached actual-vertex sphere clipped by oriented mesh bounds;
-//! cutting still uses the real mesh. No gravity is integrated a second time here.
+//! CPU fruit uses baked convex proxies and contact-point angular impulses.
+//! Lazy GPU-resident pieces retain the bounds fallback without CPU readback.
 use glam::{Mat4, Quat, Vec3};
 
 #[derive(Clone, Copy, Debug)]
@@ -174,9 +174,355 @@ pub(crate) fn contact(
     touched.then_some((center + correction, velocity))
 }
 
+pub(crate) struct BodyContact {
+    pub center: Vec3,
+    pub velocity: Vec3,
+    pub angular: Vec3,
+}
+
+/// Convex proxy versus finite blade box. All shape preparation is done at creation;
+/// queries only transform up to 26 vertices and cached separating axes.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn contact_shape(
+    config: BladePhysics,
+    blade: [Vec3; 2],
+    from: Mat4,
+    to: Mat4,
+    old_center: Vec3,
+    center: Vec3,
+    shape: &crate::contact_shape::ContactShape,
+    rotation: Quat,
+    scale: Vec3,
+    mut velocity: Vec3,
+    mut angular: Vec3,
+    bounce: f32,
+    dt: f32,
+    assisted: bool,
+    edge_cut_eligible: bool,
+) -> Option<BodyContact> {
+    let axis_local = (blade[1] - blade[0]).normalize();
+    let mid_local = (blade[0] + blade[1]) * 0.5;
+    let half_length = blade[0].distance(blade[1]) * 0.5;
+    let half = Vec3::new(half_length, config.half_width, config.half_thickness);
+    let old_mid = from.transform_point3(mid_local);
+    let new_mid = to.transform_point3(mid_local);
+    let radius = (shape.half * scale.abs()).length();
+    let broad_radius = half_length + config.half_width + radius;
+    let min = old_mid.min(new_mid) - Vec3::splat(broad_radius);
+    let max = old_mid.max(new_mid) + Vec3::splat(broad_radius);
+    if old_center.min(center).cmpgt(max).any() || old_center.max(center).cmplt(min).any() {
+        return None;
+    }
+    let qa = Quat::from_mat4(&from).normalize();
+    let qb = Quat::from_mat4(&to).normalize();
+    let travel = old_mid.distance(new_mid)
+        + center.distance(old_center)
+        + qa.angle_between(qb).abs() * half_length;
+    let steps = (travel / (radius * 0.2).clamp(0.002, 0.015))
+        .ceil()
+        .clamp(1., 256.) as u32;
+    let h = shape.half * scale.abs();
+    // Unit-mass box inertia approximation; contact shape controls the lever arm.
+    let inverse_inertia = Vec3::new(
+        3. / (h.y * h.y + h.z * h.z).max(1e-8),
+        3. / (h.x * h.x + h.z * h.z).max(1e-8),
+        3. / (h.x * h.x + h.y * h.y).max(1e-8),
+    );
+    let inverse = |v: Vec3| rotation * (inverse_inertia * (rotation.conjugate() * v));
+    let mut correction = Vec3::ZERO;
+    let mut touched = false;
+    for i in 1..=steps {
+        let t = i as f32 / steps as f32;
+        let q = qa.slerp(qb, t).normalize();
+        let mid = from.w_axis.truncate().lerp(to.w_axis.truncate(), t) + q * mid_local;
+        let axes = [
+            q * axis_local,
+            q * config.edge,
+            q * axis_local.cross(config.edge),
+        ];
+        let to_local = |v: Vec3| Vec3::new(v.dot(axes[0]), v.dot(axes[1]), v.dot(axes[2]));
+        let to_world = |v: Vec3| axes[0] * v.x + axes[1] * v.y + axes[2] * v.z;
+        let point = old_center.lerp(center, t) + correction;
+        let mut vertices = [Vec3::ZERO; 26];
+        for (out, p) in vertices.iter_mut().zip(&shape.points) {
+            *out = to_local(point - mid + rotation * (*p * scale));
+        }
+        let vertices = &vertices[..shape.points.len()];
+        let mut depth = f32::INFINITY;
+        let mut normal_local = Vec3::ZERO;
+        let candidates = [Vec3::X, Vec3::Y, Vec3::Z]
+            .into_iter()
+            .chain(
+                shape
+                    .normals
+                    .iter()
+                    .map(|n| to_local(rotation * (*n / scale))),
+            )
+            .chain(shape.edges.iter().flat_map(|e| {
+                let e = to_local(rotation * (*e * scale));
+                [e.cross(Vec3::X), e.cross(Vec3::Y), e.cross(Vec3::Z)]
+            }));
+        let mut separated = false;
+        for axis in candidates {
+            if axis.length_squared() < 1e-10 {
+                continue;
+            }
+            let axis = axis.normalize();
+            let mut low = f32::INFINITY;
+            let mut high = f32::NEG_INFINITY;
+            for p in vertices {
+                let d = p.dot(axis);
+                low = low.min(d);
+                high = high.max(d);
+            }
+            let extent = axis.abs().dot(half);
+            let positive = extent - low;
+            let negative = high + extent;
+            if positive < 0. || negative < 0. {
+                separated = true;
+                break;
+            }
+            let (overlap, direction) = if positive < negative {
+                (positive, axis)
+            } else {
+                (negative, -axis)
+            };
+            if overlap < depth {
+                depth = overlap;
+                normal_local = direction;
+            }
+        }
+        if separated {
+            continue;
+        }
+        let normal = to_world(normal_local);
+        let support = vertices
+            .iter()
+            .map(|p| p.dot(normal_local))
+            .fold(f32::INFINITY, f32::min);
+        let mut surface = Vec3::ZERO;
+        let mut count = 0.;
+        for p in vertices {
+            if p.dot(normal_local) < support + 0.0005 {
+                surface += *p;
+                count += 1.;
+            }
+        }
+        surface /= count;
+        let closest = surface.clamp(-half, half);
+        let material = mid_local
+            + axis_local * closest.x
+            + config.edge * closest.y
+            + axis_local.cross(config.edge) * closest.z;
+        let blade_velocity = (to.transform_point3(material) - from.transform_point3(material)) / dt;
+        let pose = Mat4::from_rotation_translation(q, mid - q * mid_local);
+        let relative_motion = blade_velocity * dt - (center - old_center);
+        // A face normal alone also occurs while the sharp edge is already
+        // crossing the interior. Only the outer flat is a supporting contact.
+        let center_flat = to_local(point - mid).z;
+        let flat_radius = vertices
+            .iter()
+            .map(|p| (center_flat - p.z) * center_flat.signum())
+            .fold(0., f32::max);
+        let supporting_flat = normal_local.z.abs() > 0.75
+            && center_flat.abs() >= config.half_thickness + flat_radius * 0.8;
+        if edge_cut_eligible
+            && !supporting_flat
+            && if assisted {
+                config.assisted_sharp(pose, axes[0], blade_velocity * dt)
+            } else {
+                config.sharp(pose, axes[0], relative_motion)
+            }
+        {
+            continue;
+        }
+
+        // Clamp the manifold to the finite blade: an off-center landing must tip.
+        let contact = closest + normal_local * (surface - closest).dot(normal_local);
+        let lever = mid + to_world(contact) - point;
+        correction += normal * (depth + 1e-5);
+        let relative = velocity + angular.cross(lever) - blade_velocity;
+        let incoming = relative.dot(normal);
+        if incoming < 0. {
+            let effective_mass = 1. + normal.dot(inverse(lever.cross(normal)).cross(lever));
+            let restitution = if incoming < -0.5 { bounce } else { 0. };
+            let impulse = -incoming * (1. + restitution) / effective_mass;
+            velocity += normal * impulse;
+            angular += inverse(lever.cross(normal * impulse));
+            let relative = velocity + angular.cross(lever) - blade_velocity;
+            let tangent = relative - normal * relative.dot(normal);
+            if tangent.length_squared() > 1e-12 {
+                let direction = tangent.normalize();
+                let mass = 1. + direction.dot(inverse(lever.cross(direction)).cross(lever));
+                let friction = -direction * (tangent.length() / mass).min(impulse * 0.8);
+                velocity += friction;
+                angular += inverse(lever.cross(friction));
+            }
+            // A small finite contact patch supplies static rolling resistance.
+            // This prevents numerical drift on the apple's bottom pole without
+            // cancelling the much larger moment of an off-center landing.
+            let patch = (radius * 0.04).min(config.half_width * 0.5);
+            let direction = angular.normalize_or_zero();
+            let resistance = inverse(direction).length() * impulse * patch;
+            angular -= direction * resistance.min(angular.length());
+            // Additional material damping acts only while supported.
+            angular *= (-5. * dt / steps as f32).exp();
+        }
+        touched = true;
+    }
+    touched.then_some(BodyContact {
+        center: center + correction,
+        velocity,
+        angular,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn octahedron() -> crate::contact_shape::ContactShape {
+        crate::contact_shape::ContactShape::new(
+            &[Vec3::X, -Vec3::X, Vec3::Y, -Vec3::Y, Vec3::Z, -Vec3::Z],
+            (-Vec3::ONE, Vec3::ONE),
+            Vec3::ZERO,
+        )
+    }
+    #[test]
+    fn blade_physics_convex_proxy_rejects_empty_bounds_corner_and_handles_mirrored_scale() {
+        let shape = octahedron();
+        for scale in [Vec3::splat(0.1), Vec3::new(-0.1, 0.1, 0.1)] {
+            let center = Vec3::new(0.15, 0.08, -0.5);
+            assert!(
+                contact_shape(
+                    config(),
+                    [Vec3::ZERO, -Vec3::Z],
+                    Mat4::IDENTITY,
+                    Mat4::IDENTITY,
+                    center,
+                    center,
+                    &shape,
+                    Quat::IDENTITY,
+                    scale,
+                    Vec3::ZERO,
+                    Vec3::ZERO,
+                    0.,
+                    1. / 90.,
+                    false,
+                    false,
+                )
+                .is_none(),
+                "empty AABB corner is not a surface"
+            );
+            let center = Vec3::new(0., 0.09, -0.5);
+            let hit = contact_shape(
+                config(),
+                [Vec3::ZERO, -Vec3::Z],
+                Mat4::IDENTITY,
+                Mat4::IDENTITY,
+                center,
+                center,
+                &shape,
+                Quat::IDENTITY,
+                scale,
+                -Vec3::Y,
+                Vec3::ZERO,
+                0.,
+                1. / 90.,
+                false,
+                false,
+            )
+            .unwrap();
+            assert!((hit.center.y - 0.11001).abs() < 1e-4);
+            assert!(hit.angular.length() < 1e-4);
+        }
+    }
+    #[test]
+    fn blade_physics_convex_fast_flat_sweep_does_not_tunnel() {
+        let shape = octahedron();
+        let center = Vec3::new(0., 0., -0.5);
+        let result = contact_shape(
+            config(),
+            [Vec3::ZERO, -Vec3::Z],
+            Mat4::from_translation(-Vec3::Y * 0.4),
+            Mat4::from_translation(Vec3::Y * 0.4),
+            center,
+            center,
+            &shape,
+            Quat::IDENTITY,
+            Vec3::splat(0.1),
+            Vec3::ZERO,
+            Vec3::ZERO,
+            0.,
+            0.05,
+            false,
+            false,
+        )
+        .unwrap();
+        assert!(result.center.y > 0.5, "{:?}", result.center);
+        assert!(result.velocity.y > 15.);
+    }
+    #[test]
+    fn blade_physics_sharp_interior_is_not_a_supporting_flat() {
+        let shape = octahedron();
+        let center = Vec3::new(0., 0.02, -0.5);
+        assert!(
+            contact_shape(
+                config(),
+                [Vec3::ZERO, -Vec3::Z],
+                Mat4::from_translation(-Vec3::X * 0.02),
+                Mat4::from_translation(Vec3::X * 0.02),
+                center,
+                center,
+                &shape,
+                Quat::IDENTITY,
+                Vec3::splat(0.1),
+                Vec3::ZERO,
+                Vec3::ZERO,
+                0.,
+                0.02,
+                false,
+                true,
+            )
+            .is_none(),
+            "interior sharp traversal must remain available to the mesh cutter"
+        );
+    }
+    #[test]
+    fn blade_physics_asymmetric_fragment_keeps_its_near_supporting_face() {
+        let points = [
+            Vec3::new(-0.1, -0.025, -0.1),
+            Vec3::new(0.1, -0.025, -0.1),
+            Vec3::new(0., -0.025, 0.1),
+            Vec3::new(0., 0.075, 0.),
+        ];
+        let shape = crate::contact_shape::ContactShape::new(
+            &points,
+            (Vec3::new(-0.1, -0.025, -0.1), Vec3::new(0.1, 0.075, 0.1)),
+            Vec3::ZERO,
+        );
+        let center = Vec3::new(0., 0.0349, -0.5);
+        assert!(
+            contact_shape(
+                config(),
+                [Vec3::ZERO, -Vec3::Z],
+                Mat4::IDENTITY,
+                Mat4::from_translation(Vec3::X * 0.0003),
+                center,
+                center,
+                &shape,
+                Quat::IDENTITY,
+                Vec3::ONE,
+                -Vec3::Y * 0.1,
+                Vec3::ZERO,
+                0.,
+                1. / 90.,
+                false,
+                true,
+            )
+            .is_some(),
+            "the opposite distant vertex must not hide the supporting face"
+        );
+    }
     fn config() -> BladePhysics {
         BladePhysics {
             edge: Vec3::X,

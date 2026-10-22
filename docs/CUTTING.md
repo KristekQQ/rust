@@ -242,6 +242,26 @@ Návrh vychází z [PBRT: BVH](https://www.pbr-book.org/4ed/Primitives_and_Inter
 a [Mapbox Earcut: triangulace polygonů](https://github.com/mapbox/earcut).
 Jde o vlastní omezenou implementaci, tyto knihovny se neimportují.
 
+## Opření ovoce o meč
+
+`setBladePhysics` s kontaktní odezvou používá pro CPU meshe samostatný konvexní
+kolizní tvar. Při vytvoření geometrie se vybere nejvýše 26 skutečných krajních
+vrcholů a připraví osy pro SAT test proti konečné čepeli. Barevné varianty
+i jejich instance tento neměnný tvar sdílejí. Během hraní se jen transformuje;
+změna měřítka nevyžaduje nové generování. Nový CPU řez připraví tvar svých kusů.
+
+Kontakt předává lineární i úhlový impuls podle místa dotyku, tření a přibližné
+setrvačnosti. Původní `spin` při prvním kontaktu přejde na fyzickou úhlovou rychlost;
+malá kontaktní ploška tlumí valení a točení při opření. Po ztrátě meče pokračuje
+volný pád s dosaženou rotací. Nové explicitní `spin` nastaví opět počáteční točení
+(například při recyklaci ovoce). CPU řezy dědí aktuální úhlovou rychlost.
+
+Jde o redukovaný konvexní tvar, který nepostihuje prohlubně ani oddělené části
+(například mezeru v hroznu). Těžiště je objemový centroid, setrvačnost aproximuje
+box. Srážky projektilů mezi sebou a s podlahou nadále používají koule.
+Experimentální GPU-resident kusy používají původní bounds odezvu bez vynuceného
+readbacku. Samotné řezání dál pracuje s celou geometrií.
+
 ## Ověření
 
 `cargo test cutting` pokrývá objem, uzavřenost, konkávní průřezy, komponenty,

@@ -32,6 +32,7 @@ pub struct TrackedController {
     frames: u32,
     ribbons: BTreeMap<u32, Vec<[Vec3; 2]>>,
     target_positions: BTreeMap<u32, Vec3>,
+    target_centers: BTreeMap<u32, Vec3>,
 }
 
 impl TrackedController {
@@ -77,6 +78,7 @@ impl TrackedController {
         }
         self.ribbons.clear();
         self.target_positions.clear();
+        self.target_centers.clear();
         self.previous = None;
         self.grip_speed = GripSpeed::default();
         self.anchor = None;
@@ -141,6 +143,8 @@ impl TrackedController {
         self.apply(scene, id, sample);
         scene.sample_blade_trail(id, sample.endpoints, dt);
         scene.release_fragment_blade(id, sample.endpoints, !pressed);
+        let previous_centers =
+            std::mem::replace(&mut self.target_centers, Self::contact_centers(scene));
         let target_positions = std::mem::replace(
             &mut self.target_positions,
             scene
@@ -203,7 +207,14 @@ impl TrackedController {
         let contact_response = scene.blade_contact_response(id);
         if assisted && translation < 1e-6 && angle < 1e-6 {
             if contact_response {
-                scene.blade_contacts(id, previous.pose, sample.pose, &target_positions, dt);
+                scene.blade_contacts(
+                    id,
+                    previous.pose,
+                    sample.pose,
+                    (&target_positions, &previous_centers),
+                    dt,
+                );
+                self.target_centers = Self::contact_centers(scene);
             }
             self.ribbons.clear();
             self.record(scene, sample);
@@ -340,7 +351,14 @@ impl TrackedController {
             && angle < 1e-5
             && scene.settle_shallow_blade_cuts(id, &target_positions);
         if !assisted || contact_response {
-            scene.blade_contacts(id, previous.pose, sample.pose, &target_positions, dt);
+            scene.blade_contacts(
+                id,
+                previous.pose,
+                sample.pose,
+                (&target_positions, &previous_centers),
+                dt,
+            );
+            self.target_centers = Self::contact_centers(scene);
         }
         if settled {
             self.ribbons
@@ -351,6 +369,22 @@ impl TrackedController {
         Ok(report)
     }
 
+    fn contact_centers(scene: &SceneManager) -> BTreeMap<u32, Vec3> {
+        scene
+            .triangle_meshes()
+            .iter()
+            .map(|(&id, mesh)| {
+                let center = mesh.mesh.contact_center();
+                (
+                    id,
+                    scene.objects()[&id]
+                        .transform
+                        .model()
+                        .transform_point3(center),
+                )
+            })
+            .collect()
+    }
     fn record(&mut self, scene: &SceneManager, sample: Sample) {
         self.record_interpolated(scene, sample, &BTreeMap::new(), 1., None);
     }
@@ -1106,6 +1140,78 @@ mod tests {
             assert!(scene.projectile_contacts > 0);
             assert!(scene.projectile_velocity(target).unwrap().dot(direction) > 0.);
         }
+    }
+
+    #[test]
+    fn xr_input_blade_contact_tips_off_center_landings_in_both_directions() {
+        for side in [-1., 1.] {
+            let (mut scene, mut controller, target, _) = physical_setup();
+            scene.set_cuttable(target, false, Vec3::ONE).unwrap();
+            scene.set_object_position(target, Vec3::new(side * 0.08, 1.25, -0.5));
+            scene.set_projectile(target, -Vec3::Y, 9.81, 0.);
+            for _ in 0..20 {
+                scene.update(1. / 90.);
+                controller
+                    .update_timed(
+                        &mut scene,
+                        Some(Mat4::from_translation(Vec3::Y)),
+                        true,
+                        1. / 90.,
+                    )
+                    .unwrap();
+            }
+            let rotation = scene.objects()[&target].transform.rotation;
+            assert!(scene.projectile_contacts > 0);
+            assert!(
+                rotation.z * side < -0.08,
+                "side={side}, rotation={rotation:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn xr_input_blade_support_replaces_authored_spin_and_release_keeps_physical_rotation() {
+        let (mut scene, mut controller, target, _) = physical_setup();
+        scene.set_cuttable(target, false, Vec3::ONE).unwrap();
+        scene.set_object_position(target, Vec3::new(0., 1.25, -0.5));
+        scene.set_projectile(target, -Vec3::Y * 0.1, 9.81, 0.);
+        scene.set_object_spin(target, Vec3::Y * 6.);
+        let mut previous = Vec3::ZERO;
+        for frame in 0..270 {
+            scene.update(1. / 90.);
+            controller
+                .update_timed(
+                    &mut scene,
+                    Some(Mat4::from_translation(Vec3::Y)),
+                    true,
+                    1. / 90.,
+                )
+                .unwrap();
+            let rotation = scene.objects()[&target].transform.rotation;
+            if frame == 260 {
+                previous = rotation;
+            }
+        }
+        let rotation = scene.objects()[&target].transform.rotation;
+        assert!(
+            (rotation - previous).length() < 0.01,
+            "spin must settle: {previous:?} -> {rotation:?}"
+        );
+        assert!(scene.objects()[&target].transform.position.y > 1.19);
+        assert!(scene.projectile_contacts > 100);
+        // A fresh explicit spin command resets contact angular state (pool recycling).
+        controller
+            .update_timed(&mut scene, None, true, 1. / 90.)
+            .unwrap();
+        scene.update(0.05);
+        assert!(
+            (scene.objects()[&target].transform.rotation - rotation).length() < 0.01,
+            "tracking loss must not restore the authored spin"
+        );
+        scene.set_object_spin(target, Vec3::Z);
+        let before = scene.objects()[&target].transform.rotation;
+        scene.update(0.05);
+        assert!((scene.objects()[&target].transform.rotation.z - before.z - 0.05).abs() < 1e-5);
     }
 
     #[test]

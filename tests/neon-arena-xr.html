@@ -3,6 +3,7 @@
 <canvas id="gpu-canvas"></canvas><button id="enter"></button><button id="exit" hidden></button><button id="shoot"></button><span id="cuts">0</span><p id="status">Inicializace…</p><pre id="result">RUNNING</pre>
 <figure><figcaption>Skutečné obrazy obou očí v simulovaném XR: prostředí a prostorové panely</figcaption><canvas id="stereo" style="width:100%;height:auto"></canvas></figure>
 <figure><figcaption>Skutečný zásah: neonový výboj a rozříznuté kusy</figcaption><canvas id="hit" style="width:100%;height:auto"></canvas></figure>
+<figure><figcaption>Ovoce fyzicky opřené o plochu meče</figcaption><canvas id="support" style="width:100%;height:auto"></canvas></figure>
 <figure><figcaption>Aktuální trojice a předchozí výhra +120</figcaption><canvas id="cut-evidence" style="width:100%;height:auto"></canvas></figure>
 <figure><figcaption>Konec kola: skóre a čas uvnitř scény</figcaption><canvas id="score" style="width:100%;height:auto"></canvas></figure><ol id="checks"></ol>
 <script type="module">
@@ -211,6 +212,36 @@ const report=await run.execute(async test=>{
     test.assert(incoming.exists&&!reports.some(report=>report.removed.includes(incoming.id)),'a held sword rebounds incoming fruit without inventing a stationary cut');
     test.assert(engine.projectileContacts()>oldContacts&&incoming.meshInfo.position[0]>nearest+.08,'real fruit reverses direction after hitting the stationary blade flat');
     incoming.remove();
+    const supportPose={...held,controllers:{...held.controllers,
+        right:{position:[.45,1.1,-.3],orientation:[0,0,Math.SQRT1_2,Math.SQRT1_2],pressed:false}}};
+    sim.frame(supportPose);
+    const supported=engine.scene.createMesh(world.fruits.find(f=>f.name==='watermelon').geometry)
+        .setPosition([.45,1.52,-.9]).setScale([.13,.13,.13]).setEmission(1.1)
+        .projectile([0,-.1,0],{gravity:8,bounce:0}).spin([0,3,0]);
+    const supportContacts=engine.projectileContacts();let settledRotation;
+    for(let i=0;i<180;i++){
+        sim.frame(supportPose);
+        if(i===140)settledRotation=supported.meshInfo.rotation;
+    }
+    const supportInfo=supported.meshInfo;
+    test.assert(engine.projectileContacts()>supportContacts&&Math.abs(supportInfo.bottom-1.104)<.035,
+        'real production fruit lands and stays on the finite horizontal sword surface');
+    test.assert(supportInfo.rotation.every((v,i)=>Math.abs(v-settledRotation[i])<.03),
+        'support friction stops the authored spin instead of replaying the base rotation');
+    snapshot('support');
+    test.report.evidence.supportPng=document.getElementById('support').toDataURL();
+    const supportLeft=sim.pixels('left'),supportRight=sim.pixels('right');
+    supported.remove();sim.frame(supportPose);
+    test.assert(pixelDifference(supportLeft,sim.pixels('left'),2)>10&&pixelDifference(supportRight,sim.pixels('right'),2)>10,
+        'supported fruit is visibly rendered in both simulated XR eyes');
+    const tipping=engine.scene.createMesh(world.fruits.find(f=>f.name==='watermelon').geometry)
+        .setPosition([.53,1.43,-.9]).setScale([.13,.13,.13]).setEmission(1.1)
+        .projectile([0,-.1,0],{gravity:8,bounce:0});
+    const tippingContacts=engine.projectileContacts();
+    for(let i=0;i<48;i++)sim.frame(supportPose);
+    test.assert(engine.projectileContacts()>tippingContacts&&tipping.meshInfo.rotation.some(v=>Math.abs(v)>.08),
+        'an off-center landing generates physical rotation even without an authored spin');
+    tipping.remove();sim.frame(held);
     const debris=engine.scene.createMesh(world.fruits[3].geometry).setPosition([.45,1.4,-.9])
         .setScale([.12,.12,.12]).setColorCutout(.25).setEmission(1.1)
         .projectile([0,-.02,0],{gravity:0,bounce:.6});

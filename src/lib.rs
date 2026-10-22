@@ -1,6 +1,7 @@
 pub mod blade_physics;
 pub mod collision;
 pub mod combo_display;
+mod contact_shape;
 pub mod cutting;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod cutting_bench;

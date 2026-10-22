@@ -267,7 +267,7 @@ pub struct SceneManager {
     cutters: BTreeMap<u32, [Vec3; 2]>,
     blade_physics: BTreeMap<u32, crate::blade_physics::BladePhysics>,
     blade_cut_states: BTreeMap<u32, BladeCutState>,
-    blade_body_radii: BTreeMap<u32, (Vec3, f32)>,
+    contact_angular: BTreeMap<u32, Vec3>,
     cutting_index: crate::spatial::Bvh,
     cutting_swings: BTreeMap<u32, (Vec3, Vec3, f32)>,
     cutting_scatter: BTreeMap<u32, CutScatter>,
@@ -476,6 +476,7 @@ impl SceneManager {
         if !self.object_exists(id) || !radians_per_second.is_finite() {
             return false;
         }
+        self.contact_angular.remove(&id);
         if radians_per_second == Vec3::ZERO {
             self.spins.remove(&id);
         } else {
@@ -496,6 +497,7 @@ impl SceneManager {
         if gravity == 0.0 && velocity == Vec3::ZERO {
             self.blade_cut_states.remove(&id);
             self.projectiles.remove(&id);
+            self.contact_angular.remove(&id);
         } else {
             self.projectiles.insert(id, (velocity, gravity, bounce));
         }
@@ -1206,9 +1208,10 @@ impl SceneManager {
         id: u32,
         from: glam::Mat4,
         to: glam::Mat4,
-        previous_targets: &BTreeMap<u32, Vec3>,
+        history: (&BTreeMap<u32, Vec3>, &BTreeMap<u32, Vec3>),
         dt: f32,
     ) {
+        let (previous_targets, previous_centers) = history;
         let Some(config) = self.blade_physics(id) else {
             return;
         };
@@ -1257,29 +1260,8 @@ impl SceneManager {
             };
             let object = &self.objects[&target];
             let (min, max) = mesh.mesh.bounds();
-            let local_center = (min + max) * 0.5;
+            let local_center = mesh.mesh.contact_center();
             let center = object.transform.model().transform_point3(local_center);
-            // Cache the enclosing radius of actual vertices around the authored
-            // bounds center. Lazy GPU-resident meshes keep the conservative
-            // bounds fallback without forcing geometry readback/materialization.
-            let radius = self
-                .blade_body_radii
-                .entry(target)
-                .or_insert_with(|| {
-                    let scale = object.transform.scale;
-                    let radius = mesh.mesh.geometry_cpu().map_or_else(
-                        || ((max - min) * 0.5 * scale.abs()).length(),
-                        |cpu| {
-                            cpu.positions
-                                .iter()
-                                .map(|p| ((*p - local_center) * scale).length_squared())
-                                .fold(0., f32::max)
-                                .sqrt()
-                        },
-                    );
-                    (scale, radius)
-                })
-                .1;
             let old = previous_targets
                 .get(&target)
                 .copied()
@@ -1287,39 +1269,85 @@ impl SceneManager {
             if old.distance(object.transform.position) > 0.75 {
                 continue;
             }
-            let old_center = center + old - object.transform.position;
-            if let Some((resolved, velocity)) = crate::blade_physics::contact(
-                config,
-                blade.map(|p| p * scale),
-                from,
-                to,
-                old_center,
-                center,
-                radius,
-                Some((
-                    glam::Quat::from_euler(
-                        glam::EulerRot::YXZ,
-                        object.transform.rotation.y,
-                        object.transform.rotation.x,
-                        object.transform.rotation.z,
-                    ),
-                    (max - min) * 0.5 * object.transform.scale.abs(),
-                )),
+            let old_center = previous_centers
+                .get(&target)
+                .copied()
+                .unwrap_or(center + old - object.transform.position);
+            let rotation = glam::Quat::from_euler(
+                glam::EulerRot::YXZ,
+                object.transform.rotation.y,
+                object.transform.rotation.x,
+                object.transform.rotation.z,
+            );
+            let spin = self.spins.get(&target).copied().unwrap_or(Vec3::ZERO);
+            let yaw = glam::Quat::from_rotation_y(object.transform.rotation.y);
+            let pitch = glam::Quat::from_rotation_x(object.transform.rotation.x);
+            let angular = self.contact_angular.get(&target).copied().unwrap_or(
+                Vec3::Y * spin.y + yaw * Vec3::X * spin.x + (yaw * pitch) * Vec3::Z * spin.z,
+            );
+            let velocity = if self.contact_angular.contains_key(&target) {
+                velocity
+            } else {
+                // Authored spin was about the pivot; physical velocity belongs to COM.
+                velocity + angular.cross(center - object.transform.position)
+            };
+            let result = if let Some(shape) = mesh.mesh.contact_shape() {
+                crate::blade_physics::contact_shape(
+                    config,
+                    scaled_blade,
+                    from,
+                    to,
+                    old_center,
+                    center,
+                    shape,
+                    rotation,
+                    object.transform.scale,
+                    velocity,
+                    angular,
+                    bounce,
+                    dt,
+                    assisted_contacts,
+                    self.tracked_cut_eligible(target, id),
+                )
+            } else {
+                // Experimental GPU-resident cuts must not force a CPU readback.
+                let half = (max - min) * 0.5 * object.transform.scale.abs();
+                crate::blade_physics::contact(
+                    config,
+                    scaled_blade,
+                    from,
+                    to,
+                    old_center,
+                    center,
+                    half.length(),
+                    Some((rotation, half)),
+                    velocity,
+                    bounce,
+                    dt,
+                    assisted_contacts,
+                    self.tracked_cut_eligible(target, id),
+                )
+                .map(|(center, velocity)| crate::blade_physics::BodyContact {
+                    center,
+                    velocity,
+                    angular,
+                })
+            };
+            if let Some(crate::blade_physics::BodyContact {
+                center: resolved,
                 velocity,
-                bounce,
-                dt,
-                assisted_contacts,
-                self.tracked_cut_eligible(target, id),
-            ) {
+                angular,
+            }) = result
+            {
                 let velocity = if assisted_contacts {
                     velocity.clamp_length_max(8.)
                 } else {
                     velocity
                 };
-                updates.push((target, resolved - center, velocity));
+                updates.push((target, resolved - center, velocity, angular));
             }
         }
-        for (target, delta, velocity) in updates {
+        for (target, delta, velocity, angular) in updates {
             // Keep scheduled fruit alive while held; finished fragments retain
             // their original expiry. Release restarts the existing 3s cleanup.
             if !self.cut_fragments.contains_key(&target)
@@ -1335,6 +1363,8 @@ impl SceneManager {
                 }
             }
             self.projectiles.get_mut(&target).unwrap().0 = velocity;
+            self.spins.remove(&target);
+            self.contact_angular.insert(target, angular);
             let position = self.objects[&target].transform.position + delta;
             self.set_object_position(target, position);
             self.projectile_contacts = self.projectile_contacts.saturating_add(1);
@@ -1991,15 +2021,25 @@ impl SceneManager {
         if ribbons.is_some() {
             for &source in &report.removed {
                 let object = &self.objects[&source];
-                // The original projectile velocity belongs to its authored pivot.
+                // Authored spin uses the pivot, contact angular velocity uses COM.
                 // Preserve the instantaneous rigid velocity at each new center.
                 let center = object.transform.position;
                 let spin = self.spins.get(&source).copied().unwrap_or(Vec3::ZERO);
                 // spins stores YXZ Euler rates; convert their instantaneous axes to world space.
                 let yaw = glam::Quat::from_rotation_y(object.transform.rotation.y);
                 let pitch = glam::Quat::from_rotation_x(object.transform.rotation.x);
-                let omega =
-                    Vec3::Y * spin.y + yaw * Vec3::X * spin.x + (yaw * pitch) * Vec3::Z * spin.z;
+                let physical_angular = self.contact_angular.get(&source).copied();
+                let motion_center = if physical_angular.is_some() {
+                    object
+                        .transform
+                        .model()
+                        .transform_point3(self.triangle_meshes[&source].mesh.contact_center())
+                } else {
+                    center
+                };
+                let omega = physical_angular.unwrap_or(
+                    Vec3::Y * spin.y + yaw * Vec3::X * spin.x + (yaw * pitch) * Vec3::Z * spin.z,
+                );
                 let edge_speed = self
                     .blade_cut_states
                     .get(&source)
@@ -2015,7 +2055,16 @@ impl SceneManager {
                 let ancestor = self.cut_fragments.get(&source).copied();
                 fragment_motion.insert(
                     source,
-                    (center, spin, omega, speed, direction_sum / mass, ancestor),
+                    (
+                        center,
+                        spin,
+                        omega,
+                        speed,
+                        direction_sum / mass,
+                        ancestor,
+                        physical_angular,
+                        motion_center,
+                    ),
                 );
             }
         }
@@ -2045,8 +2094,17 @@ impl SceneManager {
         {
             let mut fragment = None;
             let mut inherited_spin = None;
-            if let Some(&(source_center, spin, omega, speed, mean_direction, ancestor)) =
-                fragment_motion.get(&source)
+            let mut inherited_angular = None;
+            if let Some(&(
+                source_center,
+                spin,
+                omega,
+                speed,
+                mean_direction,
+                ancestor,
+                physical_angular,
+                motion_center,
+            )) = fragment_motion.get(&source)
             {
                 let center = piece.recenter();
                 // Rebase the pivot without changing any world vertex, apart from the tiny kerf.
@@ -2054,12 +2112,13 @@ impl SceneManager {
                     transform.model().transform_vector3(center) - mean_direction * separation * 0.5;
                 let offset = transform.position
                     - (direction - mean_direction) * separation * 0.5
-                    - source_center;
+                    - motion_center;
                 let velocity = projectile.map_or(Vec3::ZERO, |body| body.0)
                     + omega.cross(offset)
                     + (direction - mean_direction) * speed;
                 projectile = Some((velocity, 9.81, 0.));
                 inherited_spin = Some(spin);
+                inherited_angular = physical_angular;
                 let radius = piece
                     .positions
                     .iter()
@@ -2100,6 +2159,10 @@ impl SceneManager {
             }
             if let Some(spin) = inherited_spin {
                 self.set_object_spin(id, spin);
+            }
+            if let Some(angular) = inherited_angular {
+                self.spins.remove(&id);
+                self.contact_angular.insert(id, angular);
             }
             report.pieces.push(id);
             report.piece_directions.push(direction);
@@ -2236,7 +2299,7 @@ impl SceneManager {
         self.cutters.clear();
         self.blade_physics.clear();
         self.blade_cut_states.clear();
-        self.blade_body_radii.clear();
+        self.contact_angular.clear();
         self.cutting_swings.clear();
         self.cutting_scatter.clear();
         self.cutting_guide = None;
@@ -2285,7 +2348,7 @@ impl SceneManager {
         self.blade_physics.remove(&id);
         self.release_blade_cuts(id, false);
         self.blade_cut_states.remove(&id);
-        self.blade_body_radii.remove(&id);
+        self.contact_angular.remove(&id);
         self.cutting_swings.remove(&id);
         self.cutting_scatter.remove(&id);
         if self
@@ -2331,9 +2394,6 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        if object.transform.scale != scale {
-            self.blade_body_radii.remove(&id);
-        }
         object.transform = transform;
         object.refresh_render_data();
         self.cutting_swings.remove(&id);
@@ -2383,9 +2443,6 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        if object.transform.scale != scale {
-            self.blade_body_radii.remove(&id);
-        }
         object.transform.scale = scale;
         object.refresh_render_data();
         self.cutting_scatter.remove(&id);
@@ -2631,6 +2688,23 @@ impl SceneManager {
             }
             elapsed < rotation.duration
         });
+        for (&id, &angular) in &self.contact_angular {
+            if self.blade_cut_states.get(&id).is_some_and(|s| s.jammed) {
+                continue;
+            }
+            if let Some(object) = self.objects.get_mut(&id) {
+                let r = object.transform.rotation;
+                let previous = glam::Quat::from_euler(glam::EulerRot::YXZ, r.y, r.x, r.z);
+                let q = (glam::Quat::from_scaled_axis(angular * dt) * previous).normalize();
+                if let Some(mesh) = self.triangle_meshes.get(&id) {
+                    let offset = mesh.mesh.contact_center() * object.transform.scale;
+                    object.transform.position += previous * offset - q * offset;
+                }
+                let (y, x, z) = q.normalize().to_euler(glam::EulerRot::YXZ);
+                object.transform.rotation = Vec3::new(x, y, z);
+                // Projectile integration below refreshes render data after both changes.
+            }
+        }
         for (id, velocity) in &self.spins {
             if self.blade_cut_states.get(id).is_some_and(|s| s.jammed) {
                 continue;
@@ -2698,6 +2772,13 @@ mod tests {
 
     #[test]
     fn xr_input_cut_fragments_keep_world_geometry_and_rigid_motion() {
+        cut_fragments_keep_world_geometry_and_rigid_motion(false);
+    }
+    #[test]
+    fn xr_input_cut_after_blade_contact_preserves_com_momentum_and_rotation() {
+        cut_fragments_keep_world_geometry_and_rigid_motion(true);
+    }
+    fn cut_fragments_keep_world_geometry_and_rigid_motion(physical: bool) {
         use super::*;
         let mut scene = SceneManager::default();
         let mesh = apple();
@@ -2716,6 +2797,10 @@ mod tests {
         let spin = Vec3::new(0., 0., 0.8);
         scene.set_projectile(source, velocity, 9.81, 0.);
         scene.set_object_spin(source, spin);
+        if physical {
+            scene.spins.remove(&source);
+            scene.contact_angular.insert(source, spin);
+        }
         let cutter = scene.add_cube(Vec3::ZERO);
         scene
             .set_cutter(cutter, Some([Vec3::ZERO, Vec3::Z]))
@@ -2750,7 +2835,12 @@ mod tests {
             volume += mass;
             weighted_velocity += scene.projectiles[&id].0 * mass as f32;
             weighted_position += scene.objects[&id].transform.position * mass as f32;
-            assert_eq!(scene.spins[&id], spin);
+            if physical {
+                assert_eq!(scene.contact_angular[&id], spin);
+                assert!(!scene.spins.contains_key(&id));
+            } else {
+                assert_eq!(scene.spins[&id], spin);
+            }
             assert!(scene.triangle_meshes[&id].cuttable);
             // Every retained original vertex stays within the 1.5mm kerf.
             let model = scene.objects[&id].transform.model();
@@ -2767,7 +2857,11 @@ mod tests {
         assert!((volume - source_volume).abs() < 1e-5);
         let com = root + source_centroid * scale;
         assert!((weighted_position / volume as f32 - com).length() < 1e-5);
-        let expected = velocity + spin.cross(com - root);
+        let expected = if physical {
+            velocity
+        } else {
+            velocity + spin.cross(com - root)
+        };
         assert!((weighted_velocity / volume as f32 - expected).length() < 1e-5);
         let axis = report.piece_directions[1];
         let initial_gap = (initial[1] - initial[0]).dot(axis);
@@ -3385,7 +3479,10 @@ mod shared_mesh_variant_tests {
         let third = scene.add_mesh_variant(handle, 1).unwrap();
         assert!(scene.triangle_meshes[&second].mesh.ready_cpu().is_none());
         assert!(scene.triangle_meshes[&third].mesh.ready_cpu().is_none());
-        assert!(scene.triangle_meshes[&second].mesh.geometry_cpu().is_some());
+        assert!(scene.triangle_meshes[&second]
+            .mesh
+            .contact_shape()
+            .is_some());
         assert_eq!(
             scene.triangle_meshes[&second]
                 .mesh
