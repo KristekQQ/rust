@@ -21,6 +21,8 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
+    { name: 'gltf-material-cache', path: 'tests/gltf-material-cache.html', status: '#result' },
     { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify' },
     { name: 'neon-robot', path: 'examples/neon-robot/?verify=1', status: '#result', button: '#verify' },
     { name: 'postprocess-fusion', path: 'tests/postprocess-fusion.html', status: '#result' },
@@ -482,6 +484,8 @@ try {
             const expected = backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
             if (result.actualBackend !== expected) throw new Error(`Requested ${backend}, observed ${result.actualBackend || 'unknown'}; fallback is not a pass`);
             if (errors.length) throw new Error(errors.join('\n'));
+            if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);
+            if (suite.name === 'gltf-material-cache') result.materialCacheEvidence = await page.evaluate(() => window.materialCacheEvidence);
             if (suite.name === 'postprocess-fusion') {
                 result.pixelEvidence = await page.evaluate(() => window.fusionEvidence.map(({png,...item})=>item));
                 if (capture) for (const item of await page.evaluate(() => window.fusionEvidence)) {

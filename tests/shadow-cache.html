@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Static shadow cache invalidation</title>
+<canvas id="gpu-canvas" width="384" height="384"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {assertForeground, assertChanged} from './pixels.js';
+const canvas = document.querySelector('canvas');
+const nativeRAF = requestAnimationFrame.bind(window), nativeCancel = cancelAnimationFrame.bind(window);
+let id = 0, time = 0;
+const callbacks = new Map();
+window.requestAnimationFrame = callback => { callbacks.set(++id, callback); return id; };
+window.cancelAnimationFrame = handle => callbacks.delete(handle);
+let engine;
+try {
+    engine = await initEngine(canvas, {backend: new URLSearchParams(location.search).get('backend') || 'auto'});
+    document.documentElement.dataset.rendererBackend = engine.renderer_backend();
+    engine.resize(384, 384);
+    engine.set_render_effects(true, false);
+    engine.set_grid_visible(false);
+    engine.set_light_helpers_visible(false);
+    engine.scene.clear();
+    engine.set_simulation_paused(true);
+    engine.setCameraView([4, 4, 6], [0, 0, 0]);
+    engine.scene.createLight({position: [-3, 6, 3], color: [1, .7, .6]});
+    engine.scene.createLight({position: [4, 5, 0], color: [.4, .6, 1]});
+    engine.scene.createLight({position: [0, 7, -4], color: [.6, 1, .5]});
+    const caster = engine.scene.createCube([0, 0, 0]).setRenderOptions({isStatic: true, castsShadow: true});
+    const marker = engine.scene.createCube([0, -10000, 0]).setRenderOptions({isStatic: true, castsShadow: false});
+    // Drive exactly one engine frame per command, like the XR locomotion marker.
+    const frame = async () => {
+        await new Promise(nativeRAF);
+        time += 1000 / 90;
+        const pending = [...callbacks.values()]; callbacks.clear();
+        for (const callback of pending) callback(time);
+    };
+    const snapshot = () => {
+        const copy = document.createElement('canvas'); copy.width = 384; copy.height = 384;
+        const context = copy.getContext('2d'); context.drawImage(canvas, 0, 0);
+        return context.getImageData(0, 0, 384, 384);
+    };
+    for (let i = 0; i < 3; i++) await frame();
+    const before = engine.effects_stats(), firstPixels = snapshot();
+    assertForeground(firstPixels, 'Static shadow caster');
+    for (let i = 0; i < 20; i++) { marker.setPosition([0, -10000, 0]); await frame(); }
+    const after = engine.effects_stats();
+    const noopStaticUpdates = after.staticUpdates - before.staticUpdates;
+    if (before.staticUpdates !== 3) throw Error('Three initial static shadow maps must be rendered');
+    if (noopStaticUpdates !== 0) throw Error(`Identical hidden marker position caused ${noopStaticUpdates} static shadow redraws`);
+    // Actual geometry changes must still refresh every light and visible pixels.
+    caster.setPosition([1, 0, 0]); await frame();
+    const moved = engine.effects_stats();
+    if (moved.staticUpdates - after.staticUpdates !== 3) throw Error('Actual caster movement did not refresh three shadow maps');
+    assertChanged(firstPixels, snapshot(), 'Static caster movement');
+    window.shadowCacheEvidence = {before, after, moved, noopStaticUpdates, movedStaticUpdates: moved.staticUpdates - after.staticUpdates};
+    document.querySelector('#result').textContent = 'PASS: 20 identical marker commands reuse shadows; moving the caster refreshes three maps and actual pixels';
+} catch (error) {
+    document.querySelector('#result').textContent = 'FAIL: ' + error.stack;
+    console.error(error);
+} finally {
+    engine?.dispose(); window.requestAnimationFrame = nativeRAF; window.cancelAnimationFrame = nativeCancel;
+}
+</script></html>

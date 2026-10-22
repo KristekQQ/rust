@@ -124,6 +124,14 @@ každého oka nelze automaticky převzít z minulého snímku. Další reuse (na
 render bundles na podporovaném backendu) vybírej podle měření a konkrétních
 závislostí, ne pouze podle označení scény jako statické.
 
+Transformační příkazy se stejnou pozicí/rotací/scale nesmějí zvyšovat render/static
+revision ani obnovovat geometrii. Příkaz však nadále ruší příslušný fyzikální pohyb;
+není možné ho přeskočit celý. Typický případ je skrytý statický XR teleport marker:
+stejná pozice každý frame dříve znovu vykreslovala statické stíny všech světel.
+Regrese `shadow-cache` ověřuje nulové obnovy při 20 stejných příkazech, skutečnou
+obnovu tří map po pohybu a změnu pixelů na obou backendech. Nativní test ověřuje
+všechny čtyři transform setters včetně zachování rušení pohybu a validace.
+
 ## Logické efekty a fyzické průchody
 
 `postprocessing.graph()` nadále ukazuje závislosti efektů (`ssr.trace`,

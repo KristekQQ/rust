@@ -2404,11 +2404,18 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform = transform;
-        object.refresh_render_data();
+        let transform_changed = object.transform.position != position
+            || object.transform.rotation != rotation
+            || object.transform.scale != scale;
+        if transform_changed {
+            object.transform = transform;
+            object.refresh_render_data();
+        }
         self.cutting_swings.remove(&id);
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
@@ -2426,11 +2433,16 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform.position = position;
-        object.refresh_render_data();
+        let transform_changed = object.transform.position != position;
+        if transform_changed {
+            object.transform.position = position;
+            object.refresh_render_data();
+        }
         self.cutting_swings.remove(&id);
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn set_object_rotation(&mut self, id: u32, rotation: Vec3) -> bool {
@@ -2440,10 +2452,15 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform.rotation = rotation;
-        object.refresh_render_data();
+        let transform_changed = object.transform.rotation != rotation;
+        if transform_changed {
+            object.transform.rotation = rotation;
+            object.refresh_render_data();
+        }
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn set_object_scale(&mut self, id: u32, scale: Vec3) -> bool {
@@ -2453,10 +2470,15 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform.scale = scale;
-        object.refresh_render_data();
+        let transform_changed = object.transform.scale != scale;
+        if transform_changed {
+            object.transform.scale = scale;
+            object.refresh_render_data();
+        }
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn add_light(&mut self, position: Vec3, color: Vec3) -> Option<u32> {
@@ -3192,6 +3214,86 @@ mod tests {
             (scene.objects[&a].transform.position - scene.objects[&b].transform.position).length()
                 >= 0.874 - 1e-4
         );
+    }
+    #[test]
+    fn identical_transform_commands_preserve_render_caches_and_cancel_motion() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(0., -10000., 0.));
+        scene.set_render_options(
+            id,
+            RenderOptions {
+                is_static: true,
+                casts_shadow: false,
+                ..RenderOptions::default()
+            },
+        );
+        assert!(scene.set_box_collider(id, Vec3::splat(0.5), Vec3::ZERO));
+        let transform = scene.objects[&id].transform;
+        let revisions = (scene.render_revision(), scene.static_revision());
+        for command in 0..4 {
+            scene.collision_dirty = false;
+            scene.cutting_swings.insert(id, (Vec3::ZERO, Vec3::ONE, 0.));
+            scene.cutting_scatter.insert(
+                id,
+                CutScatter {
+                    start: transform,
+                    pivot: Vec3::ZERO,
+                    direction: Vec3::X,
+                    angular: Vec3::ZERO,
+                    floor_y: -10001.,
+                    distance: 1.,
+                    duration: 1.,
+                    elapsed: 0.,
+                },
+            );
+            assert!(match command {
+                0 => scene.set_object_position(id, transform.position),
+                1 => scene.set_object_rotation(id, transform.rotation),
+                2 => scene.set_object_scale(id, transform.scale),
+                _ => scene.set_object_transform(
+                    id,
+                    transform.position,
+                    transform.rotation,
+                    transform.scale
+                ),
+            });
+            assert_eq!(
+                (scene.render_revision(), scene.static_revision()),
+                revisions
+            );
+            assert!(!scene.collision_dirty);
+            assert!(!scene.cutting_scatter.contains_key(&id));
+            assert_eq!(
+                scene.cutting_swings.contains_key(&id),
+                command == 1 || command == 2
+            );
+        }
+        assert!(!scene.set_object_position(id, Vec3::splat(f32::NAN)));
+        assert!(!scene.set_object_rotation(id, Vec3::splat(f32::INFINITY)));
+        assert!(!scene.set_object_scale(id, Vec3::ZERO));
+        assert!(!scene.set_object_transform(id, Vec3::ZERO, Vec3::ZERO, Vec3::ZERO));
+        assert!(!scene.set_object_position(INVALID_ID, Vec3::ZERO));
+        assert_eq!(
+            (scene.render_revision(), scene.static_revision()),
+            revisions
+        );
+        for command in 0..4 {
+            scene.collision_dirty = false;
+            let before = (scene.render_revision(), scene.static_revision());
+            assert!(match command {
+                0 => scene.set_object_position(id, transform.position + Vec3::X * 0.1),
+                1 => scene.set_object_rotation(id, Vec3::Y * 0.1),
+                2 => scene.set_object_scale(id, Vec3::splat(2.)),
+                _ => scene.set_object_transform(
+                    id,
+                    transform.position,
+                    transform.rotation,
+                    transform.scale
+                ),
+            });
+            assert_ne!((scene.render_revision(), scene.static_revision()), before);
+            assert!(scene.collision_dirty);
+        }
     }
     #[test]
     fn static_revision_invalidates_only_when_static_geometry_changes() {

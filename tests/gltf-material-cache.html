@@ -1,0 +1,58 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>glTF material pipeline cache</title>
+<canvas id="gpu-canvas" width="640" height="480"></canvas><pre id="result">RUNNING…</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground} from './pixels.js';
+const canvas=document.querySelector('#gpu-canvas'),result=document.querySelector('#result');
+const files=['drone-orbiter-pink','blade-wraith-green','core-tank-amber'];
+const variants=['neon-enemies'];
+let recording=false,pipelineCreations=0,shaderCreations=0;
+// Stable animated frames must reuse compiled material variants.
+if(globalThis.GPUDevice){
+ for(const method of ['createRenderPipeline','createRenderPipelineAsync','createShaderModule']){
+  const original=GPUDevice.prototype[method];
+  if(original)GPUDevice.prototype[method]=function(...args){
+   if(recording){if(method==='createShaderModule')shaderCreations++;else pipelineCreations++;}
+   return original.apply(this,args);
+  };
+ }
+}
+const poses=['Idle','Run','Attack','Attack2','Attack3','Attack4','Explode','Assemble'].flatMap(clip=>[.23,.61].map(fraction=>({clip,fraction})));
+window.materialCacheEvidence={comparisons:[],metrics:[],images:[]};
+try{
+ const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto',profiling:true});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+ engine.setBackgroundColor([.008,.014,.032]);engine.postprocessing.enable('bloom',{strength:.42});
+ const lights=()=>{engine.scene.createLight({position:[-6,10,-3],color:[.40,.66,.95]});engine.scene.createLight({position:[8,7,-14],color:[.75,.18,.42]});engine.scene.createLight({position:[-3,9,-28],color:[.22,.45,.62]});engine.scene.createLight({position:[0,5,7],color:[.34,.40,.52]});};
+ const png=p=>{const c=document.createElement('canvas');c.width=p.width;c.height=p.height;c.getContext('2d').putImageData(p,0,0);return c.toDataURL('image/png').split(',')[1];};
+ for(const file of files){
+   engine.scene.clear();lights();engine.setCameraView([.7,2.0,6],[0,1.4,0]);engine.set_simulation_paused(true);
+   
+   for(const [v,variant]of variants.entries()){
+     const model=await engine.scene.loadModel(`../assets/models/${variant}/${file}.glb`);engine.set_simulation_paused(true);
+     for(const [i,{clip,fraction}]of poses.entries()){
+       const duration=model.info.animations.find(a=>a.name===clip).duration;
+       model.playAnimation(clip,{loop:false}).pauseAnimation().seekAnimation(duration*fraction);
+       const pixels=await capturePixels(canvas);assertForeground(pixels,`${file}/${clip}`);
+       window.materialCacheEvidence.images.push({name:`${file}-${clip}-${fraction}`,png:png(pixels)});
+     }
+     model.remove();
+   }
+ }
+ // Stable animated models must reuse the material shader/pipeline variants.
+ engine.scene.clear();lights();engine.setCameraView([0,2,7],[0,1.4,0]);
+ for(const [i,file]of files.entries())(await engine.scene.loadModel(`../assets/models/neon-enemies/${file}.glb`)).setPosition([(i-1)*3,0,0]).playAnimation('Idle',{loop:true});
+ engine.set_simulation_paused(false);
+ for(let i=0;i<10;i++)await new Promise(requestAnimationFrame);
+ recording=true;pipelineCreations=0;shaderCreations=0;
+ for(let i=0;i<100;i++)await new Promise(requestAnimationFrame);
+ recording=false;
+ window.materialCacheEvidence.metrics.push({gpuInstrumentation:engine.renderer_backend()==='BrowserWebGpu',pipelineCreations,shaderCreations,render:engine.debugStats()});
+ const measured=window.materialCacheEvidence.metrics[0];
+ if(engine.renderer_backend()==='BrowserWebGpu'&&(measured.pipelineCreations||measured.shaderCreations))throw new Error(`Steady animation recompiles ${measured.pipelineCreations} pipelines / ${measured.shaderCreations} shaders.`);
+ result.textContent=`PASS: ${window.materialCacheEvidence.images.length} deterministic poses; ${measured.render.mainDrawCalls} draws; ${measured.gpuInstrumentation?'0 shader / 0 pipeline creations over 100 animated frames':'WebGL animation and pixels; compilation instrumentation requires WebGPU'}.`;
+
+
+}catch(error){result.textContent=`FAIL: ${error.stack??error}`;console.error(error);}
+</script></html>

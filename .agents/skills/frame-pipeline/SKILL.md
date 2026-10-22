@@ -47,6 +47,15 @@ diagnostics and selects established effects. This is not an arbitrary WGSL edito
   results as views change; choose render bundles or other reuse only where the
   backend supports it and measurements justify it. Keep current batch boundaries
   until shared uniform writes have been audited or given independent ranges.
+- Identical transform commands must preserve render/static revisions and cached
+  geometry, while retaining their documented cancellation of physical motion.
+  `shadow-cache` checks repeated hidden XR-marker commands and real caster movement
+  on both backends; never skip a whole setter before its motion-cancellation logic.
+- glTF shader variants use actual map presence and an explicit clip-plane key.
+  OPAQUE main views may omit discard; MASK/BLEND, clipped views and shadow coverage
+  must retain it. Preserve fallback texel values and derivative/TBN behavior.
+  `gltf-material-cache` also guards zero shader/pipeline creation during stable animation;
+  use `gltf-full` and `gltf-sdk` for textured PBR, alpha, skinning and auxiliary passes.
 - Keep scene finalization after controller mutations and before either eye. Adding
   a profiler scope must not change simulation stepping or force GPU readback waits.
 - Main view cache identity is desktop 0 / XR left 1 / right 2. Keep auxiliary

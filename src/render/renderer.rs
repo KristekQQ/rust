@@ -1435,6 +1435,7 @@ impl SceneRenderer {
         let gltf_key = super::gltf_gpu::PipelineKey {
             format: wgpu::TextureFormat::Rgba8Unorm,
             depth_format: target.format,
+            clipped: false,
             reflected: false,
             material_mask: false,
             packed_depth: false,
@@ -1618,6 +1619,7 @@ impl SceneRenderer {
         let gltf_key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
             depth_format: target.depth_format,
+            clipped: reflected,
             reflected: self.passes[self.active_cache]
                 .key
                 .is_some_and(|k| k.0.determinant() < 0.0),
@@ -2214,6 +2216,7 @@ impl SceneRenderer {
         let key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
             depth_format: target.depth_format,
+            clipped: false,
             reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
             material_mask: false,
             packed_depth: false,

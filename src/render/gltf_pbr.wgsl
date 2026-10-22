@@ -76,14 +76,26 @@ struct Output { @builtin(position) pos:vec4<f32>, @location(0) world:vec3<f32>, 
 @vertex fn vs_main(v:Input)->Output { var o:Output; o.pos=scene.view_projection*vec4(v.position,1.0); o.world=v.position; o.normal=v.normal; o.tangent=v.tangent; o.uv0=v.uv0; o.uv1=v.uv1; o.uv2=v.uv2; o.uv3=v.uv3; o.uv4=v.uv4; o.color=v.color; return o; }
 fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }
 fn linear_color(c:vec3<f32>)->vec3<f32> { return select(c/12.92,pow((c+vec3(0.055))/1.055,vec3(2.4)),c>vec3(0.04045)); }
-fn base_color(v:Output)->vec4<f32> { let t=textureSample(base_map,base_sampler,v.uv0); return t*material.base*v.color; }
+// Rust specializes these sample expressions by actual map presence. Keep the
+// fallback normal decoder and complete derivative/TBN path in surface unchanged.
+fn sample_base(uv:vec2<f32>)->vec4<f32> { return textureSample(base_map,base_sampler,uv); }
+fn sample_mr(uv:vec2<f32>)->vec4<f32> { return textureSample(mr_map,mr_sampler,uv); }
+fn sample_normal(uv:vec2<f32>)->vec4<f32> { return textureSample(normal_map,normal_sampler,uv); }
+fn sample_ao(uv:vec2<f32>)->vec4<f32> { return textureSample(ao_map,ao_sampler,uv); }
+fn sample_emissive(uv:vec2<f32>)->vec4<f32> { return textureSample(emissive_map,emissive_sampler,uv); }
+fn base_color(v:Output)->vec4<f32> { let t=sample_base(v.uv0); return t*material.base*v.color; }
 fn alpha_test(alpha:f32) { if(material.extra.y==1.0 && alpha<material.extra.x) { discard; } }
+// Only the opaque, unclipped color variant omits this call. Shadow alpha tests
+// remain separate so their material coverage is never specialized away.
+fn surface_alpha_clip(v:Output,alpha:f32) {
+    alpha_test(alpha);
+    if(effects.params.z>0.5 && dot(effects.clip_plane,vec4(v.world,1.0)) < -0.001) { discard; }
+}
 fn unit(v:vec3<f32>)->vec3<f32> { return v*inverseSqrt(max(dot(v,v),0.000000000001)); }
 fn surface(v:Output,front:bool)->vec4<f32> {
     let p1=dpdx(v.world); let p2=dpdy(v.world); let u1=dpdx(v.uv2); let u2=dpdy(v.uv2);
-    let base=base_color(v); let emission=textureSample(emissive_map,emissive_sampler,v.uv4).rgb*material.emissive.rgb;
-    alpha_test(base.a);
-    if(effects.params.z>0.5 && dot(effects.clip_plane,vec4(v.world,1.0)) < -0.001) { discard; }
+    let base=base_color(v); let emission=sample_emissive(v.uv4).rgb*material.emissive.rgb;
+    surface_alpha_clip(v,base.a);
     if(material.extra.w>0.5) { return vec4(base.rgb+emission,base.a); }
     var n=unit(v.normal); let view=unit(scene.camera_pos-v.world);
     if(material.options.w>0.5) {
@@ -95,7 +107,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
     }
     // Screen-space handedness differs between LH main and reflected passes.
     if(material.extra.z>0.5 && dot(n,view)<0.0) { n=-n; }
-    let mapped=textureSample(normal_map,normal_sampler,v.uv2).xyz*2.0-vec3(1.0);
+    let mapped=sample_normal(v.uv2).xyz*2.0-vec3(1.0);
     let scaled=vec3(mapped.xy*material.factors.z,mapped.z);
     var t=unit(v.tangent.xyz-n*dot(n,v.tangent.xyz));
     var b=cross(n,t)*v.tangent.w;
@@ -105,9 +117,9 @@ fn surface(v:Output,front:bool)->vec4<f32> {
         else { t=unit(cross(select(vec3(0.0,1.0,0.0),vec3(1.0,0.0,0.0),abs(n.y)>0.9),n)); b=cross(n,t); }
     }
     n=unit(t*scaled.x+b*scaled.y+n*scaled.z);
-    let mr=textureSample(mr_map,mr_sampler,v.uv1);
+    let mr=sample_mr(v.uv1);
     let metallic=clamp(material.factors.x*mr.b,0.0,1.0); let rough=max(0.045,material.factors.y*mr.g);
-    let ao=mix(1.0,textureSample(ao_map,ao_sampler,v.uv3).r,material.factors.w);
+    let ao=mix(1.0,sample_ao(v.uv3).r,material.factors.w);
     let f0=mix(vec3(0.04),base.rgb,metallic); let nv=max(dot(n,view),0.0001); let a=rough*rough; let a2=a*a;
     var color=base.rgb*(1.0-metallic)*0.1*ao;
     for(var i=0u;i<LIGHT_COUNT;i++) {

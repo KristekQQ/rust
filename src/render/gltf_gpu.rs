@@ -37,6 +37,7 @@ struct Uniform {
 }
 struct Material {
     textures: wgpu::BindGroup,
+    texture_mask: u8,
     uniform: Uniform,
     alpha: AlphaMode,
     double_sided: bool,
@@ -65,6 +66,8 @@ pub struct PipelineKey {
     pub format: wgpu::TextureFormat,
     pub depth_format: wgpu::TextureFormat,
     pub reflected: bool,
+    // Clip-plane use is independent of winding (e.g. environment views).
+    pub clipped: bool,
     pub material_mask: bool,
     pub packed_depth: bool,
     pub shadow: bool,
@@ -72,6 +75,8 @@ pub struct PipelineKey {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Variant {
     key: PipelineKey,
+    texture_mask: u8,
+    opaque_unclipped: bool,
     topology: wgpu::PrimitiveTopology,
     blend: bool,
     double_sided: bool,
@@ -82,8 +87,8 @@ pub struct GltfGpu {
     effects: wgpu::BindGroupLayout,
     textures: wgpu::BindGroupLayout,
     material: wgpu::BindGroupLayout,
-    shader: wgpu::ShaderModule,
-    shadow: wgpu::ShaderModule,
+    // 32 map classes x (generic color, opaque unclipped color, shadow).
+    shaders: HashMap<(u8, bool, bool), wgpu::ShaderModule>,
     empty_layout: wgpu::BindGroupLayout,
     empty_bind: wgpu::BindGroup,
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
@@ -130,23 +135,6 @@ impl GltfGpu {
                 count: None,
             }],
         });
-        let source = include_str!("gltf_pbr.wgsl");
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("glTF PBR"),
-            source: wgpu::ShaderSource::Wgsl(source.into()),
-        });
-        let shadow_source = source
-            .replace(
-                "var<uniform> scene: SceneUniforms;",
-                "var<uniform> shadow_view: mat4x4<f32>;",
-            )
-            .replace("scene.view_projection", "shadow_view")
-            .replace("scene.camera_pos", "vec3(0.0)")
-            .replace("scene.lights[i]", "Light(vec3(0.0),0.0,vec3(0.0),0.0)");
-        let shadow = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("glTF masked shadow"),
-            source: wgpu::ShaderSource::Wgsl(shadow_source.into()),
-        });
         let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("glTF empty shadow effects"),
             entries: &[],
@@ -161,8 +149,7 @@ impl GltfGpu {
             effects: effects.clone(),
             textures,
             material,
-            shader,
-            shadow,
+            shaders: HashMap::new(),
             empty_layout,
             empty_bind,
             pipelines: HashMap::new(),
@@ -285,6 +272,9 @@ impl GltfGpu {
                     ]
                 })
                 .unwrap_or([None; 5]);
+            let texture_mask = slots.iter().enumerate().fold(0u8, |mask, (i, slot)| {
+                mask | if slot.is_some() { 1 << i } else { 0 }
+            });
             let mut views = Vec::new();
             let mut samplers = Vec::new();
             for (i, slot) in slots.iter().enumerate() {
@@ -515,6 +505,7 @@ impl GltfGpu {
             };
             materials.push(Material {
                 textures,
+                texture_mask,
                 uniform,
                 alpha,
                 double_sided,
@@ -672,6 +663,10 @@ impl GltfGpu {
             for negative in [false, true] {
                 let variant = Variant {
                     key,
+                    texture_mask: material.texture_mask,
+                    opaque_unclipped: material.alpha == AlphaMode::Opaque
+                        && !key.clipped
+                        && !key.shadow,
                     topology,
                     blend,
                     double_sided,
@@ -694,11 +689,22 @@ impl GltfGpu {
                     ],
                     immediate_size: 0,
                 });
-                let shader = if key.shadow {
-                    &self.shadow
-                } else {
-                    &self.shader
-                };
+                let shader = self
+                    .shaders
+                    .entry((material.texture_mask, key.shadow, variant.opaque_unclipped))
+                    .or_insert_with(|| {
+                        device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                            label: Some("glTF material-class shader"),
+                            source: wgpu::ShaderSource::Wgsl(
+                                material_shader_source(
+                                    material.texture_mask,
+                                    key.shadow,
+                                    variant.opaque_unclipped,
+                                )
+                                .into(),
+                            ),
+                        })
+                    });
                 let mut targets = Vec::new();
                 if !key.shadow {
                     targets.push(Some(wgpu::ColorTargetState {
@@ -838,6 +844,10 @@ impl GltfGpu {
             let material = &model.materials[draw.material];
             let variant = Variant {
                 key,
+                texture_mask: material.texture_mask,
+                opaque_unclipped: material.alpha == AlphaMode::Opaque
+                    && !key.clipped
+                    && !key.shadow,
                 topology: draw.topology,
                 blend,
                 double_sided: material.double_sided,
@@ -856,6 +866,47 @@ impl GltfGpu {
         }
         submitted
     }
+}
+// Replace sample expressions before compilation so absent maps incur no texture
+// operation on either backend. Raw fallback texels preserve the original decoder.
+fn material_shader_source(texture_mask: u8, shadow: bool, opaque_unclipped: bool) -> String {
+    let mut source = include_str!("gltf_pbr.wgsl").to_owned();
+    for (i, (sample, fallback)) in [
+        ("textureSample(base_map,base_sampler,uv)", "vec4<f32>(1.0)"),
+        ("textureSample(mr_map,mr_sampler,uv)", "vec4<f32>(1.0)"),
+        (
+            "textureSample(normal_map,normal_sampler,uv)",
+            "vec4<f32>(128.0/255.0,128.0/255.0,1.0,1.0)",
+        ),
+        ("textureSample(ao_map,ao_sampler,uv)", "vec4<f32>(1.0)"),
+        (
+            "textureSample(emissive_map,emissive_sampler,uv)",
+            "vec4<f32>(1.0)",
+        ),
+    ]
+    .iter()
+    .enumerate()
+    {
+        if texture_mask & (1 << i) == 0 {
+            source = source.replace(sample, fallback);
+        }
+    }
+    if opaque_unclipped && !shadow {
+        // Remove only the color entrypoints' discard call. fs_shadow continues
+        // to reach alpha_test and retains MASK/BLEND shadow coverage.
+        source = source.replace("    surface_alpha_clip(v,base.a);", "");
+    }
+    if shadow {
+        source = source
+            .replace(
+                "var<uniform> scene: SceneUniforms;",
+                "var<uniform> shadow_view: mat4x4<f32>;",
+            )
+            .replace("scene.view_projection", "shadow_view")
+            .replace("scene.camera_pos", "vec3(0.0)")
+            .replace("scene.lights[i]", "Light(vec3(0.0),0.0,vec3(0.0),0.0)");
+    }
+    source
 }
 pub fn draw_count(model: &GpuModel, blend: bool) -> usize {
     model

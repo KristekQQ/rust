@@ -26,6 +26,17 @@ Indexovaná i neindexovaná geometrie podporuje body, čáry, smyčky, stripy, t
 
 Osvětlení je přímé GGX/Smith/Schlick ze světel enginu a jednoduchá ambientní složka. Zatím není environment IBL ani HDR tonemapping; kovový model proto nemá stejné okolní odrazy jako prohlížeč s HDR panoramatem. `reflectivity` enginu je samostatná možnost pro stávající SSR/rovinný odraz.
 
+Shader varianty se sdílejí podle přítomných materiálových map (5bit maska), nikoli
+podle ID modelu. Chybějící mapy mají přímo konstanty odpovídající původním fallback
+texelům; normálová mapa zachovává přesně hodnotu 128/255, ne aproximaci 0.5.
+OPAQUE hlavní průchod bez clip roviny neobsahuje dosažitelný `discard`. MASK,
+BLEND, stíny a průchody s clip rovinou zachovávají původní testy. `clipped` je
+samostatný klíč, nezaměňovat s obráceným windingem (`reflected`). Shader moduly
+vznikají líně a sdílejí se mezi pipeline (nejvýše 32 × 3 tříd); nemění se každý frame.
+Ověření zahrnuje `gltf-full`, `gltf-sdk`, `gltf-material-cache` a `render-mirrored` na obou
+backendech. Změna kompilace může mírně změnit zaokrouhlení odlesků; pixelová
+shoda není zaručena. Desktop čas neprokazuje zrychlení na Questu.
+
 ## Hierarchie a animace
 
 Každý model má jedno ID scény a uvnitř Rustu vlastní strom uzlů, mesh primitiva, skiny a morph targety. Transformace handle mění kořen celého modelu. Klipy podporují translaci, quaternion rotaci, scale a morph weights; interpolace STEP, LINEAR (rotace SLERP) a CUBICSPLINE. Skinnování používá inverse bind matrices a všechny sady joint/weight vlivů. Nejprve se aplikuje morph, potom skin a transformace uzlu.

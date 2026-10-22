@@ -18148,6 +18148,7 @@ struct Uniform {
 }
 struct Material {
     textures: wgpu::BindGroup,
+    texture_mask: u8,
     uniform: Uniform,
     alpha: AlphaMode,
     double_sided: bool,
@@ -18176,6 +18177,8 @@ pub struct PipelineKey {
     pub format: wgpu::TextureFormat,
     pub depth_format: wgpu::TextureFormat,
     pub reflected: bool,
+    // Clip-plane use is independent of winding (e.g. environment views).
+    pub clipped: bool,
     pub material_mask: bool,
     pub packed_depth: bool,
     pub shadow: bool,
@@ -18183,6 +18186,8 @@ pub struct PipelineKey {
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Variant {
     key: PipelineKey,
+    texture_mask: u8,
+    opaque_unclipped: bool,
     topology: wgpu::PrimitiveTopology,
     blend: bool,
     double_sided: bool,
@@ -18193,8 +18198,8 @@ pub struct GltfGpu {
     effects: wgpu::BindGroupLayout,
     textures: wgpu::BindGroupLayout,
     material: wgpu::BindGroupLayout,
-    shader: wgpu::ShaderModule,
-    shadow: wgpu::ShaderModule,
+    // 32 map classes x (generic color, opaque unclipped color, shadow).
+    shaders: HashMap<(u8, bool, bool), wgpu::ShaderModule>,
     empty_layout: wgpu::BindGroupLayout,
     empty_bind: wgpu::BindGroup,
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
@@ -18241,23 +18246,6 @@ impl GltfGpu {
                 count: None,
             }],
         });
-        let source = include_str!("gltf_pbr.wgsl");
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("glTF PBR"),
-            source: wgpu::ShaderSource::Wgsl(source.into()),
-        });
-        let shadow_source = source
-            .replace(
-                "var<uniform> scene: SceneUniforms;",
-                "var<uniform> shadow_view: mat4x4<f32>;",
-            )
-            .replace("scene.view_projection", "shadow_view")
-            .replace("scene.camera_pos", "vec3(0.0)")
-            .replace("scene.lights[i]", "Light(vec3(0.0),0.0,vec3(0.0),0.0)");
-        let shadow = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("glTF masked shadow"),
-            source: wgpu::ShaderSource::Wgsl(shadow_source.into()),
-        });
         let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("glTF empty shadow effects"),
             entries: &[],
@@ -18272,8 +18260,7 @@ impl GltfGpu {
             effects: effects.clone(),
             textures,
             material,
-            shader,
-            shadow,
+            shaders: HashMap::new(),
             empty_layout,
             empty_bind,
             pipelines: HashMap::new(),
@@ -18396,6 +18383,9 @@ impl GltfGpu {
                     ]
                 })
                 .unwrap_or([None; 5]);
+            let texture_mask = slots.iter().enumerate().fold(0u8, |mask, (i, slot)| {
+                mask | if slot.is_some() { 1 << i } else { 0 }
+            });
             let mut views = Vec::new();
             let mut samplers = Vec::new();
             for (i, slot) in slots.iter().enumerate() {
@@ -18626,6 +18616,7 @@ impl GltfGpu {
             };
             materials.push(Material {
                 textures,
+                texture_mask,
                 uniform,
                 alpha,
                 double_sided,
@@ -18783,6 +18774,10 @@ impl GltfGpu {
             for negative in [false, true] {
                 let variant = Variant {
                     key,
+                    texture_mask: material.texture_mask,
+                    opaque_unclipped: material.alpha == AlphaMode::Opaque
+                        && !key.clipped
+                        && !key.shadow,
                     topology,
                     blend,
                     double_sided,
@@ -18805,11 +18800,22 @@ impl GltfGpu {
                     ],
                     immediate_size: 0,
                 });
-                let shader = if key.shadow {
-                    &self.shadow
-                } else {
-                    &self.shader
-                };
+                let shader = self
+                    .shaders
+                    .entry((material.texture_mask, key.shadow, variant.opaque_unclipped))
+                    .or_insert_with(|| {
+                        device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                            label: Some("glTF material-class shader"),
+                            source: wgpu::ShaderSource::Wgsl(
+                                material_shader_source(
+                                    material.texture_mask,
+                                    key.shadow,
+                                    variant.opaque_unclipped,
+                                )
+                                .into(),
+                            ),
+                        })
+                    });
                 let mut targets = Vec::new();
                 if !key.shadow {
                     targets.push(Some(wgpu::ColorTargetState {
@@ -18949,6 +18955,10 @@ impl GltfGpu {
             let material = &model.materials[draw.material];
             let variant = Variant {
                 key,
+                texture_mask: material.texture_mask,
+                opaque_unclipped: material.alpha == AlphaMode::Opaque
+                    && !key.clipped
+                    && !key.shadow,
                 topology: draw.topology,
                 blend,
                 double_sided: material.double_sided,
@@ -18967,6 +18977,47 @@ impl GltfGpu {
         }
         submitted
     }
+}
+// Replace sample expressions before compilation so absent maps incur no texture
+// operation on either backend. Raw fallback texels preserve the original decoder.
+fn material_shader_source(texture_mask: u8, shadow: bool, opaque_unclipped: bool) -> String {
+    let mut source = include_str!("gltf_pbr.wgsl").to_owned();
+    for (i, (sample, fallback)) in [
+        ("textureSample(base_map,base_sampler,uv)", "vec4<f32>(1.0)"),
+        ("textureSample(mr_map,mr_sampler,uv)", "vec4<f32>(1.0)"),
+        (
+            "textureSample(normal_map,normal_sampler,uv)",
+            "vec4<f32>(128.0/255.0,128.0/255.0,1.0,1.0)",
+        ),
+        ("textureSample(ao_map,ao_sampler,uv)", "vec4<f32>(1.0)"),
+        (
+            "textureSample(emissive_map,emissive_sampler,uv)",
+            "vec4<f32>(1.0)",
+        ),
+    ]
+    .iter()
+    .enumerate()
+    {
+        if texture_mask & (1 << i) == 0 {
+            source = source.replace(sample, fallback);
+        }
+    }
+    if opaque_unclipped && !shadow {
+        // Remove only the color entrypoints' discard call. fs_shadow continues
+        // to reach alpha_test and retains MASK/BLEND shadow coverage.
+        source = source.replace("    surface_alpha_clip(v,base.a);", "");
+    }
+    if shadow {
+        source = source
+            .replace(
+                "var<uniform> scene: SceneUniforms;",
+                "var<uniform> shadow_view: mat4x4<f32>;",
+            )
+            .replace("scene.view_projection", "shadow_view")
+            .replace("scene.camera_pos", "vec3(0.0)")
+            .replace("scene.lights[i]", "Light(vec3(0.0),0.0,vec3(0.0),0.0)");
+    }
+    source
 }
 pub fn draw_count(model: &GpuModel, blend: bool) -> usize {
     model
@@ -19101,14 +19152,26 @@ struct Output { @builtin(position) pos:vec4<f32>, @location(0) world:vec3<f32>, 
 @vertex fn vs_main(v:Input)->Output { var o:Output; o.pos=scene.view_projection*vec4(v.position,1.0); o.world=v.position; o.normal=v.normal; o.tangent=v.tangent; o.uv0=v.uv0; o.uv1=v.uv1; o.uv2=v.uv2; o.uv3=v.uv3; o.uv4=v.uv4; o.color=v.color; return o; }
 fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }
 fn linear_color(c:vec3<f32>)->vec3<f32> { return select(c/12.92,pow((c+vec3(0.055))/1.055,vec3(2.4)),c>vec3(0.04045)); }
-fn base_color(v:Output)->vec4<f32> { let t=textureSample(base_map,base_sampler,v.uv0); return t*material.base*v.color; }
+// Rust specializes these sample expressions by actual map presence. Keep the
+// fallback normal decoder and complete derivative/TBN path in surface unchanged.
+fn sample_base(uv:vec2<f32>)->vec4<f32> { return textureSample(base_map,base_sampler,uv); }
+fn sample_mr(uv:vec2<f32>)->vec4<f32> { return textureSample(mr_map,mr_sampler,uv); }
+fn sample_normal(uv:vec2<f32>)->vec4<f32> { return textureSample(normal_map,normal_sampler,uv); }
+fn sample_ao(uv:vec2<f32>)->vec4<f32> { return textureSample(ao_map,ao_sampler,uv); }
+fn sample_emissive(uv:vec2<f32>)->vec4<f32> { return textureSample(emissive_map,emissive_sampler,uv); }
+fn base_color(v:Output)->vec4<f32> { let t=sample_base(v.uv0); return t*material.base*v.color; }
 fn alpha_test(alpha:f32) { if(material.extra.y==1.0 && alpha<material.extra.x) { discard; } }
+// Only the opaque, unclipped color variant omits this call. Shadow alpha tests
+// remain separate so their material coverage is never specialized away.
+fn surface_alpha_clip(v:Output,alpha:f32) {
+    alpha_test(alpha);
+    if(effects.params.z>0.5 && dot(effects.clip_plane,vec4(v.world,1.0)) < -0.001) { discard; }
+}
 fn unit(v:vec3<f32>)->vec3<f32> { return v*inverseSqrt(max(dot(v,v),0.000000000001)); }
 fn surface(v:Output,front:bool)->vec4<f32> {
     let p1=dpdx(v.world); let p2=dpdy(v.world); let u1=dpdx(v.uv2); let u2=dpdy(v.uv2);
-    let base=base_color(v); let emission=textureSample(emissive_map,emissive_sampler,v.uv4).rgb*material.emissive.rgb;
-    alpha_test(base.a);
-    if(effects.params.z>0.5 && dot(effects.clip_plane,vec4(v.world,1.0)) < -0.001) { discard; }
+    let base=base_color(v); let emission=sample_emissive(v.uv4).rgb*material.emissive.rgb;
+    surface_alpha_clip(v,base.a);
     if(material.extra.w>0.5) { return vec4(base.rgb+emission,base.a); }
     var n=unit(v.normal); let view=unit(scene.camera_pos-v.world);
     if(material.options.w>0.5) {
@@ -19120,7 +19183,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
     }
     // Screen-space handedness differs between LH main and reflected passes.
     if(material.extra.z>0.5 && dot(n,view)<0.0) { n=-n; }
-    let mapped=textureSample(normal_map,normal_sampler,v.uv2).xyz*2.0-vec3(1.0);
+    let mapped=sample_normal(v.uv2).xyz*2.0-vec3(1.0);
     let scaled=vec3(mapped.xy*material.factors.z,mapped.z);
     var t=unit(v.tangent.xyz-n*dot(n,v.tangent.xyz));
     var b=cross(n,t)*v.tangent.w;
@@ -19130,9 +19193,9 @@ fn surface(v:Output,front:bool)->vec4<f32> {
         else { t=unit(cross(select(vec3(0.0,1.0,0.0),vec3(1.0,0.0,0.0),abs(n.y)>0.9),n)); b=cross(n,t); }
     }
     n=unit(t*scaled.x+b*scaled.y+n*scaled.z);
-    let mr=textureSample(mr_map,mr_sampler,v.uv1);
+    let mr=sample_mr(v.uv1);
     let metallic=clamp(material.factors.x*mr.b,0.0,1.0); let rough=max(0.045,material.factors.y*mr.g);
-    let ao=mix(1.0,textureSample(ao_map,ao_sampler,v.uv3).r,material.factors.w);
+    let ao=mix(1.0,sample_ao(v.uv3).r,material.factors.w);
     let f0=mix(vec3(0.04),base.rgb,metallic); let nv=max(dot(n,view),0.0001); let a=rough*rough; let a2=a*a;
     var color=base.rgb*(1.0-metallic)*0.1*ao;
     for(var i=0u;i<LIGHT_COUNT;i++) {
@@ -24432,6 +24495,7 @@ impl SceneRenderer {
         let gltf_key = super::gltf_gpu::PipelineKey {
             format: wgpu::TextureFormat::Rgba8Unorm,
             depth_format: target.format,
+            clipped: false,
             reflected: false,
             material_mask: false,
             packed_depth: false,
@@ -24615,6 +24679,7 @@ impl SceneRenderer {
         let gltf_key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
             depth_format: target.depth_format,
+            clipped: reflected,
             reflected: self.passes[self.active_cache]
                 .key
                 .is_some_and(|k| k.0.determinant() < 0.0),
@@ -25211,6 +25276,7 @@ impl SceneRenderer {
         let key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
             depth_format: target.depth_format,
+            clipped: false,
             reflected: cache.key.is_some_and(|k| k.0.determinant() < 0.0),
             material_mask: false,
             packed_depth: false,
@@ -29865,11 +29931,18 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform = transform;
-        object.refresh_render_data();
+        let transform_changed = object.transform.position != position
+            || object.transform.rotation != rotation
+            || object.transform.scale != scale;
+        if transform_changed {
+            object.transform = transform;
+            object.refresh_render_data();
+        }
         self.cutting_swings.remove(&id);
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn set_object_position(&mut self, id: u32, position: Vec3) -> bool {
@@ -29887,11 +29960,16 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform.position = position;
-        object.refresh_render_data();
+        let transform_changed = object.transform.position != position;
+        if transform_changed {
+            object.transform.position = position;
+            object.refresh_render_data();
+        }
         self.cutting_swings.remove(&id);
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn set_object_rotation(&mut self, id: u32, rotation: Vec3) -> bool {
@@ -29901,10 +29979,15 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform.rotation = rotation;
-        object.refresh_render_data();
+        let transform_changed = object.transform.rotation != rotation;
+        if transform_changed {
+            object.transform.rotation = rotation;
+            object.refresh_render_data();
+        }
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn set_object_scale(&mut self, id: u32, scale: Vec3) -> bool {
@@ -29914,10 +29997,15 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
-        object.transform.scale = scale;
-        object.refresh_render_data();
+        let transform_changed = object.transform.scale != scale;
+        if transform_changed {
+            object.transform.scale = scale;
+            object.refresh_render_data();
+        }
         self.cutting_scatter.remove(&id);
-        self.changed(id);
+        if transform_changed {
+            self.changed(id);
+        }
         true
     }
     pub fn add_light(&mut self, position: Vec3, color: Vec3) -> Option<u32> {
@@ -30653,6 +30741,86 @@ mod tests {
             (scene.objects[&a].transform.position - scene.objects[&b].transform.position).length()
                 >= 0.874 - 1e-4
         );
+    }
+    #[test]
+    fn identical_transform_commands_preserve_render_caches_and_cancel_motion() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(0., -10000., 0.));
+        scene.set_render_options(
+            id,
+            RenderOptions {
+                is_static: true,
+                casts_shadow: false,
+                ..RenderOptions::default()
+            },
+        );
+        assert!(scene.set_box_collider(id, Vec3::splat(0.5), Vec3::ZERO));
+        let transform = scene.objects[&id].transform;
+        let revisions = (scene.render_revision(), scene.static_revision());
+        for command in 0..4 {
+            scene.collision_dirty = false;
+            scene.cutting_swings.insert(id, (Vec3::ZERO, Vec3::ONE, 0.));
+            scene.cutting_scatter.insert(
+                id,
+                CutScatter {
+                    start: transform,
+                    pivot: Vec3::ZERO,
+                    direction: Vec3::X,
+                    angular: Vec3::ZERO,
+                    floor_y: -10001.,
+                    distance: 1.,
+                    duration: 1.,
+                    elapsed: 0.,
+                },
+            );
+            assert!(match command {
+                0 => scene.set_object_position(id, transform.position),
+                1 => scene.set_object_rotation(id, transform.rotation),
+                2 => scene.set_object_scale(id, transform.scale),
+                _ => scene.set_object_transform(
+                    id,
+                    transform.position,
+                    transform.rotation,
+                    transform.scale
+                ),
+            });
+            assert_eq!(
+                (scene.render_revision(), scene.static_revision()),
+                revisions
+            );
+            assert!(!scene.collision_dirty);
+            assert!(!scene.cutting_scatter.contains_key(&id));
+            assert_eq!(
+                scene.cutting_swings.contains_key(&id),
+                command == 1 || command == 2
+            );
+        }
+        assert!(!scene.set_object_position(id, Vec3::splat(f32::NAN)));
+        assert!(!scene.set_object_rotation(id, Vec3::splat(f32::INFINITY)));
+        assert!(!scene.set_object_scale(id, Vec3::ZERO));
+        assert!(!scene.set_object_transform(id, Vec3::ZERO, Vec3::ZERO, Vec3::ZERO));
+        assert!(!scene.set_object_position(INVALID_ID, Vec3::ZERO));
+        assert_eq!(
+            (scene.render_revision(), scene.static_revision()),
+            revisions
+        );
+        for command in 0..4 {
+            scene.collision_dirty = false;
+            let before = (scene.render_revision(), scene.static_revision());
+            assert!(match command {
+                0 => scene.set_object_position(id, transform.position + Vec3::X * 0.1),
+                1 => scene.set_object_rotation(id, Vec3::Y * 0.1),
+                2 => scene.set_object_scale(id, Vec3::splat(2.)),
+                _ => scene.set_object_transform(
+                    id,
+                    transform.position,
+                    transform.rotation,
+                    transform.scale
+                ),
+            });
+            assert_ne!((scene.render_revision(), scene.static_revision()), before);
+            assert!(scene.collision_dirty);
+        }
     }
     #[test]
     fn static_revision_invalidates_only_when_static_geometry_changes() {
