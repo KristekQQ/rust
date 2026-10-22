@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opička · Modelář · Rust engine</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111b21;color:#f4e6cf;font:15px/1.6 system-ui}main{height:100dvh;display:grid;grid-template-columns:1fr 300px}canvas{width:100%;height:100%;min-width:0;min-height:0;display:block;touch-action:none}aside{padding:32px 24px;background:#1a282b;overflow:auto;border-left:1px solid #334847}h1{font-size:36px;line-height:1.1;margin:20px 0 12px}p{color:#bdc8bd}small{color:#97b3a1;letter-spacing:.12em}a{color:#e4bc79}button,.download{display:inline-block;padding:10px 14px;border:1px solid #617b69;border-radius:8px;background:#304b3c;color:#fff0cd;font:inherit;cursor:pointer;margin:0 0 10px;text-decoration:none}button:hover,.download:hover{background:#40624d}:focus-visible{outline:3px solid #f5ce8a;outline-offset:3px}#result{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:650px){main{height:auto;grid-template-columns:1fr;grid-template-rows:65dvh auto}aside{border-left:0;border-top:1px solid #334847;padding:20px}h1{font-size:28px}}
+</style>
+<main>
+<canvas id="gpu-canvas" tabindex="0" aria-label="Prostorový model hnědé opičky s mávající rukou"></canvas>
+<aside>
+<a href="../">← Ukázky</a>
+<h1>Ahoj, opičko.</h1>
+<small>MODELOVAL MODELÁŘ</small>
+<p>Velké uši, zvídavé oči a zatočený ocas. Originální prostorový model s animací mávání.</p>
+<p>Tažením myši otáčej pohled, kolečkem přibližuj. Prohlédni si ji i zezadu.</p>
+<button id="animation" disabled>Pozastavit mávání</button><br>
+<button id="front" disabled>Zepředu</button>
+<button id="back" disabled>Zezadu</button><br>
+<a class="download" href="../../assets/models/monkey/monkey.glb" download="monkey.glb">Stáhnout GLB ↓</a>
+<p id="status" role="status">Načítám opičku…</p>
+<details><summary>Ověření vykreslení</summary><button id="verify">Ověřit model</button><pre id="result">Připravuji…</pre></details>
+</aside>
+</main>
+<script type="module" src="main.js"></script>
+</html>

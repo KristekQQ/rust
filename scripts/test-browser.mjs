@@ -21,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },
     { name: 'neon-font-preview', path: 'examples/neon-font-preview/', status: '#result', button: '#verify' },
     { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
