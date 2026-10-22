@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 #[path = "cut_feedback.rs"]
 pub(crate) mod cut_feedback;
+#[path = "font3d.rs"]
+mod font3d;
 #[path = "numeric_font.rs"]
 mod numeric_font;
 
@@ -259,6 +261,7 @@ struct BoxCollider {
 pub struct SceneManager {
     feedback: cut_feedback::Feedback,
     numeric_font: numeric_font::NumericFont,
+    font3d: font3d::Font3D,
     objects: BTreeMap<u32, SceneObject>,
     triangle_meshes: BTreeMap<u32, TriangleObject>,
     pub(crate) mesh_variants: BTreeMap<u32, MeshVariants>,
@@ -2296,6 +2299,7 @@ impl SceneManager {
         self.mesh_variants.clear();
         self.info_panels.clear();
         self.numeric_font = Default::default();
+        self.font3d = Default::default();
         self.cutters.clear();
         self.blade_physics.clear();
         self.blade_cut_states.clear();
@@ -2329,6 +2333,12 @@ impl SceneManager {
         self.paused = false;
     }
     pub fn remove_object(&mut self, id: u32) -> bool {
+        // Glyph instances belong to their text root. Root cleanup removes the
+        // binding first, then uses this same path to release each instance.
+        if self.font3d.children.contains(&id) {
+            return false;
+        }
+        self.remove_font3d_text(id);
         self.remove_numeric_panel(id);
         self.remove_blade_trail_binding(id);
         let was_static = self

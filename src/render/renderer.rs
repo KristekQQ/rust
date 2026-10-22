@@ -662,12 +662,14 @@ impl SceneRenderer {
         self.imported_meshes.insert(id, mesh);
         Ok(id)
     }
-    /// Prewarm canonical glyph buffers only when a numeric library was created.
+    /// Upload new shared numeric or general-font glyph assets before any pass.
     pub fn sync_numeric_font_meshes(&mut self) {
         self.scene.sync_numeric_font();
+        self.scene.sync_font3d();
         if self
             .scene
             .numeric_font_assets()
+            .chain(self.scene.font3d_assets())
             .any(|id| !self.variant_colors.contains_key(id))
         {
             self.sync_triangle_meshes();
@@ -775,6 +777,7 @@ impl SceneRenderer {
     pub fn sync_triangle_meshes(&mut self) {
         let _cpu_scope = super::profiler::cpu_scope("mesh.sync");
         self.scene.sync_numeric_font();
+        self.scene.sync_font3d();
         // New meshes are immutable per stable ID. Upload only once; all passes share
         // the same existing imported-mesh path, bounds and cache invalidation.
         for (&handle, asset) in &self.scene.mesh_variants {
@@ -1224,6 +1227,11 @@ impl SceneRenderer {
         let stats = self.render_stats();
         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
         serde_json::json!({
+            "font3d": {
+                "runtime": self.scene.font3d_stats(),
+                "geometryBytes": self.scene.font3d_assets().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+                "instanceGeometryBytes": self.scene.font3d_children().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+            },
             "numericFont": {
                 "glyphMeshes": self.scene.numeric_font_stats().0,
                 "liveGlyphs": self.scene.numeric_font_stats().1,

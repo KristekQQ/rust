@@ -42,6 +42,7 @@ pub struct InfoPanel {
     pub mesh: ImportedMesh,
     pub dirty: bool,
     pub(crate) revision: u64,
+    pub(crate) font3d_bound: bool,
     rows: Vec<(&'static str, String)>,
 }
 impl InfoPanel {
@@ -88,6 +89,7 @@ impl InfoPanel {
             mesh: geometry(kind, width, height, &rows),
             dirty: true,
             revision: 0,
+            font3d_bound: false,
             rows,
         })
     }
@@ -124,7 +126,9 @@ impl InfoPanel {
         if matches!(self.kind, PanelKind::Text | PanelKind::NumericText) || rows == self.rows {
             return false;
         }
-        self.mesh = geometry(self.kind, self.width, self.height, &rows);
+        if !self.font3d_bound {
+            self.mesh = geometry(self.kind, self.width, self.height, &rows);
+        }
         self.rows = rows;
         self.dirty = true;
         self.revision = self.revision.wrapping_add(1);
@@ -943,10 +947,31 @@ fn numeric_geometry(width: f32, height: f32, value: &str) -> ImportedMesh {
 }
 impl InfoPanel {
     pub(crate) fn numeric(&self) -> bool {
-        matches!(
+        self.font3d_bound
+            || matches!(
+                self.kind,
+                PanelKind::Countdown | PanelKind::Score | PanelKind::NumericText
+            )
+    }
+    pub(crate) fn set_font3d_bound(&mut self, bound: bool) {
+        self.font3d_bound = bound;
+        if !bound {
+            self.mesh = geometry(self.kind, self.width, self.height, &self.rows);
+            self.dirty = true;
+        }
+    }
+    pub(crate) fn font3d_value(&self) -> Result<&str, String> {
+        if !matches!(
             self.kind,
-            PanelKind::Countdown | PanelKind::Score | PanelKind::NumericText
-        )
+            PanelKind::Countdown
+                | PanelKind::Score
+                | PanelKind::NumericText
+                | PanelKind::ComboAward
+                | PanelKind::DebugText
+        ) {
+            return Err("Font binding requires a single-value text panel".into());
+        }
+        Ok(self.rows.first().map_or("", |row| row.1.as_str()))
     }
     pub(crate) fn numeric_layout(&self) -> Vec<(u8, f32, f32, f32)> {
         numeric_layout(

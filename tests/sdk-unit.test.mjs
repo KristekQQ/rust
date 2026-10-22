@@ -132,6 +132,75 @@ function response(bytes = new Uint8Array([1]), url = '') {
     }) };
 }
 
+test('3D font handles forward layout and lifetime commands to Rust', async () => {
+    const {Scene,Font3D,Text3D}=await sdk(),calls=[];
+    let value='AAA';
+    const wasm={
+        register_font3d:json=>{calls.push(['font',JSON.parse(json)]);return 20;},
+        builtin_font3d:name=>{calls.push(['builtin',name]);return 21;},
+        font3d_info:id=>JSON.stringify({name:'Test',characters:'A ',registered:true,cachedGlyphs:1}),
+        add_font3d_text:(font,text,json)=>{calls.push(['text',font,text,JSON.parse(json)]);return 30;},
+        font3d_text_info:id=>JSON.stringify({text:value,glyphCount:3}),
+        update_font3d_text:(id,text,json)=>{value=text;calls.push(['update',id,text,JSON.parse(json)]);},
+        set_object_position:(...args)=>{calls.push(['position',...args]);return true;},
+        remove_font3d:id=>{calls.push(['removeFont',id]);return true;},
+        remove_object:id=>{calls.push(['removeText',id]);return true;},
+        bind_info_panel_font3d:(...args)=>calls.push(['panelFont',...args]),
+    };
+    const scene=new Scene(wasm),data={font:'Test',depth:.13,glyphs:{}};
+    const font=scene.registerFont3D(data);assert(font instanceof Font3D);assert.equal(font.id,20);
+    const text=font.createText('AAA',{size:2,align:'left',position:[1,2,3]});
+    assert(text instanceof Text3D);assert.equal(text.id,30);
+    assert.deepEqual(calls[1],['text',20,'AAA',{size:2,align:'left'}]);
+    assert.deepEqual(calls[2],['position',30,1,2,3]);
+    text.setText('A A').setOptions({color:[0,1,1],sideIntensity:.32});
+    assert.deepEqual(calls.at(-1),['update',30,'A A',{color:[0,1,1],sideIntensity:.32}]);
+    assert.equal(font.info.name,'Test');assert.equal(text.info.text,'A A');
+    font.remove();text.remove();assert.deepEqual(calls.slice(-2),[['removeFont',20],['removeText',30]]);
+    assert.equal(scene.builtinFont3D().id,21);assert.deepEqual(calls.at(-1),['builtin','pixel']);
+    text.setFont3D(font,{sideIntensity:.32});
+    assert.deepEqual(calls.at(-1),['panelFont',30,20,'{"sideIntensity":0.32}']);
+    text.setFont3D(null);assert.deepEqual(calls.at(-1),['panelFont',30,0xffffffff,'{}']);
+    assert.throws(()=>text.setFont3D(new Font3D({},99)),/stejnému enginu/);
+    const before=calls.length;
+    assert.throws(()=>font.createText('A',{position:[NaN,0,0]}),/pozice/);
+    assert.equal(calls.length,before,'Invalid position must not allocate text');
+    wasm.set_object_position=()=>false;
+    assert.throws(()=>font.createText('A',{position:[1e30,0,0]}));
+    assert.deepEqual(calls.at(-1),['removeText',30],'Rust transform rejection releases the allocated root');
+});
+
+test('3D font streaming cancels on scene clear and does not register late data', async t => {
+    environment(t);let registered=0,cancelled=false;
+    const started=deferred();
+    const body=new ReadableStream({start(){started.resolve();},cancel(){cancelled=true;}});
+    globalThis.fetch=async()=>({ok:true,headers:new Headers(),body});
+    const {Scene}=await sdk();
+    const scene=new Scene({scene_object_count:()=>0,clear_all(){},register_font3d(){registered++;return 1;}});
+    const pending=scene.loadFont3D('/slow-font.json');
+    const rejected=assert.rejects(pending,/zrušeno/);
+    await started.promise;
+    // Let fetch resolve and the reader subscribe before cancelling the scene.
+    await new Promise(resolve=>setImmediate(resolve));
+    scene.clear();await rejected;
+    assert(cancelled);assert.equal(registered,0);
+});
+
+test('3D font loader enforces byte budget and preserves decoder/transport errors', async t => {
+    environment(t);let registered=0,cancelled=0;
+    const {Scene}=await sdk();
+    const scene=new Scene({scene_object_count:()=>0,register_font3d:()=>{registered++;return 8;}});
+    globalThis.fetch=async()=>({ok:true,headers:new Headers({'content-length':String(17*1024*1024)}),body:{cancel:async()=>cancelled++}});
+    await assert.rejects(scene.loadFont3D('/large.json'),/velký/);assert.equal(cancelled,1);
+    globalThis.fetch=async()=>response(new Uint8Array([0xff]));
+    await assert.rejects(scene.loadFont3D('/invalid-utf8.json'));
+    assert.equal(registered,0);
+    const data='{ "font":"UTF-8 ž", "glyphs":{} }';let received;
+    globalThis.fetch=async()=>response(new TextEncoder().encode(data));
+    const valid=new Scene({scene_object_count:()=>0,register_font3d:json=>{received=json;return 9;}});
+    assert.equal((await valid.loadFont3D('/font.json')).id,9);assert.equal(received,data);
+});
+
 test('character command resolves clip names, validates parameters and preserves runtime ownership', async t => {
     const canvas = environment(t);
     const calls = [];

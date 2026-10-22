@@ -1000,6 +1000,42 @@ pub fn add_info_panel(kind: &str, width: f32, height: f32) -> Result<u32, JsValu
     })
 }
 
+/// Bind an existing native single-value panel; INVALID_ID restores its legacy font.
+#[wasm_bindgen]
+pub fn bind_info_panel_font3d(panel: u32, font: u32, options_json: &str) -> Result<(), JsValue> {
+    cutting_command(|s| s.bind_info_panel_font3d(panel, font, options_json))
+}
+
+/// Register a validated closed-mesh glyph library.
+#[wasm_bindgen]
+pub fn register_font3d(json: &str) -> Result<u32, JsValue> {
+    cutting_command(|s| s.register_font3d(json))
+}
+#[wasm_bindgen]
+pub fn builtin_font3d(name: &str) -> Result<u32, JsValue> {
+    cutting_command(|s| s.builtin_font3d(name))
+}
+#[wasm_bindgen]
+pub fn font3d_info(id: u32) -> Result<String, JsValue> {
+    cutting_command(|s| s.font3d_info(id))
+}
+#[wasm_bindgen]
+pub fn remove_font3d(id: u32) -> bool {
+    cutting_command(|s| Ok(s.remove_font3d(id))).unwrap_or(false)
+}
+#[wasm_bindgen]
+pub fn add_font3d_text(font: u32, text: &str, options_json: &str) -> Result<u32, JsValue> {
+    cutting_command(|s| s.add_font3d_text(font, text, options_json))
+}
+#[wasm_bindgen]
+pub fn update_font3d_text(id: u32, text: &str, options_json: &str) -> Result<(), JsValue> {
+    cutting_command(|s| s.update_font3d_text(id, text, options_json))
+}
+#[wasm_bindgen]
+pub fn font3d_text_info(id: u32) -> Result<String, JsValue> {
+    cutting_command(|s| s.font3d_text_info(id))
+}
+
 /// Static numeric tube inscription, sharing cached digit meshes with native HUDs.
 #[wasm_bindgen]
 pub fn add_numeric_text(value: &str, width: f32, height: f32) -> Result<u32, JsValue> {

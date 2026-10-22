@@ -20,13 +20,16 @@ struct Panel {
 }
 impl SceneManager {
     pub(crate) fn is_numeric_panel(&self, id: u32) -> bool {
-        self.info_panels.get(&id).is_some_and(|p| p.numeric())
+        self.font3d.texts.contains_key(&id)
+            || self.info_panels.get(&id).is_some_and(|p| p.numeric())
     }
     pub(crate) fn is_numeric_glyph(&self, id: u32) -> bool {
         self.numeric_font.children.contains(&id)
     }
     pub(crate) fn is_text_object(&self, id: u32) -> bool {
-        self.info_panels.contains_key(&id) || self.numeric_font.children.contains(&id)
+        self.info_panels.contains_key(&id)
+            || self.numeric_font.children.contains(&id)
+            || self.font3d.children.contains(&id)
     }
     #[cfg(target_arch = "wasm32")]
     pub(crate) fn numeric_font_digit(&self, handle: u32) -> Option<u8> {
@@ -70,7 +73,7 @@ impl SceneManager {
     }
     /// Glyph instances share immutable render-only topology. They do not consume
     /// the scene's per-object cutting budget or enter the public cuttable API.
-    fn add_numeric_glyph_instance(&mut self, handle: u32) -> Result<u32, String> {
+    pub(super) fn add_numeric_glyph_instance(&mut self, handle: u32) -> Result<u32, String> {
         let mesh = self
             .mesh_variants
             .get(&handle)
@@ -106,7 +109,9 @@ impl SceneManager {
             let next = self
                 .info_panels
                 .iter()
-                .find(|(id, p)| p.numeric() && cursor.is_none_or(|previous| **id > previous))
+                .find(|(id, p)| {
+                    p.numeric() && !p.font3d_bound && cursor.is_none_or(|previous| **id > previous)
+                })
                 .map(|(&id, _)| id);
             let Some(id) = next else {
                 break;

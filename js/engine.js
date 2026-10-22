@@ -79,6 +79,15 @@ export class SceneObject {
     }
     /** Vertex-color emission, 0..8; primitive and triangle meshes. @param {number} intensity */
     setEmission(intensity) { accepted(this.#wasm.set_object_emission(this.id, intensity)); return this; }
+    /** Use a loaded mesh font for a live single-value information panel. Null restores its original font.
+     * @param {Font3D|null} font @param {import('./engine.d.ts').Text3DLayout} [options] */
+    setFont3D(font,options={}) {
+        if(font!==null&&handleBindings.get(font)!==this.#wasm)throw new Error('Font musí patřit stejnému enginu jako panel.');
+        this.#wasm.bind_info_panel_font3d(this.id,font?.id??0xffffffff,JSON.stringify(options));return this;
+    }
+    /** Snapshot of a live info panel's mesh-font text; throws when not font-bound.
+     * @returns {import('./engine.d.ts').Text3DInfo} */
+    get font3DInfo() {return JSON.parse(this.#wasm.font3d_text_info(this.id));}
     /** Discard fragments below this maximum vertex RGB; finite 0..1, zero disables. Triangle meshes show both sides. @param {number} threshold */
     setColorCutout(threshold) { accepted(this.#wasm.set_object_color_cutout(this.id, threshold)); return this; }
     /** Vertex-color mesh alpha; brighter facets can stay opaque (neon seams).
@@ -112,6 +121,42 @@ export class MeshVariants {
     }
     /** Release the asset handle; existing instances remain valid. */
     remove() { accepted(this.#wasm.remove_mesh_variants(this.id)); }
+}
+
+/** Immutable font asset handle; parsing, layout and glyph caches live in Rust. */
+export class Font3D {
+    #wasm;
+    /** @param {Wasm} wasm @param {number} id */
+    constructor(wasm,id) {this.#wasm=wasm;handleBindings.set(this,wasm);this.id=id;Object.freeze(this);}
+    /** @returns {import('./engine.d.ts').Font3DInfo} */
+    get info() {return JSON.parse(this.#wasm.font3d_info(this.id));}
+    /** @param {string} value @param {import('./engine.d.ts').Text3DOptions} [options] */
+    createText(value,{position=[0,0,0],...options}={}) {
+        if(!position||position.length!==3||!Array.from(position).every(Number.isFinite))throw new Error('Neplatná pozice textu.');
+        const id=this.#wasm.add_font3d_text(this.id,value,JSON.stringify(options));
+        accepted(id!==0xffffffff);
+        const text=new Text3D(this.#wasm,id);
+        try{return text.setPosition(position);}catch(error){
+            try{text.remove();}catch{/* Preserve the rejected transform error. */}
+            throw error;
+        }
+    }
+    /** Existing texts remain alive; creating new texts through this handle stops. */
+    remove() {accepted(this.#wasm.remove_font3d(this.id));}
+}
+
+/** One Rust-owned text root; child glyphs inherit its transform and material. */
+export class Text3D extends SceneObject {
+    #wasm;
+    /** @param {Wasm} wasm @param {number} id */
+    constructor(wasm,id) {super(wasm,id);this.#wasm=wasm;}
+    /** @returns {import('./engine.d.ts').Text3DInfo} */
+    get info() {return JSON.parse(this.#wasm.font3d_text_info(this.id));}
+    /** Atomic content/layout/style update; unsupported characters throw. @param {string} value
+     * @param {import('./engine.d.ts').Text3DLayout} [options] */
+    setText(value,options={}) {this.#wasm.update_font3d_text(this.id,value,JSON.stringify(options));return this;}
+    /** @param {import('./engine.d.ts').Text3DLayout} options */
+    setOptions(options) {return this.setText(this.info.text,options);}
 }
 
 export class SceneLight {
@@ -216,6 +261,58 @@ export class Scene {
         const id=this.#wasm.register_mesh_variants(new Float32Array(positions),new Uint32Array(indices),colors,smooth);
         accepted(id!==0xffffffff);
         return new MeshVariants(this.#wasm,id);
+    }
+    /** Register baked outline geometry; Rust validates it atomically. No JS glyph cache.
+     * @param {import('./engine.d.ts').MeshFontData} data */
+    registerFont3D(data) {
+        const id=this.#wasm.register_font3d(JSON.stringify(data));accepted(id!==0xffffffff);
+        return new Font3D(this.#wasm,id);
+    }
+    /** Existing engine bitmap alphabet, extruded into a reusable mesh font.
+     * @param {'pixel'} [name] */
+    builtinFont3D(name='pixel') {
+        const id=this.#wasm.builtin_font3d(name);accepted(id!==0xffffffff);return new Font3D(this.#wasm,id);
+    }
+    /** Stream a bounded mesh-font asset, cancelling on clear/dispose. Rust parses JSON.
+     * @param {string|URL} url */
+    async loadFont3D(url) {
+        this.#wasm.scene_object_count();
+        const epoch=this.#loadEpoch,controller=new AbortController();
+        /** @type {Set<ReadableStreamDefaultReader<Uint8Array>>} */
+        const readers=new Set();
+        this.#loads.set(controller,readers);
+        const current=()=>{
+            if(controller.signal.aborted||epoch!==this.#loadEpoch)throw new Error('Načítání fontu zrušeno vymazáním scény');
+        };
+        /** @type {ReadableStreamDefaultReader<Uint8Array>|undefined} */
+        let reader;
+        try {
+            const response=await fetch(new URL(url,location.href),{signal:controller.signal});current();
+            if(!response.ok)throw new Error(`Font nelze načíst: ${response.status}`);
+            const limit=16*1024*1024;
+            if(Number(response.headers.get('content-length'))>limit){
+                await response.body?.cancel();throw new Error('Font je příliš velký');
+            }
+            reader=response.body?.getReader();
+            if(!reader)throw new Error('Font nemá tělo odpovědi');
+            readers.add(reader);
+            const decoder=new TextDecoder('utf-8',{fatal:true});let text='',size=0;
+            for(;;){
+                const {done,value}=await reader.read();current();
+                if(done)break;
+                size+=value.length;if(size>limit)throw new Error('Font je příliš velký');
+                text+=decoder.decode(value,{stream:true});
+            }
+            text+=decoder.decode();current();
+            const id=this.#wasm.register_font3d(text);accepted(id!==0xffffffff);
+            return new Font3D(this.#wasm,id);
+        }catch(error){
+            try{await reader?.cancel();}catch{/* Preserve the import error. */}
+            throw error;
+        }finally{
+            if(reader){readers.delete(reader);reader.releaseLock();}
+            this.#loads.delete(controller);
+        }
     }
     /** @param {SceneObject} cutter @param {import('./engine.d.ts').CutterAimOptions} options @returns {Vector3} */
     aimCutter(cutter,{center,yaw=0,tilt=0,height=3.6,floorY=0.2,guides=[]}) {

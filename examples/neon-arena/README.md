@@ -4,6 +4,13 @@ Aktuální hra používá [dva rostoucí zásobníky](#dva-zásobníky-prototyp-
 Starší popisy automatických trojic a historie níže popisují zachovaný SDK režim
 `legacy`; nejsou pravidly výchozí arény.
 
+## Font skóre a času
+
+Výchozí Cynatar používá skutečné 3D znaky se zářícími plochami a barevnými boky.
+Volba **Font skóre a času** přepíná časovač, skóre, bonus a oba zásobníky mezi
+Cynatarem a původním neonem. `?font=neon` otevře původní styl. Hodnoty i rozložení
+aktualizuje Rust; opakované znaky sdílejí geometrii. Cynatar je pouze pro osobní použití.
+
 ## Automatické srovnání odrazů v brýlích
 
 Před vstupem do VR zaškrtni **Srovnávací test před hrou**. Místo hry vznikne

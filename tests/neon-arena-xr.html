@@ -38,13 +38,15 @@ const report=await run.execute(async test=>{
     const restartPose=world.restartButton.meshInfo.position;
     test.assert(Math.abs(restartPose[0])<.05&&restartPose[2]>.8&&restartPose[2]<1.05&&restartPose[1]>1.05&&restartPose[1]<1.35,'restart is behind the player at chest height within stationary sword reach');
     test.assert(engine.xr.roundState.duration===60,'Rust owns a 60 second round');
-    const fontInitial=engine.debugStats().numericFont;
-    test.assert(fontInitial.glyphMeshes===10&&fontInitial.liveGlyphs===3&&fontInitial.panels===2,'timer60 and score0 use three instances from ten cached digit meshes');
     const still={dt:0,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{
         right:{position:[1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false},
         left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false}
     }};
     sim.frame(still);
+    const fontInitial=engine.debugStats().font3d;
+    test.assert(world.arenaFont.selected==='cynatar'&&world.timerPanel.font3DInfo.text==='60'&&world.scorePanel.font3DInfo.text==='0',`default Cynatar binds the existing native timer60 and score0 roots: ${JSON.stringify([world.arenaFont.selected,world.timerPanel.font3DInfo,world.scorePanel.font3DInfo])}`);
+    test.assert(fontInitial.runtime.texts===5&&fontInitial.runtime.liveGlyphs===3&&fontInitial.runtime.cachedGlyphs===2&&fontInitial.instanceGeometryBytes===0,'five native font bindings share two glyph assets for three visible instances');
+    test.assert(engine.debugStats().numericFont.liveGlyphs===0,'Cynatar bindings release the original numeric tube instances');
     const person=engine.xr.player;
     const initialPerson=person.state;
     test.assert(initialPerson.head.tracked&&Math.abs(initialPerson.head.position[1]-1.55)<1e-5,'generic XRPlayer receives the actual viewer head pose');
@@ -143,11 +145,20 @@ const report=await run.execute(async test=>{
     test.assert(pixelDifference(innerLeft,sim.pixels('left'),3)>100 && pixelDifference(innerRight,sim.pixels('right'),3)>100,'transparent mesh retains visible rear-facing seams in both eyes');
     visibleFruit.setScale([FRUIT_SCALE,FRUIT_SCALE,FRUIT_SCALE]).setPosition(fruitOrigin);sim.frame(still);
     snapshot('stereo');
-    const clockGeometry=JSON.stringify(world.timerPanel.meshSnapshot.positions),clockBefore=engine.xr.roundState.remaining;
+    const clockText=world.timerPanel.font3DInfo.text,clockBefore=engine.xr.roundState.remaining;
+    const fontBeforeTick=engine.debugStats().font3d.runtime;
     sim.frame({...still,dt:1000});
-    test.assert(Math.abs(engine.xr.roundState.remaining-(clockBefore-1))<.001&&clockGeometry!==JSON.stringify(world.timerPanel.meshSnapshot.positions),'one elapsed second updates the real bitmap countdown once, not once per eye');
-    const fontTick=engine.debugStats().numericFont;
-    test.assert(fontTick.glyphMeshes===10&&fontTick.geometryBytes===fontInitial.geometryBytes&&fontTick.liveGlyphs===3,'countdown changes reuse the digit geometry without growing the font cache');
+    test.assert(Math.abs(engine.xr.roundState.remaining-(clockBefore-1))<.001&&world.timerPanel.font3DInfo.text===String(Math.ceil(engine.xr.roundState.remaining))&&clockText!==world.timerPanel.font3DInfo.text,'one elapsed second updates the native Cynatar countdown once, not once per eye');
+    const fontTick=engine.debugStats().font3d;
+    test.assert(fontTick.runtime.layoutRebuilds===fontBeforeTick.layoutRebuilds+1&&fontTick.runtime.liveGlyphs===3&&fontTick.runtime.cachedGlyphs<=3&&fontTick.instanceGeometryBytes===0,'one native countdown revision rebuilds one layout while glyph instances share GPU geometry');
+    sim.frame(still);
+    test.assert(engine.debugStats().font3d.runtime.layoutRebuilds===fontTick.runtime.layoutRebuilds&&engine.debugStats().font3d.runtime.syncUpdates===fontTick.runtime.syncUpdates,'unchanged stereo frames reuse native layouts and synchronized glyph transforms');
+    const boundRoots=[world.timerPanel,world.scorePanel,world.awardPanels[2],...world.stockScorePanels];
+    const boundIdentities=boundRoots.map(p=>({id:p.id,position:p.meshInfo.position,text:p.font3DInfo.text}));
+    world.arenaFont.set('neon');sim.frame(still);
+    test.assert(world.arenaFont.selected==='neon'&&engine.debugStats().numericFont.glyphMeshes===10&&engine.debugStats().numericFont.liveGlyphs===3&&engine.debugStats().font3d.runtime.texts===0,'font switch restores original native neon digits and releases Cynatar bindings');
+    world.arenaFont.set('cynatar');sim.frame(still);
+    test.assert(boundRoots.every((p,i)=>p.id===boundIdentities[i].id&&p.meshInfo.position.every((v,j)=>Math.abs(v-boundIdentities[i].position[j])<1e-5)&&p.font3DInfo.text===boundIdentities[i].text),'restoring Cynatar preserves all five root IDs, world positions and current native values');
     const panels=[world.timerPanel,world.scorePanel],origins=panels.map(p=>p.meshInfo.position);
     const diagnosticOrigin=world.infoPanel.meshInfo.position;
     test.assert(diagnosticOrigin[0]>1.2 && diagnosticOrigin[2]>-3.1 && diagnosticOrigin[2]<-2.4 && diagnosticOrigin[1]<.75,'diagnostic gravestone remains right and low');
@@ -160,7 +171,7 @@ const report=await run.execute(async test=>{
     world.logo.setPosition([100,100,100]);sim.frame(leftLook);
     test.assert(pixelDifference(sideLogo,sim.pixels('left'),3)>50,'bitmap logo visibly renders above the left paytable');
     world.credits.setPosition(creditsPosition);world.logo.setPosition(logoPosition);sim.frame(still);
-    test.assert(!engine.debugStats().enabled && panels.every(p=>p.meshInfo.triangles>20),'scene info and score are real world meshes');
+    test.assert(!engine.debugStats().enabled && panels.every(p=>p.font3DInfo.glyphCount>0)&&engine.debugStats().font3d.geometryBytes>0,'timer and score have native Cynatar glyphs uploaded as shared world meshes');
     const frontPanelsLeft=sim.pixels('left'),frontPanelsRight=sim.pixels('right');
     panels.forEach(p=>p.setPosition([100,100,100]));sim.frame(still);
     test.assert(pixelDifference(frontPanelsLeft,sim.pixels('left'))>100 && pixelDifference(frontPanelsRight,sim.pixels('right'))>100,'countdown and score visibly render in both eyes');
@@ -419,12 +430,12 @@ const report=await run.execute(async test=>{
     test.assert(!engine.xr.comboDisplayState?.current&&won?.success&&won.kind==='MELOUN'&&won.points===120&&won.count===3,'successful triple moves below the current row with its exact reward');
     test.assert(won.frames.every(id=>engine.scene.getObject(id).meshInfo.emission>2)&&engine.scene.getObject(won.label).meshInfo.triangles>0,'successful row has bright neon frames and actual reward text geometry');
     test.assert(engine.xr.roundState.score===120 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===1,'three original watermelons award exactly their configured reward');
-    const scorePixels=sim.pixels('left'),scoreGeometry=JSON.stringify(world.scorePanel.meshSnapshot.positions);
+    const scorePixels=sim.pixels('left'),scorePixelsRight=sim.pixels('right'),scoreText=world.scorePanel.font3DInfo.text;
     hitCombo('lemon');sim.frame(still);snapshot('cut-evidence');
     hitCombo('lemon');hitCombo('lemon');
     assertProgress('lemon',3);
     test.assert(engine.xr.roundState.score===140 && engine.xr.roundState.triples===2,'another fruit adds its different reward');
-    test.assert(scoreGeometry!==JSON.stringify(world.scorePanel.meshSnapshot.positions) && pixelDifference(scorePixels,sim.pixels('left'))>50,'Rust updates the real world score mesh and visible stereo pixels');
+    test.assert(scoreText==='120'&&world.scorePanel.font3DInfo.text==='140'&&pixelDifference(scorePixels,sim.pixels('left'))>50&&pixelDifference(scorePixelsRight,sim.pixels('right'))>50,'Rust updates native Cynatar score text and visible pixels in both stereo eyes');
     hitCombo('watermelon');hitCombo('wild');hitCombo('watermelon');
     test.assert(engine.xr.roundState.score===260,'a real sliced wildcard substitutes inside a fruit triple');
     hitCombo('wild');hitCombo('wild');hitCombo('lemon');

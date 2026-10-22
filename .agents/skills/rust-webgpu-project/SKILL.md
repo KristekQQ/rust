@@ -14,6 +14,8 @@ For direct Quest WebGPU XR, feature support, texture imports or headset diagnost
 For pass scheduling, transient textures/buffers, graph invalidation and CPU/GPU profiling use [frame-pipeline](../frame-pipeline/SKILL.md); read its [extension guide](../../../docs/FRAME_PIPELINE.md) before adding resources or changing submission boundaries.
 For the shared XR person and inventory use [xr-player-equipment](../xr-player-equipment/SKILL.md); for cut-hit materials, size and speed response use [cut-feedback-tuning](../cut-feedback-tuning/SKILL.md).
 
+For 3D fonts and neon lettering use [mesh-fonts](../mesh-fonts/SKILL.md) and [FONTS.md](../../../docs/FONTS.md).
+
 Use the [verification matrix](../../../docs/DEVELOPMENT.md). During iteration run targeted checks and reuse matching evidence. Native tests do not compile the wasm32 renderer; browser acceptance must use fresh matching `pkg/` and the actual Rust page. A build, DOM load, `cube.html` or separate JS graphics demo is not renderer acceptance.
 
 For Quest delivery use `npm run serve:quest`, which builds/verifies release WASM and

@@ -7,6 +7,13 @@ export async function verifyArena(engine, world, canvas, previewCut) {
     const {capturePixels,assertForeground,assertChanged} = await import('../../tests/pixels.js');
     const wait=async()=>{for(let i=0;i<5;i++)await new Promise(requestAnimationFrame);};
     const originalView=engine.cameraViewState();
+    const originalFont=world.arenaFont.selected;
+    const fontSelect=document.getElementById('arena-font');
+    if(!(fontSelect instanceof HTMLSelectElement)||fontSelect.disabled||fontSelect.value!==originalFont)throw new Error('Arena font selector unavailable');
+    const selectFont=async(/** @type {'cynatar'|'neon'} */ value)=>{
+        fontSelect.value=value;fontSelect.dispatchEvent(new Event('change'));await wait();
+        if(world.arenaFont.selected!==value)throw new Error('Font selector did not update native panels');
+    };
     const style=document.getElementById('solid-fruit');
     if(!(style instanceof HTMLInputElement)||!style.checked)throw new Error('Solid fruit must be selectable and enabled by default');
     engine.set_simulation_paused(true);
@@ -15,7 +22,12 @@ export async function verifyArena(engine, world, canvas, previewCut) {
     /** @type {import('../../js/engine.js').SceneObject[]} */
     const alphaMarkers=[];
     try {
-        await wait();
+        await selectFont('cynatar');
+        const boundPanels=[world.timerPanel,world.scorePanel,world.awardPanels[2],...world.stockScorePanels];
+        const roots=boundPanels.map(panel=>panel.id);
+        if([world.timerPanel,world.scorePanel].some(panel=>panel.font3DInfo.glyphCount<1||panel.font3DInfo.depth<=0))throw new Error('Cynatar panels lack solid glyphs');
+        const meshFont=engine.debugStats().font3d;
+        if(meshFont.runtime.texts!==5||meshFont.runtime.liveGlyphs<3||meshFont.instanceGeometryBytes!==0)throw new Error(`Arena mesh font is not shared: ${JSON.stringify(meshFont)}`);
         const toggle=document.getElementById('ssr');
         const build=document.getElementById('build');
         if(!(toggle instanceof HTMLInputElement)||!build?.textContent?.includes(ARENA_REVISION))throw new Error('Missing loaded-version or SSR control');
@@ -36,17 +48,16 @@ export async function verifyArena(engine, world, canvas, previewCut) {
             for(let x=Math.max(0,Math.floor(Math.min(fontCorners[0][0],fontCorners[1][0])*canvas.width));x<Math.min(canvas.width,Math.ceil(Math.max(fontCorners[0][0],fontCorners[1][0])*canvas.width));x++){
                 const i=(y*canvas.width+x)*4;
                 if(Math.max(plainFont.data[i],plainFont.data[i+1],plainFont.data[i+2])<6&&forwardImage.data[i+2]>12&&forwardImage.data[i+1]>forwardImage.data[i]*1.2&&forwardImage.data[i+2]>forwardImage.data[i]*1.2)fontHalo++;
-                if(plainFont.data[i]>160&&plainFont.data[i+1]>190&&plainFont.data[i+2]>220)fontCore++;
+                if(plainFont.data[i+1]>150&&plainFont.data[i+2]>180)fontCore++;
             }
         if(fontHalo<20)throw new Error(`Countdown has no actual neon halo outside glyph pixels (${fontHalo})`);
-        if(fontCore<3)throw new Error(`Countdown lacks a rendered white-hot tube core (${fontCore})`);
+        if(fontCore<3)throw new Error(`Countdown lacks a rendered luminous Cynatar face (${fontCore})`);
         assertForeground(forwardImage,'forward neon countdown and score');
         const stats=engine.postprocessing.stats();
         if(stats.passes!==2||stats.targets===0)throw new Error('Tiled floor SSR is not active in forward view');
         if(world.timerPanel.meshInfo.position[0]!==0||world.timerPanel.meshInfo.position[1]<=world.scorePanel.meshInfo.position[1]||world.galleryIcons.some(icon=>icon.meshInfo.position[0]>-2.4))
             throw new Error('Countdown/score are not ahead with the paytable to the left');
-        const timer=world.timerPanel.meshSnapshot;
-        if(timer.positions.length<12||world.scorePanel.meshInfo.triangles<10)throw new Error('Neon HUD lacks real glyph geometry');
+
         // Keep actual frontal and oblique font renders for visual inspection.
         const fontEvidence=document.createElement('canvas');fontEvidence.id='font-evidence';fontEvidence.hidden=true;
         document.getElementById(fontEvidence.id)?.remove();
@@ -58,6 +69,8 @@ export async function verifyArena(engine, world, canvas, previewCut) {
             fontContext.putImageData(await capturePixels(canvas),view*canvas.width,0);
         }
         document.body.append(fontEvidence);
+        await selectFont('neon');
+        if(engine.debugStats().font3d.runtime.liveGlyphs!==0||boundPanels.some((panel,index)=>panel.id!==roots[index]))throw new Error('Font switch leaked glyphs or replaced panel handles');
         // Inspect the off-axis paytable intentionally rather than requiring it
         // to remain in the forward field of view.
         engine.setOrbitView([.25,1.3,-.4],[-2.75,1.3,-.4]);await wait();
@@ -87,6 +100,9 @@ export async function verifyArena(engine, world, canvas, previewCut) {
             throw new Error(`Gallery does not share repeated geometry: ${JSON.stringify(shared)}`);
         if(shared.colorTableBytes>=shared.geometryBytes)
             throw new Error(`Palette table still duplicates unchanged seams: ${JSON.stringify(shared)}`);
+        await selectFont('cynatar');
+        if([world.timerPanel,world.scorePanel].some(panel=>panel.font3DInfo.glyphCount<1))throw new Error('Cynatar did not restore');
+        await selectFont('neon');
         const alpha=engine.debugStats().translucency;
         if(!alpha||alpha.cachedMeshes<1||alpha.fullIndices<=0||alpha.submittedIndices>=alpha.fullIndices*.35)
             throw new Error(`Alpha rendering still processes the opaque seam triangles: ${JSON.stringify(alpha)}`);
@@ -415,6 +431,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         if(engine.postprocessing.stats().targets!==0)throw new Error('Resize allocated postprocess targets');
         return {sharedMeshes:shared,alpha};
     } finally {
+        await selectFont(originalFont);
         if(originalView.orbitTarget)engine.setOrbitView(originalView.position,originalView.orbitTarget);
         alphaMarkers.forEach(object=>{if(object.exists)object.remove();});
         if(marker?.exists)marker.remove();

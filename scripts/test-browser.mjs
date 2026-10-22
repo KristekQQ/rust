@@ -21,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'cynatar', path: 'examples/cynatar/?verify=1', status: '#result', button: '#verify' },
     { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },
     { name: 'arena-minute', path: 'tests/arena-minute.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'arena-presets', path: 'tests/arena-presets.html', status: '#result', backends:['webgl'] },

@@ -26,6 +26,46 @@ export class MeshVariants {
     /** Releases the handle; live instances keep their resources until removed. */
     remove(): void;
 }
+/** Portable baked glyph schema generated from authorized TTF/OTF sources. */
+export interface MeshFontData {
+    font: string;
+    depth: number;
+    license?: string;
+    author?: string;
+    source?: string;
+    glyphs: Record<string,{advance:number;positions:number[];indices:number[];front:number[]}>;
+}
+export interface Text3DLayout {
+    size?: number;
+    maxWidth?: number|null;
+    align?: 'left'|'center'|'right';
+    letterSpacing?: number;
+    color?: Vector3;
+    sideIntensity?: number;
+}
+export interface Text3DOptions extends Text3DLayout {position?: Vector3}
+export interface Font3DInfo {
+    name:string;characters:string;depth:number;license:string;registered:boolean;
+    cachedGlyphs:number;liveTexts:number;liveGlyphs:number;
+}
+export interface Text3DInfo {
+    text:string;fontId:number;width:number;height:number;depth:number;glyphCount:number;
+    size:number;align:'left'|'center'|'right';letterSpacing:number;color:Vector3;sideIntensity:number;
+}
+export class Font3D {
+    private constructor();
+    readonly id:number;
+    readonly info:Font3DInfo;
+    createText(value:string,options?:Text3DOptions):Text3D;
+    /** Existing texts retain their resources until removed. */
+    remove():void;
+}
+export class Text3D extends SceneObject {
+    private constructor();
+    readonly info:Text3DInfo;
+    setText(value:string,options?:Text3DLayout):this;
+    setOptions(options:Text3DLayout):this;
+}
 export interface CutterAimOptions {center:Vector3;yaw?:number;tilt?:number;height?:number;floorY?:number;guides?:readonly SceneObject[]}
 export interface CameraViewState {position:Vector3;orbitTarget:Vector3|null}
 export interface TriangleMeshInfo {
@@ -101,6 +141,9 @@ export class SceneObject {
     rotate(degrees: Vector3, options?: RotationOptions): this;
     /** Vertex-color emission, 0..8; primitive and triangle meshes. */
     setEmission(intensity: number): this;
+    /** Live single-value info panel only. Rust keeps its native data source, pose and ID. */
+    setFont3D(font:Font3D|null,options?:Text3DLayout):this;
+    readonly font3DInfo:Text3DInfo;
     /** Discard fragments below maximum vertex RGB; finite 0..1, zero disables. Triangle meshes show both sides. */
     setColorCutout(threshold: number): this;
     /** Alpha 0..1 for vertex-color meshes, inherited by cut pieces. Facets with max RGB >= opaqueAbove stay opaque (default 8). variation 0..1 gives stable face-based alpha from opacity towards 1 (default 0). Optional coverage 0..1 switches to a sparse/dense near-clear vs solid facet mask; omit for linear variation. glTF keeps its own materials. */
@@ -154,6 +197,9 @@ export class Scene {
     createSphere(position?: Vector3): SceneObject;
     createMesh(options: TriangleMeshOptions): SceneObject;
     createMeshVariants(options: MeshVariantsOptions): MeshVariants;
+    registerFont3D(data:MeshFontData):Font3D;
+    loadFont3D(url:string|URL):Promise<Font3D>;
+    builtinFont3D(name?:'pixel'):Font3D;
     /** Actual world-space text mesh; width/height in metres, facing local +Z. */
     createInfoPanel(kind: 'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award'|'debug-text', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
     /** Static inscription of 1..32 ASCII digits using shared 3D tube meshes. */
@@ -195,6 +241,10 @@ export interface EffectStats {
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
 export interface DebugStats {
+    font3d: {
+        runtime:{fonts:number;texts:number;cachedGlyphs:number;liveGlyphs:number;layoutRebuilds:number;syncUpdates:number};
+        geometryBytes:number;instanceGeometryBytes:number;
+    };
     /** Pooled imported-mesh instance buffers across render passes. */
     instanceUploadPages: number;
     numericFont: {glyphMeshes:number;liveGlyphs:number;panels:number;geometryBytes:number;instanceGeometryBytes:number};

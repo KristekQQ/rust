@@ -1,4 +1,4 @@
-export const ARENA_REVISION='end-round-start-46';
+export const ARENA_REVISION='cynatar-arena-47';
 import { swordGeometry, neonFrameGeometry, fruitGeometries, createFruitPatternCatalog, FRUIT_PATTERN_COUNT } from './geometry.js';
 export const NEON_GLOW=Object.freeze({strength:.4,radius:.045});
 export const PAYTABLE_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([-2.75,1.2,-.40]);
@@ -188,7 +188,21 @@ export async function createScene(scene) {
     const launchGlintAssets=[[.15,1,.75],[1,.25,.65],[1,.8,.2]].map(color=>scene.createMeshVariants({
         positions:pointerGeometry.positions,indices:pointerGeometry.indices,
         variants:[Array.from({length:8},()=>color).flat()]}));
-    return {stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
+    const cynatar=await scene.loadFont3D(new URL('../../assets/fonts/cynatar/glyphs.json',import.meta.url));
+    const fontPanels=[timerPanel,scorePanel,awardPanels[2],...stockScorePanels];
+    /** @type {'cynatar'|'neon'} */
+    let selectedFont='cynatar';
+    const arenaFont={
+        get selected(){return selectedFont;},
+        /** @param {'cynatar'|'neon'} value */
+        set(value){
+            if(value!=='cynatar'&&value!=='neon')throw new Error('Neznámý font arény.');
+            fontPanels.forEach(panel=>panel.setFont3D(value==='cynatar'?cynatar:null,{color:[.02,.8,1],sideIntensity:.32}));
+            selectedFont=value;
+        },
+    };
+    arenaFont.set('cynatar');
+    return {arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
 }
 
 // Points per completed triple; adapted ranking, not the slot's cash payouts.

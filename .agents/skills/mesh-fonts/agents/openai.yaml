@@ -1,0 +1,4 @@
+interface:
+  display_name: "3D mesh fonts"
+  short_description: "Import and render reusable 3D fonts in this engine"
+  default_prompt: "Use $mesh-fonts to add a reusable 3D font to this Rust engine."

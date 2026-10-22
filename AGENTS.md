@@ -16,6 +16,8 @@ For frame scheduling, transient textures/buffers, pass dependencies and CPU/GPU 
 
 For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-player-equipment/SKILL.md). For cut-impact visuals and speed tuning use [cut-feedback-tuning](.agents/skills/cut-feedback-tuning/SKILL.md); prefer existing configuration knobs for numeric iteration.
 
+For reusable 3D fonts, glyph imports, text layout and neon lettering use [mesh-fonts](.agents/skills/mesh-fonts/SKILL.md); existing bitmap panels and numeric tubes stay supported.
+
 Keep Rust/WGSL layouts and `src/web.rs` exports consistent with `js/engine.js`, types and callers. Rebuild ignored `pkg/` when WASM/export changes need browser verification. Test the affected Rust page; `cube.html` and JS graphics demos do not verify this renderer.
 
 Use `MEMORY.md` only for orientation/current decisions; consult linked docs only for the affected area. Choose required checks from [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Native tests omit wasm32 renderer/web code. Preserve independent pass visibility, static revisions and resource cleanup. Respect `rust-toolchain.toml`; inspect Cargo configuration before source/offline changes.

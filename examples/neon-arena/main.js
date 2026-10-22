@@ -64,6 +64,18 @@ engine.setDebugOverlay(false);
 const home = () => engine.setOrbitView([0,1.75,1.2],[0,1.45,-1.6]);
 home();
 export const world = await createScene(engine.scene);
+const fontSelect=document.getElementById('arena-font');
+const initialFont=parameters.get('font')==='neon'?'neon':'cynatar';
+if(initialFont!==world.arenaFont.selected)world.arenaFont.set(initialFont);
+if(fontSelect instanceof HTMLSelectElement){
+    fontSelect.disabled=false;fontSelect.value=world.arenaFont.selected;
+    fontSelect.addEventListener('change',()=>{
+        try{
+            world.arenaFont.set(fontSelect.value==='neon'?'neon':'cynatar');
+            reportDiagnostic('font-changed',undefined,{font:world.arenaFont.selected,revision});
+        }catch(error){fontSelect.value=world.arenaFont.selected;reportDiagnostic('font-change',error);}
+    });
+}
 engine.xr.configureComboDisplay(world.comboDisplay);
 const fruitStyle=document.getElementById('solid-fruit');
 const applyFruitStyle=()=>world.galleryIcons.forEach((icon,index)=>icon.setColorCutout(solidFruit?0:.25).setOpacity(solidFruit?FRUIT_OPACITY:1,{opaqueAbove:.25,variation:solidFruit?FRUIT_OPACITY_VARIATION:0,coverage:world.galleryPatterns[index].coverage??.5}));
