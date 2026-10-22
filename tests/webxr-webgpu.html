@@ -197,7 +197,7 @@ const report=await run.execute(async test=>{
     frame();
     const submitted=binding.submissions.slice(submissionStart).filter(record=>record.labels.length);
     const viewBatches=submitted.filter(record=>record.labels.includes('render'));
-    test.assert(submitted.length===3&&viewBatches.length===2&&viewBatches.every(record=>record.buffers===3&&record.labels.includes('ssr')&&record.labels.includes('postprocess overlays')),'SSR stereo submits one main/postprocess/overlay batch per eye plus final stereo presentation',submitted);
+    test.assert(submitted.length===3&&viewBatches.length===2&&viewBatches.every(record=>record.buffers===3&&record.labels.join(',')==='render,SSR half-resolution trace,ssr,final.postprocess.overlays'),'SSR stereo fuses final bloom with overlays in one view batch per eye plus final stereo presentation',submitted);
     const ignoredDepth=[await binding.depthPixels(0),await binding.depthPixels(1)];
     test.assert(ignoredDepth.every(values=>values.every(v=>v===sentinel)),'ignored compositor depth is retained while internal SSR depth still renders');
     test.assert(binding.presentationWrites.at(-1).length===2&&binding.presentationWrites.at(-1).every(write=>!write.depthAttached),'ignored compositor depth is never attached to either final eye pass');
@@ -255,7 +255,7 @@ const report=await run.execute(async test=>{
             await new Promise(resolve=>setTimeout(resolve,10));profile=engine.frameProfile();
         }
         test.assert(profile.gpu.available&&!profile.gpu.error,'sampled GPU timing resolves asynchronously',profile.gpu);
-        test.assert(['scene.main','ssr.trace','ssr','bloom','xr.present'].every(name=>Number.isFinite(profile.gpu.passesMs?.[name])&&profile.gpu.passesMs[name]>=0),'GPU profile measures the actual stereo passes',profile.gpu);
+        test.assert(['scene.main','ssr.trace','ssr','final.postprocess.overlays','xr.present'].every(name=>Number.isFinite(profile.gpu.passesMs?.[name])&&profile.gpu.passesMs[name]>=0),'GPU profile measures the actual stereo passes',profile.gpu);
     }else test.assert(profile.gpu.passesMs===null,'unsupported GPU timestamps explicitly report no measurement');
     test.assert(profile.cpu['postprocess.encode']?.samples>0&&Number.isFinite(profile.cpu['postprocess.encode'].p95Ms),'CPU profile retains bounded encoding timings',profile.cpu);
 
@@ -271,7 +271,9 @@ const report=await run.execute(async test=>{
     if(profiling){
         // The real arena workload on real GPU XR slices, with GPU completion instead of readback timing.
         const {createScene,launchApple,NEON_GLOW,FLOOR_SSR,FLOOR_SSR_BOUNDS}=await import('../examples/neon-arena/scene.js');
-        const world=await createScene(engine.scene);
+        const world=await createScene(engine.scene);await world.loadDecorations?.();
+        // Match the Quest color-only compositor policy; do not benchmark unused depth copies.
+        second.layer.ignoreDepthValues=true;
         const names=['cherry','grapes','banana','orange','watermelon','pear'];
         const fruitTargets=names.map((name,i)=>launchApple(engine.scene,world.fruits.find(f=>f.name===name),1)
             .setPosition([(i%3-1)*.48,i<3?1.6:1.08,-1.3]));

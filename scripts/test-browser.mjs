@@ -21,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    { name: 'postprocess-fusion', path: 'tests/postprocess-fusion.html', status: '#result' },
     { name: 'cynatar', path: 'examples/cynatar/?verify=1', status: '#result', button: '#verify' },
     { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },
     { name: 'arena-minute', path: 'tests/arena-minute.html', status: '#result', backends:['webgl'], xrReport:true },
@@ -479,6 +480,12 @@ try {
             const expected = backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
             if (result.actualBackend !== expected) throw new Error(`Requested ${backend}, observed ${result.actualBackend || 'unknown'}; fallback is not a pass`);
             if (errors.length) throw new Error(errors.join('\n'));
+            if (suite.name === 'postprocess-fusion') {
+                result.pixelEvidence = await page.evaluate(() => window.fusionEvidence.map(({png,...item})=>item));
+                if (capture) for (const item of await page.evaluate(() => window.fusionEvidence)) {
+                    await writeFile(path.join(output,`fusion-${backend}-${item.name}.png`),Buffer.from(item.png,'base64'));
+                }
+            }
             if (capture && suite.xrReport) {
                 result.xrScreenshot = `${suite.name}-report.png`;
                 await page.screenshot({path:path.join(output,result.xrScreenshot),fullPage:true});

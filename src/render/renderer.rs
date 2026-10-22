@@ -2142,11 +2142,12 @@ impl SceneRenderer {
         submitted_draws
     }
 
-    /// Final color overlays share one pass, preserving transparent/ring/glow/helper order.
+    /// Compose the final effect and overlays in one pass, preserving their order.
     pub fn draw_postprocess_overlays(
         &mut self,
         target: &RenderTarget<'_>,
-    ) -> Result<Option<wgpu::CommandBuffer>, String> {
+        composite: &super::postprocess::FinalPostprocessDraw<'_>,
+    ) -> Result<wgpu::CommandBuffer, String> {
         let _cpu_scope = super::profiler::cpu_scope("render.encode.overlays");
         target.validate()?;
         if target.auxiliary.is_some() || target.material_mask {
@@ -2188,11 +2189,8 @@ impl SceneRenderer {
                             && self.neon_meshes.get(id).is_some_and(Option::is_some)
                     },
                 );
-        if !has_transparent && !has_mesh_transparency && !has_rings && !has_neon && !has_helpers {
-            self.neon_draws = 0;
-            self.neon_segments = 0;
-            return Ok(None);
-        }
+        let has_overlays =
+            has_transparent || has_mesh_transparency || has_rings || has_neon || has_helpers;
         if has_rings {
             self.prepare_cut_feedback(target);
         }
@@ -2235,27 +2233,34 @@ impl SceneRenderer {
             });
         let mut draws = 0;
         let mut neon_stats = (0, 0);
-        let stamp = super::profiler::stamp("scene.overlays");
+        let label = if has_overlays {
+            "final.postprocess.overlays"
+        } else {
+            composite.name
+        };
+        let stamp = super::profiler::stamp(label);
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("postprocess overlays"),
+                label: Some(label),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: target.color,
                     resolve_target: None,
                     depth_slice: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: target.depth,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
+                depth_stencil_attachment: has_overlays.then_some(
+                    wgpu::RenderPassDepthStencilAttachment {
+                        view: target.depth,
+                        // Every overlay pipeline has depth writes disabled. Keep the
+                        // attachment for occlusion, but do not request a depth store.
+                        // Read-only also preserves it for a later XR depth resolve.
+                        depth_ops: None,
+                        stencil_ops: None,
+                    },
+                ),
                 timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                 occlusion_query_set: None,
                 multiview_mask: None,
@@ -2274,6 +2279,9 @@ impl SceneRenderer {
                 target.viewport.width,
                 target.viewport.height,
             );
+            // Fullscreen composition reads scene depth but never writes it.
+            // Geometry then uses the same attachment for read-only occlusion.
+            composite.encode(&mut pass, has_overlays);
             if has_transparent {
                 pass.set_bind_group(0, &self.grid_bind_group, &[]);
                 pass.set_bind_group(1, &self.effects.as_ref().unwrap().scene_group, &[]);
@@ -2318,6 +2326,6 @@ impl SceneRenderer {
         self.neon_segments = neon_stats.1;
         self.draw_calls += draws;
         self.main_draw_calls += draws;
-        Ok(Some(encoder.finish()))
+        Ok(encoder.finish())
     }
 }

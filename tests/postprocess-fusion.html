@@ -1,0 +1,65 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Finální efekty a průhlednost</title>
+<canvas id="gpu-canvas" width="640" height="480"></canvas><pre id="result">RUNNING…</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+import {createScene,launchApple,NEON_GLOW,FLOOR_SSR,FLOOR_SSR_BOUNDS} from '../examples/neon-arena/scene.js';
+const result=document.querySelector('#result'),canvas=document.querySelector('#gpu-canvas');
+try {
+    // Observe real WebGPU pass descriptors; WebGL is covered by pixels/errors.
+    let passes=[];
+    if(globalThis.GPUCommandEncoder){
+        const begin=GPUCommandEncoder.prototype.beginRenderPass;
+        GPUCommandEncoder.prototype.beginRenderPass=function(descriptor){
+            passes.push({label:descriptor.label,depth:!!descriptor.depthStencilAttachment,readOnly:descriptor.depthStencilAttachment?.depthReadOnly});
+            return begin.call(this,descriptor);
+        };
+    }
+    const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+    document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+    engine.resize(640,480);engine.set_simulation_paused(true);
+    engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+    engine.setBackgroundColor([.002,.004,.012]);engine.setCameraView([0,1.65,0],[0,1.15,-2]);
+    window.fusionEvidence=[];
+    async function capture(name){
+        passes=[];
+        const pixels=await capturePixels(canvas);assertForeground(pixels,name);
+        const final=passes.findLast(pass=>pass.label==='final.postprocess.overlays'||pass.label==='bloom');
+        if(engine.renderer_backend()==='BrowserWebGpu'&&name!=='arena-direct'){
+            if(!final)throw new Error(`${name}: final physical pass missing`);
+            if(name==='opaque-only-bloom'&&final.depth)throw new Error('No-overlay composition attaches unnecessary depth');
+            if(name!=='opaque-only-bloom'&&(!final.depth||!final.readOnly||final.label!=='final.postprocess.overlays'))throw new Error(`${name}: final composition must share read-only depth with overlays`);
+            if(passes.some(pass=>pass.label==='postprocess overlays'))throw new Error('Standalone overlay pass still exists');
+        }
+        const copy=document.createElement('canvas');copy.width=pixels.width;copy.height=pixels.height;
+        copy.getContext('2d').putImageData(pixels,0,0);
+        window.fusionEvidence.push({name,png:copy.toDataURL('image/png').split(',')[1],finalPass:final,postprocess:engine.postprocessing.stats(),draws:engine.debugStats().drawCalls});
+        return pixels;
+    }
+    engine.scene.createCube([0,1,-2]).setScale([.5,.5,.5]);
+    engine.scene.createLight({position:[0,4,0],color:[2,2,2]});
+    engine.postprocessing.enable('bloom',{strength:.3});
+    await capture('opaque-only-bloom');
+    // clear() inside createScene resets pause; freeze immediately at its first await.
+    const worldPromise=createScene(engine.scene);engine.set_simulation_paused(true);
+    const world=await worldPromise;await world.loadDecorations?.();
+    const names=['cherry','grapes','banana','orange','watermelon','pear'];
+    names.forEach((name,i)=>launchApple(engine.scene,world.fruits.find(f=>f.name===name),1)
+        .setPosition([(i%3-1)*.48,i<3?1.6:1.08,-1.3]));
+    engine.setNeonGlow(NEON_GLOW);engine.postprocessing.disable('bloom');
+    await capture('arena-direct');
+    engine.postprocessing.configureSSR({resolutionScale:.5,receiverBounds:FLOOR_SSR_BOUNDS});
+    engine.postprocessing.enable('ssr',FLOOR_SSR);
+    // Strong SSR floor visibility is checked in both eyes by webxr-webgpu.
+    const half=await capture('arena-half-ssr');
+    engine.setNeonGlow({strength:0});
+    const noGlow=await capture('arena-half-ssr-no-glow');assertChanged(half,noGlow,'Final glow remains visible',20);
+    engine.setNeonGlow(NEON_GLOW);engine.postprocessing.configureSSR({resolutionScale:1});
+    await capture('arena-full-ssr');
+    engine.postprocessing.configureSSR({resolutionScale:.5});engine.postprocessing.enable('bloom',{strength:.25});
+    await capture('arena-ssr-bloom');
+    engine.set_light_helpers_visible(true);await capture('arena-ssr-bloom-helpers');
+    engine.set_output_mode('texture');await capture('arena-ssr-bloom-texture');
+    result.textContent='PASS: final effects, translucent fruit, glow, helpers, offscreen output and fully loaded arena';
+} catch(error){result.textContent=`FAIL: ${error.message??error}`;console.error(error);}
+</script></html>

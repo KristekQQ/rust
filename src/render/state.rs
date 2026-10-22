@@ -963,7 +963,8 @@ impl State {
             let (position, color) = light
                 .map(|l| (l.position, l.color))
                 .unwrap_or((Vec3::ZERO, Vec3::ZERO));
-            let (passes, postprocess_command) = self.postprocess.render(
+            let overlay_depth = self.postprocess.target().depth.clone();
+            let (passes, postprocess_command, final_draw) = self.postprocess.render(
                 &self.renderer.device,
                 &self.renderer.queue,
                 self.view,
@@ -981,20 +982,20 @@ impl State {
             self.renderer.draw_calls += passes;
             if let Some(command) = postprocess_command {
                 commands.push(command);
-                postprocessed = true;
             }
             let overlays = super::target::RenderTarget {
-                depth: self.postprocess.target().depth,
+                depth: &overlay_depth,
                 auxiliary: None,
                 material_mask: false,
                 ..target
             };
-            if let Some(command) = self
-                .renderer
-                .draw_postprocess_overlays(&overlays)
-                .map_err(|e| JsValue::from_str(&e))?
-            {
-                commands.push(command);
+            if let Some(final_draw) = final_draw {
+                commands.push(
+                    self.renderer
+                        .draw_postprocess_overlays(&overlays, &final_draw)
+                        .map_err(|e| JsValue::from_str(&e))?,
+                );
+                postprocessed = true;
             }
         } else {
             self.postprocess.skip_render();

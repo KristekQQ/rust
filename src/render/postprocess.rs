@@ -70,7 +70,11 @@ struct Effect {
     name: &'static str,
     enabled: bool,
     strength: f32,
-    pipelines: Vec<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
+    pipelines: Vec<(
+        wgpu::TextureFormat,
+        Option<wgpu::TextureFormat>,
+        wgpu::RenderPipeline,
+    )>,
     uniform: super::view_uniforms::ViewUniforms,
 }
 struct Intermediate {
@@ -168,6 +172,33 @@ struct SsrTarget {
     width: u32,
     height: u32,
 }
+/// Frame-local final fullscreen draw. It retains no browser attachments and
+/// must execute before the next view rewrites any shared resources.
+pub struct FinalPostprocessDraw<'a> {
+    pub name: &'static str,
+    pipeline: &'a wgpu::RenderPipeline,
+    depth_pipeline: &'a wgpu::RenderPipeline,
+    source: &'a wgpu::BindGroup,
+    shadows: &'a wgpu::BindGroup,
+    trace: Option<&'a wgpu::BindGroup>,
+    uniform_offset: u32,
+}
+impl FinalPostprocessDraw<'_> {
+    pub fn encode(&self, pass: &mut wgpu::RenderPass<'_>, with_depth: bool) {
+        pass.set_pipeline(if with_depth {
+            self.depth_pipeline
+        } else {
+            self.pipeline
+        });
+        pass.set_bind_group(0, self.source, &[self.uniform_offset]);
+        pass.set_bind_group(1, self.shadows, &[]);
+        if let Some(trace) = self.trace {
+            pass.set_bind_group(2, trace, &[]);
+        }
+        pass.draw(0..3, 0..1);
+    }
+}
+
 pub struct PostProcessor {
     ssr_resolution_scale: f32,
     ssr_region: Option<(Vec3, Vec3)>,
@@ -175,7 +206,11 @@ pub struct PostProcessor {
     ssr_target: Option<SsrTarget>,
     ssr_layout: wgpu::BindGroupLayout,
     ssr_trace_pipeline: wgpu::RenderPipeline,
-    ssr_composite_pipelines: Vec<(wgpu::TextureFormat, wgpu::RenderPipeline)>,
+    ssr_composite_pipelines: Vec<(
+        wgpu::TextureFormat,
+        Option<wgpu::TextureFormat>,
+        wgpu::RenderPipeline,
+    )>,
     format: wgpu::TextureFormat,
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
@@ -209,6 +244,7 @@ impl PostProcessor {
         shadow_layout: &wgpu::BindGroupLayout,
         descriptor: &EffectDescriptor,
         ssr_layout: Option<&wgpu::BindGroupLayout>,
+        depth_format: Option<wgpu::TextureFormat>,
     ) -> wgpu::RenderPipeline {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(descriptor.name),
@@ -254,7 +290,13 @@ impl PostProcessor {
                 })],
             }),
             primitive: Default::default(),
-            depth_stencil: None,
+            depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
+                format,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::Always),
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
             multisample: Default::default(),
             multiview_mask: None,
             cache: None,
@@ -437,6 +479,7 @@ impl PostProcessor {
                 shader_source: include_str!("postprocess.wgsl"),
             },
             None,
+            None,
         );
         let ssr_composite_pipeline = Self::pipeline(
             device,
@@ -449,15 +492,23 @@ impl PostProcessor {
                 shader_source: include_str!("postprocess.wgsl"),
             },
             Some(&ssr_layout),
+            None,
         );
         let effects = EFFECTS
             .iter()
             .map(|descriptor| {
-                let pipeline =
-                    Self::pipeline(device, format, &layout, &shadow_layout, descriptor, None);
+                let pipeline = Self::pipeline(
+                    device,
+                    format,
+                    &layout,
+                    &shadow_layout,
+                    descriptor,
+                    None,
+                    None,
+                );
                 Effect {
                     name: descriptor.name,
-                    pipelines: vec![(format, pipeline)],
+                    pipelines: vec![(format, None, pipeline)],
                     enabled: false,
                     strength: 0.5,
                     uniform: super::view_uniforms::ViewUniforms::new(
@@ -498,7 +549,7 @@ impl PostProcessor {
             ssr_target: None,
             ssr_layout,
             ssr_trace_pipeline,
-            ssr_composite_pipelines: vec![(format, ssr_composite_pipeline)],
+            ssr_composite_pipelines: vec![(format, None, ssr_composite_pipeline)],
             sky_cube_color: sky_cube_fallback.create_view(&wgpu::TextureViewDescriptor {
                 dimension: Some(wgpu::TextureViewDimension::Cube),
                 ..Default::default()
@@ -1173,7 +1224,11 @@ impl PostProcessor {
         shadows_enabled: bool,
         xr_rendering: bool,
         view_slot: u32,
-    ) -> (usize, Option<wgpu::CommandBuffer>) {
+    ) -> (
+        usize,
+        Option<wgpu::CommandBuffer>,
+        Option<FinalPostprocessDraw<'_>>,
+    ) {
         // new() has no queue; initialize its white fallback once, before sampling.
         if self.reflection_mask.needs_white_upload {
             self.reflection_mask.upload(queue, 1, 1, &[255]);
@@ -1194,16 +1249,18 @@ impl PostProcessor {
             if !effect
                 .pipelines
                 .iter()
-                .any(|(format, _)| *format == output.color_format)
+                .any(|(format, depth, _)| *format == output.color_format && depth.is_none())
             {
                 effect.pipelines.push((
                     output.color_format,
+                    None,
                     Self::pipeline(
                         device,
                         output.color_format,
                         &self.layout,
                         &self.shadow_layout,
                         descriptor,
+                        None,
                         None,
                     ),
                 ));
@@ -1214,10 +1271,11 @@ impl PostProcessor {
             && !self
                 .ssr_composite_pipelines
                 .iter()
-                .any(|(format, _)| *format == output.color_format)
+                .any(|(format, depth, _)| *format == output.color_format && depth.is_none())
         {
             self.ssr_composite_pipelines.push((
                 output.color_format,
+                None,
                 Self::pipeline(
                     device,
                     output.color_format,
@@ -1229,22 +1287,60 @@ impl PostProcessor {
                         shader_source: include_str!("postprocess.wgsl"),
                     },
                     Some(&self.ssr_layout),
+                    None,
                 ),
             ));
         }
+        // The final draw can share the overlay pass. Cache both variants so an
+        // empty overlay list does not force an unnecessary depth attachment.
+        if let Some(step) = self.targets.as_ref().and_then(|t| t.plan.steps.last()) {
+            let descriptor = if step.trace.is_some() {
+                &EffectDescriptor {
+                    name: "SSR depth-aware composite",
+                    entry_point: "fs_ssr_composite",
+                    shader_source: include_str!("postprocess.wgsl"),
+                }
+            } else {
+                &EFFECTS[step.effect]
+            };
+            let pipelines = if step.trace.is_some() {
+                &mut self.ssr_composite_pipelines
+            } else {
+                &mut self.effects[step.effect].pipelines
+            };
+            if !pipelines.iter().any(|(format, depth, _)| {
+                *format == output.color_format && *depth == Some(output.depth_format)
+            }) {
+                pipelines.push((
+                    output.color_format,
+                    Some(output.depth_format),
+                    Self::pipeline(
+                        device,
+                        output.color_format,
+                        &self.layout,
+                        &self.shadow_layout,
+                        descriptor,
+                        step.trace.map(|_| &self.ssr_layout),
+                        Some(output.depth_format),
+                    ),
+                ));
+            }
+        }
         self.ssr_work = [0.0; 2];
         let Some(targets) = &self.targets else {
-            return (0, None);
+            return (0, None, None);
         };
         let active_count = targets.plan.steps.len();
         if active_count == 0 {
-            return (0, None);
+            return (0, None, None);
         }
         let _scope = super::profiler::cpu_scope("postprocess.encode");
         let shadow_matrix = crate::render_math::shadow_view_projection(light_position);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("postprocess chain"),
         });
+        let mut final_draw = None;
+        let mut encoded_passes = 0;
         for (index, step) in targets.plan.steps.iter().enumerate() {
             let effect = &self.effects[step.effect];
             let uniforms = Uniforms {
@@ -1331,6 +1427,7 @@ impl PostProcessor {
                     rect[2] as f64 * rect[3] as f64,
                     trace.width as f64 * trace.height as f64,
                 ];
+                encoded_passes += 1;
                 let stamp = super::profiler::stamp("ssr.trace");
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("SSR half-resolution trace"),
@@ -1359,6 +1456,41 @@ impl PostProcessor {
                     pass.draw(0..3, 0..1);
                 }
             }
+            let format = if index + 1 == active_count {
+                output.color_format
+            } else {
+                self.format
+            };
+            let pipelines = if half_ssr {
+                &self.ssr_composite_pipelines
+            } else {
+                &effect.pipelines
+            };
+            let pipeline = &pipelines
+                .iter()
+                .find(|(candidate, depth, _)| *candidate == format && depth.is_none())
+                .expect("cached postprocess output format")
+                .2;
+            if index + 1 == active_count {
+                let depth_pipeline = &pipelines
+                    .iter()
+                    .find(|(candidate, depth, _)| {
+                        *candidate == format && *depth == Some(output.depth_format)
+                    })
+                    .expect("cached final postprocess depth-compatible pipeline")
+                    .2;
+                final_draw = Some(FinalPostprocessDraw {
+                    name: effect.name,
+                    pipeline,
+                    depth_pipeline,
+                    source: bind_group,
+                    shadows: &self.shadow_bind_group,
+                    trace: half_ssr.then(|| &self.ssr_target.as_ref().unwrap().bind_group),
+                    uniform_offset,
+                });
+                continue;
+            }
+            encoded_passes += 1;
             let stamp = super::profiler::stamp(effect.name);
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(effect.name),
@@ -1376,36 +1508,9 @@ impl PostProcessor {
                 occlusion_query_set: None,
                 multiview_mask: None,
             });
-            let format = if index + 1 == active_count {
-                output.color_format
-            } else {
-                self.format
-            };
-            let pipelines = if half_ssr {
-                &self.ssr_composite_pipelines
-            } else {
-                &effect.pipelines
-            };
-            let pipeline = &pipelines
-                .iter()
-                .find(|(candidate, _)| *candidate == format)
-                .expect("cached postprocess output format")
-                .1;
             pass.set_pipeline(pipeline);
             if half_ssr {
                 pass.set_bind_group(2, &self.ssr_target.as_ref().unwrap().bind_group, &[]);
-            }
-            if index + 1 == active_count {
-                let viewport = output.viewport;
-                pass.set_viewport(
-                    viewport.x as f32,
-                    viewport.y as f32,
-                    viewport.width as f32,
-                    viewport.height as f32,
-                    0.0,
-                    1.0,
-                );
-                pass.set_scissor_rect(viewport.x, viewport.y, viewport.width, viewport.height);
             }
             pass.set_bind_group(0, bind_group, &[uniform_offset]);
             pass.set_bind_group(1, &self.shadow_bind_group, &[]);
@@ -1413,6 +1518,10 @@ impl PostProcessor {
         }
         self.last_pass_count =
             active_count + usize::from(self.ssr_target.is_some() && self.ssr_enabled());
-        (self.last_pass_count, Some(encoder.finish()))
+        (
+            self.last_pass_count,
+            (encoded_passes > 0).then(|| encoder.finish()),
+            final_draw,
+        )
     }
 }

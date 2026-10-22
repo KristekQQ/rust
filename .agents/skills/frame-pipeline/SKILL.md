@@ -24,6 +24,19 @@ diagnostics and selects established effects. This is not an arbitrary WGSL edito
   resolve, HUD, presentation or another eye. Keep shadow/reflection/environment
   submissions immediate because they overwrite shared uniforms. Postprocess
   submission counters advance only after the owning batch is submitted.
+- `PostProcessor::render` defers its last draw through frame-local
+  `FinalPostprocessDraw`; the renderer encodes it before overlays in the same pass.
+  Preserve the no-overlay/no-depth variant and cache pipelines by color + optional
+  depth format. WebGPU samples read-only scene depth; GL samples its separate
+  packed-depth color target, never the attached depth texture.
+- Graph effect names/counts are logical; the final physical GPU timing scope is
+  `final.postprocess.overlays` when overlays exist. Keep composition first and
+  transparency/rings/glow/helpers in order; do not double-count the final draw.
+  Validate same-backend before/after pixels with `postprocess-fusion --capture`
+  and actual stereo pass/submission checks with `webxr-webgpu`.
+- The final overlay attachment is read-only depth (`depth_ops: None`): every
+  overlay pipeline must disable depth writes. Preserve depth for occlusion and
+  later XR resolve; adding a depth-writing effect requires revisiting this contract.
 - `State::render_to` is shared by wgpu WebGPU and WebGL: its batching changes
   affect both. The 7 → 3 submit observation belongs to the tested WebGPU XR SSR
   path, including its final stereo presentation; do not claim that count for

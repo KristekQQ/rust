@@ -12,7 +12,7 @@ For gameplay feel, player skill, wave rhythm and varied VR scenes use [zabavnost
 
 For direct Quest WebGPU XR, runtime support, projection textures and headset diagnostics use [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md).
 
-For frame scheduling, transient textures/buffers, pass dependencies and CPU/GPU profiling use [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md); the extension guide is [FRAME_PIPELINE.md](docs/FRAME_PIPELINE.md).
+For frame scheduling, transient textures/buffers, pass dependencies and CPU/GPU profiling use [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md); the extension guide is [FRAME_PIPELINE.md](docs/FRAME_PIPELINE.md). For quality-preserving render optimization, keep resolution/effects fixed and compare deterministic before/after pixels on each affected backend. Pass/submit reductions and desktop timings are evidence of changed work, not proof of Quest FPS gains.
 
 For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-player-equipment/SKILL.md). For cut-impact visuals and speed tuning use [cut-feedback-tuning](.agents/skills/cut-feedback-tuning/SKILL.md); prefer existing configuration knobs for numeric iteration.
 

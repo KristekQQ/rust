@@ -44,8 +44,20 @@ uploady. Desktopové testy dokazují cache a správnost obrazu; FPS přínos Que
 je samostatné měření, zvlášť u dynamické hry a pohybující se hlavy.
 
 Scénové průchody zachovávají své nezávislé visibility/cache rozhodování.
-Postprocessing používá deklarovaný řetězec; výsledné transparentní objekty,
-cut rings, glow a helpers sdílejí finální overlay pass při zachovaném pořadí.
+Postprocessing používá deklarovaný řetězec; poslední fullscreen efekt a výsledné
+transparentní objekty, cut rings, glow a helpers sdílejí jeden render pass.
+Pořadí je fullscreen kompozice → glTF průhlednost → mesh průhlednost → cut rings
+→ glow → helpers. Odpadá samostatné uložení a opětovné načtení výsledné barvy
+mezi kompozicí a overlays; rozlišení, shadery ani počet draw calls se tím nemění.
+Jeho depth attachment je pouze pro čtení (`depth_ops: None`): všechny zde použité
+pipeline mají vypnutý zápis hloubky. Hloubka zůstává dostupná pro zakrytí i pozdější
+XR resolve, bez požadavku na další depth store. Nový efekt zapisující hloubku
+vyžaduje tento kontrakt přehodnotit; samotný `frag_depth` při vypnutém depth write
+ovlivňuje pouze test. Úspora na konkrétním headsetu vyžaduje měření.
+Bez skutečných overlays poslední efekt běží bez depth attachmentu. Cache pipeline
+rozlišuje barevný formát a volitelný formát hloubky. WebGPU může současně vzorkovat
+read-only scene depth; WebGL vzorkuje samostatnou packed-depth barevnou texturu,
+nikoli svůj připojený depth attachment (zamezení framebuffer feedback loopu).
 Graf postprocessingu neznamená, že všechny engine průchody již mají jeden encoder.
 
 WebGPU XR dokončí každé oko do vlastního color/depth cíle a následně odešle
@@ -81,9 +93,12 @@ nových změn grafu ani prokázaný výkonový zisk. Podrobnosti: [WEBXR.md](WEB
 
 `Effects::render` / `SceneRenderer::render_view` vrací hlavní command buffer;
 shadow/reflection/environment se dál odesílají ihned před přepsáním sdílených
-uniformů. `PostProcessor::render` vrací počet passů a volitelný command buffer,
-`draw_postprocess_overlays` volitelný overlay buffer. `State::render_to` tyto
-výsledky lokálně seřadí **main → postprocess → overlays** a odešle jedním
+uniformů. `PostProcessor::render` vrací počet logických efektových draw calls,
+volitelný buffer mezikroků a frame-local `FinalPostprocessDraw` s vypůjčenými
+pipeline/bindings pro poslední efekt. `draw_postprocess_overlays` tento efekt
+zakóduje jako první draw ve společném finálním passu. Descriptor nepřežívá pohled.
+`State::render_to` výsledky seřadí **main → postprocess mezikroky → final + overlays**
+a odešle jedním
 `queue.submit` pro daný pohled. Postprocess frame counter se zvýší až potom.
 Při chybě se lokální neodeslané buffery zahodí; nic se neukládá do dalšího snímku.
 
@@ -92,8 +107,9 @@ dalšího oka. Nesbírej auxiliary passy kolem celého `render_view`: přepisuj�
 uniformy. V běžné XR aréně se SSR, bez využití compositor depth a bez debug HUD,
 jsou nyní dvě odeslání očí + jedno finální stereo předání místo šesti + jednoho.
 Přibyde-li skutečný shadow/reflection pass, depth resolve, HUD či profiler readback,
-má vlastní odeslání. Počet render passů ani ray-march kroků se tím nesnižuje;
-headsetový FPS přínos je nutné měřit. `webxr-webgpu` kontroluje skutečné submitty
+má vlastní odeslání. Batching submitů sám počet passů nemění. Sloučení finální
+kompozice s neprázdnými overlays odstraní jeden render pass na pohled; počet
+ray-march kroků a draw calls zachovává. Headsetový FPS přínos je nutné měřit. `webxr-webgpu` kontroluje skutečné submitty
 včetně jejich command bufferů a pass labels, nikoli jen deklarovaný graf.
 
 `State::render_to` je společný pro wgpu WebGPU i WebGL, takže tato úprava
@@ -107,6 +123,22 @@ Pohyb kamery/hlavy však mění pohled i nad statickou geometrií, takže SSR a 
 každého oka nelze automaticky převzít z minulého snímku. Další reuse (například
 render bundles na podporovaném backendu) vybírej podle měření a konkrétních
 závislostí, ne pouze podle označení scény jako statické.
+
+## Logické efekty a fyzické průchody
+
+`postprocessing.graph()` nadále ukazuje závislosti efektů (`ssr.trace`,
+`ssr.compose`, `bloom.compose` atd.), nikoli celý renderer. Poslední logický krok
+provádí `FinalPostprocessDraw` ve společném passu `final.postprocess.overlays`.
+GPU profiler měří tento celek; nerozděluj jeho čas na samostatný efekt a glow.
+Bez overlays má finální pass původní název efektu. Statistiky `passes` postprocessingu
+zachovávají počet efektových draw calls, nikoli počet všech fyzických passů scény.
+Nový poslední efekt používá stejné rozhraní bez znalosti konkrétní arény.
+
+`postprocess-fusion --capture` v udržovaném browser runneru uloží deterministické
+snímky plně načtené arény pro SSR half/full, více efektů, průhlednost/glow, helpers,
+texturový výstup a scénu bez overlays. Při změně skládání porovnej původní a nové
+pixely zvlášť na stejném backendu. `webxr-webgpu` ověřuje fyzické pass labels,
+obě oči, hloubku, sRGB a stabilní cache. Desktop/simulace nedokazuje Quest FPS.
 
 ## Kontrakt grafu
 
