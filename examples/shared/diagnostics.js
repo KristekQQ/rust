@@ -11,7 +11,7 @@ export function reportDiagnostic(stage,error,details={}) {
     const key=JSON.stringify([stage,detail.message]);
     // Performance and effect changes need successive samples, including after a
     // toggle or XR reentry. Bound them separately from one-off error messages.
-    if(stage==='xr-performance'||stage==='ssr-changed'){
+    if(stage==='xr-performance'||stage==='ssr-changed'||stage==='xr-benchmark-result'){
         if(streamed>=80)return;
         streamed++;
     }else{

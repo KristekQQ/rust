@@ -1,5 +1,32 @@
 # Development and verification
 
+## Produkční sestavení pro Quest
+
+`npm run build:production` sestaví rychlostně optimalizované release WASM
+(`opt-level=3`, fat LTO, jedna codegen jednotka, `wasm-opt -O3`), minifikuje JS/CSS
+a připraví gzip/Brotli varianty do izolovaného `output/production/`.
+Moduly ukázek zůstávají oddělené; nejde o sdílený runtime bootstrap.
+Manifest obsahuje režim sestavení a SHA-256 jednotlivých souborů.
+
+`npm run serve:quest` (také `scripts/run-quest.sh`) vždy připraví tento balíček,
+matching WASM znovu nepřekládá, a servíruje jej přes důvěryhodné HTTPS.
+Vývojový `scripts/run-local.sh` nadále používá `--dev`, ale jeho server neslouží
+k porovnávání FPS. Produkční server čte izolovaný balíček, nikoli pracovní `pkg/`.
+HTTP odpovědi záměrně zakazují cache, aby Quest po nové iteraci nezůstal na staré verzi;
+předkomprimované soubory zrychlují přenos, ne GPU shadery.
+
+Ověření skutečně minifikovaného balíčku pomocí stejného browser runneru:
+
+```sh
+npm run build:production
+npm run test:production
+VERIFY_WASM_PROFILE=release npm run test:browser -- --production-root output/production --page neon-arena,neon-font-preview,webxr-webgpu,neon-arena-xr --backend all
+```
+
+Runner připojí `/tests/` výhradně pro ověření; produkční server tento mount nemá.
+Nižší velikost a vyšší úroveň optimalizace samy nedokazují vyšší FPS.
+Quest přijetí a výkon se posuzují samostatně na zařízení.
+
 ## Automated entry points
 
 `npm ci` installs the committed lockfile. Use `npm run verify` for native tests/Clippy/format, SDK and harness tests, locked wasm32 check/Clippy/build, typecheck, then **every registered browser scenario on WebGPU and WebGL**. Install the pinned Rust toolchain, Clippy (`rustup component add clippy`) and wasm-pack 0.15.0 first. The runner uses this repository's pinned Puppeteer, closes each page before the next, and starts/stops its own loopback server on a free port.

@@ -4,19 +4,23 @@
     "puppeteer": "25.12.0"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
     "typescript": "7.0.2"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test:sdk": "node --test tests/sdk-unit.test.mjs",
-    "test:harness": "node --test tests/harness-unit.test.mjs",
+    "test:harness": "node --test tests/harness-unit.test.mjs tests/production-bundle-unit.test.mjs && python3 tests/production-server-unit.py && python3 tests/arena-tools-unit.py",
     "verify:fast": "npm run typecheck && npm run test:sdk && npm run test:harness",
     "test:browser": "node scripts/test-browser.mjs",
     "verify": "bash scripts/verify.sh all",
     "verify:push": "bash scripts/pre-push",
     "verify:native": "bash scripts/verify.sh native",
     "verify:browser": "bash scripts/verify.sh browser",
-    "test:xr": "node --test tests/xr-simulator-unit.test.mjs tests/diagnostics-unit.test.mjs tests/neon-geometry-unit.test.mjs",
-    "verify:vr": "npm run test:xr && bash scripts/verify.sh browser --page webxr-contract,webxr,webxr-simulation,neon-arena-xr --backend webgl --capture"
+    "test:xr": "node --test tests/xr-simulator-unit.test.mjs tests/diagnostics-unit.test.mjs tests/neon-geometry-unit.test.mjs tests/performance-test-unit.test.mjs tests/arena-wave-unit.test.mjs tests/arena-presets-unit.test.mjs tests/arena-minute-unit.test.mjs",
+    "verify:vr": "npm run test:xr && bash scripts/verify.sh browser --page webxr-contract,webxr,webxr-simulation,neon-arena-xr --backend webgl --capture",
+    "build:production": "bash scripts/build-release.sh",
+    "serve:quest": "bash scripts/run-quest.sh",
+    "test:production": "node --test tests/production-bundle-unit.test.mjs && python3 tests/production-server-unit.py"
   }
 }

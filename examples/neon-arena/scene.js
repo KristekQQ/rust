@@ -1,12 +1,13 @@
+export const ARENA_REVISION='end-round-start-46';
 import { swordGeometry, neonFrameGeometry, fruitGeometries, createFruitPatternCatalog, FRUIT_PATTERN_COUNT } from './geometry.js';
 export const NEON_GLOW=Object.freeze({strength:.4,radius:.045});
 export const PAYTABLE_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([-2.75,1.2,-.40]);
 export const PAYTABLE_YAW=Math.PI/2;
 export const COMBO_DISPLAY_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([0,1.42,-2.15]);
-export const FRUIT_SCALE=.105; // Half of the original .21 gameplay scale.
+export const FRUIT_SCALE=.09; // Comfortable playable targets; gallery/UI scale is independent.
 export const FRUIT_OPACITY=.06;
 export const FRUIT_OPACITY_VARIATION=1;
-export const RESTART_POSITION=/** @type {import('../../js/engine.d.ts').Vector3} */([0,.20,-1.45]);
+export const RESTART_POSITION=/** @type {import('../../js/engine.d.ts').Vector3} */([0,1.20,.95]);
 export const FLOOR_SSR=Object.freeze({strength:.92});
 export const FLOOR_SSR_BOUNDS={min:/** @type {import('../../js/engine.d.ts').Vector3} */([-1.5,-.03,-3]),max:/** @type {import('../../js/engine.d.ts').Vector3} */([1.5,.03,.75])};
 // Gentle hits only; fast attacks keep their full effect. Tune from the Quest URL (?hitSize=0.08) without rebuilding WASM.
@@ -89,7 +90,7 @@ export async function createScene(scene) {
             PAYTABLE_ORIGIN[1]+Math.cos(boardTilt)*(y-1.2)-Math.sin(boardTilt)*depth,
             PAYTABLE_ORIGIN[2]-Math.sin(PAYTABLE_YAW)*x+Math.cos(PAYTABLE_YAW)*localZ];
     };
-    const comboRules = scene.createTextPanel({title:'3 STEJNE - BODY',lines:['WILD NAHRADI KAZDE OVOCE'],position:onBoard(0,2.36,-.05),width:1.65,height:.13}).setRotation([boardTilt,PAYTABLE_YAW,0]);
+    const comboRules = scene.createTextPanel({title:'BONUS ZA TROJICI',lines:['WILD NAHRADI KAZDE OVOCE'],position:onBoard(0,2.36,-.05),width:1.65,height:.13}).setRotation([boardTilt,PAYTABLE_YAW,0]);
     const catalog=[...fruits].sort((a,b)=>FRUIT_POINTS[a.name].points-FRUIT_POINTS[b.name].points).concat(wild);
     const rowPositions=catalog.map((_,i)=>/** @type {import('../../js/engine.d.ts').Vector3} */ ([0,2.15-i*.215,-2.65]));
     const galleryPositions=catalog.flatMap((_,row)=>[-.46,-.16,.14].map(x=>
@@ -161,24 +162,33 @@ export async function createScene(scene) {
         .setEmission(4).setRenderOptions({castsShadow:false,receivesShadow:false});
     const scoreLabel=scene.createTextPanel({title:'SKORE',lines:[],position:[0,2.075,-2.15],width:.50,height:.10})
         .setRenderOptions({castsShadow:false,receivesShadow:false});
-    const currentLabel=scene.createTextPanel({title:'3 STEJNE',lines:[],position:[0,1.70,-2.15],width:.70,height:.12})
+    const currentLabel=scene.createTextPanel({title:'DVA ZASOBNIKY',lines:['REZ +10 / SERIE = BONUS'],position:[0,1.07,-2.15],width:1.35,height:.17})
         .setEmission(1.2).setRenderOptions({castsShadow:false,receivesShadow:false});
-    const awardPanels=[0,1,2].map(row=>scene.createInfoPanel('combo-award',{
-        position:[.90,COMBO_DISPLAY_ORIGIN[1]-(row+1)*.35,-2.15],width:.55,height:.18})
+    const awardPanels=[0,1,2].map(row=>scene.createInfoPanel(row<2?'debug-text':'combo-award',{
+        position:[.90,COMBO_DISPLAY_ORIGIN[1]-(row+1)*.35,-2.15],width:row<2?.18:.55,height:row<2?.05:.18})
         .setRenderOptions({castsShadow:false,receivesShadow:false}));
-    const comboDisplay={symbols:[...fruits,wild].map(fruit=>({kind:FRUIT_POINTS[fruit.name].label,
+    const stockScorePanels=[-.32,.32].map(x=>scene.createInfoPanel('combo-award',{position:[x,COMBO_DISPLAY_ORIGIN[1]-.22,COMBO_DISPLAY_ORIGIN[2]+.04],width:.28,height:.11})
+        .setEmission(4).setRenderOptions({castsShadow:false,receivesShadow:false}));
+    const comboDisplay={mode:/** @type {'chains'} */('chains'),symbols:[...fruits,wild].map(fruit=>({kind:FRUIT_POINTS[fruit.name].label,
         asset:recipes.get(fruit.geometry).asset.id,variant:0})),frameAsset:earnedFrameAsset.id,
         origin:COMBO_DISPLAY_ORIGIN,spacing:.34,rowGap:.35,fruitScale:.085,
         frameScale:/** @type {import('../../js/engine.d.ts').Vector3} */([1,1,1]),
-        historySeconds:2,timerPanel,scorePanel,awardPanels};
+        historySeconds:2,timerPanel,scorePanel,awardPanels,stockScorePanels};
     const logo = scene.createTextPanel({title:'APOLLO GAMES',lines:[],position:onBoard(0,3.11,-.158),width:2.20,height:.65}).setRotation([boardTilt,PAYTABLE_YAW,0]);
-    const restartButton = scene.createInfoPanel('restart', {position:RESTART_POSITION,width:.75,height:.22});
+    const phasePanels=[['VOLBA','VYBER DRAZSI TROJICI'],['DOKONCI','DVA TED - TRETI ZA CHVILI'],['PRESNOST','MALY CIL - VELKA ODMENA'],['NACASOVANI','POCKEJ NA SROVNANI'],['SERIE','DRZ SVOJE DVA DRUHY'],['FINALE','DRZ DRUH A DOKONCI TROJICI']].map(([title,hint])=>({title,object:scene.createTextPanel({title,lines:[hint],position:[100,100,100],width:1.7,height:.23})
+        .setEmission(2).setRenderOptions({castsShadow:false,receivesShadow:false})}));
+    const restartButton = scene.createTextPanel({title:'START',lines:[],position:RESTART_POSITION,width:.50,height:.22})
+        .setRotation([0,-Math.atan2(RESTART_POSITION[0],-RESTART_POSITION[2]),0]);
     /** @type {import("../../js/engine.d.ts").TriangleMeshOptions} */
     const pointerGeometry={positions:[0,1,0,0,-1,0,-1,0,0,1,0,0,0,0,1,0,0,-1],
         indices:[0,4,3,0,3,5,0,5,2,0,2,4,1,3,4,1,5,3,1,2,5,1,4,2],color:[.15,1,.35]};
     const pointers = ['left','right'].map(()=>scene.createMesh(pointerGeometry).setPosition([100,100,100]).setScale([.012,.012,.012])
         .setRenderOptions({castsShadow:false,receivesShadow:false}));
-    return {scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
+    // Shared launch glints: presentation only, with no projectile/collider proxy.
+    const launchGlintAssets=[[.15,1,.75],[1,.25,.65],[1,.8,.2]].map(color=>scene.createMeshVariants({
+        positions:pointerGeometry.positions,indices:pointerGeometry.indices,
+        variants:[Array.from({length:8},()=>color).flat()]}));
+    return {stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
 }
 
 // Points per completed triple; adapted ranking, not the slot's cash payouts.
@@ -191,17 +201,19 @@ export const FRUIT_POINTS = /** @type {Record<string, {label:string,points:numbe
 });
 
 /** Vystřelení je příkaz; dráhu, rotaci, gravitaci a odstranění počítá Rust.
- * Start je ve výšce rukou: plod musí být v obou očích vidět již v prvním snímku.
+ * Authored minute launches start below the strike zone; Rust integrates the rise and fall.
  * @param {import('../../js/engine.js').Scene} scene
  * @param {ReturnType<typeof fruitGeometries>[number]} fruit
- * @param {number} side @param {boolean} [solid] */
-export function launchApple(scene, fruit, side, solid=true) {
-    return createFruitMesh(scene,fruit).setPosition([side*.38,1.15,-1.10]).setScale([FRUIT_SCALE,FRUIT_SCALE,FRUIT_SCALE])
+ * @param {number} side @param {boolean} [solid]
+ * @param {{position:import("../../js/engine.d.ts").Vector3,velocity:import("../../js/engine.d.ts").Vector3,gravity:number,lifetime:number,scale?:number}} [recipe] */
+export function launchApple(scene, fruit, side, solid=true, recipe) {
+    return createFruitMesh(scene,fruit).setPosition(recipe?.position??[side*.38,1.15,-1.10]).setScale([recipe?.scale??FRUIT_SCALE,recipe?.scale??FRUIT_SCALE,recipe?.scale??FRUIT_SCALE])
         .setEmission(2.4).setColorCutout(solid?0:.25).setOpacity(solid?FRUIT_OPACITY:1,{opaqueAbove:.25,variation:solid?FRUIT_OPACITY_VARIATION:0,coverage:fruit.coverage??.5}).setRenderOptions({castsShadow:false,receivesShadow:false})
         .setCuttable(true,{capColor:cutFaceColor(fruit,solid)})
         .setComboTarget(FRUIT_POINTS[fruit.name].label,FRUIT_POINTS[fruit.name].points,{wild:fruit.name==='wild'})
-        .projectile([-side*.035,1.2,.08],{gravity:1.6,bounce:0})
-        .spin([.12,.45,.06]).removeAfter(1.9);
+        .projectile(recipe?.velocity??[-side*.035,1.2,.08],{gravity:recipe?.gravity??1.6,bounce:0})
+        .spin(recipe&&recipe.gravity>=2?[.55+Math.abs(recipe.velocity[0])*.8,.8+Math.abs(recipe.position[0])*.7,recipe.velocity[0]*1.1]:[.12,.45,.06])
+        .removeAfter(recipe?.lifetime??1.9);
 }
 
 /** Open style discards dark caps; solid style renders the fruit's colored flesh.

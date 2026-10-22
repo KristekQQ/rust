@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8"><title>Ten fruit authoring tools / simulated VR</title>
+<style>body{background:#080d1b;color:#b8eaff}canvas{width:640px;height:400px}</style>
+<canvas id="gpu-canvas"></canvas><button id="enter">VR</button><button id="exit" hidden>Exit</button><p id="status"></p>
+<section id="arena-tools"><input name="count" type="range" min="1" max="10"><span id="wave-count"></span><input name="intervalMs" type="number"><select name="formation"><option>arc</option><option>line</option><option>cross</option><option>rain</option></select><select name="fruit"><option>mixed</option><option>cherry</option></select><input name="automatic" type="checkbox"><button data-tool="arena_spawn">Spawn</button><button data-tool="arena_stop">Stop</button><output></output></section>
+<canvas id="evidence"></canvas><ol id="checks"></ol><pre id="result">RUNNING</pre>
+<script type="module">
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+const sim=installXRSimulator({profile:{eyeWidth:800,eyeHeight:800}});
+const run=new XRTestRun('arena-waves',sim,publishXRReport);
+const previousPreset=localStorage.getItem('neon-arena.wave-preset.v1');
+let app;
+await run.execute(async test=>{
+    app=await import('../examples/neon-arena/main.js');
+    app.arenaTools.call('arena_reset');
+    const {engine,arenaTools}=app;
+    arenaTools.call('arena_configure',{formation:'arc',program:'practice'});
+    await engine.xr.enter();
+    const pose={dt:0,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{}};
+    sim.frame(pose);
+    let fruit=app.gameState().liveApples;
+    test.assert(fruit.length===10&&app.gameState().shots===10,'VR immediately shows ten actual cuttable fruit');
+    test.assert(sim.timerCount===1,'one automatic wave timer');
+    test.assert(fruit.every(object=>Math.abs(object.meshInfo.scale[0]-.09)<1e-6),'all ten fruit use the larger comfortable physical meshes');
+    test.assert(fruit[9].meshInfo.position[1]-fruit[0].meshInfo.position[1]>.3&&fruit[4].meshInfo.position[1]>(fruit[0].meshInfo.position[1]+fruit[9].meshInfo.position[1])/2+.15,'targets form a sloped curved stroke in XR coordinates');
+    const left=sim.pixels('left'),right=sim.pixels('right');
+    const canvas=document.getElementById('evidence');canvas.width=left.width+right.width;canvas.height=left.height;
+    canvas.getContext('2d').putImageData(left,0,0);canvas.getContext('2d').putImageData(right,left.width,0);
+    for(const object of fruit){
+        const position=object.meshInfo.position;
+        object.setPosition([100,100,100]);sim.frame(pose);
+        test.assert(pixelDifference(left,sim.pixels('left'),3)>15&&pixelDifference(right,sim.pixels('right'),3)>15,'each of ten targets contributes pixels in BOTH eyes #'+object.id);
+        object.setPosition(position);
+    }
+    test.assert(arenaTools.call('arena_spawn').spawned===0&&app.gameState().liveApples.length===10,'repeated commands cannot exceed ten original targets');
+    document.querySelector('[data-tool=arena_stop]').click();test.assert(sim.timerCount===0,'human Stop uses same dispatcher and cancels timer');
+    const count=document.querySelector('[name=count]');count.value='6';count.dispatchEvent(new Event('change',{bubbles:true}));
+    test.assert(arenaTools.config.count===6&&document.getElementById('wave-count').textContent==='6','human control updates API config');
+    test.assert(sim.timerCount===0,'changing density does not resume a manually stopped director');
+    arenaTools.call('arena_configure',{count:10,automatic:false});
+    test.assert(count.value==='10'&&sim.timerCount===0,'AI configuration updates panel and automatic toggle');
+    // Same real Rust split used by a blade; no synthetic fruit placeholders.
+    const target=fruit[3],position=target.meshInfo.position;
+    const cutter=engine.scene.createCube([position[0],position[1]+.4,-.45]).setScale([.01,.01,.01]).setCutter({base:[0,0,-10],tip:[0,0,-95]});
+    const cut=engine.scene.cutWith(cutter,{motion:[0,-.8,0],separation:.03});cutter.remove();
+    test.assert(cut.removed.includes(target.id)&&cut.pieces.length>=2&&cut.pieces.every(piece=>piece.exists&&piece.meshInfo.closed),'wave targets really split into closed Rust meshes',{target:target.id,removed:cut.removed,pieces:cut.pieces.map(piece=>({id:piece.id,closed:piece.meshInfo.closed}))});
+    cut.pieces.forEach(piece=>piece.remove());
+    for(let frame=0;frame<28;frame++)sim.frame({...pose,dt:100});
+    test.assert(app.gameState().liveApples.length===0,'Rust lifetime removes uncut fruit');
+    document.querySelector('[data-tool=arena_spawn]').click();
+    test.assert(app.gameState().liveApples.length===10,'human Spawn creates next full wave');
+    const next=app.gameState().liveApples;
+    test.assert(next[0].meshInfo.position[1]-next[9].meshInfo.position[1]>.3,'next wave reverses the slope to vary the player stroke');
+    let rejected=false;try{arenaTools.call('arena_configure',{count:11});}catch{rejected=true;}
+    test.assert(rejected&&arenaTools.config.count===10,'invalid AI configuration is rejected without mutation');
+    await engine.xr.exit();
+    test.assert(sim.timerCount===0,'exit releases all wave timers');
+});
+if(previousPreset===null)localStorage.removeItem('neon-arena.wave-preset.v1');else localStorage.setItem('neon-arena.wave-preset.v1',previousPreset);
+app?.engine.dispose();sim.dispose();
+</script>

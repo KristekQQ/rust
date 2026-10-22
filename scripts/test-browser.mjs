@@ -22,6 +22,10 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 
 const suites = [
     { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },
+    { name: 'arena-minute', path: 'tests/arena-minute.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'arena-presets', path: 'tests/arena-presets.html', status: '#result', backends:['webgl'] },
+    { name: 'arena-waves', path: 'tests/arena-waves.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'neon-arena-benchmark', path: 'tests/neon-arena-benchmark.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-font-preview', path: 'examples/neon-font-preview/', status: '#result', button: '#verify' },
     { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
@@ -48,11 +52,13 @@ const suites = [
     { name: 'fox-control', path: 'examples/fox-control/', status: '#status', interaction: 'fox' },
     { name: 'culling', path: 'examples/culling/', interaction: 'culling' },
 ];
-let xrSlow = false;
+let xrSlow = false, arenaLegacyStress = false, productionRoot = null;
 let backends = ['webgpu', 'webgl'], selected = suites, software = false, headed = false, capture = false, timeout = 90000;
 for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
-    if (arg === '--xr-slow') xrSlow = true;
+    if (arg === '--production-root') productionRoot = path.resolve(process.argv[++i] || 'output/production');
+    else if (arg === '--arena-legacy-stress') arenaLegacyStress = true;
+    else if (arg === '--xr-slow') xrSlow = true;
     else if (arg === '--software') software = true;
     else if (arg === '--capture') capture = true;
     else if (arg === '--headed') headed = true;
@@ -68,11 +74,12 @@ for (let i = 2; i < process.argv.length; i++) {
         timeout = Number(process.argv[++i]);
         if (!Number.isFinite(timeout) || timeout < 1000) throw new Error('--timeout must be at least 1000 ms');
     } else if (arg === '--help') {
-        console.log('node scripts/test-browser.mjs [--backend all|webgpu|webgl] [--page suite,suite] [--software] [--headed] [--capture] [--xr-slow] [--timeout ms]');
+        console.log('node scripts/test-browser.mjs [--backend all|webgpu|webgl] [--page suite,suite] [--software] [--headed] [--capture] [--xr-slow] [--arena-legacy-stress] [--timeout ms]');
         process.exit(0);
     } else throw new Error(`Unknown option ${arg}`);
 }
 
+if (productionRoot) process.env.VERIFY_WASM_PROFILE = 'release';
 let browser, server;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function verifyHud(page, simpleScene = false) {
@@ -355,7 +362,9 @@ async function applicationFingerprint() {
     return hash.digest('hex');
 }
 async function startServer() {
-    server = spawn('python3', ['-u', 'scripts/serve-local.py', '0'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+    const serverArgs = ['-u', 'scripts/serve-local.py', '0'];
+    if (productionRoot) serverArgs.push('--production', '--directory', productionRoot, '--test-directory', path.join(root, 'tests'));
+    server = spawn('python3', serverArgs, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
     let log = '';
     server.stderr.on('data', data => { log = (log + data).slice(-4000); });
     return new Promise((resolve, reject) => {
@@ -380,6 +389,10 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
 });
 try {
     report.build = await assertFreshBuild();
+    if (productionRoot) {
+        const {assertProductionBuild} = await import('./build-production.mjs');
+        report.production = await assertProductionBuild(productionRoot, {checkCurrentSource: true});
+    }
     report.application = await applicationFingerprint();
     await mkdir(output, { recursive: true });
     const baseUrl = await startServer();
@@ -410,6 +423,7 @@ try {
         try {
             const url = new URL(suite.path, baseUrl);
             url.searchParams.set('backend', backend === 'webgl' ? 'webgl' : 'auto');
+            if (arenaLegacyStress && suite.name === 'arena-minute') url.searchParams.set('legacyStress','1');
             if (xrSlow && suite.xrReport) url.searchParams.set('slow','1');
             result.url = url.href;
             await page.goto(url.href, { waitUntil: 'load' });

@@ -155,11 +155,11 @@ export class Scene {
     createMesh(options: TriangleMeshOptions): SceneObject;
     createMeshVariants(options: MeshVariantsOptions): MeshVariants;
     /** Actual world-space text mesh; width/height in metres, facing local +Z. */
-    createInfoPanel(kind: 'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
+    createInfoPanel(kind: 'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award'|'debug-text', options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
     /** Static inscription of 1..32 ASCII digits using shared 3D tube meshes. */
     createNumericText(value: string, options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
     createTextPanel(options: {title: string; lines: string[]; position?: Vector3; width?: number; height?: number}): SceneObject;
-    playCutFeedback(pieces: SceneObject[], options?: {mirrorText?: boolean; /** Gentle hit size multiplier, 0.01..2; fast tracked attacks retain full size. */ size?: number}): {objects: SceneObject[]; duration: number};
+    playCutFeedback(pieces: SceneObject[], options?: {mirrorText?: boolean; /** Native hit reward or current chain bonus sum, sampled at the hit. */ scoreLabel?:'pending-bonus'|'hit-points'|'stock-total'; /** Gentle hit size multiplier, 0.01..2; fast tracked attacks retain full size. */ size?: number}): {objects: SceneObject[]; duration: number};
     clearCutFeedback(): void;
     cutWithAsync(cutter:SceneObject,options:AsyncCutOptions):Promise<AsyncCutResult>;
     aimCutter(cutter:SceneObject,options:CutterAimOptions):Vector3;
@@ -247,8 +247,9 @@ export interface PostProcessing {
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
     stats(): { passes: number; width: number; height: number; targets: number; frames: number; ssrWidth:number; ssrHeight:number; ssrPixels:number; ssrTracePixels:number; ssrViewportPixels:number };
 }
-export interface XRCutReport extends CutResult { handedness: 'left'|'right'; bladeContacts?: number }
-export interface XRRoundState { duration: number; remaining: number; finished: boolean; cuts: number; score: number; streak: number; fruit: string; triples: number }
+export interface XRCutReport extends CutResult { handedness: 'left'|'right'; bladeContacts?: number; /** Actual native score increase per original in this cut. */ scoreAwards?: {original:number;points:number;totalPoints:number}[] }
+export interface FruitChainState {kind:string;count:number;points:number;potential:number}
+export interface XRRoundState { mode?:'legacy'|'chains'; chains?:(FruitChainState|null)[]; rejected?:number; pendingBonus?:number; duration: number; remaining: number; finished: boolean; cuts: number; score: number; streak: number; fruit: string; triples: number }
 export interface XRHandOptions {cutting?: boolean; requireTrigger?: boolean; haptics?: boolean}
 export interface XRTrackedPose {
     readonly tracked: boolean;
@@ -278,17 +279,23 @@ export class XRPlayer {
     unequip(hand:'left'|'right'): this;
 }
 export interface ComboDisplayOptions {
+    mode?: 'legacy'|'chains';
     symbols: readonly {kind:string;asset:number;variant:number}[];
     frameAsset: number;
     origin: Vector3; spacing: number; rowGap: number; fruitScale: number;
     frameScale?: Vector3;
     historySeconds?: number;
-    timerPanel: SceneObject; scorePanel: SceneObject; awardPanels: readonly SceneObject[];
+    stockScorePanels?: readonly SceneObject[];
+    stackScorePanel?: SceneObject; timerPanel: SceneObject; scorePanel: SceneObject; awardPanels: readonly SceneObject[];
 }
 export interface ComboDisplayRow {
     kind: string; count: number; icons: number[]; frames: number[];
 }
 export interface ComboDisplayState {
+    mode?:'legacy'|'chains';
+    pendingBonus?:number; stackScorePanel?:number|null; stockScorePanels?:number[]|null;
+    retiring?:{age:number;earnedBonus:number;earnedPoints:number;scoreLabel:number|null;objects:number[]}|null;
+    chains?:(FruitChainState & {earnedPoints:number;icons:number[];frames:number[];label:number})[];
     current: ComboDisplayRow|null;
     history: (ComboDisplayRow & {success:boolean;points:number;age:number;opacity:number;label:number})[];
 }
@@ -300,6 +307,7 @@ export interface WebXRHost extends EventTarget {
     startRound(seconds?: number): void;
     readonly roundState: XRRoundState|null;
     configureComboDisplay(options: ComboDisplayOptions): void;
+    bankChain(hand: 'left'|'right'): boolean;
     clearComboDisplay(): void;
     readonly comboDisplayState: ComboDisplayState|null;
     /** Grip pose is applied in Rust. requireTrigger defaults to true; false enables natural swings. Null unbinds. */

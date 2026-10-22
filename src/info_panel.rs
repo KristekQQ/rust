@@ -9,6 +9,7 @@ pub enum PanelKind {
     Diagnostics,
     Text,
     NumericText,
+    DebugText,
     Countdown,
     Score,
     ComboAward,
@@ -25,11 +26,12 @@ impl PanelKind {
             "countdown" => Ok(Self::Countdown),
             "score" => Ok(Self::Score),
             "combo-award" => Ok(Self::ComboAward),
+            "debug-text" => Ok(Self::DebugText),
             "scene" => Ok(Self::Scene),
             "round" => Ok(Self::Round),
             "restart" => Ok(Self::Restart),
             "diagnostics" => Ok(Self::Diagnostics),
-            _ => Err("Info panel kind must be scene, round, restart, diagnostics, countdown, score, or combo-award".into()),
+            _ => Err("Info panel kind must be scene, round, restart, diagnostics, countdown, score, combo-award, or debug-text".into()),
         }
     }
 }
@@ -55,6 +57,7 @@ impl InfoPanel {
             PanelKind::Countdown => vec![("", "30".into())],
             PanelKind::Score => vec![("", "0".into())],
             PanelKind::ComboAward => vec![("", "".into())],
+            PanelKind::DebugText => vec![("", "".into())],
             PanelKind::Text | PanelKind::NumericText => {
                 return Err("Use the static text constructor".into())
             }
@@ -227,6 +230,21 @@ pub fn geometry(kind: PanelKind, width: f32, height: f32, rows: &[(&str, String)
         return numeric_geometry(width, height, rows.first().map_or("", |row| row.1.as_str()));
     }
     let mut mesh = empty_mesh(width, height);
+    if kind == PanelKind::DebugText {
+        let value = rows.first().map_or("", |row| row.1.as_str());
+        if !value.is_empty() {
+            let unit = fit(value, width * 0.94, height * 0.90);
+            text(
+                &mut mesh,
+                value,
+                -text_width(value, unit) / 2.,
+                3.5 * unit,
+                unit,
+                [0.55, 0.55, 0.55],
+            );
+        }
+        return mesh;
+    }
     if matches!(
         kind,
         PanelKind::Countdown | PanelKind::Score | PanelKind::ComboAward
@@ -284,6 +302,7 @@ pub fn geometry(kind: PanelKind, width: f32, height: f32, rows: &[(&str, String)
         | PanelKind::Countdown
         | PanelKind::Score
         | PanelKind::ComboAward => "",
+        PanelKind::DebugText => "",
     };
     let title_unit = fit(title, width * 0.86, height * 0.15);
     text(&mut mesh, title, left, top, title_unit, GOLD);
@@ -376,6 +395,45 @@ mod tests {
             .iter()
             .chain(&award.mesh.bounds_max)
             .all(|n| n.is_finite()));
+    }
+    #[test]
+    fn debug_text_panel_is_empty_neutral_centered_and_cached_on_repeat() {
+        let mut panel = InfoPanel::new(PanelKind::DebugText, 1.2, 0.3).unwrap();
+        assert!(panel.mesh.vertices.is_empty());
+        assert!(!panel.kind.neon());
+        assert!(!panel.numeric());
+        assert!(panel.update(vec![("", "DEBUG".into())]));
+        assert!(!panel.mesh.vertices.is_empty());
+        assert!(panel
+            .mesh
+            .vertices
+            .iter()
+            .all(|v| v.color == [0.55, 0.55, 0.55]));
+        assert!(panel.mesh.vertices.iter().all(|v| v.position[2] == 0.003));
+        let min_x = panel
+            .mesh
+            .vertices
+            .iter()
+            .map(|v| v.position[0])
+            .fold(f32::INFINITY, f32::min);
+        let max_x = panel
+            .mesh
+            .vertices
+            .iter()
+            .map(|v| v.position[0])
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!((min_x + max_x).abs() < 1e-6);
+        assert!(panel
+            .mesh
+            .vertices
+            .iter()
+            .all(|v| v.position[0].abs() <= panel.width / 2.
+                && v.position[1].abs() <= panel.height / 2.));
+        let indices = panel.mesh.indices.clone();
+        panel.dirty = false;
+        assert!(!panel.update(vec![("", "DEBUG".into())]));
+        assert_eq!(panel.mesh.indices, indices);
+        assert!(!panel.dirty);
     }
     #[test]
     fn info_panel_neon_numbers_are_centered_background_free_and_content_cached() {

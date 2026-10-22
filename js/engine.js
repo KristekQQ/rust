@@ -178,7 +178,7 @@ export class Scene {
     /** @param {Vector3} [position] */
     createSphere(position = [0, 0, 0]) { return this.#create(this.#wasm.add_sphere(...position)); }
     /** World-space Rust text geometry, updated from native scene/round data.
-     * @param {'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award'} kind
+     * @param {'scene'|'round'|'restart'|'diagnostics'|'countdown'|'score'|'combo-award'|'debug-text'} kind
      * @param {{position?: Vector3, width?: number, height?: number}} [options] */
     createInfoPanel(kind, {position = [0,0,0], width = 1.2, height = .72} = {}) {
         return this.#create(this.#wasm.add_info_panel(kind, width, height)).setPosition(position);
@@ -234,10 +234,12 @@ export class Scene {
         return {...result, pieces: result.pieces.map((/** @type {number} */ id) => this.#create(id))};
     }
     /** Explicit bounded Rust burst and fragment presentation.
-     * @param {SceneObject[]} pieces @param {{mirrorText?: boolean,size?: number}} [options] @returns {{objects: SceneObject[], duration: number}} */
-    playCutFeedback(pieces, {mirrorText = false, size = 1} = {}) {
+     * @param {SceneObject[]} pieces @param {{mirrorText?: boolean,size?: number,scoreLabel?: 'pending-bonus'|'hit-points'|'stock-total'}} [options] @returns {{objects: SceneObject[], duration: number}} */
+    playCutFeedback(pieces, {mirrorText = false, size = 1, scoreLabel = undefined} = {}) {
         if (pieces.some(p => handleBindings.get(p) !== this.#wasm)) throw new Error('Fragmenty musí patřit této scéně.');
-        const result = JSON.parse(this.#wasm.play_cut_feedback_facing(new Uint32Array(pieces.map(p => p.id)), mirrorText, size));
+        if (scoreLabel !== undefined && scoreLabel !== 'pending-bonus' && scoreLabel !== 'hit-points' && scoreLabel !== 'stock-total') throw new Error('Neznamy bodovy popisek.');
+        const ids = new Uint32Array(pieces.map(p => p.id));
+        const result = JSON.parse(scoreLabel === undefined ? this.#wasm.play_cut_feedback_facing(ids, mirrorText, size) : this.#wasm.play_cut_feedback_facing(ids, mirrorText, size, scoreLabel));
         return {objects: result.objects.map((/** @type {number} */ id) => this.#create(id)), duration: result.duration};
     }
     clearCutFeedback() { this.#wasm.clear_cut_feedback(); }

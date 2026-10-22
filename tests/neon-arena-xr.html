@@ -9,6 +9,7 @@
 import {cutFaceColor,FRUIT_POINTS,launchApple,NEON_GLOW,FRUIT_SCALE,RESTART_POSITION,PAYTABLE_YAW,COMBO_DISPLAY_ORIGIN} from '../examples/neon-arena/scene.js';
 import {FRUIT_PATTERN_COUNT} from '../examples/neon-arena/geometry.js';
 import {installXRSimulator} from './xr/simulator.js';
+import {matrixFromPose} from './xr/poses.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
 import {assertForeground} from './pixels.js';
 const sim=installXRSimulator({profile:{eyeWidth:640,eyeHeight:640}});
@@ -18,20 +19,26 @@ const snapshot=id=>{
     canvas.width=left.width+right.width;canvas.height=left.height;
     const context=canvas.getContext('2d');context.putImageData(left,0,0);context.putImageData(right,left.width,0);
 };
+const previousPreset=localStorage.getItem('neon-arena.wave-preset.v1');
 let app;
 const report=await run.execute(async test=>{
     app=await import('../examples/neon-arena/main.js');
+    app.arenaTools.call('arena_reset');
+    app.engine.xr.configureComboDisplay({...app.world.comboDisplay,mode:'legacy'});
     const {engine,world}=app;
+    // Keep legacy cutting/score probes isolated; ten-target coverage lives in arena-waves.
+    app.arenaTools.call('arena_configure',{count:1,program:'practice'});
     test.assert(engine.renderer_backend()==='Gl','actual WebGL production arena');
     const reports=[];
     engine.xr.addEventListener('cut',event=>reports.push({...event.detail,info:event.detail.pieces.map(p=>p.meshInfo),colors:event.detail.pieces.map(p=>p.meshSnapshot.colors)}));
     await engine.xr.enter();
     test.assert(app.gameState().shots===1 && sim.timerCount===1,'VR starts one automatic fruit launch timer');
-    test.assert(app.gameState().liveApples[0].meshInfo.scale.every(value=>Math.abs(value-FRUIT_SCALE)<1e-6)&&Math.abs(FRUIT_SCALE-.105)<1e-6,'production fruit has half the previous linear size');
-    test.assert(world.restartButton.meshInfo.position[2]>-1.55&&world.restartButton.meshInfo.position[2]<-1.35,'restart stays beyond the main sword swing area');
-    test.assert(engine.xr.roundState.duration===30,'Rust owns a 30 second round');
+    test.assert(app.gameState().liveApples[0].meshInfo.scale.every(value=>Math.abs(value-FRUIT_SCALE)<1e-6)&&Math.abs(FRUIT_SCALE-.09)<1e-6,'production fruit uses the larger comfortable gameplay scale');
+    const restartPose=world.restartButton.meshInfo.position;
+    test.assert(Math.abs(restartPose[0])<.05&&restartPose[2]>.8&&restartPose[2]<1.05&&restartPose[1]>1.05&&restartPose[1]<1.35,'restart is behind the player at chest height within stationary sword reach');
+    test.assert(engine.xr.roundState.duration===60,'Rust owns a 60 second round');
     const fontInitial=engine.debugStats().numericFont;
-    test.assert(fontInitial.glyphMeshes===10&&fontInitial.liveGlyphs===3&&fontInitial.panels===2,'timer30 and score0 use three instances from ten cached digit meshes');
+    test.assert(fontInitial.glyphMeshes===10&&fontInitial.liveGlyphs===3&&fontInitial.panels===2,'timer60 and score0 use three instances from ten cached digit meshes');
     const still={dt:0,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{
         right:{position:[1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false},
         left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false}
@@ -402,20 +409,65 @@ const report=await run.execute(async test=>{
     test.assert(pixelDifference(fadeStart,sim.pixels('left'),3)>20,'history fading changes visible pixels');
     sim.frame({...still,dt:1100});
     test.assert(engine.xr.comboDisplayState.history.length===0&&fadeObjects.every(object=>!object.exists),'all expired rows and their geometry instances disappear after two seconds');
-    for(let i=0;i<460 && !engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
+    for(let i=0;i<760 && !engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
     test.assert(engine.xr.roundState.finished && sim.timerCount===0 && !app.gameState().launching,'round finishes and stops automatic launches');
     const finishedScore=engine.xr.roundState.score;
     test.assert(app.shootApple()===null && engine.xr.roundState.score===finishedScore,'finished round blocks new targets and preserves score');
     snapshot('score');
     test.assert(JSON.stringify(world.credits.meshSnapshot.positions)===creditsGeometry,'static bitmap credit is preserved through live diagnostics and scoring updates');
-    const aim=pressed=>({...still,dt:1000/72,controllers:{...still.controllers,
-        left:{...still.controllers.left,targetRayMatrix:sim.gripX(0,[0,.20,-.2]),pressed}}});
+    const frontStart=world.restartButton.meshInfo;
+    test.assert(Math.abs(frontStart.position[0])<.01&&Math.abs(frontStart.position[2]+.95)<.01&&Math.abs(frontStart.position[1]-1.2)<.01,'finished round brings START in front within stationary hand reach');
+    const frontAim=pressed=>({...still,dt:1000/72,controllers:{...still.controllers,
+        right:{position:[0,1.2,-.25],orientation:[0,0,0,1],targetRayMatrix:matrixFromPose({position:[0,1.2,-.25],orientation:[0,0,0,1]}),pressed}}});
+    sim.frame(frontAim(false));
+    const startLeft=sim.pixels('left'),startRight=sim.pixels('right');
+    world.restartButton.setOpacity(0);sim.frame(frontAim(false));
+    test.assert(pixelDifference(startLeft,sim.pixels('left'),3)>100&&pixelDifference(startRight,sim.pixels('right'),3)>100,'START is visible in both eyes without turning');
+    world.restartButton.setOpacity(1);sim.frame(frontAim(false));
+    const startShot=document.createElement('canvas');startShot.width=startLeft.width+startRight.width;startShot.height=startLeft.height;
+    startShot.getContext('2d').putImageData(startLeft,0,0);startShot.getContext('2d').putImageData(startRight,startLeft.width,0);
+    test.report.evidence={...test.report.evidence,frontStartPng:startShot.toDataURL('image/png')};
+    sim.frame(frontAim(true));
+    test.assert(!engine.xr.roundState.finished&&engine.xr.roundState.remaining===60&&engine.xr.roundState.score===0&&sim.timerCount===1,'front START immediately begins one fresh round');
+    test.assert(world.restartButton.meshInfo.position[2]>.8,'playing moves START back behind the player');
+    // Turn around in place; neither head nor grip teleports to the panel.
+    const sideYaw=-Math.atan2(RESTART_POSITION[0],-RESTART_POSITION[2]);
+    const sideHead={position:[0,1.55,0],orientation:[0,Math.sin(sideYaw/2),0,Math.cos(sideYaw/2)]};
+    const rightOrientation=sideHead.orientation;
+    const restartDistance=Math.hypot(RESTART_POSITION[0],RESTART_POSITION[2]);
+    const nearHand=[RESTART_POSITION[0]/restartDistance*.25,RESTART_POSITION[1],RESTART_POSITION[2]/restartDistance*.25];
+    engine.xr.bindButton(world.restartButton);
+    const aim=pressed=>({...still,dt:1000/72,head:sideHead,controllers:{...still.controllers,
+        right:{position:nearHand,orientation:rightOrientation,targetRayMatrix:matrixFromPose({position:nearHand,orientation:rightOrientation}),pressed}}});
     sim.frame(aim(false));
-    test.assert(Math.abs(world.pointers[0].meshInfo.position[2]-RESTART_POSITION[2])<.02,'target ray cursor reaches real restart object');
+    test.assert(Math.hypot(...world.pointers[1].meshInfo.position.map((v,i)=>v-RESTART_POSITION[i]))<.03,'nearby hand reaches the rear restart without moving the player');
+    const sideLeft=sim.pixels('left'),sideRight=sim.pixels('right');
+    world.restartButton.setOpacity(0);sim.frame(aim(false));
+    test.assert(pixelDifference(sideLeft,sim.pixels('left'),3)>100&&pixelDifference(sideRight,sim.pixels('right'),3)>100,'turning around in place reveals the rear restart in both eyes');
+    world.restartButton.setOpacity(1);sim.frame(aim(false));
+    const sideShot=document.createElement('canvas');sideShot.width=sideLeft.width+sideRight.width;sideShot.height=sideLeft.height;
+    sideShot.getContext('2d').putImageData(sideLeft,0,0);sideShot.getContext('2d').putImageData(sideRight,sideLeft.width,0);
+    test.report.evidence={...test.report.evidence,reachableRestartPng:sideShot.toDataURL('image/png')};
     sim.frame(aim(true));
-    test.assert(engine.xr.roundState.remaining===30 && engine.xr.roundState.score===0 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===0 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
+    test.assert(engine.xr.roundState.remaining===60 && engine.xr.roundState.score===0 && engine.xr.roundState.streak===0 && engine.xr.roundState.triples===0 && app.gameState().cuts===0 && app.gameState().shots===1 && sim.timerCount===1,'restart object starts one fresh round with zero score');
     assertProgress('',0);
     sim.frame(aim(true));test.assert(app.gameState().shots===1,'held trigger never repeatedly restarts');
+    let sideTaps=0;engine.xr.addEventListener('buttonpress',()=>sideTaps++);
+    const tapPose=y=>({...aim(false),controllers:{...still.controllers,right:{position:[nearHand[0],y,nearHand[2]],orientation:rightOrientation,pressed:false}}});
+    sim.frame(tapPose(1.60));sim.frame(tapPose(1.60));
+    for(let i=1;i<=16;i++)sim.frame(tapPose(1.60-i/16*.40));
+    test.assert(sideTaps===1&&engine.xr.roundState.remaining>59.8&&sim.timerCount===1,'one short sword tap restarts from a stationary play position without a trigger');
+    for(let i=0;i<3;i++)sim.frame(tapPose(1.20));
+    test.assert(sideTaps===1,'holding the sword against restart does not repeat it');
+    engine.xr.startRound(1);
+    const turnedHead={position:[.4,1.7,.2],orientation:[0,Math.SQRT1_2,0,Math.SQRT1_2]};
+    for(let i=0;i<12;i++)sim.frame({dt:100,head:turnedHead,controllers:{}});
+    const turnedStart=world.restartButton.meshInfo;
+    test.assert(engine.xr.roundState.finished&&Math.abs(turnedStart.position[0]+.55)<.02&&Math.abs(turnedStart.position[2]-.2)<.02&&Math.abs(turnedStart.position[1]-1.35)<.02,'end START follows current translated and turned head position');
+    const frontTap=y=>({dt:1000/72,head:turnedHead,controllers:{right:{position:[.15,y,.2],orientation:turnedHead.orientation,pressed:false}}});
+    sim.frame(frontTap(1.75));sim.frame(frontTap(1.75));
+    for(let i=1;i<=16;i++)sim.frame(frontTap(1.75-i/16*.4));
+    test.assert(!engine.xr.roundState.finished&&engine.xr.roundState.duration===60&&sim.timerCount===1,'a nearby sword tap on forward START begins the next round without turning back');
     test.assert(!engine.xr.lastError,'real stereo rendering completes without XR error',engine.xr.lastError);
     await engine.xr.exit();
     test.assert(!person.head.tracked&&!person.rightHand.tracked&&person.inventory.length===2,'XR exit clears poses while retaining owned equipment for reentry');
@@ -425,5 +477,6 @@ const report=await run.execute(async test=>{
     test.report.evidence={...test.report.evidence,cuts:reports.length,panels:panels.map(p=>p.id),background:'black',postprocessPasses:engine.postprocessing.stats().passes};
 });
 if(app?.engine.xr.isPresenting)await app.engine.xr.exit();
+if(previousPreset===null)localStorage.removeItem('neon-arena.wave-preset.v1');else localStorage.setItem('neon-arena.wave-preset.v1',previousPreset);
 app?.engine.dispose();sim.dispose();publishXRReport(report);
 </script></html>

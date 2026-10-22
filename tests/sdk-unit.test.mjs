@@ -492,7 +492,7 @@ test('cut feedback and blade trail are thin ownership-checked native commands', 
     const {Scene, SceneObject} = await sdk();
     const calls = [];
     const wasm = {
-        play_cut_feedback_facing(ids, mirrorText, size) { calls.push(['feedback', Array.from(ids), mirrorText, size]); return JSON.stringify({objects:[40,41],duration:.65}); },
+        play_cut_feedback_facing(ids, mirrorText, size, scoreLabel) { calls.push(['feedback', Array.from(ids), mirrorText, size,...(scoreLabel===undefined?[]:[scoreLabel])]); return JSON.stringify({objects:[40,41],duration:.65}); },
         clear_cut_feedback() { calls.push(['clearFeedback']); },
         set_blade_trail(id, enabled) { calls.push(['trail',id,enabled]); },
     };
@@ -508,6 +508,14 @@ test('cut feedback and blade trail are thin ownership-checked native commands', 
     assert.deepEqual(calls[3],['feedback',[12,13],true,.15]);
     assert.throws(()=>scene.playCutFeedback([pieces[0],new SceneObject({},14)]),/scéně/);
     assert.equal(calls.length,4,'Foreign handles never reach native mutation');
+    scene.playCutFeedback(pieces,{scoreLabel:'pending-bonus'});
+    assert.deepEqual(calls[4],['feedback',[12,13],false,1,'pending-bonus']);
+    scene.playCutFeedback(pieces,{scoreLabel:'hit-points'});
+    assert.deepEqual(calls[5],['feedback',[12,13],false,1,'hit-points']);
+    scene.playCutFeedback(pieces,{scoreLabel:'stock-total'});
+    assert.deepEqual(calls[6],['feedback',[12,13],false,1,'stock-total']);
+    assert.throws(()=>scene.playCutFeedback(pieces,{scoreLabel:'other'}),/popisek/);
+    assert.equal(calls.length,7,'Invalid score labels never reach native mutation');
 });
 
 test('XRPlayer exposes native tracking and generic inventory without weapon assumptions', async () => {

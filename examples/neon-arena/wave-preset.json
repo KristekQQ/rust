@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "Lexi · Minutová jízda · 60 sekund",
+  "wave": {
+    "count": 10,
+    "intervalMs": 3000,
+    "formation": "arc",
+    "fruit": "mixed",
+    "automatic": true,
+    "fruitScale": 0.09,
+    "width": 0.74,
+    "height": 1.28,
+    "depth": -1.12,
+    "curve": 0.2,
+    "slope": 0.16,
+    "lift": 0.6,
+    "gravity": 0.8,
+    "lifetime": 2.6,
+    "program": "minute"
+  }
+}

@@ -1,8 +1,39 @@
 # Ovocná aréna s neonem a lesklou podlahou
 
+Aktuální hra používá [dva rostoucí zásobníky](#dva-zásobníky-prototyp-rostoucích-sérií).
+Starší popisy automatických trojic a historie níže popisují zachovaný SDK režim
+`legacy`; nejsou pravidly výchozí arény.
+
+## Automatické srovnání odrazů v brýlích
+
+Před vstupem do VR zaškrtni **Srovnávací test před hrou**. Místo hry vznikne
+stejná nehybná sada šesti plodů nad podlahou; simulace se pozastaví a automatické
+vystřelování neběží. Dívej se stále na odrazy před sebou a nehýbej ovladači.
+Test projde bez efektů → glow → SSR 50 % → SSR 100 % → SSR 50 % + glow → bez efektů.
+Procenta znamenají poměr šířky i výšky SSR textury, nikoli hlavního obrazu.
+
+Každá fáze zahodí dvě telemetrická okna a změří další tři (180 snímků v okně).
+FPS a CPU ms vážíme počtem snímků/dobou; medián a minimum jsou statistiky **oken**,
+nikoli 1% low nebo per-frame percentily. Po výstupu z VR uvidíš tabulku a stáhneš
+JSON. Stejný souhrn se jednou odešle místnímu `/__diagnostics` jako
+`xr-benchmark-result`. Neodesíláme další data za každý snímek.
+Poslední směr pohledu každého okna je zaznamenán, pohyb hlavy není uzamčený.
+
+Test trvá zhruba 1–2 minuty; původní SSR/glow obnoví i při předčasném ukončení.
+Po třech minutách bez dostatečných vzorků skončí s částečnými výsledky.
+Změna XR relace či rozlišení měření zruší. Srovnej zvlášť WebGPU a WebGL,
+se stejným pohledem, stavem profilování a po podobném zahřátí zařízení.
+Základ zopakovaný na konci ukazuje možný časový drift; neurčuje jeho příčinu.
+Pevná scéna izoluje náklady renderování a nenahrazuje FPS celé dynamické hry.
+
+Řadič je volitelný diagnostický nástroj v `performance-test.js`, ne herní simulace
+v SDK. `tests/neon-arena-benchmark.html` ověřuje přepínání skutečného SSR,
+statistiky ze syntetických paketů, obnovu nastavení a úklid v simulovaném XR.
+Nejde o naměřený výkon Questu.
+
 Aktuální ukázka používá čisté černé pozadí. Obsahuje devět druhů ovoce včetně dvojice třešní, banánu, hroznů,
 pomeranče a limetky; dvě katany,
-30sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Nízký žulový náhrobek vpravo mimo prostor galerie nese kredit CODEX a živou
+60sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Nízký žulový náhrobek vpravo mimo prostor galerie nese kredit CODEX a živou
 diagnostiku FPS, FRAME MS, CPU MS, CULL MS, VISIBLE, CULLED, OBJECTS a DRAWS.
 
 Aplikace neimportuje `environment.js`, nestahuje barevné/emisní stěny cubemapy,
@@ -61,7 +92,7 @@ Získané symboly i jejich samostatné zlaté rámečky používají emisi 8,0 m
 klidové 0,65; zvýraznění stále řídí skutečný postup série v Rustu.
 Galerie je viditelná v obou očích po otočení doleva; diagnostický kámen je vpravo
 na X=3 m, aby ji nezakrýval. Restart zůstává před hráčem na [0;0,20;−1,45].
-Každých 550 ms startuje plod přímo před hráčem ve výšce rukou. Rust vlastní fyziku, řezy,
+Výchozí nástroj nyní posílá až deset plodů najednou každé 3 s; viz Ovocné vlny níže. Rust vlastní fyziku, řezy,
 čas i skóre. Objekt DALSI KOLO lze aktivovat mečem nebo namířením a triggerem.
 Při odchodu z XR se výstřely zastaví a náhledové ovoce se vrátí.
 
@@ -116,17 +147,17 @@ novou sérii 1/3. Po vyplacení trojice se série vrátí na 0/3; šest zásahů
 stejného druhu tedy vyplatí dvě trojice. Minutí série nepřerušuje, fragmenty
 nepřidávají body. Restart vymaže body i sérii, po konci kola body nepřibývají.
 
-Každá vlna je `[ovoce, ovoce, wild, ovoce, ovoce, ovoce]` po 550 ms,
-od třešní až po meloun. Všech devět druhů se vystřídá za 29,7 s během 30s kola při průběžném zasahování cílů.
+Původní katalog jednotlivých výstřelů má `[ovoce, ovoce, wild, ovoce, ovoce, ovoce]`.
+Nový výchozí nástroj Ovocné vlny jej nahrazuje současnými formacemi s mixem po trojicích.
 Žolík má vlastní uzavřený neonový mesh třícípé šaškovské koruny a lze ho skutečně
 rozkrojit. `setComboTarget(kind, points, {wild:true})` jej označí jako náhradu
 jakéhokoliv druhu: ovoce–wild–ovoce i wild–wild–ovoce vyplatí cenu ovoce.
 Tři wild vyplatí 120 bodů; po výplatě další trojice začíná samostatně.
 
-Plody mají poloviční původní měřítko (scale 0,105), startují v `[±0,38;1,15;−1,10]`, mají pomalý
+Plody mají větší herní měřítko (scale 0,09), startují v `[±0,38;1,15;−1,10]`, mají pomalý
 oblouk (vy=1,2 m/s, gravitace 1,6 m/s²), mírně se přibližují a po 1,9 s zmizí
-bez odrazů. V dosahu 1,10–1,65 m na výšku zůstávají přes sekundu; nejvýš tři
-současné cíle brání zahlcení i při ručním vystřelování. Jde o návrh hratelnosti,
+bez odrazů. V dosahu 1,10–1,65 m na výšku zůstávají přes sekundu; Původní režim jednotlivého výstřelu je zachován pro desktopovou ukázku;
+nové vlny používají vlastní rozmístění, trajektorie a limit deseti cílů. Jde o návrh hratelnosti,
 ne o potvrzený komfort na skutečném headsetu.
 
 Prostřední displej ukazuje body, druh ovoce, postup série a čas; pod ním je
@@ -237,3 +268,218 @@ omezuje třes; otáčení špičky samo rychlost ruky nenavyšuje.
 
 `engine.xr.player` je obecný hráč s inventářem. Aréna mu explicitně vybavuje
 obě katany přes `player.equip`; model hráče ani jiné zbraně automaticky nevytváří.
+
+
+## Nástroj Ovocné vlny: člověk i AI
+
+Panel **Ovocné vlny** před VR nastavuje 1–10 současných skutečně řezatelných
+plodů, pauzu 1800–6000 ms, ovoce a formaci (jedna řada, střídavé zahnuté tahy, kříž, déšť).
+Výchozí nastavení je 10 menších plodů v mírně zahnutém tahu / 3000 ms.
+Čtyři varianty střídají sklon nahoru/dolů i prohnutí; další vlna tedy neopakuje
+stejný vodorovný pohyb. Směr řezu se nevynucuje, hráč reaguje na skutečnou polohu cílů. Vše zůstává před hráčem:
+X ±0,74 m (ostatní formace ±0,68 m), počáteční Y 1,01–1,75 m, Z přibližně −1,0 až −1,27 m.
+Jednotlivé původní cíle mizí za 2,6 s; fyziku a řezy dál počítá Rust.
+Další celá vlna čeká, pokud by překročila limit deseti celých plodů.
+Fragmenty tento limit nespotřebovávají. Mix střídá druhy po skupinách tří,
+aby šlo dál využít existující bodování; nové bonusy za jeden švih nepřidává.
+Levý trigger ve VR pošle celou vlnu, pravý a levý meč dál normálně řežou.
+
+Člověk i AI používají společný validovaný dispatcher:
+
+```js
+window.arenaTools.call('arena_configure', {count:10, formation:'arc', intervalMs:3000});
+window.arenaTools.call('arena_spawn');
+window.arenaTools.call('arena_state');
+window.arenaTools.call('arena_stop'); // zastaví další vlny, ponechá rozehrané cíle
+window.arenaTools.call('arena_start'); // nové 60s kolo, reset skóre a cílů
+```
+
+Poslání samostatné vlny funguje i v desktopovém náhledu. Start bodovaného
+kola vyžaduje aktivní VR; bez něj vrátí chybu. Stav `presenting` výslovně říká,
+zda běží immersive VR. Start VR vyžaduje běžné tlačítko a souhlas prohlížeče.
+Srovnávací benchmark blokuje start a posílání vln.
+
+### Skutečné MCP (stdio) a připojený Quest
+
+Není potřeba další Python balíček. Běžný server MCP neaktivuje.
+Pro Quest nejprve připrav produkci `npm run build:production`, potom spusť
+volitelný server s důvěryhodným certifikátem a vlastním tajným tokenem:
+
+```sh
+python3 scripts/arena-tools.py --host 0.0.0.0 --port 8766 \
+  --production --directory output/production \
+  --cert /absolutni/cesta/server.crt --key /absolutni/cesta/server.key \
+  --token VLASTNI_TAJNY_TOKEN
+```
+
+Otevři `https://IP_MACU:8766/examples/neon-arena/` v Questu. V panelu
+**Připojit AI přes MCP** vlož token a klikni **Připojit**. Stránka příkazy
+vyzvedává ze stejného HTTPS původu; nepřipojuje se k localhostu headsetu.
+Token se neukládá do URL ani localStorage. Pro lokální HTTP náhled vynech
+certifikát, produkční volby a `--host`; výchozí server je jen na loopbacku.
+
+Do MCP klienta nastav command `python3` s argumenty:
+
+```json
+["/Users/Honza/WebstormProjects/rust/scripts/arena-tools.py", "--mcp",
+ "--url", "https://IP_MACU:8766", "--token", "VLASTNI_TAJNY_TOKEN"]
+```
+
+Na jiném počítači uprav absolutní cestu. MCP nástroje jsou `arena_state`,
+`arena_configure`, `arena_spawn`, `arena_start`, `arena_stop`. Jejich argumenty
+odpovídají dispatcheru; volitelné `session` vybírá konkrétní stránku.
+Při více připojených stránkách je session povinná. Bez připojené stránky
+nebo při timeoutu se vrací chyba. Token musí znát server, stránka i klient;
+TLS ověřuje běžný systémový trust store Pythonu. Neregistrujeme MCP automaticky
+v globální konfiguraci Codexu.
+
+Ověření: `node --test tests/arena-wave-unit.test.mjs`,
+`python3 tests/arena-tools-unit.py` a udržovaný browser scénář `arena-waves`
+(10 cílů v obou očích, Rust řez, životnost, ovládání a timer).
+Simulované XR a produkční balíček nepotvrzují pohodlí ani FPS skutečného Questu.
+
+Návrh formací čerpá z [rozhovoru s vývojářem Fruit Ninja VR](https://www.gameanalytics.com/blog/fruit-ninja-dev-talks-porting-to-vr)
+a [diskuse hráčů na Redditu](https://www.reddit.com/r/OculusQuest/comments/bvo2fi/fruit_ninja_vr/).
+Vývojář zdůrazňuje několik plodů jedním pohodlným tahem; reakce hráčů na
+opakování a chaos se liší. Čtyři formace a nastavitelné pauzy jsou náš návrh,
+ne prokázané univerzální optimum.
+
+
+## Paměť vzhledu a vystřelování
+
+Verzovaná [wave-preset.json](wave-preset.json) uchovává přijatou scénu:
+10 menších plodů, čtyři střídavé zahnuté tahy a 60sekundové kolo.
+Obsahuje množství, tempo, formaci, druhy, velikost, šířku, výšku, hloubku,
+prohnutí, sklon, počáteční rychlost vzhůru, gravitaci a životnost cíle.
+Parametry se načtou před spuštěním ovládání; fyziku dál integruje Rust.
+Čas kola je 60 s podle `minute-scene.json`; společný Rust clock jej měří pro oba režimy.
+
+Panel **Tvar a let ovoce** i MCP `arena_configure` upravují stejné hodnoty.
+Platná změna se automaticky uloží jako celý JSON do localStorage pod klíčem
+`neon-arena.wave-preset.v1`. Při příštím otevření má přednost před projektovým
+JSONem. Načtení nic nevystřelí ani nespustí kolo.
+
+Nástroje a odpovídající tlačítka:
+
+- `arena_save`: výslovně uložit aktuální nastavení.
+- `arena_load`: znovu načíst uložené nastavení.
+- `arena_reset`: odstranit lokální změny a obnovit projektový JSON.
+- `arena_export`: vrátit přenositelný JSON; panel nabízí jeho stažení.
+- `arena_import({json:"…"})`: validovat, aplikovat a uložit celý JSON.
+
+Například `arena_configure({curve:.15, width:.68, fruitScale:.05})` změní
+prohnutí, poloviční šířku a velikost. Uplatní se u příštích cílů, nikoli
+zpětně na už rozletěné plody. Jednorázové overrides `arena_spawn` se neukládají.
+Verze formátu je 1; neúplné/neplatné importy zachovají původní platný stav.
+Poškozené uložené nastavení zobrazí chybu a použije projektovou předvolbu,
+aniž by poškozený obsah potichu přepsalo. Nedostupné úložiště nebo plný limit
+nebrání nastavení pro aktuální stránku, ale vrací `saved:false` a varování;
+výslovné uložení/import vrací chybu.
+
+LocalStorage patří konkrétnímu prohlížeči **a původu včetně portu**. Desktop,
+Quest, HTTP/HTTPS a jiný port mají oddělené nastavení. K přenosu použij JSON.
+Uložená data neobsahují MCP token ani herní skóre či pozici rozehraného ovoce.
+Uložení v prohlížeči nemění soubor v repozitáři.
+
+Test `arena-presets` ve stejném browser runneru ověřuje skutečný reload,
+obnovení parametrů, synchronizaci panelu, import souboru a reset.
+
+
+## Minuta pro skóre · připravená scéna
+
+[minute-scene.json](minute-scene.json) obsahuje konkrétní 60sekundový sled
+24 výstřelů se 140 cíli. Výchozí `program:"minute"` vystřídá volbu levné
+nebo hodnotné trojice, dokončení dvojice třetím plodem později mezi rušivými
+cíli, malé hodnotné ovoce, pohybující se cíle se společným oknem pro řez,
+rychlejší série a finále s deseti cíli. Už první čtyři výstřely střídají
+diagonály, zahnutý tah a oddělený vějíř.
+Předchozí zahnuté řady zůstávají v `program:"practice"` jako volné vlny.
+Oba režimy trvají minutu; režim se ukládá s předvolbou v localStorage.
+Starší uložené předvolby bez `program` přejdou na minutovou scénu a zachovají
+velikost i ostatní hodnoty.
+
+Ve VR se mění skutečný prostorový nadpis fáze. Časování se řídí uplynulým
+časem Rust kola; jediný 100ms autorovací timer nepoužívá čas od otevření stránky.
+Pozastavené/zpožděné callbacky nespouštějí zpětně shluk starých výstřelů.
+Stop zastaví řadič, restart resetuje cue index i cíle, konec kola/odchod z XR
+uvolní timer. Původních celých plodů zůstává nejvýš deset.
+
+U cue s `launch:{apexSeconds,gravity}` znamená `target.position` bod pro řez
+u vrcholu dráhy. `planCue` jednou odvodí počáteční polohu pod ním a svislou
+rychlost; skutečný let dál integruje Rust. Minutovka používá gravitaci
+2,4525 m/s² a vrchol po 0,84 s. Jde o arkádový let zpomalený dvakrát
+při zachování stejné prostorové dráhy, nikoli realistickou gravitaci. Vodorovné složky `target.velocity`
+řídí nálet; její Y zde nahrazuje vypočtená rychlost. Bez `launch` zůstává
+původní význam pozice a rychlosti. Atmosférický odpor není implementován.
+Krátké sdílené světelné výstřely jsou dekorace bez fyzikálních proxy a mizí
+nativně po 0,24 s; stop/restart/odchod je také vyčistí.
+
+Každý cíl může přepsat `scale`, `velocity` a `lifetime`. Životnost má v tomto režimu strop 2,6 s, aby delší uložená hodnota neblokovala
+následující výstřely ani finále.
+Šířka, výška a prohnutí z panelu řídí volné vlny. Zásahy se nesimulují ani
+nepřidělují automaticky, řezy, fyzika a stávající bodování trojic zůstávají v Rustu.
+Mezery a kombinace usnadňují přechod mezi stranami, ale použití konkrétní ruky
+či směr řezu nejsou vynucované bodovacím pravidlem.
+
+`arena_preview({seconds:41})` ukáže jednu část scény před VR. Bez `seconds`
+postupuje k další odlišné fázi. Náhled nespouští čas kola a ve VR je blokovaný.
+`arena_configure({program:"minute"})` nebo volba **Herní scéna** přepíná režim.
+Levý trigger během připravené scény nevkládá další ovoce; ve volných vlnách
+zůstává ruční výstřel skupiny. Samostatný `arena_spawn` je v běžící připravené
+scéně blokovaný, aby nerušil choreografii.
+
+Ověření: unit `arena-minute-unit.test.mjs` kontroluje plán, rozestupy a no-cut
+kapacitu. Browser `arena-minute` projde skutečných šedesát sekund v simulovaném
+XR, zachytí obě oči v šesti fázích a ověří všechny výstřely, konec, restart,
+náhled i stop. Navíc skutečnými řezy sledovaným ovladačem porovnává dvě
+pořadí zásahů přes bodování Rustu (110 vs. 2440). Jde o izolovanou kontrolu
+bodovacích pobídek, nikoli odehraný lidský výkon v pohyblivé scéně. Pohodlí, subjektivní zábavnost a výkon skutečného Questu vyžadují
+hraní na zařízení; tyto testy je nepotvrzují.
+
+## Dva zásobníky: prototyp rostoucích sérií
+
+Aréna používá `ComboDisplayOptions.mode:"chains"`; výchozí SDK režim zůstává
+`legacy`. Skóre, dva druhové sloty a jejich čítače drží Rust. Obě ruce přidávají
+ovoce podle druhu. Každý řez původního plodu přidá hned 10 jistých bodů.
+Růst bonusu série se připisuje hned do hlavního skóre.
+Třetí druh nahradí nejdříve založenou sérii; všechny získané body zůstanou. Další stejný plod stáří série neobnovuje. Druhá série
+zůstane zachovaná. Žolík doplní kratší obsazenou sérii.
+
+Levý/pravý trigger, SDK `engine.xr.bankChain(hand)`, panel i MCP `arena_bank`
+uvolní slot; už získaný bonus se znovu nepřičítá. Méně než tři kusy mají
+nulový bonus. Na konci kola se pouze uvolní zbývající sloty. Tabulka vlevo ukazuje bonus za trojici. Hodnota delších sérií roste
+podle nativního `FruitChain::value`; herní nápověda tento skrytý růst neprozrazuje.
+Každý nasbíraný plod přidá skutečný symbol do vodorovné řady směrem ven: čtyři/pět kusů ukážou
+čtyři/pět symbolů. Sdílené meshe se znovu používají; limit je 144 symbolů na
+zásobník (minuta má 140 cílů), každý symbol má vlastní sdílený rámeček. Levá řada roste doleva,
+pravá doprava; velikost i rozestupy zůstávají stejné, dlouhá řada pokračuje mimo výhled. Ovoce i rámeček společně přiletí z vnější strany
+(levá zleva, pravá zprava): 55 % → 135 % → 75 % → 100 % za 0,76 s,
+s neonovým zábleskem celého zásobníku až při dosednutí. Prázdné sloty nemají
+rámečky; získané rámečky svítí stejně jasně i v klidu po skončení animace.
+Čítače jsou drobný šedý debug text
+bez glow (`debug-text`, stejná bitmapová abeceda jako FPS), nikoli herní odměna.
+Každý zásobník má vlastní pulzující celkovou hodnotu (10 za každý plod + bonus). U řezu vyletí
+celková hodnota příslušného zásobníku: `+10`, `+20`, třetí hrozen `+130`.
+Nativní `scoreAwards` rozlišuje plody zasažené jedním švihem a nese skutečný
+přírůstek i celkovou hodnotu (`totalPoints`). Nahrazená série předá existující
+symboly a rámečky odletu pod skóre (cubic ease-out, fade a zmenšení za 0,95 s),
+s řadou odletí i kladná celková hodnota (např. pět melounů `+770`), která sdílí easing
+a vyblednutí; potom se odstraní symboly, rámečky i dočasný číselný panel. Nejvýš jedna odcházející série;
+reset nebo další nahrazení ji uklidí okamžitě. Žádná druhá JS herní smyčka.
+Pole `pendingBonus` zůstává pro kompatibilitu: ukazuje bonus držených sérií,
+který je již započten do skóre.
+`XRRoundState.chains` a `ComboDisplayState.chains` umožňují kontrolu skutečného stavu.
+Přepnutí režimu resetuje skóre; rekonfigurace stejného režimu jej zachová.
+
+Ověření `arena-minute` nyní kontroluje aktuální chain režim včetně skutečných
+řezů 4/5 kusů, třetího druhu, levého triggeru, panelu, AI toolu a koncového
+vyplacení. Původní hromadné legacy pořadí lze spustit samostatně:
+`verify:browser -- --page arena-minute --backend webgl --arena-legacy-stress`.
+Tento dlouhý diagnostický průběh nyní reprodukuje WASM `unreachable` v
+`xr_render_eye`, následovaný `RefCell already borrowed` při úklidu XR. Příčina
+rendererového pádu není touto gameplay změnou opravena. Legacy pravidla zvlášť
+pokrývá `neon-arena-xr`; oddělení diagnostiky není potvrzení, že chyba zmizela.
+
+Po vypršení kola se stejné tlačítko `START` přesune 0,95 m před aktuální
+vodorovný směr hlavy, přibližně na výšku hrudi. Meč i trigger spustí další kolo;
+za hry se tlačítko vrátí za hráče, aby nepřekáželo řezání.

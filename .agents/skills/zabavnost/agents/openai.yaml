@@ -1,0 +1,4 @@
+interface:
+  display_name: "Zábavnost"
+  short_description: "Ladění zručnosti, rytmu a pocitu při hraní ve VR"
+  default_prompt: "Použij $zabavnost pro návrh a ověření zábavnější VR scény."

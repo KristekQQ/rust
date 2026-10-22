@@ -8,6 +8,8 @@ At Honza's request, [honza-intent](.agents/skills/honza-intent/SKILL.md) is also
 
 For scene placement, rotations, scale and attached world-space labels, use [scene-object-layout](.agents/skills/scene-object-layout/SKILL.md); verify requested sides in XR coordinates, not only the desktop preview.
 
+For gameplay feel, player skill, wave rhythm and varied VR scenes use [zabavnost](.agents/skills/zabavnost/SKILL.md). Its article notes support design choices; actual enjoyment needs player feedback.
+
 For direct Quest WebGPU XR, runtime support, projection textures and headset diagnostics use [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md).
 
 For frame scheduling, transient textures/buffers, pass dependencies and CPU/GPU profiling use [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md); the extension guide is [FRAME_PIPELINE.md](docs/FRAME_PIPELINE.md).
@@ -17,6 +19,8 @@ For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-
 Keep Rust/WGSL layouts and `src/web.rs` exports consistent with `js/engine.js`, types and callers. Rebuild ignored `pkg/` when WASM/export changes need browser verification. Test the affected Rust page; `cube.html` and JS graphics demos do not verify this renderer.
 
 Use `MEMORY.md` only for orientation/current decisions; consult linked docs only for the affected area. Choose required checks from [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Native tests omit wasm32 renderer/web code. Preserve independent pass visibility, static revisions and resource cleanup. Respect `rust-toolchain.toml`; inspect Cargo configuration before source/offline changes.
+
+For user-facing Quest delivery use `npm run serve:quest`: it prepares the verified release/minified `output/production/` package before HTTPS serving. `run-local.sh` is explicitly dev; do not use it for headset FPS comparisons. Verify the packaged files with the browser runner's `--production-root` option; build/minification success is not headset performance evidence.
 
 During iteration run only the smallest affected check; do not automatically run the full suite after each edit or milestone. Docs-only changes need no GPU tests. Reuse existing matching evidence; repeat only failed/invalidated checks. Keep output to concise summaries, expand failures only.
 

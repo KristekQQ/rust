@@ -7,6 +7,17 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+# Runtime speed first; production JS/compression is handled separately.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3"]
+
 [dependencies]
 bytemuck = { version = "1.25", features = ["derive"] }
 wasm-bindgen = "0.2"
@@ -872,12 +883,66 @@ use crate::{scene::SceneManager as Scene, xr_round::ComboEvent};
 use glam::Vec3;
 use serde_json::{json, Value};
 
+// A full authored minute has 140 targets; cap malformed external counts as well.
+const MAX_CHAIN_ICONS: usize = 144;
+const CHAIN_PULSE_SECONDS: f32 = 0.76;
+const STOCK_FRAME_EMISSION: f32 = 8.;
+const RETIRE_SECONDS: f32 = 0.95;
+
+struct RetiredPart {
+    id: u32,
+    start: Vec3,
+    scale: Vec3,
+    target: Vec3,
+}
+struct RetiredRow {
+    age: f32,
+    parts: Vec<RetiredPart>,
+    earned_bonus: u64,
+    earned_points: u64,
+    score_label: Option<u32>,
+}
+
+fn chain_arrival(progress: f32) -> (f32, f32) {
+    let t = progress.clamp(0., 1.);
+    if t < 0.45 {
+        let remaining = (1. - t / 0.45).powi(3);
+        (0.55 + 0.80 * (1. - remaining), remaining)
+    } else if t < 0.72 {
+        let u = (t - 0.45) / 0.27;
+        let eased = u * u * (3. - 2. * u);
+        (1.35 - 0.60 * eased, 0.)
+    } else {
+        let remaining = (1. - (t - 0.72) / 0.28).powi(3);
+        (1. - 0.25 * remaining, 0.)
+    }
+}
+
+fn chain_landing_glow(progress: f32) -> f32 {
+    let t = if progress < 0.50 {
+        (progress - 0.38) / 0.12
+    } else {
+        (1. - progress) / 0.50
+    }
+    .clamp(0., 1.);
+    t * t * (3. - 2. * t)
+}
+
 struct Symbol {
     kind: String,
     asset: u32,
     variant: u32,
 }
 pub struct ComboDisplay {
+    notice_seconds: f32,
+    stack_score_panel: Option<u32>,
+    stock_score_panels: Option<[u32; 2]>,
+    retired: Option<RetiredRow>,
+    pending_bonus: u64,
+    stack_score_pulse: f32,
+    chain_pulse: [f32; 2],
+    pub chain_mode: bool,
+    chain_rows: [Option<Row>; 2],
     symbols: Vec<Symbol>,
     frame_asset: u32,
     origin: Vec3,
@@ -926,6 +991,12 @@ impl Row {
 impl ComboDisplay {
     pub fn configure(scene: &Scene, input: &str) -> Option<Self> {
         let v: Value = serde_json::from_str(input).ok()?;
+        let chain_mode = match v.get("mode").and_then(Value::as_str) {
+            None if v.get("mode").is_none() => false,
+            Some("legacy") => false,
+            Some("chains") => true,
+            _ => return None,
+        };
         let id = |v: &Value| v.as_u64().and_then(|n| u32::try_from(n).ok());
         let vector = |key: &str, default: [f32; 3]| -> Option<Vec3> {
             let Some(v) = v.get(key) else {
@@ -994,15 +1065,62 @@ impl ComboDisplay {
                 _ => crate::info_panel::PanelKind::ComboAward,
             };
             if panels[..i].contains(p)
-                || !scene
-                    .info_panels
-                    .get(p)
-                    .is_some_and(|panel| panel.kind == expected)
+                || !scene.info_panels.get(p).is_some_and(|panel| {
+                    panel.kind == expected
+                        || (i >= 2 && panel.kind == crate::info_panel::PanelKind::DebugText)
+                })
             {
                 return None;
             }
         }
+        let stack_score_panel = match v.get("stackScorePanel") {
+            None => None,
+            Some(value) => {
+                let id = id(value)?;
+                if panels.contains(&id)
+                    || !scene
+                        .info_panels
+                        .get(&id)
+                        .is_some_and(|p| p.kind == crate::info_panel::PanelKind::ComboAward)
+                {
+                    return None;
+                }
+                Some(id)
+            }
+        };
+        let stock_score_panels = match v.get("stockScorePanels") {
+            None => None,
+            Some(value) => {
+                let values = value.as_array()?;
+                if values.len() != 2 {
+                    return None;
+                }
+                let ids = [id(&values[0])?, id(&values[1])?];
+                if ids[0] == ids[1]
+                    || ids.iter().any(|id| {
+                        panels.contains(id)
+                            || stack_score_panel == Some(*id)
+                            || !scene
+                                .info_panels
+                                .get(id)
+                                .is_some_and(|p| p.kind == crate::info_panel::PanelKind::ComboAward)
+                    })
+                {
+                    return None;
+                }
+                Some(ids)
+            }
+        };
         Some(Self {
+            stack_score_panel,
+            stock_score_panels,
+            retired: None,
+            pending_bonus: 0,
+            stack_score_pulse: 0.,
+            notice_seconds: 0.,
+            chain_pulse: [0.; 2],
+            chain_mode,
+            chain_rows: [None, None],
             symbols,
             frame_asset,
             origin: vector("origin", [0., 1.5, -2.])?,
@@ -1018,7 +1136,388 @@ impl ComboDisplay {
             history: vec![],
         })
     }
+    pub fn clear(&mut self, scene: &mut Scene) {
+        self.clear_retired(scene);
+        self.notice_seconds = 0.;
+        self.pending_bonus = 0;
+        self.stack_score_pulse = 0.;
+        self.chain_pulse = [0.; 2];
+        for row in self.chain_rows.iter_mut() {
+            if let Some(mut row) = row.take() {
+                row.remove(scene);
+            }
+        }
+        if let Some(mut row) = self.current.take() {
+            row.remove(scene);
+        }
+        for row in &mut self.history {
+            row.remove(scene);
+        }
+        self.history.clear();
+        for id in self
+            .awards
+            .into_iter()
+            .chain(self.stack_score_panel)
+            .chain(self.stock_score_panels.into_iter().flatten())
+        {
+            if let Some(panel) = scene.info_panels.get_mut(&id) {
+                panel.update(vec![("", String::new())]);
+            }
+            scene.set_opacity(id, 0., 8., 0., -1.);
+        }
+    }
+    pub fn sync_chains(
+        &mut self,
+        scene: &mut Scene,
+        chains: &[Option<crate::xr_round::FruitChain>; 2],
+    ) {
+        let mut hit = false;
+        for (index, chain) in chains.iter().enumerate() {
+            let kind = chain.as_ref().map_or("", |c| c.kind.as_str());
+            let count = chain.as_ref().map_or(0, |c| c.count);
+            if count > 0
+                && self.chain_rows[index]
+                    .as_ref()
+                    .is_some_and(|r| r.count > 0 && r.kind != kind)
+            {
+                let old = self.chain_rows[index].take().unwrap();
+                self.retire_row(scene, old, index);
+            }
+            let row =
+                self.chain_rows[index].get_or_insert_with(|| Row::new(String::new(), 0, false, 0));
+            let new_hit = count > 0 && (row.kind != kind || count > row.count);
+            hit |= new_hit;
+            if count == 0 {
+                self.chain_pulse[index] = 0.;
+            } else if new_hit {
+                self.chain_pulse[index] = CHAIN_PULSE_SECONDS;
+            }
+            if row.kind != kind {
+                for id in row.icons.drain(..) {
+                    scene.remove_object(id);
+                }
+                row.kind = kind.into();
+            }
+            row.count = count;
+            row.points = chain.as_ref().map_or(0, |c| c.points);
+            let frame_count = (count as usize).min(MAX_CHAIN_ICONS);
+            while row.frames.len() > frame_count {
+                if let Some(id) = row.frames.pop() {
+                    scene.remove_object(id);
+                }
+            }
+            while row.frames.len() < frame_count {
+                let Ok(id) = scene.add_mesh_variant(self.frame_asset, 0) else {
+                    break;
+                };
+                row.frames.push(id);
+            }
+            if let Some(symbol) = self.symbols.iter().find(|s| s.kind == kind) {
+                while row.icons.len() > (count as usize).min(MAX_CHAIN_ICONS) {
+                    if let Some(id) = row.icons.pop() {
+                        scene.remove_object(id);
+                    }
+                }
+                while row.icons.len() < (count as usize).min(MAX_CHAIN_ICONS) {
+                    let Ok(id) = scene.add_mesh_variant(symbol.asset, symbol.variant) else {
+                        break;
+                    };
+                    row.icons.push(id);
+                }
+            }
+            let center = self.origin + Vec3::new(if index == 0 { -0.65 } else { 0.65 }, 0., 0.);
+            let direction = if index == 0 { -1. } else { 1. };
+            let step = self.spacing;
+            let icon_scale = self.fruit_scale;
+            for (ids, scale, icons) in [
+                (&row.frames, self.frame_scale, false),
+                (&row.icons, Vec3::splat(icon_scale), true),
+            ] {
+                for (slot, &id) in ids.iter().enumerate() {
+                    scene.set_object_position(
+                        id,
+                        center
+                            + Vec3::new(
+                                direction * (slot as f32 * step - self.spacing),
+                                0.,
+                                if icons { 0.02 } else { 0. },
+                            ),
+                    );
+                    scene.set_object_scale(id, scale);
+                    scene.set_opacity(id, 1., 8., 0., -1.);
+                    scene.set_emission(id, if icons { 3. } else { STOCK_FRAME_EMISSION });
+                    scene.set_render_options(
+                        id,
+                        crate::scene::RenderOptions {
+                            casts_shadow: false,
+                            receives_shadow: false,
+                            ..Default::default()
+                        },
+                    );
+                }
+            }
+            let id = self.awards[index];
+            if let Some(panel) = scene.info_panels.get_mut(&id) {
+                panel.update(vec![(
+                    "",
+                    if count == 0 {
+                        String::new()
+                    } else {
+                        count.to_string()
+                    },
+                )]);
+            }
+            let debug = scene
+                .info_panels
+                .get(&id)
+                .is_some_and(|p| p.kind == crate::info_panel::PanelKind::DebugText);
+            scene.set_object_position(
+                id,
+                center + Vec3::new(0., if debug { -0.14 } else { -0.23 }, 0.),
+            );
+            scene.set_opacity(id, if count == 0 { 0. } else { 1. }, 8., 0., -1.);
+            scene.set_emission(id, if debug { 0. } else { 4. });
+            self.sync_chain_pulse(scene, index);
+            if let Some(ids) = self.stock_score_panels {
+                let id = ids[index];
+                let value = chain.as_ref().map_or(0, |c| c.total_points());
+                if let Some(panel) = scene.info_panels.get_mut(&id) {
+                    panel.update(vec![("", format!("+{value}"))]);
+                }
+                scene.set_object_position(
+                    id,
+                    self.origin + Vec3::new(if index == 0 { -0.32 } else { 0.32 }, -0.22, 0.04),
+                );
+                scene.set_opacity(id, if count > 0 { 1. } else { 0. }, 8., 0., -1.);
+                self.sync_stock_score(scene, index);
+            }
+        }
+        self.pending_bonus = chains
+            .iter()
+            .flatten()
+            .fold(0_u64, |sum, c| sum.saturating_add(c.value()));
+        if hit {
+            self.stack_score_pulse = 0.42;
+        }
+        if chains.iter().all(Option::is_none) {
+            self.stack_score_pulse = 0.;
+        }
+        if let Some(id) = self.stack_score_panel {
+            if let Some(panel) = scene.info_panels.get_mut(&id) {
+                panel.update(vec![("", format!("+{}", self.pending_bonus))]);
+            }
+            scene.set_object_position(id, self.origin + Vec3::new(0., 0., 0.04));
+            scene.set_opacity(id, 1., 8., 0., -1.);
+            self.sync_stack_score(scene);
+        }
+    }
+    fn sync_stack_score(&self, scene: &mut Scene) {
+        let Some(id) = self.stack_score_panel else {
+            return;
+        };
+        let pulse = (self.stack_score_pulse / 0.42).powi(2);
+        let sign = scene
+            .objects()
+            .get(&id)
+            .map_or(1., |o| o.transform.scale.x.signum());
+        let size = 1. + 0.12 * pulse;
+        scene.set_object_scale(id, Vec3::new(sign * size, size, size));
+        scene.set_emission(id, 4. + 4. * pulse);
+    }
+    fn sync_stock_score(&self, scene: &mut Scene, index: usize) {
+        let Some(ids) = self.stock_score_panels else {
+            return;
+        };
+        let id = ids[index];
+        let pulse = (self.chain_pulse[index] / CHAIN_PULSE_SECONDS).powi(2);
+        let sign = scene
+            .objects()
+            .get(&id)
+            .map_or(1., |o| o.transform.scale.x.signum());
+        scene.set_object_scale(
+            id,
+            Vec3::new(
+                sign * (1. + 0.12 * pulse),
+                1. + 0.12 * pulse,
+                1. + 0.12 * pulse,
+            ),
+        );
+        scene.set_emission(id, 4. + 4. * pulse);
+    }
+    fn clear_retired(&mut self, scene: &mut Scene) {
+        if let Some(row) = self.retired.take() {
+            for part in row.parts {
+                scene.remove_object(part.id);
+            }
+        }
+    }
+    fn retire_row(&mut self, scene: &mut Scene, row: Row, index: usize) {
+        // One outgoing row at most; transfer existing instances rather than clone them.
+        self.clear_retired(scene);
+        let center = scene
+            .objects()
+            .get(&self.score_panel)
+            .map_or(self.origin + Vec3::Y * 0.24, |o| {
+                o.transform.position - Vec3::Y * 0.24
+            });
+        let count = row.icons.len().max(row.frames.len());
+        let mut parts = Vec::with_capacity(row.icons.len() + row.frames.len() + 1);
+        for (ids, icons) in [(&row.icons, true), (&row.frames, false)] {
+            for (index, &id) in ids.iter().enumerate() {
+                if let Some(object) = scene.objects().get(&id) {
+                    parts.push(RetiredPart {
+                        id,
+                        start: object.transform.position,
+                        scale: object.transform.scale,
+                        target: center
+                            + Vec3::new(
+                                (index as f32 - (count.saturating_sub(1)) as f32 * 0.5)
+                                    * self.spacing
+                                    * 0.65,
+                                0.,
+                                if icons { 0.04 } else { 0.02 },
+                            ),
+                    });
+                }
+            }
+        }
+        let earned_bonus = crate::xr_round::FruitChain {
+            kind: row.kind,
+            count: row.count,
+            points: row.points,
+        }
+        .value();
+        let earned_points = u64::from(row.count)
+            .saturating_mul(crate::xr_round::CHAIN_HIT_POINTS)
+            .saturating_add(earned_bonus);
+        let mut score_label = None;
+        if earned_points > 0 {
+            if let Ok(id) = scene.add_info_panel("combo-award", 0.42, 0.12) {
+                if let Some(panel) = scene.info_panels.get_mut(&id) {
+                    panel.update(vec![("", format!("+{earned_points}"))]);
+                }
+                let source = self
+                    .stock_score_panels
+                    .map(|ids| ids[index])
+                    .unwrap_or(self.score_panel);
+                let sign = scene
+                    .objects()
+                    .get(&source)
+                    .map_or(1., |o| o.transform.scale.x.signum());
+                let start =
+                    self.origin + Vec3::new(if index == 0 { -0.32 } else { 0.32 }, -0.22, 0.06);
+                let scale = Vec3::new(sign, 1., 1.);
+                scene.set_object_position(id, start);
+                scene.set_object_scale(id, scale);
+                scene.set_emission(id, 4.);
+                scene.set_render_options(
+                    id,
+                    crate::scene::RenderOptions {
+                        casts_shadow: false,
+                        receives_shadow: false,
+                        ..Default::default()
+                    },
+                );
+                parts.push(RetiredPart {
+                    id,
+                    start,
+                    scale,
+                    target: center + Vec3::new(0., -0.11, 0.06),
+                });
+                score_label = Some(id);
+            }
+        }
+        self.retired = Some(RetiredRow {
+            age: 0.,
+            parts,
+            earned_bonus,
+            earned_points,
+            score_label,
+        });
+    }
+    fn advance_retired(&mut self, scene: &mut Scene, dt: f32) {
+        let Some(row) = &mut self.retired else {
+            return;
+        };
+        row.age += dt;
+        if row.age >= RETIRE_SECONDS {
+            self.clear_retired(scene);
+            return;
+        }
+        let t = row.age / RETIRE_SECONDS;
+        let travel = 1. - (1. - (t / 0.6).min(1.)).powi(3);
+        let fade = ((t - 0.35) / 0.65).clamp(0., 1.);
+        let opacity = (1. - fade).powi(2);
+        for part in &row.parts {
+            scene.set_object_position(
+                part.id,
+                part.start.lerp(part.target, travel) + Vec3::Y * (0.05 * fade),
+            );
+            scene.set_object_scale(
+                part.id,
+                part.scale * (1. - 0.35 * travel) * (1. - 0.65 * fade * fade),
+            );
+            scene.set_opacity(part.id, opacity, 8., 0., -1.);
+        }
+    }
+    fn sync_chain_pulse(&self, scene: &mut Scene, index: usize) {
+        let Some(row) = &self.chain_rows[index] else {
+            return;
+        };
+        let Some(&id) = row.icons.last() else {
+            return;
+        };
+        // Arrival -> overshoot -> squash -> settle; one local highlight per hit.
+        let remaining = self.chain_pulse[index] / CHAIN_PULSE_SECONDS;
+        let landing = chain_landing_glow(1. - remaining);
+        let (size, flight) = chain_arrival(1. - remaining);
+        let direction = if index == 0 { -1. } else { 1. };
+        let step = self.spacing;
+        let center = self.origin + Vec3::new(direction * 0.65, 0., 0.);
+        let destination = center
+            + Vec3::new(
+                direction * ((row.icons.len() - 1) as f32 * step - self.spacing),
+                0.,
+                0.02,
+            );
+        scene.set_object_position(
+            id,
+            destination + Vec3::new(direction * 0.90, 0., 0.) * flight,
+        );
+        let scale = self.fruit_scale;
+        scene.set_object_scale(id, Vec3::splat(scale * size));
+        for &fruit in &row.icons {
+            scene.set_emission(fruit, 3. + if fruit == id { 5. } else { 2.5 } * landing);
+        }
+        // Fruit accents fade after landing; earned frame glow remains at its baseline.
+        if let Some(&frame) = row.frames.get(row.icons.len() - 1) {
+            scene.set_object_position(
+                frame,
+                destination - Vec3::new(0., 0., 0.02)
+                    + Vec3::new(direction * 0.90, 0., 0.) * flight,
+            );
+            scene.set_object_scale(frame, self.frame_scale * size);
+        }
+    }
+    pub fn notice(&mut self, scene: &mut Scene, label: String) {
+        if !self.chain_mode {
+            return;
+        }
+        self.notice_seconds = 0.5;
+        let id = self.awards[2];
+        if let Some(panel) = scene.info_panels.get_mut(&id) {
+            panel.update(vec![("", label)]);
+        }
+        scene.set_object_position(id, self.origin + Vec3::new(0., -0.56, 0.));
+        scene.set_opacity(id, 1., 8., 0., -1.);
+        scene.set_emission(id, 4.);
+    }
     pub fn reset(&mut self, scene: &mut Scene) {
+        if self.chain_mode {
+            self.clear(scene);
+            self.sync_chains(scene, &[None, None]);
+            return;
+        }
         if let Some(mut r) = self.current.take() {
             r.remove(scene);
         }
@@ -1050,6 +1549,33 @@ impl ComboDisplay {
         self.sync(scene);
     }
     pub fn advance(&mut self, scene: &mut Scene, dt: f32) {
+        if self.chain_mode {
+            if !dt.is_finite() || dt <= 0. {
+                return;
+            }
+            self.advance_retired(scene, dt);
+            if self.stack_score_pulse > 0. {
+                self.stack_score_pulse = (self.stack_score_pulse - dt).max(0.);
+                self.sync_stack_score(scene);
+            }
+            for index in 0..2 {
+                if self.chain_pulse[index] > 0. {
+                    self.chain_pulse[index] = (self.chain_pulse[index] - dt).max(0.);
+                    self.sync_chain_pulse(scene, index);
+                    self.sync_stock_score(scene, index);
+                }
+            }
+            if self.notice_seconds > 0. {
+                self.notice_seconds = (self.notice_seconds - dt).max(0.);
+                if self.notice_seconds == 0. {
+                    if let Some(panel) = scene.info_panels.get_mut(&self.awards[2]) {
+                        panel.update(vec![("", String::new())]);
+                    }
+                    scene.set_opacity(self.awards[2], 0., 8., 0., -1.);
+                }
+            }
+            return;
+        }
         if !dt.is_finite() || dt <= 0. || self.history.is_empty() {
             return;
         }
@@ -1139,10 +1665,25 @@ impl ComboDisplay {
             }
             let opacity = row.map_or(0., |r| (1. - r.age / self.seconds).clamp(0., 1.));
             scene.set_opacity(*id, opacity, 8., 0., -1.);
-            scene.set_emission(*id, 4. * opacity * opacity);
+            let debug = scene
+                .info_panels
+                .get(id)
+                .is_some_and(|p| p.kind == crate::info_panel::PanelKind::DebugText);
+            scene.set_emission(*id, if debug { 0. } else { 4. * opacity * opacity });
         }
     }
     pub fn state(&self) -> String {
+        if self.chain_mode {
+            let chains: Vec<Value> = self.chain_rows.iter().enumerate().map(|(i, row)| {
+                let r = row.as_ref();
+                json!({"kind":r.map_or("", |r|r.kind.as_str()),"count":r.map_or(0,|r|r.count),"points":r.map_or(0,|r|r.points),
+                    "earnedPoints":r.map_or(0,|r|crate::xr_round::FruitChain{kind:r.kind.clone(),count:r.count,points:r.points}.total_points()),
+                    "potential":r.map_or(0,|r|crate::xr_round::FruitChain{kind:r.kind.clone(),count:r.count,points:r.points}.value()),
+                    "icons":r.map(|r|&r.icons),"frames":r.map(|r|&r.frames),"label":self.awards[i]})
+            }).collect();
+            return json!({"mode":"chains","pendingBonus":self.pending_bonus,"stackScorePanel":self.stack_score_panel,"stockScorePanels":self.stock_score_panels,"retiring":self.retired.as_ref().map(|r|json!({"age":r.age,"earnedBonus":r.earned_bonus,"earnedPoints":r.earned_points,"scoreLabel":r.score_label,"objects":r.parts.iter().map(|p|p.id).collect::<Vec<_>>()})),"current":null,"history":[],"chains":chains})
+                .to_string();
+        }
         json!({"current":self.current.as_ref().map(|r|r.value(self.seconds,0)),"history":self.history.iter().enumerate().map(|(i,r)|r.value(self.seconds,self.awards[i])).collect::<Vec<_>>()}).to_string()
     }
 }
@@ -1262,6 +1803,328 @@ mod tests {
         assert_eq!(scene.objects().len(), 5);
     }
     #[test]
+    fn individual_bonuses_and_replaced_row_animate_then_release_instances() {
+        let (mut scene, old) = fixture();
+        scene.set_object_position(old.score_panel, Vec3::new(0., 1.90, -2.));
+        let panels = [
+            scene.add_info_panel("combo-award", 0.28, 0.11).unwrap(),
+            scene.add_info_panel("combo-award", 0.28, 0.11).unwrap(),
+        ];
+        let config = json!({"mode":"chains","symbols":[{"kind":"A","asset":old.symbols[0].asset,"variant":0},{"kind":"B","asset":old.symbols[1].asset,"variant":0}],
+            "frameAsset":old.frame_asset,"timerPanel":old.timer_panel,"scorePanel":old.score_panel,"awardPanels":old.awards,"stockScorePanels":panels});
+        let mut display = ComboDisplay::configure(&scene, &config.to_string()).unwrap();
+        let make = |kind: &str, count| {
+            Some(crate::xr_round::FruitChain {
+                kind: kind.into(),
+                count,
+                points: 10,
+            })
+        };
+        display.sync_chains(&mut scene, &[make("A", 4), make("B", 5)]);
+        let state: Value = serde_json::from_str(&display.state()).unwrap();
+        assert_eq!(state["chains"][0]["potential"], 30);
+        assert_eq!(state["chains"][0]["earnedPoints"], 70);
+        assert_eq!(state["chains"][1]["earnedPoints"], 110);
+        assert_eq!(state["chains"][1]["potential"], 60);
+        assert!(scene.objects()[&panels[0]].transform.position.x < 0.);
+        assert!(scene.objects()[&panels[1]].transform.position.x > 0.);
+        display.advance(&mut scene, 0.8);
+        let preserved = display.chain_rows[1].as_ref().unwrap().icons.clone();
+        let old_ids = display.chain_rows[0].as_ref().unwrap().icons.clone();
+        let start_y = scene.objects()[&old_ids[0]].transform.position.y;
+        scene.set_object_scale(panels[0], Vec3::new(-1., 1., 1.));
+        display.sync_chains(&mut scene, &[make("B", 1), make("B", 5)]);
+        assert_eq!(display.chain_rows[1].as_ref().unwrap().icons, preserved);
+        assert!(old_ids.iter().all(|id| scene.objects().contains_key(id)));
+        assert!(!display.chain_rows[0]
+            .as_ref()
+            .unwrap()
+            .icons
+            .contains(&old_ids[0]));
+        let retired = display.retired.as_ref().unwrap();
+        assert_eq!(retired.earned_bonus, 30);
+        assert_eq!(retired.earned_points, 70);
+        let earned_label = retired.score_label.unwrap();
+        assert!(scene.objects()[&earned_label].transform.scale.x < 0.);
+        assert!(!scene.info_panels[&earned_label].mesh.vertices.is_empty());
+        display.advance(&mut scene, 0.45);
+        let moving = &scene.objects()[&old_ids[0]];
+        assert!(
+            moving.transform.position.y > start_y && moving.opacity < 1. && moving.opacity > 0.
+        );
+        let earned = &scene.objects()[&earned_label];
+        assert!(earned.opacity > 0. && earned.opacity < 1. && earned.transform.scale.x < 0.);
+        display.advance(&mut scene, 0.51);
+        assert!(display.retired.is_none());
+        assert!(
+            !scene.objects().contains_key(&earned_label)
+                && !scene.info_panels.contains_key(&earned_label)
+        );
+        assert!(old_ids.iter().all(|id| !scene.objects().contains_key(id)));
+        display.sync_chains(&mut scene, &[make("A", 2), make("B", 5)]);
+        assert!(display.retired.as_ref().unwrap().score_label.is_some());
+        assert_eq!(display.retired.as_ref().unwrap().earned_points, 10);
+        let outgoing = display
+            .retired
+            .as_ref()
+            .unwrap()
+            .parts
+            .iter()
+            .map(|p| p.id)
+            .collect::<Vec<_>>();
+        display.sync_chains(&mut scene, &[make("B", 1), make("B", 5)]);
+        assert!(outgoing.iter().all(|id| !scene.objects().contains_key(id)));
+        let outgoing = display
+            .retired
+            .as_ref()
+            .unwrap()
+            .parts
+            .iter()
+            .map(|p| p.id)
+            .collect::<Vec<_>>();
+        display.clear(&mut scene);
+        assert!(display.retired.is_none());
+        assert!(outgoing.iter().all(|id| !scene.objects().contains_key(id)));
+        assert!(panels.iter().all(|id| scene.objects()[id].opacity == 0.));
+        let mut invalid = config;
+        invalid["stockScorePanels"] = json!([panels[0], panels[0]]);
+        assert!(ComboDisplay::configure(&scene, &invalid.to_string()).is_none());
+    }
+    #[test]
+    fn central_stack_bonus_tracks_both_stocks_pulses_and_clears() {
+        let (mut scene, old) = fixture();
+        let pending = scene.add_info_panel("combo-award", 0.28, 0.11).unwrap();
+        let config = json!({"mode":"chains","symbols":[{"kind":"A","asset":old.symbols[0].asset,"variant":0},{"kind":"B","asset":old.symbols[1].asset,"variant":0}],
+            "frameAsset":old.frame_asset,"timerPanel":old.timer_panel,"scorePanel":old.score_panel,"awardPanels":old.awards,"stackScorePanel":pending});
+        let mut display = ComboDisplay::configure(&scene, &config.to_string()).unwrap();
+        let mut chains = [
+            Some(crate::xr_round::FruitChain {
+                kind: "A".into(),
+                count: 4,
+                points: 10,
+            }),
+            Some(crate::xr_round::FruitChain {
+                kind: "B".into(),
+                count: 5,
+                points: 20,
+            }),
+        ];
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(display.pending_bonus, 150);
+        assert_eq!(
+            scene.objects()[&pending].transform.position.x,
+            display.origin.x
+        );
+        assert!(scene.objects()[&pending].transform.scale.x > 1.1);
+        assert_eq!(scene.objects()[&pending].emission, 8.);
+        display.advance(&mut scene, 0.5);
+        assert_eq!(scene.objects()[&pending].transform.scale.x, 1.);
+        assert_eq!(scene.objects()[&pending].emission, 4.);
+        chains[0] = None;
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(display.pending_bonus, 120);
+        chains[1] = None;
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(display.pending_bonus, 0);
+        assert!(!scene.info_panels[&pending].mesh.vertices.is_empty());
+        display.clear(&mut scene);
+        assert_eq!(scene.objects()[&pending].opacity, 0.);
+        assert!(scene.info_panels[&pending].mesh.vertices.is_empty());
+        let mut invalid = config;
+        invalid["stackScorePanel"] = serde_json::json!(old.score_panel);
+        assert!(ComboDisplay::configure(&scene, &invalid.to_string()).is_none());
+    }
+    #[test]
+    fn debug_stock_counters_keep_plain_font_and_zero_emission() {
+        let (mut scene, old) = fixture();
+        let counts = [
+            scene.add_info_panel("debug-text", 0.18, 0.05).unwrap(),
+            scene.add_info_panel("debug-text", 0.18, 0.05).unwrap(),
+        ];
+        let config = json!({"mode":"chains", "symbols":[{"kind":"A","asset":old.symbols[0].asset,"variant":0}],"frameAsset":old.frame_asset,
+            "timerPanel":old.timer_panel,"scorePanel":old.score_panel,"awardPanels":[counts[0],counts[1],old.awards[2]]});
+        let mut display = ComboDisplay::configure(&scene, &config.to_string()).unwrap();
+        display.sync_chains(
+            &mut scene,
+            &[
+                Some(crate::xr_round::FruitChain {
+                    kind: "A".into(),
+                    count: 5,
+                    points: 10,
+                }),
+                None,
+            ],
+        );
+        let panel = &scene.info_panels[&counts[0]];
+        assert!(!panel.kind.neon());
+        assert!(!panel.mesh.indices.is_empty());
+        assert!(panel.height <= 0.05);
+        assert_eq!(scene.objects()[&counts[0]].emission, 0.);
+        display.advance(&mut scene, CHAIN_PULSE_SECONDS * 0.5);
+        assert_eq!(scene.objects()[&counts[0]].emission, 0.);
+        assert!(scene.objects()[&counts[1]].opacity == 0.);
+        display.clear(&mut scene);
+        assert_eq!(scene.objects()[&counts[0]].opacity, 0.);
+    }
+    #[test]
+    fn combo_display_two_chains_remain_bounded_and_reset_cleanly() {
+        let (mut scene, mut display) = fixture();
+        display.chain_mode = true;
+        display.reset(&mut scene);
+        assert_eq!(scene.variant_instances.len(), 0);
+        let mut chains = [
+            Some(crate::xr_round::FruitChain {
+                kind: "A".into(),
+                count: 5,
+                points: 10,
+            }),
+            Some(crate::xr_round::FruitChain {
+                kind: "B".into(),
+                count: 2,
+                points: 20,
+            }),
+        ];
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(scene.variant_instances.len(), 14);
+        let state: Value = serde_json::from_str(&display.state()).unwrap();
+        assert_eq!(state["chains"][0]["count"], 5);
+        assert_eq!(state["chains"][0]["potential"], 60);
+        let icons = display.chain_rows[0].as_ref().unwrap().icons.clone();
+        chains[0].as_mut().unwrap().count = 100;
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(&display.chain_rows[0].as_ref().unwrap().icons[..5], &icons);
+        assert_eq!(scene.variant_instances.len(), 204);
+        display.advance(&mut scene, CHAIN_PULSE_SECONDS);
+        for row in display.chain_rows.iter().flatten() {
+            for id in &row.icons {
+                assert!((scene.objects()[id].transform.scale.x - display.fruit_scale).abs() < 1e-6);
+            }
+            for id in &row.frames {
+                assert!(
+                    (scene.objects()[id].transform.scale.x - display.frame_scale.x).abs() < 1e-6
+                );
+            }
+        }
+        let hundred = display.chain_rows[0].as_ref().unwrap();
+        assert!(
+            scene.objects()[hundred.icons.last().unwrap()]
+                .transform
+                .position
+                .x
+                < -30.
+        );
+
+        chains[0].as_mut().unwrap().count = u32::MAX;
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(scene.variant_instances.len(), 2 * MAX_CHAIN_ICONS + 4);
+        chains[0].as_mut().unwrap().count = 4;
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(scene.variant_instances.len(), 12);
+        let row = display.chain_rows[0].as_ref().unwrap();
+        assert_eq!(row.icons.len(), 4);
+        assert!(
+            scene.objects()[&row.icons[3]].transform.position.x
+                < scene.objects()[&row.icons[0]].transform.position.x
+        );
+        chains[0] = None;
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(scene.variant_instances.len(), 4);
+        display.reset(&mut scene);
+        assert_eq!(scene.variant_instances.len(), 0);
+        display.clear(&mut scene);
+        assert!(scene.variant_instances.is_empty());
+    }
+    #[test]
+    fn chain_rows_grow_outwards_and_newest_icon_pulses_once() {
+        let (mut scene, mut display) = fixture();
+        display.chain_mode = true;
+        let chains = [
+            Some(crate::xr_round::FruitChain {
+                kind: "A".into(),
+                count: 4,
+                points: 10,
+            }),
+            Some(crate::xr_round::FruitChain {
+                kind: "B".into(),
+                count: 5,
+                points: 20,
+            }),
+        ];
+        display.sync_chains(&mut scene, &chains);
+        for index in 0..2 {
+            let row = display.chain_rows[index].as_ref().unwrap();
+            let sign = if index == 0 { -1. } else { 1. };
+            for pair in row.icons[..row.icons.len() - 1].windows(2) {
+                let a = &scene.objects()[&pair[0]].transform.position;
+                let b = &scene.objects()[&pair[1]].transform.position;
+                assert!((b.x - a.x) * sign > 0.);
+                assert_eq!(a.y, b.y);
+            }
+            let last = &scene.objects()[row.icons.last().unwrap()];
+
+            assert!((last.transform.scale.x / (display.fruit_scale) - 0.55).abs() < 1e-5);
+            let frame = &scene.objects()[row.frames.last().unwrap()];
+            assert!((last.transform.position.x - frame.transform.position.x).abs() < 1e-6);
+            assert!((last.transform.position.y - frame.transform.position.y).abs() < 1e-6);
+            assert!((frame.transform.scale.x / (display.frame_scale.x) - 0.55).abs() < 1e-5);
+            let target_x = display.origin.x
+                + sign * (0.65 + (row.icons.len() - 1) as f32 * display.spacing - display.spacing);
+            assert!((last.transform.position.x - target_x) * sign > 0.85);
+            assert_eq!(last.emission, 3.);
+            assert_eq!(frame.emission, STOCK_FRAME_EMISSION);
+            assert_eq!(frame.opacity, 1.);
+        }
+        display.advance(&mut scene, CHAIN_PULSE_SECONDS * 0.45);
+        let last = *display.chain_rows[1]
+            .as_ref()
+            .unwrap()
+            .icons
+            .last()
+            .unwrap();
+
+        let peak = &scene.objects()[&last];
+        assert!((peak.transform.scale.x / (display.fruit_scale) - 1.35).abs() < 1e-5);
+        assert!((peak.transform.position.y - display.origin.y).abs() < 1e-6);
+        let frame = *display.chain_rows[1]
+            .as_ref()
+            .unwrap()
+            .frames
+            .last()
+            .unwrap();
+        assert!(
+            (scene.objects()[&frame].transform.scale.x / (display.frame_scale.x) - 1.35).abs()
+                < 1e-5
+        );
+        assert!(scene.objects()[&frame].emission > 5. && scene.objects()[&frame].opacity > 0.65);
+        assert!(scene.objects()[&display.chain_rows[1].as_ref().unwrap().icons[0]].emission > 4.);
+        display.advance(&mut scene, CHAIN_PULSE_SECONDS * 0.27);
+        assert!(
+            (scene.objects()[&last].transform.scale.x / (display.fruit_scale) - 0.75).abs() < 1e-5
+        );
+        assert!(
+            (scene.objects()[&frame].transform.scale.x / (display.frame_scale.x) - 0.75).abs()
+                < 1e-5
+        );
+        display.advance(&mut scene, CHAIN_PULSE_SECONDS);
+        assert!(
+            (scene.objects()[&frame].transform.scale.x / (display.frame_scale.x) - 1.).abs() < 1e-5
+        );
+        for row in display.chain_rows.iter().flatten() {
+            for id in &row.icons {
+                assert!((scene.objects()[id].transform.position.y - display.origin.y).abs() < 1e-6);
+            }
+        }
+        assert_eq!(scene.objects()[&last].emission, 3.);
+        assert_eq!(scene.objects()[&frame].emission, STOCK_FRAME_EMISSION);
+        assert_eq!(scene.objects()[&frame].opacity, 1.);
+        assert!((scene.objects()[&last].transform.scale.x - display.fruit_scale).abs() < 1e-6);
+        display.sync_chains(&mut scene, &chains);
+        assert_eq!(scene.objects()[&last].emission, 3.); // unchanged state does not retrigger
+        display.clear(&mut scene);
+        assert_eq!(display.chain_pulse, [0.; 2]);
+        assert!(scene.variant_instances.is_empty());
+    }
+    #[test]
     fn combo_display_bounds_history_and_shared_instance_lifetime() {
         let (mut scene, mut display) = fixture();
         for _ in 0..8 {
@@ -1303,6 +2166,7 @@ use super::*;
 
 pub const DURATION: f32 = 0.65;
 const HIDDEN: Vec3 = Vec3::new(0., -10000., 0.);
+const DEFAULT_LABEL: &str = "CISTY REZ";
 #[derive(Clone, Copy)]
 struct PieceMotion {
     id: u32,
@@ -1463,10 +2327,26 @@ impl SceneManager {
         mirror_text: bool,
         size: f32,
     ) -> Result<Vec<u32>, String> {
+        self.play_cut_feedback_labeled(pieces, mirror_text, size, None)
+    }
+    /// Emit a bounded hit popup, replacing the default title only for this hit.
+    pub fn play_cut_feedback_labeled(
+        &mut self,
+        pieces: &[u32],
+        mirror_text: bool,
+        size: f32,
+        label: Option<&str>,
+    ) -> Result<Vec<u32>, String> {
+        if label.is_some_and(|label| {
+            !(1..=32).contains(&label.len())
+                || !label.bytes().all(|byte| (b' '..=b'~').contains(&byte))
+        }) {
+            return Err("Cut feedback label requires 1..32 printable ASCII characters".into());
+        }
         if !size.is_finite() || !(0.01..=2.).contains(&size) {
             return Err("Cut feedback size must be finite in 0.01..2".into());
         }
-        let ids = self.play_cut_feedback_facing(pieces, mirror_text)?;
+        let ids = self.play_cut_feedback_with_label(pieces, mirror_text, label)?;
         let fragments = &self.cut_fragments;
         for burst in self.feedback.bursts.iter_mut().flatten() {
             if ids.contains(&burst.ids[0]) {
@@ -1488,10 +2368,108 @@ impl SceneManager {
         self.update_cut_feedback(0.);
         Ok(ids)
     }
+    /// Emit one popup per cut family, using the score already awarded to its
+    /// original target. Missing or zero rewards retain the impact effect without a score caption.
+    pub fn play_cut_feedback_scored(
+        &mut self,
+        pieces: &[u32],
+        mirror_text: bool,
+        size: f32,
+        rewards: &[(u32, u64)],
+    ) -> Result<Vec<u32>, String> {
+        if !size.is_finite() || !(0.01..=2.).contains(&size) {
+            return Err("Cut feedback size must be finite in 0.01..2".into());
+        }
+        if rewards.len() > 32
+            || rewards
+                .iter()
+                .enumerate()
+                .any(|(i, (id, _))| rewards[..i].iter().any(|(other, _)| other == id))
+        {
+            return Err("Cut feedback rewards require at most 32 unique original IDs".into());
+        }
+        if !(2..=32).contains(&pieces.len())
+            || pieces.iter().enumerate().any(|(i, id)| {
+                pieces[..i].contains(id)
+                    || !self.triangle_meshes.contains_key(id)
+                    || self
+                        .feedback
+                        .bursts
+                        .iter()
+                        .flatten()
+                        .any(|burst| burst.ids.contains(id))
+                    || self
+                        .feedback
+                        .trails
+                        .iter()
+                        .flatten()
+                        .any(|trail| trail.ids.contains(id))
+            })
+        {
+            return Err("Cut feedback requires 2..32 unique live solid pieces".into());
+        }
+        let mut groups = BTreeMap::<u64, Vec<u32>>::new();
+        for &id in pieces {
+            self.triangle_meshes[&id].mesh.cpu()?;
+            let family = self
+                .cut_fragments
+                .get(&id)
+                .map_or(0, |fragment| fragment.family);
+            groups.entry(family).or_default().push(id);
+        }
+        let mut objects = std::collections::BTreeSet::new();
+        for group in groups.values() {
+            let parent = self
+                .cut_fragments
+                .get(&group[0])
+                .map(|fragment| fragment.parent);
+            let reward = parent
+                .and_then(|parent| {
+                    rewards
+                        .iter()
+                        .find(|(id, _)| *id == parent)
+                        .map(|(_, value)| *value)
+                })
+                .unwrap_or(0);
+            let label = if reward == 0 {
+                String::new()
+            } else {
+                format!("+{reward}")
+            };
+            let ids = self.emit_cut_feedback_group(group, mirror_text, Some(&label))?;
+            let fragments = &self.cut_fragments;
+            for burst in self.feedback.bursts.iter_mut().flatten() {
+                if ids.contains(&burst.ids[0]) {
+                    if burst
+                        .pieces
+                        .iter()
+                        .flatten()
+                        .any(|piece| fragments.contains_key(&piece.id))
+                    {
+                        let attack = ((burst.strength - 0.12) / 1.88).clamp(0., 1.);
+                        burst.strength = 0.12 * size + (2. - 0.12 * size) * attack;
+                    } else {
+                        burst.strength *= size;
+                    }
+                }
+            }
+            objects.extend(ids);
+        }
+        self.update_cut_feedback(0.);
+        Ok(objects.into_iter().collect())
+    }
     pub fn play_cut_feedback_facing(
         &mut self,
         pieces: &[u32],
         mirror_text: bool,
+    ) -> Result<Vec<u32>, String> {
+        self.play_cut_feedback_with_label(pieces, mirror_text, None)
+    }
+    fn play_cut_feedback_with_label(
+        &mut self,
+        pieces: &[u32],
+        mirror_text: bool,
+        label: Option<&str>,
     ) -> Result<Vec<u32>, String> {
         if !(2..=32).contains(&pieces.len())
             || pieces.iter().enumerate().any(|(i, id)| {
@@ -1526,7 +2504,7 @@ impl SceneManager {
         }
         let mut objects = std::collections::BTreeSet::new();
         for group in groups.values() {
-            objects.extend(self.emit_cut_feedback_group(group, mirror_text)?);
+            objects.extend(self.emit_cut_feedback_group(group, mirror_text, label)?);
         }
         Ok(objects.into_iter().collect())
     }
@@ -1534,6 +2512,7 @@ impl SceneManager {
         &mut self,
         pieces: &[u32],
         mirror_text: bool,
+        label: Option<&str>,
     ) -> Result<Vec<u32>, String> {
         let mut motions = [None; 32];
         let mut weighted = Vec3::ZERO;
@@ -1624,6 +2603,19 @@ impl SceneManager {
         debug_assert!(world_min.is_finite() && world_max.is_finite());
         let slot = self.feedback.next;
         let mut burst = if let Some(old) = self.feedback.bursts[slot] {
+            // Only emission rebuilds glyph geometry; frame updates retain this panel
+            // and its object ID. Always restore the default after a labeled hit.
+            if let Some(panel) = self.info_panels.get_mut(&old.ids[7]) {
+                panel.mesh = crate::info_panel::InfoPanel::text(
+                    label.unwrap_or(DEFAULT_LABEL),
+                    &[],
+                    panel.width,
+                    panel.height,
+                )?
+                .mesh;
+                panel.dirty = true;
+                panel.revision = panel.revision.wrapping_add(1);
+            }
             // Reclaim the previous burst's short lived fragments when the bounded slot wraps.
             for p in old.pieces.into_iter().flatten() {
                 if !pieces.contains(&p.id) {
@@ -1657,7 +2649,7 @@ impl SceneManager {
                 for id in &mut ids[1..7] {
                     *id = self.effect_mesh(diamond(Vec3::new(0.75, 0.22, 1.))?)?;
                 }
-                ids[7] = self.add_text_panel("CISTY REZ", &[], 0.55, 0.24)?;
+                ids[7] = self.add_text_panel(label.unwrap_or(DEFAULT_LABEL), &[], 0.55, 0.24)?;
                 self.park_feedback(ids[7]);
                 Ok::<(), String>(())
             })();
@@ -1985,6 +2977,103 @@ mod tests {
             id
         })
     }
+    fn assert_label(scene: &SceneManager, id: u32, label: &str) {
+        let panel = &scene.info_panels[&id];
+        let expected = crate::info_panel::InfoPanel::text(label, &[], 0.55, 0.24).unwrap();
+        assert_eq!(panel.mesh.indices, expected.mesh.indices);
+        let vertices = |mesh: &crate::gltf_loader::ImportedMesh| {
+            mesh.vertices
+                .iter()
+                .map(|vertex| (vertex.position, vertex.normal, vertex.color))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(vertices(&panel.mesh), vertices(&expected.mesh));
+    }
+    #[test]
+    fn cut_feedback_custom_label_updates_actual_geometry_without_frame_rebuilds() {
+        let mut scene = SceneManager::default();
+        let pieces = pieces(&mut scene);
+        let ids = scene
+            .play_cut_feedback_labeled(&pieces, false, 0.15, Some("BONUS 960"))
+            .unwrap();
+        assert_label(&scene, ids[7], "BONUS 960");
+        let revision = scene.info_panels[&ids[7]].revision;
+        scene.update_cut_feedback(0.1);
+        scene.update_cut_feedback(0.1);
+        assert_eq!(scene.info_panels[&ids[7]].revision, revision);
+        assert_label(&scene, ids[7], "BONUS 960");
+        let default = crate::info_panel::InfoPanel::text(DEFAULT_LABEL, &[], 0.55, 0.24).unwrap();
+        assert_ne!(
+            scene.info_panels[&ids[7]].mesh.indices,
+            default.mesh.indices
+        );
+    }
+    #[test]
+    fn cut_feedback_default_methods_restore_labels_and_keep_pool_ids() {
+        for method in 0..3 {
+            let mut scene = SceneManager::default();
+            let pieces = pieces(&mut scene);
+            let first = scene
+                .play_cut_feedback_labeled(&pieces, false, 1., Some("BONUS 960"))
+                .unwrap();
+            let second = scene
+                .play_cut_feedback_labeled(&pieces, false, 1., Some("BONUS 120"))
+                .unwrap();
+            let count = scene.objects.len();
+            for index in 0..8 {
+                let ids = match method {
+                    0 => scene.play_cut_feedback(&pieces),
+                    1 => scene.play_cut_feedback_facing(&pieces, true),
+                    _ => scene.play_cut_feedback_sized(&pieces, true, 0.15),
+                }
+                .unwrap();
+                assert_eq!(ids, if index % 2 == 0 { &first } else { &second }.clone());
+                assert_label(&scene, ids[7], DEFAULT_LABEL);
+                assert_eq!(scene.objects.len(), count);
+                assert_eq!(scene.info_panels.len(), 2);
+            }
+        }
+    }
+    #[test]
+    fn cut_feedback_malformed_labels_are_atomic_for_live_pool() {
+        let mut scene = SceneManager::default();
+        let pieces = pieces(&mut scene);
+        let ids = scene
+            .play_cut_feedback_labeled(&pieces, false, 1., Some("BONUS 960"))
+            .unwrap();
+        let count = scene.objects.len();
+        let next = scene.feedback.next;
+        let revision = scene.info_panels[&ids[7]].revision;
+        let positions: Vec<_> = scene
+            .objects
+            .values()
+            .map(|object| object.transform.model())
+            .collect();
+        for label in [
+            "",
+            "BAD\nLABEL",
+            "BAD\tLABEL",
+            "BONUS č",
+            "\u{7f}",
+            &"A".repeat(33),
+        ] {
+            assert!(scene
+                .play_cut_feedback_labeled(&pieces, true, 0.15, Some(label))
+                .is_err());
+            assert_eq!(scene.objects.len(), count);
+            assert_eq!(scene.feedback.next, next);
+            assert_eq!(scene.info_panels[&ids[7]].revision, revision);
+            assert_label(&scene, ids[7], "BONUS 960");
+            assert_eq!(
+                scene
+                    .objects
+                    .values()
+                    .map(|object| object.transform.model())
+                    .collect::<Vec<_>>(),
+                positions
+            );
+        }
+    }
     #[test]
     fn cut_feedback_size_is_configurable_and_invalid_values_are_atomic() {
         let mut scene = SceneManager::default();
@@ -2128,6 +3217,53 @@ mod tests {
         assert!((centers[0] - Vec3::new(-0.7, 1.4, -1.2)).length() < 1e-5);
         assert!((centers[1] - Vec3::new(0.7, 1.4, -1.2)).length() < 1e-5);
         assert!(a.iter().chain(b.iter()).all(|id| scene.object_exists(*id)));
+    }
+    #[test]
+    fn scored_cut_feedback_uses_each_original_reward_and_reuses_pool_ids() {
+        let mut scene = SceneManager::default();
+        let a = pieces(&mut scene);
+        let b = pieces(&mut scene);
+        for (family, ids, parent) in [(11, a, 101), (12, b, 202)] {
+            for id in ids {
+                scene.cut_fragments.insert(
+                    id,
+                    CutFragment {
+                        cut_speed: 0.,
+                        family,
+                        blade_grace_until: 0.,
+                        radius: 0.15,
+                        generation: 1,
+                        expires_at: 4.,
+                        birth_cutter: None,
+                        parent,
+                        parent_offset: Vec3::ZERO,
+                    },
+                );
+            }
+        }
+        let pieces = [a[0], a[1], b[0], b[1]];
+        let rewards = [(101, 10), (202, 37)];
+        let first = scene
+            .play_cut_feedback_scored(&pieces, false, 0.8, &rewards)
+            .unwrap();
+        assert_eq!(first.len(), 16);
+        assert_label(&scene, scene.feedback.bursts[0].unwrap().ids[7], "+10");
+        assert_label(&scene, scene.feedback.bursts[1].unwrap().ids[7], "+37");
+        let second = scene
+            .play_cut_feedback_scored(&pieces, false, 0.8, &rewards)
+            .unwrap();
+        assert_eq!(first, second);
+        assert_label(&scene, scene.feedback.bursts[0].unwrap().ids[7], "+10");
+        assert_label(&scene, scene.feedback.bursts[1].unwrap().ids[7], "+37");
+    }
+    #[test]
+    fn scored_cut_feedback_missing_original_reward_hides_score_caption() {
+        let mut scene = SceneManager::default();
+        let pieces = pieces(&mut scene);
+        let ids = scene
+            .play_cut_feedback_scored(&pieces, false, 1., &[(999, 10)])
+            .unwrap();
+        assert_label(&scene, ids[7], "");
     }
     #[test]
     fn cut_feedback_real_debris_keeps_momentum_and_external_impulses() {
@@ -9130,6 +10266,7 @@ pub enum PanelKind {
     Diagnostics,
     Text,
     NumericText,
+    DebugText,
     Countdown,
     Score,
     ComboAward,
@@ -9146,11 +10283,12 @@ impl PanelKind {
             "countdown" => Ok(Self::Countdown),
             "score" => Ok(Self::Score),
             "combo-award" => Ok(Self::ComboAward),
+            "debug-text" => Ok(Self::DebugText),
             "scene" => Ok(Self::Scene),
             "round" => Ok(Self::Round),
             "restart" => Ok(Self::Restart),
             "diagnostics" => Ok(Self::Diagnostics),
-            _ => Err("Info panel kind must be scene, round, restart, diagnostics, countdown, score, or combo-award".into()),
+            _ => Err("Info panel kind must be scene, round, restart, diagnostics, countdown, score, combo-award, or debug-text".into()),
         }
     }
 }
@@ -9176,6 +10314,7 @@ impl InfoPanel {
             PanelKind::Countdown => vec![("", "30".into())],
             PanelKind::Score => vec![("", "0".into())],
             PanelKind::ComboAward => vec![("", "".into())],
+            PanelKind::DebugText => vec![("", "".into())],
             PanelKind::Text | PanelKind::NumericText => {
                 return Err("Use the static text constructor".into())
             }
@@ -9348,6 +10487,21 @@ pub fn geometry(kind: PanelKind, width: f32, height: f32, rows: &[(&str, String)
         return numeric_geometry(width, height, rows.first().map_or("", |row| row.1.as_str()));
     }
     let mut mesh = empty_mesh(width, height);
+    if kind == PanelKind::DebugText {
+        let value = rows.first().map_or("", |row| row.1.as_str());
+        if !value.is_empty() {
+            let unit = fit(value, width * 0.94, height * 0.90);
+            text(
+                &mut mesh,
+                value,
+                -text_width(value, unit) / 2.,
+                3.5 * unit,
+                unit,
+                [0.55, 0.55, 0.55],
+            );
+        }
+        return mesh;
+    }
     if matches!(
         kind,
         PanelKind::Countdown | PanelKind::Score | PanelKind::ComboAward
@@ -9405,6 +10559,7 @@ pub fn geometry(kind: PanelKind, width: f32, height: f32, rows: &[(&str, String)
         | PanelKind::Countdown
         | PanelKind::Score
         | PanelKind::ComboAward => "",
+        PanelKind::DebugText => "",
     };
     let title_unit = fit(title, width * 0.86, height * 0.15);
     text(&mut mesh, title, left, top, title_unit, GOLD);
@@ -9497,6 +10652,45 @@ mod tests {
             .iter()
             .chain(&award.mesh.bounds_max)
             .all(|n| n.is_finite()));
+    }
+    #[test]
+    fn debug_text_panel_is_empty_neutral_centered_and_cached_on_repeat() {
+        let mut panel = InfoPanel::new(PanelKind::DebugText, 1.2, 0.3).unwrap();
+        assert!(panel.mesh.vertices.is_empty());
+        assert!(!panel.kind.neon());
+        assert!(!panel.numeric());
+        assert!(panel.update(vec![("", "DEBUG".into())]));
+        assert!(!panel.mesh.vertices.is_empty());
+        assert!(panel
+            .mesh
+            .vertices
+            .iter()
+            .all(|v| v.color == [0.55, 0.55, 0.55]));
+        assert!(panel.mesh.vertices.iter().all(|v| v.position[2] == 0.003));
+        let min_x = panel
+            .mesh
+            .vertices
+            .iter()
+            .map(|v| v.position[0])
+            .fold(f32::INFINITY, f32::min);
+        let max_x = panel
+            .mesh
+            .vertices
+            .iter()
+            .map(|v| v.position[0])
+            .fold(f32::NEG_INFINITY, f32::max);
+        assert!((min_x + max_x).abs() < 1e-6);
+        assert!(panel
+            .mesh
+            .vertices
+            .iter()
+            .all(|v| v.position[0].abs() <= panel.width / 2.
+                && v.position[1].abs() <= panel.height / 2.));
+        let indices = panel.mesh.indices.clone();
+        panel.dirty = false;
+        assert!(!panel.update(vec![("", "DEBUG".into())]));
+        assert_eq!(panel.mesh.indices, indices);
+        assert!(!panel.dirty);
     }
     #[test]
     fn info_panel_neon_numbers_are_centered_background_free_and_content_cached() {
@@ -22473,6 +23667,13 @@ use std::ops::{Deref, DerefMut};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 
+#[derive(Clone, Copy)]
+pub struct XRCutReward {
+    pub original: u32,
+    pub points: u64,
+    pub total_points: u64,
+}
+
 struct ComboIndicator {
     id: u32,
     kind: String,
@@ -22501,6 +23702,7 @@ pub struct State {
     xr_view_slot: u32,
     xr_eye_count: u32,
     xr_cuts: u64,
+    xr_cut_rewards: Vec<XRCutReward>,
     pub combo_score: crate::xr_round::ComboScore,
     combo_indicators: Vec<ComboIndicator>,
     combo_display: Option<crate::combo_display::ComboDisplay>,
@@ -22565,6 +23767,7 @@ impl State {
             xr_view_slot: 0,
             xr_eye_count: 0,
             xr_cuts: 0,
+            xr_cut_rewards: Vec::with_capacity(32),
             combo_score: Default::default(),
             combo_indicators: Vec::new(),
             combo_display: None,
@@ -22987,13 +24190,21 @@ impl State {
             return false;
         };
         self.clear_combo_display();
+        if self.combo_score.chain_mode != display.chain_mode {
+            self.combo_score.set_chain_mode(display.chain_mode);
+        }
         display.reset(&mut self.renderer.scene);
+        if display.chain_mode {
+            display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+        }
         self.combo_display = Some(display);
+        self.xr_scene_pending = true;
+        self.invalidate_xr_hud();
         true
     }
     pub fn clear_combo_display(&mut self) {
         if let Some(mut display) = self.combo_display.take() {
-            display.reset(&mut self.renderer.scene);
+            display.clear(&mut self.renderer.scene);
         }
     }
     pub fn combo_display_state(&self) -> String {
@@ -23035,7 +24246,15 @@ impl State {
         self.combo_indicators
             .retain(|item| self.renderer.scene.object_exists(item.id));
         for item in &self.combo_indicators {
-            let active = item.kind == kind && item.slot < count;
+            let active = if self.combo_score.chain_mode {
+                self.combo_score
+                    .chains
+                    .iter()
+                    .flatten()
+                    .any(|c| c.kind == item.kind && item.slot < c.count)
+            } else {
+                item.kind == kind && item.slot < count
+            };
             self.renderer
                 .scene
                 .set_emission(item.id, if active { 8.0 } else { 0.65 });
@@ -23049,6 +24268,7 @@ impl State {
             .ok_or_else(|| JsValue::from_str("Round duration must be 1..3600 seconds"))?;
         self.xr_round = Some(round);
         self.xr_cuts = 0;
+        self.xr_cut_rewards.clear();
         self.combo_score.reset();
         if let Some(display) = &mut self.combo_display {
             display.reset(&mut self.renderer.scene);
@@ -23059,6 +24279,13 @@ impl State {
         self.invalidate_xr_hud();
         Ok(())
     }
+    pub fn xr_pending_bonus(&self) -> u64 {
+        if self.combo_score.chain_mode {
+            self.combo_score.pending_bonus()
+        } else {
+            0
+        }
+    }
     pub fn xr_round_state(&self) -> String {
         self.xr_round
             .map(|round| {
@@ -23067,6 +24294,10 @@ impl State {
                     "finished": round.finished(), "cuts": self.xr_cuts,
                     "score": self.combo_score.score, "streak": self.combo_score.streak,
                     "fruit": self.combo_score.kind, "triples": self.combo_score.triples,
+                    "mode": if self.combo_score.chain_mode { "chains" } else { "legacy" },
+                    "chains": self.combo_score.chains.iter().map(|c|c.as_ref().map(|c|serde_json::json!({"kind":c.kind,"count":c.count,"points":c.points,"potential":c.value()}))).collect::<Vec<_>>(),
+                    "rejected": self.combo_score.rejected,
+                    "pendingBonus": self.xr_pending_bonus(),
                 })
             })
             .unwrap_or(serde_json::Value::Null)
@@ -23079,7 +24310,11 @@ impl State {
             hud.invalidate();
         }
     }
+    pub fn xr_cut_rewards(&self) -> &[XRCutReward] {
+        &self.xr_cut_rewards
+    }
     pub fn record_xr_cuts(&mut self, removed: &[u32]) {
+        self.xr_cut_rewards.clear();
         let count = removed.len();
         if count > 0 {
             // Controller input follows advance_xr; new halves must be visible in
@@ -23089,6 +24324,25 @@ impl State {
         if count > 0 && !self.xr_round_finished() {
             self.xr_cuts = self.xr_cuts.saturating_add(count as u64);
             for id in removed {
+                if self.combo_score.chain_mode {
+                    let before = self.combo_score.score;
+                    if let Some(accepted) = self.combo_score.hit_chain(*id) {
+                        if self.xr_cut_rewards.len() < 32 {
+                            self.xr_cut_rewards.push(XRCutReward {
+                                original: *id,
+                                points: self.combo_score.score.saturating_sub(before),
+                                total_points: self.combo_score.last_chain_total_points(),
+                            });
+                        }
+                        if let Some(display) = &mut self.combo_display {
+                            display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+                            if !accepted {
+                                display.notice(&mut self.renderer.scene, "PLNO".into());
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if let Some(event) = self.combo_score.hit_event(*id) {
                     if let Some(display) = &mut self.combo_display {
                         display.event(&mut self.renderer.scene, event);
@@ -23097,6 +24351,23 @@ impl State {
             }
             self.invalidate_xr_hud();
         }
+    }
+    pub fn bank_xr_chain(&mut self, index: usize) -> bool {
+        if !self.combo_score.chain_mode || self.xr_round.is_none() || self.xr_round_finished() {
+            return false;
+        }
+        let Some(_) = self.combo_score.bank_chain(index) else {
+            return false;
+        };
+        if let Some(display) = &mut self.combo_display {
+            display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+        }
+        if let Some(display) = &mut self.combo_display {
+            display.notice(&mut self.renderer.scene, "SERIE ULOZENA".into());
+        }
+        self.xr_scene_pending = true;
+        self.invalidate_xr_hud();
+        true
     }
     pub fn frame_dt(&self) -> f32 {
         self.frame_dt
@@ -23108,7 +24379,14 @@ impl State {
         self.xr_view_slot = 0;
         if let Some(round) = &mut self.xr_round {
             let before = round.remaining.ceil();
+            let was_finished = round.finished();
             round.advance(dt);
+            if !was_finished && round.finished() && self.combo_score.chain_mode {
+                self.combo_score.bank_all();
+                if let Some(display) = &mut self.combo_display {
+                    display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+                }
+            }
             if before != round.remaining.ceil() {
                 self.invalidate_xr_hud();
             }
@@ -30926,9 +32204,60 @@ pub fn play_cut_feedback_facing(
     pieces: &[u32],
     mirror_text: bool,
     size: Option<f32>,
+    score_label: Option<String>,
 ) -> Result<String, JsValue> {
+    let rewards = if matches!(score_label.as_deref(), Some("hit-points" | "stock-total")) {
+        Some(
+            STATE
+                .with(|slot| {
+                    slot.borrow().as_ref().map(|state| {
+                        state
+                            .borrow()
+                            .xr_cut_rewards()
+                            .iter()
+                            .map(|reward| {
+                                (
+                                    reward.original,
+                                    if score_label.as_deref() == Some("stock-total") {
+                                        reward.total_points
+                                    } else {
+                                        reward.points
+                                    },
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .ok_or_else(|| JsValue::from_str("Engine neni inicializovan"))?,
+        )
+    } else {
+        None
+    };
+    let label = match score_label.as_deref() {
+        None => None,
+        Some("pending-bonus") => Some(
+            STATE
+                .with(|slot| {
+                    slot.borrow()
+                        .as_ref()
+                        .map(|state| format!("BONUS {}", state.borrow().xr_pending_bonus()))
+                })
+                .ok_or_else(|| JsValue::from_str("Engine neni inicializovan"))?,
+        ),
+        Some("hit-points" | "stock-total") => None,
+        Some(_) => return Err(JsValue::from_str("Unknown cut feedback score label")),
+    };
     cutting_command(|scene| {
-        let objects = scene.play_cut_feedback_sized(pieces, mirror_text, size.unwrap_or(1.))?;
+        let objects = if let Some(rewards) = &rewards {
+            scene.play_cut_feedback_scored(pieces, mirror_text, size.unwrap_or(1.), rewards)?
+        } else {
+            scene.play_cut_feedback_labeled(
+                pieces,
+                mirror_text,
+                size.unwrap_or(1.),
+                label.as_deref(),
+            )?
+        };
         Ok(serde_json::json!({"objects":objects,"duration":0.65}).to_string())
     })
 }
@@ -31713,12 +33042,14 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
         Ok((report, scene.projectile_contacts.saturating_sub(before)))
     })?;
     // cutting_command's mutable scene borrow must end before borrowing State again.
-    STATE.with(|slot| {
+    let score_awards = STATE.with(|slot| {
         if let Some(state) = slot.borrow().as_ref() {
-            state.borrow_mut().record_xr_cuts(&report.removed);
-        }
+            let mut state = state.borrow_mut();
+            state.record_xr_cuts(&report.removed);
+            state.xr_cut_rewards().iter().map(|reward| serde_json::json!({"original":reward.original,"points":reward.points,"totalPoints":reward.total_points})).collect::<Vec<_>>()
+        } else { Vec::new() }
     });
-    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts}).to_string())
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts,"scoreAwards":score_awards}).to_string())
 }
 
 #[wasm_bindgen]
@@ -31736,6 +33067,17 @@ pub fn clear_combo_display() {
             s.borrow_mut().clear_combo_display();
         }
     });
+}
+#[wasm_bindgen]
+pub fn xr_bank_chain(index: usize) -> bool {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return false;
+    }
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().bank_xr_chain(index))
+    })
 }
 #[wasm_bindgen]
 pub fn combo_display_state() -> String {
@@ -35127,11 +36469,43 @@ impl RoundClock {
     }
 }
 
-/// Optional object-tagged triples. Only original targets can award points;
+/// Guaranteed reward for each registered original cut in chain mode.
+pub const CHAIN_HIT_POINTS: u64 = 10;
+
+/// Pending bonus; guaranteed hit points are already in ComboScore::score.
+#[derive(Clone, Debug)]
+pub struct FruitChain {
+    pub kind: String,
+    pub count: u32,
+    pub points: u32,
+}
+impl FruitChain {
+    /// Total earned by the stored fruit: guaranteed hits and chain bonus.
+    pub fn total_points(&self) -> u64 {
+        u64::from(self.count)
+            .saturating_mul(CHAIN_HIT_POINTS)
+            .saturating_add(self.value())
+    }
+    pub fn value(&self) -> u64 {
+        if self.count < 3 {
+            return 0;
+        }
+        let n = u64::from(self.count);
+        // The triangular factor fits u64 for every u32 count. Divide before
+        // multiplying by points so only the final reward saturates.
+        ((n - 2) * (n - 1) / 2).saturating_mul(u64::from(self.points))
+    }
+}
+
+/// Optional object-tagged scoring. Only original targets can award points;
 /// fragments never inherit a target registration.
 #[derive(Default)]
 pub struct ComboScore {
     pub enabled: bool,
+    pub chain_mode: bool,
+    pub chains: [Option<FruitChain>; 2],
+    pub rejected: u32,
+    pub last_lost_bonus: u64,
     pub score: u64,
     pub triples: u32,
     pub streak: u32,
@@ -35140,6 +36514,11 @@ pub struct ComboScore {
     streak_points: u32,
     display_kind: String,
     display_count: u32,
+    chain_wild: [bool; 2],
+    last_chain_index: Option<usize>,
+    // Relative creation order: 0 = vacant, 1 = older, 2 = newer.
+    // Bounded ranks avoid counter overflow during arbitrarily long rounds.
+    chain_age: [u8; 2],
 }
 impl ComboScore {
     pub fn register(&mut self, id: u32, kind: &str, points: u32, wild: bool) -> bool {
@@ -35161,9 +36540,113 @@ impl ComboScore {
     pub fn reset(&mut self) {
         *self = Self {
             enabled: self.enabled,
+            chain_mode: self.chain_mode,
             targets: std::mem::take(&mut self.targets),
             ..Self::default()
         };
+    }
+    pub fn set_chain_mode(&mut self, enabled: bool) {
+        if self.chain_mode == enabled {
+            return;
+        }
+        self.chain_mode = enabled;
+        self.reset();
+    }
+    /// Consume an original target once. A third ordinary kind replaces the
+    /// oldest chain; its previously earned reward remains in the score.
+    pub fn hit_chain(&mut self, id: u32) -> Option<bool> {
+        let (kind, points, wild) = self.targets.remove(&id)?;
+        // Only registered originals get the guaranteed reward, exactly once.
+        self.score = self.score.saturating_add(CHAIN_HIT_POINTS);
+        self.last_lost_bonus = 0;
+        let slot = if wild {
+            self.chains
+                .iter()
+                .enumerate()
+                .filter_map(|(index, chain)| chain.as_ref().map(|c| (index, c.count)))
+                .min_by_key(|&(index, count)| (count, index))
+                .map(|(index, _)| index)
+                .or(Some(0))
+        } else {
+            self.chains
+                .iter()
+                .position(|chain| chain.as_ref().is_some_and(|c| c.kind == kind))
+                .or_else(|| {
+                    self.chain_wild
+                        .iter()
+                        .enumerate()
+                        .position(|(index, wild)| *wild && self.chains[index].is_some())
+                })
+                .or_else(|| self.chains.iter().position(Option::is_none))
+                .or_else(|| (0..self.chains.len()).min_by_key(|&index| self.chain_age[index]))
+        };
+        let index = slot?;
+        if !wild
+            && !self.chain_wild[index]
+            && self.chains[index]
+                .as_ref()
+                .is_some_and(|chain| chain.kind != kind)
+        {
+            // Chain growth is credited immediately, so replacing its display
+            // row cannot remove points already earned.
+            self.last_lost_bonus = 0;
+            self.chains[index] = None;
+        }
+        let old_value = self.chains[index].as_ref().map_or(0, FruitChain::value);
+        let old_count = self.chains[index].as_ref().map_or(0, |chain| chain.count);
+        if let Some(chain) = self.chains[index].as_mut() {
+            if !wild && self.chain_wild[index] {
+                chain.kind = kind;
+                chain.points = points;
+                self.chain_wild[index] = false;
+            }
+            chain.count = chain.count.saturating_add(1);
+        } else {
+            let other = 1 - index;
+            self.chain_age[other] = u8::from(self.chains[other].is_some());
+            self.chain_age[index] = 2;
+            self.chains[index] = Some(FruitChain {
+                kind: if wild { "ZOLIK".into() } else { kind },
+                count: 1,
+                points,
+            });
+            self.chain_wild[index] = wild;
+        }
+        let chain = self.chains[index]
+            .as_ref()
+            .expect("chain was inserted or grown");
+        let new_value = chain.value();
+        self.score = self
+            .score
+            .saturating_add(new_value.saturating_sub(old_value));
+        let new_triples = chain.count / 3;
+        self.triples = self
+            .triples
+            .saturating_add(new_triples.saturating_sub(old_count / 3));
+        self.last_chain_index = Some(index);
+        Some(true)
+    }
+    pub fn last_chain_total_points(&self) -> u64 {
+        self.last_chain_index
+            .and_then(|index| self.chains[index].as_ref())
+            .map_or(0, FruitChain::total_points)
+    }
+    pub fn bank_chain(&mut self, index: usize) -> Option<u64> {
+        let chain = self.chains.get_mut(index)?.take()?;
+        self.chain_wild[index] = false;
+        self.chain_age[index] = 0;
+        Some(chain.value())
+    }
+    pub fn pending_bonus(&self) -> u64 {
+        self.chains
+            .iter()
+            .flatten()
+            .fold(0_u64, |sum, chain| sum.saturating_add(chain.value()))
+    }
+    pub fn bank_all(&mut self) -> u64 {
+        (0..self.chains.len()).fold(0_u64, |total, index| {
+            total.saturating_add(self.bank_chain(index).unwrap_or(0))
+        })
     }
     /// Kind and number of matching icons to highlight in the combo display.
     /// The completed triple remains visible until the next registered hit.
@@ -35229,6 +36712,217 @@ pub struct ComboEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn chain_hit(score: &mut ComboScore, id: u32, kind: &str, points: u32, wild: bool) -> bool {
+        assert!(score.register(id, kind, points, wild));
+        score.hit_chain(id).unwrap()
+    }
+    #[test]
+    fn growing_chains_are_independent_and_credit_bonus_growth_immediately() {
+        let mut score = ComboScore::default();
+        score.set_chain_mode(true);
+        for id in 0..5 {
+            assert!(chain_hit(&mut score, id, "CHERRY", 10, false));
+            if id < 4 {
+                assert!(chain_hit(&mut score, id + 10, "MELON", 100, false));
+            }
+        }
+        assert_eq!(score.score, 450);
+        assert_eq!(score.triples, 2);
+        assert_eq!(score.chains[0].as_ref().unwrap().count, 5);
+        assert_eq!(score.chains[1].as_ref().unwrap().count, 4);
+        assert_eq!(score.bank_chain(0), Some(60));
+        assert_eq!(score.bank_chain(1), Some(300));
+        assert_eq!((score.score, score.triples), (450, 2));
+        assert_eq!(score.bank_all(), 0);
+        assert_eq!(score.bank_chain(2), None);
+        assert_eq!(score.hit_chain(0), None);
+        assert_eq!(score.hit_chain(999), None);
+    }
+    #[test]
+    fn chain_bonus_is_credited_on_each_hit_and_banking_never_repeats_it() {
+        let mut score = ComboScore::default();
+        score.set_chain_mode(true);
+        for (id, expected_score, expected_triples) in
+            [(1, 10, 0), (2, 20, 0), (3, 40, 1), (4, 70, 1), (5, 110, 1)]
+        {
+            chain_hit(&mut score, id, "A", 10, false);
+            assert_eq!(
+                (score.score, score.triples),
+                (expected_score, expected_triples)
+            );
+            assert_eq!(score.last_chain_total_points(), expected_score);
+        }
+        assert_eq!(score.bank_chain(0), Some(60));
+        assert_eq!((score.score, score.triples), (110, 1));
+        assert_eq!(score.bank_all(), 0);
+        assert_eq!((score.score, score.triples), (110, 1));
+    }
+    #[test]
+    fn third_kind_replaces_oldest_creation_without_refreshing_on_matches() {
+        let mut score = ComboScore::default();
+        chain_hit(&mut score, 1, "A", 10, false);
+        chain_hit(&mut score, 2, "B", 20, false);
+        chain_hit(&mut score, 3, "A", 10, false);
+        assert!(chain_hit(&mut score, 4, "C", 30, false));
+        assert_eq!(score.rejected, 0);
+        assert_eq!(score.hit_chain(4), None);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "C");
+        assert_eq!(score.chains[0].as_ref().unwrap().count, 1);
+        assert_eq!(score.chains[1].as_ref().unwrap().count, 1);
+        chain_hit(&mut score, 5, "B", 20, false);
+        assert!(chain_hit(&mut score, 6, "D", 40, false));
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "C");
+        assert_eq!(score.chains[1].as_ref().unwrap().kind, "D");
+        assert_eq!(score.chains[1].as_ref().unwrap().count, 1);
+    }
+    #[test]
+    fn replacement_preserves_earned_rewards_and_banking_refill_has_new_creation_age() {
+        let mut score = ComboScore::default();
+        for id in 0..3 {
+            chain_hit(&mut score, id, "A", 10, false);
+        }
+        chain_hit(&mut score, 3, "B", 20, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().value(), 10);
+        chain_hit(&mut score, 4, "C", 30, false);
+        assert_eq!((score.score, score.triples), (60, 1));
+        assert_eq!(score.last_chain_total_points(), 10);
+        assert_eq!(score.bank_chain(0), Some(0));
+        assert_eq!(score.chain_age[0], 0);
+        chain_hit(&mut score, 5, "D", 40, false);
+        chain_hit(&mut score, 6, "E", 50, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "D");
+        assert_eq!(score.chains[1].as_ref().unwrap().kind, "E");
+        assert_eq!(score.bank_all(), 0);
+        assert_eq!(score.chain_age, [0, 0]);
+        // Refilling slot 1 while slot 0 remains makes slot 0 the oldest.
+        chain_hit(&mut score, 7, "A", 10, false);
+        chain_hit(&mut score, 8, "B", 20, false);
+        score.bank_chain(1);
+        chain_hit(&mut score, 9, "C", 30, false);
+        chain_hit(&mut score, 10, "D", 40, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "D");
+        assert_eq!(score.chains[1].as_ref().unwrap().kind, "C");
+    }
+    #[test]
+    fn wildcard_adoption_and_same_mode_keep_creation_age_until_reset() {
+        let mut score = ComboScore::default();
+        score.set_chain_mode(true);
+        chain_hit(&mut score, 1, "WILD", 120, true);
+        chain_hit(&mut score, 2, "A", 10, false);
+        chain_hit(&mut score, 3, "B", 20, false);
+        chain_hit(&mut score, 4, "WILD", 120, true);
+        score.set_chain_mode(true);
+        assert_eq!(score.chains[0].as_ref().unwrap().count, 2);
+        assert_eq!(score.chains[1].as_ref().unwrap().count, 2);
+        chain_hit(&mut score, 5, "C", 30, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "C");
+        assert_eq!(score.chains[1].as_ref().unwrap().kind, "B");
+        score.reset();
+        assert_eq!(score.chain_age, [0, 0]);
+        chain_hit(&mut score, 6, "D", 40, false);
+        chain_hit(&mut score, 7, "E", 50, false);
+        chain_hit(&mut score, 8, "F", 60, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "F");
+        assert_eq!(score.chains[1].as_ref().unwrap().kind, "E");
+    }
+    #[test]
+    fn chain_wildcards_choose_shortest_then_adopt_ordinary_kind() {
+        let mut score = ComboScore::default();
+        chain_hit(&mut score, 1, "WILD", 120, true);
+        chain_hit(&mut score, 2, "WILD", 120, true);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "ZOLIK");
+        chain_hit(&mut score, 3, "A", 10, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "A");
+        assert_eq!(score.chains[0].as_ref().unwrap().value(), 10);
+        chain_hit(&mut score, 4, "B", 20, false);
+        chain_hit(&mut score, 5, "WILD", 120, true);
+        chain_hit(&mut score, 6, "WILD", 120, true);
+        // At a tie, slot zero wins deterministically.
+        chain_hit(&mut score, 7, "WILD", 120, true);
+        assert_eq!(score.chains[0].as_ref().unwrap().count, 4);
+        assert_eq!(score.chains[1].as_ref().unwrap().count, 3);
+        assert_eq!(score.bank_all(), 50);
+        chain_hit(&mut score, 8, "WILD", 120, true);
+        chain_hit(&mut score, 9, "WILD", 120, true);
+        chain_hit(&mut score, 10, "WILD", 120, true);
+        assert_eq!(score.bank_all(), 120);
+    }
+    #[test]
+    fn chain_reset_mode_and_end_banking_are_idempotent_and_saturating() {
+        let mut score = ComboScore::default();
+        score.set_chain_mode(true);
+        assert!(score.register(50, "A", 10, false));
+        for id in 0..3 {
+            chain_hit(&mut score, id, "A", 10, false);
+        }
+        assert_eq!(score.bank_all(), 10);
+        assert_eq!(score.bank_all(), 0);
+        assert_eq!(score.score, 40);
+        score.reset();
+        assert!(score.chain_mode && score.enabled && score.targets.contains_key(&50));
+        assert!(score.chains.iter().all(Option::is_none));
+        assert_eq!((score.score, score.triples, score.rejected), (0, 0, 0));
+        let maximal = FruitChain {
+            kind: "A".into(),
+            count: u32::MAX,
+            points: u32::MAX,
+        };
+        assert_eq!(maximal.value(), u64::MAX);
+        score.chains = [Some(maximal.clone()), Some(maximal)];
+        assert_eq!(score.pending_bonus(), u64::MAX);
+        score.score = 1;
+        score.triples = u32::MAX;
+        assert_eq!(score.bank_all(), u64::MAX);
+        assert_eq!((score.score, score.triples), (1, u32::MAX));
+        assert_eq!(score.pending_bonus(), 0);
+        score.set_chain_mode(false);
+        assert!(!score.chain_mode);
+        assert_eq!(score.score, 0);
+        assert!(score.targets.contains_key(&50));
+    }
+    #[test]
+    fn guaranteed_hits_survive_short_banks_eviction_and_duplicate_fragments() {
+        let mut score = ComboScore::default();
+        score.set_chain_mode(true);
+        chain_hit(&mut score, 1, "A", 120, false);
+        assert_eq!(score.score, 10);
+        assert_eq!(score.bank_chain(0), Some(0));
+        assert_eq!(score.score, 10);
+        for id in 2..=6 {
+            chain_hit(&mut score, id, "A", 120, false);
+        }
+        chain_hit(&mut score, 7, "B", 20, false);
+        chain_hit(&mut score, 8, "C", 30, false);
+        assert_eq!(score.last_lost_bonus, 0);
+        assert_eq!(score.score, 800);
+        assert_eq!(score.hit_chain(8), None);
+        assert_eq!(score.hit_chain(99), None);
+        assert_eq!(score.score, 800);
+        assert_eq!(score.bank_all(), 0);
+        chain_hit(&mut score, 9, "WILD", 120, true);
+        assert_eq!(score.last_lost_bonus, 0);
+        assert_eq!(score.score, 810);
+        score.score = u64::MAX - 5;
+        chain_hit(&mut score, 10, "WILD", 120, true);
+        assert_eq!(score.score, u64::MAX);
+    }
+    #[test]
+    fn saving_a_long_chain_beats_two_safe_triples_but_every_player_gets_hits() {
+        let mut long = ComboScore::default();
+        let mut safe = ComboScore::default();
+        let mut beginner = ComboScore::default();
+        for id in 0..6 {
+            chain_hit(&mut long, id, "A", 10, false);
+            chain_hit(&mut safe, id, "A", 10, false);
+            if id % 3 == 2 {
+                safe.bank_chain(0);
+            }
+            chain_hit(&mut beginner, id, &format!("K{id}"), 10, false);
+        }
+        long.bank_all();
+        beginner.bank_all();
+        assert_eq!((long.score, safe.score, beginner.score), (160, 80, 60));
+    }
     #[test]
     fn combo_triples_require_consecutive_original_targets() {
         let mut score = ComboScore::default();

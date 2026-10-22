@@ -4,6 +4,7 @@ use super::*;
 
 pub const DURATION: f32 = 0.65;
 const HIDDEN: Vec3 = Vec3::new(0., -10000., 0.);
+const DEFAULT_LABEL: &str = "CISTY REZ";
 #[derive(Clone, Copy)]
 struct PieceMotion {
     id: u32,
@@ -164,10 +165,26 @@ impl SceneManager {
         mirror_text: bool,
         size: f32,
     ) -> Result<Vec<u32>, String> {
+        self.play_cut_feedback_labeled(pieces, mirror_text, size, None)
+    }
+    /// Emit a bounded hit popup, replacing the default title only for this hit.
+    pub fn play_cut_feedback_labeled(
+        &mut self,
+        pieces: &[u32],
+        mirror_text: bool,
+        size: f32,
+        label: Option<&str>,
+    ) -> Result<Vec<u32>, String> {
+        if label.is_some_and(|label| {
+            !(1..=32).contains(&label.len())
+                || !label.bytes().all(|byte| (b' '..=b'~').contains(&byte))
+        }) {
+            return Err("Cut feedback label requires 1..32 printable ASCII characters".into());
+        }
         if !size.is_finite() || !(0.01..=2.).contains(&size) {
             return Err("Cut feedback size must be finite in 0.01..2".into());
         }
-        let ids = self.play_cut_feedback_facing(pieces, mirror_text)?;
+        let ids = self.play_cut_feedback_with_label(pieces, mirror_text, label)?;
         let fragments = &self.cut_fragments;
         for burst in self.feedback.bursts.iter_mut().flatten() {
             if ids.contains(&burst.ids[0]) {
@@ -189,10 +206,108 @@ impl SceneManager {
         self.update_cut_feedback(0.);
         Ok(ids)
     }
+    /// Emit one popup per cut family, using the score already awarded to its
+    /// original target. Missing or zero rewards retain the impact effect without a score caption.
+    pub fn play_cut_feedback_scored(
+        &mut self,
+        pieces: &[u32],
+        mirror_text: bool,
+        size: f32,
+        rewards: &[(u32, u64)],
+    ) -> Result<Vec<u32>, String> {
+        if !size.is_finite() || !(0.01..=2.).contains(&size) {
+            return Err("Cut feedback size must be finite in 0.01..2".into());
+        }
+        if rewards.len() > 32
+            || rewards
+                .iter()
+                .enumerate()
+                .any(|(i, (id, _))| rewards[..i].iter().any(|(other, _)| other == id))
+        {
+            return Err("Cut feedback rewards require at most 32 unique original IDs".into());
+        }
+        if !(2..=32).contains(&pieces.len())
+            || pieces.iter().enumerate().any(|(i, id)| {
+                pieces[..i].contains(id)
+                    || !self.triangle_meshes.contains_key(id)
+                    || self
+                        .feedback
+                        .bursts
+                        .iter()
+                        .flatten()
+                        .any(|burst| burst.ids.contains(id))
+                    || self
+                        .feedback
+                        .trails
+                        .iter()
+                        .flatten()
+                        .any(|trail| trail.ids.contains(id))
+            })
+        {
+            return Err("Cut feedback requires 2..32 unique live solid pieces".into());
+        }
+        let mut groups = BTreeMap::<u64, Vec<u32>>::new();
+        for &id in pieces {
+            self.triangle_meshes[&id].mesh.cpu()?;
+            let family = self
+                .cut_fragments
+                .get(&id)
+                .map_or(0, |fragment| fragment.family);
+            groups.entry(family).or_default().push(id);
+        }
+        let mut objects = std::collections::BTreeSet::new();
+        for group in groups.values() {
+            let parent = self
+                .cut_fragments
+                .get(&group[0])
+                .map(|fragment| fragment.parent);
+            let reward = parent
+                .and_then(|parent| {
+                    rewards
+                        .iter()
+                        .find(|(id, _)| *id == parent)
+                        .map(|(_, value)| *value)
+                })
+                .unwrap_or(0);
+            let label = if reward == 0 {
+                String::new()
+            } else {
+                format!("+{reward}")
+            };
+            let ids = self.emit_cut_feedback_group(group, mirror_text, Some(&label))?;
+            let fragments = &self.cut_fragments;
+            for burst in self.feedback.bursts.iter_mut().flatten() {
+                if ids.contains(&burst.ids[0]) {
+                    if burst
+                        .pieces
+                        .iter()
+                        .flatten()
+                        .any(|piece| fragments.contains_key(&piece.id))
+                    {
+                        let attack = ((burst.strength - 0.12) / 1.88).clamp(0., 1.);
+                        burst.strength = 0.12 * size + (2. - 0.12 * size) * attack;
+                    } else {
+                        burst.strength *= size;
+                    }
+                }
+            }
+            objects.extend(ids);
+        }
+        self.update_cut_feedback(0.);
+        Ok(objects.into_iter().collect())
+    }
     pub fn play_cut_feedback_facing(
         &mut self,
         pieces: &[u32],
         mirror_text: bool,
+    ) -> Result<Vec<u32>, String> {
+        self.play_cut_feedback_with_label(pieces, mirror_text, None)
+    }
+    fn play_cut_feedback_with_label(
+        &mut self,
+        pieces: &[u32],
+        mirror_text: bool,
+        label: Option<&str>,
     ) -> Result<Vec<u32>, String> {
         if !(2..=32).contains(&pieces.len())
             || pieces.iter().enumerate().any(|(i, id)| {
@@ -227,7 +342,7 @@ impl SceneManager {
         }
         let mut objects = std::collections::BTreeSet::new();
         for group in groups.values() {
-            objects.extend(self.emit_cut_feedback_group(group, mirror_text)?);
+            objects.extend(self.emit_cut_feedback_group(group, mirror_text, label)?);
         }
         Ok(objects.into_iter().collect())
     }
@@ -235,6 +350,7 @@ impl SceneManager {
         &mut self,
         pieces: &[u32],
         mirror_text: bool,
+        label: Option<&str>,
     ) -> Result<Vec<u32>, String> {
         let mut motions = [None; 32];
         let mut weighted = Vec3::ZERO;
@@ -325,6 +441,19 @@ impl SceneManager {
         debug_assert!(world_min.is_finite() && world_max.is_finite());
         let slot = self.feedback.next;
         let mut burst = if let Some(old) = self.feedback.bursts[slot] {
+            // Only emission rebuilds glyph geometry; frame updates retain this panel
+            // and its object ID. Always restore the default after a labeled hit.
+            if let Some(panel) = self.info_panels.get_mut(&old.ids[7]) {
+                panel.mesh = crate::info_panel::InfoPanel::text(
+                    label.unwrap_or(DEFAULT_LABEL),
+                    &[],
+                    panel.width,
+                    panel.height,
+                )?
+                .mesh;
+                panel.dirty = true;
+                panel.revision = panel.revision.wrapping_add(1);
+            }
             // Reclaim the previous burst's short lived fragments when the bounded slot wraps.
             for p in old.pieces.into_iter().flatten() {
                 if !pieces.contains(&p.id) {
@@ -358,7 +487,7 @@ impl SceneManager {
                 for id in &mut ids[1..7] {
                     *id = self.effect_mesh(diamond(Vec3::new(0.75, 0.22, 1.))?)?;
                 }
-                ids[7] = self.add_text_panel("CISTY REZ", &[], 0.55, 0.24)?;
+                ids[7] = self.add_text_panel(label.unwrap_or(DEFAULT_LABEL), &[], 0.55, 0.24)?;
                 self.park_feedback(ids[7]);
                 Ok::<(), String>(())
             })();
@@ -686,6 +815,103 @@ mod tests {
             id
         })
     }
+    fn assert_label(scene: &SceneManager, id: u32, label: &str) {
+        let panel = &scene.info_panels[&id];
+        let expected = crate::info_panel::InfoPanel::text(label, &[], 0.55, 0.24).unwrap();
+        assert_eq!(panel.mesh.indices, expected.mesh.indices);
+        let vertices = |mesh: &crate::gltf_loader::ImportedMesh| {
+            mesh.vertices
+                .iter()
+                .map(|vertex| (vertex.position, vertex.normal, vertex.color))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(vertices(&panel.mesh), vertices(&expected.mesh));
+    }
+    #[test]
+    fn cut_feedback_custom_label_updates_actual_geometry_without_frame_rebuilds() {
+        let mut scene = SceneManager::default();
+        let pieces = pieces(&mut scene);
+        let ids = scene
+            .play_cut_feedback_labeled(&pieces, false, 0.15, Some("BONUS 960"))
+            .unwrap();
+        assert_label(&scene, ids[7], "BONUS 960");
+        let revision = scene.info_panels[&ids[7]].revision;
+        scene.update_cut_feedback(0.1);
+        scene.update_cut_feedback(0.1);
+        assert_eq!(scene.info_panels[&ids[7]].revision, revision);
+        assert_label(&scene, ids[7], "BONUS 960");
+        let default = crate::info_panel::InfoPanel::text(DEFAULT_LABEL, &[], 0.55, 0.24).unwrap();
+        assert_ne!(
+            scene.info_panels[&ids[7]].mesh.indices,
+            default.mesh.indices
+        );
+    }
+    #[test]
+    fn cut_feedback_default_methods_restore_labels_and_keep_pool_ids() {
+        for method in 0..3 {
+            let mut scene = SceneManager::default();
+            let pieces = pieces(&mut scene);
+            let first = scene
+                .play_cut_feedback_labeled(&pieces, false, 1., Some("BONUS 960"))
+                .unwrap();
+            let second = scene
+                .play_cut_feedback_labeled(&pieces, false, 1., Some("BONUS 120"))
+                .unwrap();
+            let count = scene.objects.len();
+            for index in 0..8 {
+                let ids = match method {
+                    0 => scene.play_cut_feedback(&pieces),
+                    1 => scene.play_cut_feedback_facing(&pieces, true),
+                    _ => scene.play_cut_feedback_sized(&pieces, true, 0.15),
+                }
+                .unwrap();
+                assert_eq!(ids, if index % 2 == 0 { &first } else { &second }.clone());
+                assert_label(&scene, ids[7], DEFAULT_LABEL);
+                assert_eq!(scene.objects.len(), count);
+                assert_eq!(scene.info_panels.len(), 2);
+            }
+        }
+    }
+    #[test]
+    fn cut_feedback_malformed_labels_are_atomic_for_live_pool() {
+        let mut scene = SceneManager::default();
+        let pieces = pieces(&mut scene);
+        let ids = scene
+            .play_cut_feedback_labeled(&pieces, false, 1., Some("BONUS 960"))
+            .unwrap();
+        let count = scene.objects.len();
+        let next = scene.feedback.next;
+        let revision = scene.info_panels[&ids[7]].revision;
+        let positions: Vec<_> = scene
+            .objects
+            .values()
+            .map(|object| object.transform.model())
+            .collect();
+        for label in [
+            "",
+            "BAD\nLABEL",
+            "BAD\tLABEL",
+            "BONUS č",
+            "\u{7f}",
+            &"A".repeat(33),
+        ] {
+            assert!(scene
+                .play_cut_feedback_labeled(&pieces, true, 0.15, Some(label))
+                .is_err());
+            assert_eq!(scene.objects.len(), count);
+            assert_eq!(scene.feedback.next, next);
+            assert_eq!(scene.info_panels[&ids[7]].revision, revision);
+            assert_label(&scene, ids[7], "BONUS 960");
+            assert_eq!(
+                scene
+                    .objects
+                    .values()
+                    .map(|object| object.transform.model())
+                    .collect::<Vec<_>>(),
+                positions
+            );
+        }
+    }
     #[test]
     fn cut_feedback_size_is_configurable_and_invalid_values_are_atomic() {
         let mut scene = SceneManager::default();
@@ -829,6 +1055,53 @@ mod tests {
         assert!((centers[0] - Vec3::new(-0.7, 1.4, -1.2)).length() < 1e-5);
         assert!((centers[1] - Vec3::new(0.7, 1.4, -1.2)).length() < 1e-5);
         assert!(a.iter().chain(b.iter()).all(|id| scene.object_exists(*id)));
+    }
+    #[test]
+    fn scored_cut_feedback_uses_each_original_reward_and_reuses_pool_ids() {
+        let mut scene = SceneManager::default();
+        let a = pieces(&mut scene);
+        let b = pieces(&mut scene);
+        for (family, ids, parent) in [(11, a, 101), (12, b, 202)] {
+            for id in ids {
+                scene.cut_fragments.insert(
+                    id,
+                    CutFragment {
+                        cut_speed: 0.,
+                        family,
+                        blade_grace_until: 0.,
+                        radius: 0.15,
+                        generation: 1,
+                        expires_at: 4.,
+                        birth_cutter: None,
+                        parent,
+                        parent_offset: Vec3::ZERO,
+                    },
+                );
+            }
+        }
+        let pieces = [a[0], a[1], b[0], b[1]];
+        let rewards = [(101, 10), (202, 37)];
+        let first = scene
+            .play_cut_feedback_scored(&pieces, false, 0.8, &rewards)
+            .unwrap();
+        assert_eq!(first.len(), 16);
+        assert_label(&scene, scene.feedback.bursts[0].unwrap().ids[7], "+10");
+        assert_label(&scene, scene.feedback.bursts[1].unwrap().ids[7], "+37");
+        let second = scene
+            .play_cut_feedback_scored(&pieces, false, 0.8, &rewards)
+            .unwrap();
+        assert_eq!(first, second);
+        assert_label(&scene, scene.feedback.bursts[0].unwrap().ids[7], "+10");
+        assert_label(&scene, scene.feedback.bursts[1].unwrap().ids[7], "+37");
+    }
+    #[test]
+    fn scored_cut_feedback_missing_original_reward_hides_score_caption() {
+        let mut scene = SceneManager::default();
+        let pieces = pieces(&mut scene);
+        let ids = scene
+            .play_cut_feedback_scored(&pieces, false, 1., &[(999, 10)])
+            .unwrap();
+        assert_label(&scene, ids[7], "");
     }
     #[test]
     fn cut_feedback_real_debris_keeps_momentum_and_external_impulses() {

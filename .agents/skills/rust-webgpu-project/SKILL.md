@@ -16,6 +16,11 @@ For the shared XR person and inventory use [xr-player-equipment](../xr-player-eq
 
 Use the [verification matrix](../../../docs/DEVELOPMENT.md). During iteration run targeted checks and reuse matching evidence. Native tests do not compile the wasm32 renderer; browser acceptance must use fresh matching `pkg/` and the actual Rust page. A build, DOM load, `cube.html` or separate JS graphics demo is not renderer acceptance.
 
+For Quest delivery use `npm run serve:quest`, which builds/verifies release WASM and
+serves minified, precompressed files from isolated `output/production/`.
+`run-local.sh` remains dev. Verify deployed bytes with `test:browser -- --production-root output/production`;
+do not infer headset FPS from a release label or smaller download.
+
 Before a requested commit/push run `npm run verify:push` once: full native/WASM/SDK/harness/types checks, every registered browser scenario on both WebGPU and WebGL, then source dump. Include `all_sources.txt` in the commit. Do not substitute cutting-only checks for the full gate. Browser coverage includes direct render-target, shadow/reflection/cache, postprocessing, mirrored-transform, glTF animation/PBR and culling/pixel checks as well as scene/SDK/lifecycle/examples. A matching content-bound PASS receipt allows the pre-push hook to reuse tests; changed inputs/build options invalidate it. Preserve unrelated staging. A successful gate is not permission to commit/push, and desktop browser checks do not verify Quest/WebXR or software-WebGL CI.
 
 Read [glTF](../../../docs/GLTF.md), [render passes](../../../docs/RENDER_PASSES.md) or [postprocessing](../../../docs/POSTPROCESSING.md) only for the affected area. Report concrete changes, actual verification and material limits concisely in Czech.

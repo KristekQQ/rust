@@ -1,0 +1,48 @@
+<!doctype html><meta charset="utf-8"><title>Neon arena benchmark lifecycle</title>
+<style>body{background:#080d1b;color:#b8eaff}canvas{width:640px;height:400px}table{border-collapse:collapse}td{padding:5px}</style>
+<canvas id="gpu-canvas"></canvas><button id="enter">VR</button><button id="exit" hidden>Exit</button>
+<label>Test<input id="benchmark" type="checkbox" checked></label>
+<label>SSR<input id="ssr" type="checkbox" checked></label>
+<p id="build"></p><p id="status"></p><section id="benchmark-results" hidden></section>
+<button id="benchmark-download" hidden>JSON</button><ol id="checks"></ol><pre id="result">RUNNING</pre>
+<script type="module">
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport} from './xr/testkit.js';
+const sim=installXRSimulator({profile:{eyeWidth:640,eyeHeight:640}});
+const run=new XRTestRun('neon-arena-benchmark',sim,publishXRReport);
+let app;
+await run.execute(async test=>{
+    app=await import('../examples/neon-arena/main.js');
+    const {engine,benchmarkState}=app;
+    document.getElementById('benchmark').checked=true;
+    const before=engine.scene.objectCount;
+    await engine.xr.enter();
+    await sim.frame({dt:0,head:{position:[0,1.55,0],orientation:[-.25,0,0,.9682458]},controllers:{}});
+    test.assert(benchmarkState().status==='running'&&!app.gameState().launching,'benchmark substitutes a fixed scene for automatic gameplay');
+    test.assert(document.getElementById('ssr').disabled,'manual SSR changes locked while sampling');
+    const testedScales=[];
+    for(let phase=0;phase<6;phase++){
+        test.assert(benchmarkState().phaseIndex===phase,'expected phase '+phase);
+        await sim.frame({dt:1000/90});
+        testedScales.push(engine.postprocessing.stats());
+        for(let sample=0;sample<5;sample++)engine.xr.dispatchEvent(new CustomEvent('performance',{detail:{
+            frames:180,frameMs:sample<2?100:1000/90,cpuSubmitMs:2,fps:sample<2?10:90,sessionId:123,frameRate:90,
+            eyeViewports:[{eye:'left',width:640,height:640},{eye:'right',width:640,height:640}],headForward:[0,-.48,-.88]
+        }}));
+    }
+    const result=benchmarkState();
+    test.assert(result.status==='complete'&&result.results.length===6,'all six phases completed');
+    test.assert(result.results.every(phase=>Math.abs(phase.fps-90)<1e-6),'warmup windows excluded from reported statistics');
+    test.assert(testedScales[2].ssrWidth===320&&testedScales[3].ssrWidth===640,'real SSR render targets switch between half and full size');
+    test.assert(engine.debugStats().neonGlow.enabled&&!document.getElementById('ssr').disabled&&document.getElementById('ssr').checked,'original effects and controls restored');
+    test.assert(!document.getElementById('benchmark-download').hidden&&document.querySelectorAll('#benchmark-results tr').length===7,'six-row results and export shown');
+    await engine.xr.exit();
+    test.assert(engine.scene.objectCount===before,'temporary test geometry and labels removed',{before,after:engine.scene.objectCount});
+    document.getElementById('benchmark').checked=true;
+    await engine.xr.enter();
+    await sim.frame({dt:0});
+    await engine.xr.exit();
+    test.assert(benchmarkState().status==='cancelled'&&engine.scene.objectCount===before,'early XR exit cancels sampling and cleans up');
+});
+app?.engine.dispose();sim.dispose();
+</script>

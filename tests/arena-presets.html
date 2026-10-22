@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><title>Ovocné předvolby / skutečné obnovení stránky</title>
+<style>body{background:#080d1b;color:#b8eaff}iframe{width:800px;height:600px;border:0}</style>
+<iframe id="arena" title="Skutečná ovocná aréna"></iframe><canvas id="gpu-canvas" width="800" height="600" style="display:none"></canvas><ol id="checks"></ol><pre id="result">RUNNING</pre>
+<script type="module">
+import {ARENA_STORAGE_KEY} from '../examples/neon-arena/arena-presets.js';
+const frame=document.getElementById('arena'),result=document.getElementById('result'),checks=document.getElementById('checks');
+const original=localStorage.getItem(ARENA_STORAGE_KEY);
+const assert=(condition,label)=>{if(!condition)throw new Error(label);const item=document.createElement('li');item.textContent='PASS '+label;checks.append(item);};
+const until=async predicate=>{const end=performance.now()+20000;while(!predicate()){if(performance.now()>end)throw new Error('Timed out waiting for arena');await new Promise(resolve=>setTimeout(resolve,30));}};
+try{
+    localStorage.removeItem(ARENA_STORAGE_KEY);
+    const url=new URL('../examples/neon-arena/?backend=webgl',location.href);frame.src=url.href;
+    await until(()=>frame.contentWindow?.arenaTools);
+    let tools=frame.contentWindow.arenaTools;
+    document.documentElement.dataset.rendererBackend=frame.contentDocument.documentElement.dataset.rendererBackend;
+    assert(tools.config.count===10&&tools.config.curve===.2,'repository JSON initializes accepted curved scene');
+    const changed={count:6,fruitScale:.045,width:.62,curve:.12,lift:.4,gravity:1,lifetime:3};
+    assert(tools.call('arena_configure',changed).saved,'tool change automatically writes browser localStorage');
+    assert(tools.call('arena_export').name.includes('Lexi'),'preset retains its human name');
+    const old=tools;frame.contentWindow.location.reload();
+    await until(()=>frame.contentWindow?.arenaTools&&frame.contentWindow.arenaTools!==old);
+    tools=frame.contentWindow.arenaTools;
+    assert(tools.config.count===6&&tools.config.fruitScale===.045&&tools.config.curve===.12&&tools.config.lift===.4,'real page reload restores layout size and motion');
+    assert(!tools.call('arena_state').launching,'restoring settings does not start a round');
+    const input=frame.contentDocument.querySelector('[name=curve]');
+    assert(input.value==='0.12','restored values appear in human panel');
+    input.value='0.15';input.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
+    assert(JSON.parse(localStorage.getItem(ARENA_STORAGE_KEY)).wave.curve===.15,'human panel autosaves geometry');
+    frame.contentDocument.querySelector('[data-tool=arena_save]').click();
+    const exported=tools.call('arena_export');
+    frame.contentDocument.querySelector('[data-tool=arena_reset]').click();
+    assert(tools.config.count===10&&localStorage.getItem(ARENA_STORAGE_KEY)===null,'human reset clears override and restores JSON default');
+    const token=frame.contentDocument.getElementById('arena-token');token.value='test-only';token.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
+    assert(localStorage.getItem(ARENA_STORAGE_KEY)===null,'MCP credential entry never writes or overwrites a preset');
+    const fileInput=frame.contentDocument.querySelector('[data-preset-import]');
+    const transfer=new frame.contentWindow.DataTransfer();
+    transfer.items.add(new frame.contentWindow.File([JSON.stringify(exported)],'saved.json',{type:'application/json'}));
+    fileInput.files=transfer.files;fileInput.dispatchEvent(new frame.contentWindow.Event('change',{bubbles:true}));
+    await until(()=>tools.config.count===6);
+    assert(tools.config.curve===.15&&JSON.parse(localStorage.getItem(ARENA_STORAGE_KEY)).wave.fruitScale===.045,'JSON file import validates applies and saves full preset');
+    const stored=localStorage.getItem(ARENA_STORAGE_KEY);
+    let rejected=false;try{tools.call('arena_import',{json:'{"version":99}'});}catch{rejected=true;}
+    assert(rejected&&stored===localStorage.getItem(ARENA_STORAGE_KEY)&&tools.config.count===6,'invalid import leaves current and stored presets untouched');
+    assert(tools.call('arena_spawn').spawned===6,'restored settings launch the requested number of real fruit');
+    await new Promise(resolve=>frame.contentWindow.requestAnimationFrame(()=>frame.contentWindow.requestAnimationFrame(resolve)));
+    const source=frame.contentDocument.getElementById('gpu-canvas'),capture=document.getElementById('gpu-canvas');
+    capture.width=source.width;capture.height=source.height;capture.getContext('2d').drawImage(source,0,0);
+    result.textContent='PASS: JSON předvolba, automatické uložení, skutečný reload, panel, import, reset';
+}catch(error){result.textContent='FAIL: '+(error.stack??error);}
+finally{
+    if(original===null)localStorage.removeItem(ARENA_STORAGE_KEY);else localStorage.setItem(ARENA_STORAGE_KEY,original);
+}
+</script>

@@ -1,0 +1,244 @@
+<!doctype html><meta charset="utf-8"><title>Minuta v pohybu / skutečný Rust ve stereo XR</title>
+<style>body{background:#080d1b;color:#b8eaff}canvas{width:640px;height:auto}</style>
+<canvas id="gpu-canvas" style="width:480px;height:320px"></canvas><button id="enter">VR</button><button id="exit" hidden>Exit</button><p id="status"></p>
+<div id="arena-tools"><button data-tool="arena_bank" data-hand="left">Uložit levý zásobník</button><button data-tool="arena_bank" data-hand="right">Uložit pravý zásobník</button><p data-tool-status></p></div>
+<span id="cuts">0</span><div id="evidence"></div><ol id="checks"></ol><pre id="result">RUNNING</pre>
+<script type="module">
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+const sim=installXRSimulator({profile:{eyeWidth:400,eyeHeight:400}});
+const run=new XRTestRun('arena-minute',sim,publishXRReport);
+import {planCue} from '../examples/neon-arena/round-plan.js';
+import {FRUIT_POINTS,launchApple} from '../examples/neon-arena/scene.js';
+const previousPreset=localStorage.getItem('neon-arena.wave-preset.v1');
+let app;
+await run.execute(async test=>{
+    app=await import('../examples/neon-arena/main.js');
+    app.arenaTools.call('arena_reset');
+    const {engine,arenaTools,minutePlan,programState}=app;
+    arenaTools.call('arena_configure',{program:'minute',automatic:true,fruitScale:.09,lift:.6,gravity:.8,lifetime:3.5});
+    await engine.xr.enter();
+    const pose={dt:0,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{}};
+    sim.frame(pose);
+    test.assert(engine.xr.roundState.duration===60&&engine.xr.roundState.remaining===60,'real Rust clock starts at sixty seconds');
+    test.assert(app.gameState().liveApples.length===6,'opening offers two differently valued triples');
+    test.assert(app.gameState().liveApples.every(fruit=>Math.abs(fruit.meshInfo.scale[0]-.09)<1e-6),'real opening fruit uses the larger comfortable physical scale');
+    test.assert(sim.timerCount===1,'whole choreography owns exactly one timer');
+    const initial=app.gameState().liveApples.map(fruit=>fruit.meshInfo.position);
+    test.assert(initial.every(p=>p[1]<.9),'fruit launches below the strike zone instead of appearing at hand height');
+    test.assert(app.gameState().launchGlints.length===12&&app.gameState().launchGlints.every(g=>!g.meshInfo.cuttable),'opening launch glints are bounded decorative geometry');
+    const captured=new Set();let maximum=0;
+    for(let frame=0;frame<620&&!engine.xr.roundState.finished;frame++){
+        sim.frame({...pose,dt:100});
+        const state=programState(),fruit=app.gameState().liveApples;
+        maximum=Math.max(maximum,fruit.length);
+        test.assert(fruit.length<=10,'no-cut run never exceeds ten whole targets');
+        if(frame===7){
+            const cue=minutePlan.cues[0],recipes=planCue(cue,arenaTools.config,0);
+            test.assert(fruit.length===recipes.length&&fruit.every((item,i)=>{
+                const p=item.meshInfo.position,r=recipes[i],t=.8;
+                return p.every((v,axis)=>Math.abs(v-(r.position[axis]+r.velocity[axis]*t-(axis===1?.5*r.gravity*t*t:0)))<.035);
+            }),'native Rust flight reaches the authored strike window with readable arcade timing');
+            test.assert(app.gameState().launchGlints.length===0,'launch show expires natively without extra timers');
+        }
+        if(frame===17)test.assert(fruit.every(item=>item.meshInfo.position[1]<.8),'fruit falls out of the hand zone after its strike window');
+        if(state.phase&&!captured.has(state.phase)&&60-engine.xr.roundState.remaining-(state.cues.at(-1)?.at??0)>=minutePlan.cues[state.cues.at(-1)?.index??0].launch.apexSeconds-.05){
+            captured.add(state.phase);
+            sim.frame(pose);
+            const left=sim.pixels('left'),right=sim.pixels('right');
+            const origins=fruit.map(item=>item.meshInfo.position);
+            fruit.forEach(item=>item.setPosition([100,100,100]));sim.frame(pose);
+            test.assert(pixelDifference(left,sim.pixels('left'),3)>20&&pixelDifference(right,sim.pixels('right'),3)>20,`${state.phase}: real fruit visible in both eyes`);
+            fruit.forEach((item,i)=>item.setPosition(origins[i]));sim.frame(pose);
+            const caption=document.createElement('p');caption.textContent=`${state.phase} · ${Math.round(60-engine.xr.roundState.remaining)} s`;
+            const canvas=document.createElement('canvas');canvas.width=left.width+right.width;canvas.height=left.height;
+            const context=canvas.getContext('2d');context.putImageData(left,0,0);context.putImageData(right,left.width,0);
+            document.getElementById('evidence').append(caption,canvas);
+            const active=app.world.phasePanels.filter(panel=>panel.object.meshInfo.position[0]<10);
+            test.assert(active.length===1&&active[0].title===state.phase,'one matching world-space phase heading');
+        }
+    }
+    const history=programState().cues;
+    test.assert(captured.size===6,'all six different phases ran in the real minute');
+    test.assert(history.length===minutePlan.cues.length&&history.every(cue=>cue.spawned===minutePlan.cues[cue.index].targets.length),'every authored cue fired once without skipped fruit');
+    test.assert(history.at(-1).spawned===10&&maximum===10,'finale really launches ten original fruit');
+    test.assert(engine.xr.roundState.finished&&sim.timerCount===0&&!app.gameState().launching,'round ends at sixty seconds and releases director timer');
+    test.assert(app.gameState().liveApples.length===0,'finale has time to settle before the round ends');
+    test.assert(app.world.phasePanels.every(panel=>panel.object.meshInfo.position[0]>10),'phase heading hidden after round end');
+    await engine.xr.exit();
+    const preview=arenaTools.call('arena_preview',{seconds:41});
+    test.assert(preview.label==='SERIE'&&preview.spawned===6,'same authoring tool can preview a chosen phase before VR');
+    await engine.xr.enter();sim.frame(pose);
+    test.assert(programState().cues.length===1&&app.gameState().shots===6&&engine.xr.roundState.remaining===60,'restart resets minute program without replaying stale cues');
+    arenaTools.call('arena_stop');
+    const stopped=app.gameState().shots;for(let i=0;i<40;i++)sim.frame({...pose,dt:100});
+    test.assert(sim.timerCount===0&&app.gameState().shots===stopped&&app.gameState().launchGlints.length===0,'manual stop prevents future cues and clears launch show');
+    // Keep score probes isolated from decorative fragment/effect accumulation.
+    const probePieces=[];
+    let lastCut=null;
+    engine.xr.addEventListener('cut',event=>{probePieces.push(...event.detail.pieces);lastCut=event.detail;});
+    const clearProbeDecorations=()=>{for(const piece of probePieces)if(piece.exists)piece.remove();probePieces.length=0;engine.scene.clearCutFeedback();};
+    // A fixed human-scale sweep must hit the actual moving opening triple.
+    arenaTools.call('arena_configure',{automatic:false});arenaTools.call('arena_start');
+    for(let i=0;i<8;i++)sim.frame({...pose,dt:100});
+    const movingHigh=app.gameState().liveApples.slice(3);
+    const slash=i=>{
+        const x=-.78+i/40*1.56,t=.8+(i+1)/72;
+        return {...pose,dt:1000/72,controllers:{right:{position:[x,1.54+x*(.12/.56)-.5*2.4525*(t-.84)**2,-.4],orientation:[0,0,Math.SQRT1_2,Math.SQRT1_2],pressed:false}}};
+    };
+    for(let i=0;i<=40;i++)sim.frame(slash(i));
+    engine.xr.bankChain('left');
+    test.assert(movingHigh.every(fruit=>!fruit.exists)&&engine.xr.roundState.score===130,'moving opening triple earns 30 immediate points plus its 100-point bonus');
+    clearProbeDecorations();
+    // Probe the authored hit orders through real tracked sword cuts and Rust scoring.
+    // Separate from the full no-hit timeline above: this measures score decisions,
+    // not whether a human can execute every authored moving target.
+    for(const object of app.gameState().liveApples)if(object.exists)object.remove();
+    const still={dt:1000/72,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{}};
+    const hitFruit=(name,probeX=1.8,keepFeedback=false)=>{
+        const beforeScore=engine.xr.roundState.score;
+        const fruit=app.world.fruits.find(f=>f.name===name);
+        // Aim through one cherry body, not the genuine gap between its two lobes.
+        const targetX=probeX-(name==='cherry'?.49*.06:0);
+        sim.frame({...still,controllers:{right:{position:[probeX,1.8,-.45],orientation:[0,0,0,1],pressed:false}}});
+        const target=launchApple(engine.scene,fruit,0,true,{position:[targetX,1.35,-1.1],scale:.06,velocity:[0,0,0],gravity:0,lifetime:2.6});
+        for(let i=0;i<=24&&target.exists;i++)sim.frame({...still,controllers:{right:{position:[probeX,1.8-i/24*.9,-.45],orientation:[0,0,0,1],pressed:false}}});
+        test.assert(!target.exists,`authored scoring probe cuts real ${name}`,{player:engine.xr.player.state,sword:app.world.sword.meshInfo,round:engine.xr.roundState});
+        if(engine.xr.roundState.mode==='chains'){
+            const award=lastCut.scoreAwards.find(a=>a.original===target.id);
+            test.assert(award?.points===engine.xr.roundState.score-beforeScore,'actual cut carries its exact native hit plus chain-bonus reward');
+            const stock=engine.xr.comboDisplayState.chains.find(c=>c.kind===FRUIT_POINTS[name].label);
+            test.assert(award?.totalPoints===stock?.earnedPoints,'hit caption total matches the corresponding stored-fruit total');
+        }
+        if(!keepFeedback)clearProbeDecorations();
+    };
+    engine.xr.startRound(60);
+    test.assert(engine.xr.comboDisplayState.chains.every(c=>c.frames.length===0&&c.icons.length===0),'empty stocks do not draw placeholder frames');
+    hitFruit('watermelon');
+    test.assert(engine.xr.comboDisplayState.chains[0].earnedPoints===10,'first stored fruit visibly has ten total points, never zero');
+    hitFruit('watermelon');
+    test.assert(engine.xr.comboDisplayState.chains[0].earnedPoints===20,'second stored fruit raises its total to twenty');
+    for(let i=0;i<2;i++)hitFruit('watermelon');
+    for(let i=0;i<5;i++)hitFruit('grapes');
+    test.assert(app.gameState().feedback?.objects.length===8,'numeric hit popup reuses the bounded eight-object cut effect');
+    engine.xr.configureComboDisplay(app.world.comboDisplay);
+    test.assert(engine.xr.roundState.chains[0].count===4&&engine.xr.roundState.chains[1].count===5,'reconfiguring the same display mode preserves held chains');
+    test.assert(engine.xr.roundState.score===1050,'nine real cuts immediately earn ninety hit points plus both chain bonuses');
+    test.assert(document.getElementById('cuts').textContent==='1050','human score display updates immediately after each real fruit cut');
+    test.assert(engine.xr.roundState.pendingBonus===960&&engine.xr.comboDisplayState.pendingBonus===960,'both native score views agree on the sum of held bonuses');
+    test.assert(engine.xr.comboDisplayState.chains[0].earnedPoints===400&&engine.xr.comboDisplayState.chains[1].earnedPoints===650,'stock values include every guaranteed hit plus the chain bonus');
+    const bonusPanels=app.world.stockScorePanels.map(p=>p.meshInfo);
+    test.assert(bonusPanels[0].position[0]<0&&bonusPanels[1].position[0]>0&&bonusPanels.every(p=>p.rotation.every(v=>Math.abs(v)<.01)),'each stock has its own upright bonus value');
+    test.assert(bonusPanels[1].scale[0]>1&&bonusPanels[1].emission>4,'the hit stock bonus pops independently');
+    const stocks=engine.xr.comboDisplayState.chains;
+    test.assert(stocks.length===2&&stocks.every(c=>c.frames.length===c.count&&c.icons.length===c.count)&&stocks[0].count===4&&stocks[1].count===5,'four and five fruit are represented by four and five real icons');
+    test.assert(stocks.every((c,i)=>c.frames.every(id=>engine.scene.getObject(id).meshInfo.position[0]*(i===0?-1:1)>0)),'left and right stocks occupy distinct XR sides');
+    test.assert(stocks.every(c=>{const m=engine.scene.getObject(c.label).meshInfo;return m.emission===0&&Number.isFinite(m.bottom)&&m.position[1]-m.bottom<.03;}),'stock counters use tiny plain non-emissive debug text');
+    const newest=engine.scene.getObject(stocks[1].icons.at(-1));
+    const newestFrame=engine.scene.getObject(stocks[1].frames.at(-1));
+    const arrivalStart=newest.meshInfo,frameStart=newestFrame.meshInfo;
+    const defaultFruitScale=engine.scene.getObject(stocks[1].icons[0]).meshInfo.scale[0];
+    const defaultFrameScale=engine.scene.getObject(stocks[1].frames[0]).meshInfo.scale[0];
+    test.assert(Math.abs(arrivalStart.scale[0]/defaultFruitScale-.55)<1e-5&&arrivalStart.emission===3&&frameStart.emission===8,'earned frame is fully lit during arrival');
+    test.assert(Math.abs(frameStart.scale[0]/defaultFrameScale-.55)<1e-5&&Math.abs(frameStart.position[0]-arrivalStart.position[0])<1e-5,'matching frame travels and scales together with its fruit');
+    const leftArrival=engine.scene.getObject(stocks[0].icons.at(-1)).meshInfo.position[0];
+    for(let i=0;i<4;i++)sim.frame({...still,dt:80});
+    const arrivalPeak=newest.meshInfo;
+    test.assert(arrivalPeak.scale[0]/defaultFruitScale>1.3&&arrivalPeak.position[0]<arrivalStart.position[0]-.8&&engine.scene.getObject(stocks[0].icons.at(-1)).meshInfo.position[0]>leftArrival+.8,'right fruit flies from the right and left fruit from the left');
+    test.assert(newestFrame.meshInfo.scale[0]/defaultFrameScale>1.3,'frame shares the fruit overshoot');
+    sim.frame({...still,dt:80});
+    test.assert(newestFrame.meshInfo.emission>7&&engine.scene.getObject(stocks[1].icons[0]).meshInfo.emission>5,'landing creates a brief neon reward across the occupied stock');
+    const arrivalShot=document.createElement('canvas'),arrivalLeft=sim.pixels('left'),arrivalRight=sim.pixels('right');
+    arrivalShot.width=arrivalLeft.width+arrivalRight.width;arrivalShot.height=arrivalLeft.height;
+    arrivalShot.getContext('2d').putImageData(arrivalLeft,0,0);arrivalShot.getContext('2d').putImageData(arrivalRight,arrivalLeft.width,0);
+    test.report.evidence={...test.report.evidence,collectionArrivalPeakPng:arrivalShot.toDataURL('image/png')};
+    for(let i=0;i<2;i++)sim.frame({...still,dt:80});
+    test.assert(newest.meshInfo.scale[0]/defaultFruitScale>.74&&newest.meshInfo.scale[0]/defaultFruitScale<.86&&newestFrame.meshInfo.scale[0]/defaultFrameScale<.86,'fruit and frame squash together near seventy-five percent');
+    for(let i=0;i<4;i++)sim.frame({...still,dt:80});
+    test.assert(Math.abs(newest.meshInfo.scale[0]-defaultFruitScale)<1e-5&&newest.meshInfo.emission===3&&Math.abs(newestFrame.meshInfo.scale[0]-defaultFrameScale)<1e-5,'fruit and frame settle together at default size');
+    test.assert(stocks.every(c=>c.frames.every(id=>engine.scene.getObject(id).meshInfo.emission===8))&&engine.scene.getObject(stocks[1].icons[0]).meshInfo.emission===3,'every earned frame stays fully lit after the landing accent fades');
+    test.assert(stocks.every(c=>c.icons.every(id=>Math.abs(engine.scene.getObject(id).meshInfo.scale[0]-.085)<1e-5)&&c.frames.every(id=>Math.abs(engine.scene.getObject(id).meshInfo.scale[0]-1)<1e-5)),'four and five stored fruit keep the same base icon and frame sizes');
+    for(const [index,stock] of stocks.entries()){
+        const poses=stock.icons.map(id=>engine.scene.getObject(id).meshInfo.position);
+        test.assert(poses.every((p,i)=>Math.abs(p[1]-poses[0][1])<1e-5&&(i===0||(p[0]-poses[i-1][0])*(index===0?-1:1)>0)),'settled stocks grow horizontally away from the center');
+    }
+    sim.frame(still);
+    const stockImage=document.createElement('canvas'),stockLeft=sim.pixels('left'),stockRight=sim.pixels('right');
+    stockImage.width=stockLeft.width+stockRight.width;stockImage.height=stockLeft.height;
+    stockImage.getContext('2d').putImageData(stockLeft,0,0);stockImage.getContext('2d').putImageData(stockRight,stockLeft.width,0);
+    test.report.evidence={...test.report.evidence,chainStereoPng:stockImage.toDataURL('image/png')};
+    sim.frame({...still,controllers:{left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:false}}});
+    sim.frame({...still,controllers:{left:{position:[-1.2,1.1,-.2],orientation:[0,0,0,1],pressed:true}}});
+    test.assert(engine.xr.roundState.score===1050&&engine.xr.roundState.chains[0]===null&&engine.xr.roundState.chains[1].count===5,'actual left trigger releases only the left stock without awarding twice');
+    test.assert(engine.xr.roundState.pendingBonus===600&&engine.xr.comboDisplayState.pendingBonus===600,'banking removes only that stock from the center pending sum');
+    document.querySelector('[data-tool=arena_bank][data-hand=right]').click();
+    test.assert(engine.xr.roundState.score===1050&&engine.xr.roundState.chains.every(c=>c===null),'human panel banks the right stock through the shared native tool');
+    test.assert(engine.xr.comboDisplayState.pendingBonus===0,'banking both stocks clears the center pending value');
+    test.assert(!arenaTools.call('arena_bank',{hand:'right'}).banked&&engine.xr.roundState.score===1050,'banking an empty stock cannot pay twice');
+    engine.xr.configureComboDisplay(app.world.comboDisplay);
+    test.assert(engine.xr.roundState.score===1050,'same-mode reconfiguration preserves already banked points');
+    for(let i=0;i<3;i++)hitFruit('lemon');
+    test.assert(arenaTools.call('arena_bank',{hand:'left'}).banked&&engine.xr.roundState.score===1100,'AI tool banks the same native stock');
+    engine.xr.startRound(60);
+    for(let i=0;i<4;i++)hitFruit('watermelon');
+    for(let i=0;i<5;i++)hitFruit('grapes');
+    hitFruit('watermelon'); // A matching hit does not refresh creation age.
+    const retiredIcons=engine.xr.comboDisplayState.chains[0].icons.map(id=>engine.scene.getObject(id));
+    hitFruit('lemon');
+    test.assert(engine.xr.comboDisplayState.retiring?.objects.length>0&&retiredIcons.every(object=>object.exists),'replaced stock transfers its existing instances to the outgoing animation');
+    const outgoing=engine.xr.comboDisplayState.retiring;
+    test.assert(outgoing.earnedBonus===720&&outgoing.earnedPoints===770&&outgoing.scoreLabel!==null,'outgoing stock carries its total earned points including five hits');
+    const earnedLabel=engine.scene.getObject(outgoing.scoreLabel);
+    for(let i=0;i<5;i++)sim.frame({...still,dt:100});
+    test.assert(earnedLabel.meshInfo.position[1]>1.5&&earnedLabel.meshInfo.scale[1]<1,'earned number travels with the outgoing symbols and eases down in scale');
+    const outgoingShot=document.createElement('canvas'),outgoingLeft=sim.pixels('left'),outgoingRight=sim.pixels('right');
+    outgoingShot.width=outgoingLeft.width+outgoingRight.width;outgoingShot.height=outgoingLeft.height;
+    outgoingShot.getContext('2d').putImageData(outgoingLeft,0,0);outgoingShot.getContext('2d').putImageData(outgoingRight,outgoingLeft.width,0);
+    test.report.evidence={...test.report.evidence,outgoingStockPng:outgoingShot.toDataURL('image/png')};
+    for(let i=0;i<5;i++)sim.frame({...still,dt:100});
+    test.assert(!earnedLabel.exists,'earned number object is deleted with outgoing symbols');
+    test.assert(engine.xr.comboDisplayState.retiring===null&&retiredIcons.every(object=>!object.exists),'outgoing stock objects are removed after their fade');
+    test.assert(engine.xr.roundState.score===1430&&engine.xr.roundState.rejected===0&&engine.xr.roundState.chains[0].kind==='CITRON'&&engine.xr.roundState.chains[0].count===1&&engine.xr.roundState.chains[1].count===5,'third kind preserves every already-earned hit and chain bonus');
+    test.assert(engine.xr.comboDisplayState.chains[0].icons.length===1&&engine.xr.comboDisplayState.chains[1].icons.length===5,'replacement clears old icons and preserves the other visible pile');
+    hitFruit('watermelon');
+    test.assert(engine.xr.roundState.chains[0].count===1&&engine.xr.roundState.chains[1].count===1,'next new kind replaces the other older stock');
+    engine.xr.startRound(1);for(let i=0;i<3;i++)hitFruit('lemon');
+    for(let i=0;i<20&&!engine.xr.roundState.finished;i++)sim.frame({...still,dt:100});
+    test.assert(engine.xr.roundState.finished&&engine.xr.roundState.score===50&&engine.xr.roundState.chains.every(c=>c===null),'round end automatically banks remaining chains once');
+    test.assert(document.getElementById('cuts').textContent==='50','end banking updates the human score panel too');
+    test.report.evidence={...test.report.evidence,twoChains:{leftCount:4,rightCount:5,banked:1050}};
+    engine.xr.configureComboDisplay({...app.world.comboDisplay,mode:'legacy'});
+    test.assert(engine.xr.roundState.mode==='legacy'&&engine.xr.roundState.score===0&&engine.xr.comboDisplayState.current===null,'switching scoring modes resets points and clears old chain geometry');
+    engine.xr.configureComboDisplay(app.world.comboDisplay);
+    // Retain the older cross-mode mass-cut diagnostic separately. Current arena
+    // acceptance above exercises chains; legacy rules also have their own XR suite.
+    if(new URLSearchParams(location.search).has('legacyStress')){
+    engine.xr.configureComboDisplay({...app.world.comboDisplay,mode:'legacy'});
+    const orders={
+        sweeping:minutePlan.cues.flatMap(c=>c.targets.map(t=>t.fruit)),
+        selective:minutePlan.cues.flatMap(c=>c.targets.filter(t=>FRUIT_POINTS[t.fruit].points>=60).sort((a,b)=>FRUIT_POINTS[b.fruit].points-FRUIT_POINTS[a.fruit].points).map(t=>t.fruit)),
+    };
+    const scores={};
+    for(const [strategy,hits] of Object.entries(orders)){
+        engine.xr.startRound(60);
+        for(const fruit of hits)hitFruit(fruit);
+        scores[strategy]=engine.xr.roundState.score;
+        test.assert(!engine.xr.roundState.finished,`${strategy}: scoring probe stays inside real round time`);
+    }
+    test.assert(scores.sweeping===110&&scores.selective===2440,'real Rust scoring rewards deliberate selection over sweeping',scores);
+    test.report.evidence={...test.report.evidence,scoreDecisions:scores};
+    }
+    engine.xr.startRound(60);
+    hitFruit('grapes');hitFruit('grapes');hitFruit('grapes',.1,true);
+    for(let i=0;i<5;i++)sim.frame(still);
+    test.assert(engine.xr.roundState.pendingBonus===100&&lastCut.scoreAwards[0].points===110&&lastCut.scoreAwards[0].totalPoints===130,'third grape popup shows all thirty hit points plus its hundred-point bonus');
+    const popupShot=document.createElement('canvas'),popupLeft=sim.pixels('left'),popupRight=sim.pixels('right');
+    popupShot.width=popupLeft.width+popupRight.width;popupShot.height=popupLeft.height;
+    popupShot.getContext('2d').putImageData(popupLeft,0,0);popupShot.getContext('2d').putImageData(popupRight,popupLeft.width,0);
+    test.report.evidence={...test.report.evidence,pendingPopupPng:popupShot.toDataURL('image/png')};
+    await engine.xr.exit();
+});
+if(app?.engine.xr.lastError){const original=app.engine.xr.lastError;run.report.evidence={...run.report.evidence,xrFailure:{message:String(original),stack:original?.stack,cause:String(original?.cause)}};publishXRReport(run.report);}
+if(previousPreset===null)localStorage.removeItem('neon-arena.wave-preset.v1');else localStorage.setItem('neon-arena.wave-preset.v1',previousPreset);
+app?.engine.dispose();sim.dispose();
+</script>

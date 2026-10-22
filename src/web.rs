@@ -1223,9 +1223,60 @@ pub fn play_cut_feedback_facing(
     pieces: &[u32],
     mirror_text: bool,
     size: Option<f32>,
+    score_label: Option<String>,
 ) -> Result<String, JsValue> {
+    let rewards = if matches!(score_label.as_deref(), Some("hit-points" | "stock-total")) {
+        Some(
+            STATE
+                .with(|slot| {
+                    slot.borrow().as_ref().map(|state| {
+                        state
+                            .borrow()
+                            .xr_cut_rewards()
+                            .iter()
+                            .map(|reward| {
+                                (
+                                    reward.original,
+                                    if score_label.as_deref() == Some("stock-total") {
+                                        reward.total_points
+                                    } else {
+                                        reward.points
+                                    },
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .ok_or_else(|| JsValue::from_str("Engine neni inicializovan"))?,
+        )
+    } else {
+        None
+    };
+    let label = match score_label.as_deref() {
+        None => None,
+        Some("pending-bonus") => Some(
+            STATE
+                .with(|slot| {
+                    slot.borrow()
+                        .as_ref()
+                        .map(|state| format!("BONUS {}", state.borrow().xr_pending_bonus()))
+                })
+                .ok_or_else(|| JsValue::from_str("Engine neni inicializovan"))?,
+        ),
+        Some("hit-points" | "stock-total") => None,
+        Some(_) => return Err(JsValue::from_str("Unknown cut feedback score label")),
+    };
     cutting_command(|scene| {
-        let objects = scene.play_cut_feedback_sized(pieces, mirror_text, size.unwrap_or(1.))?;
+        let objects = if let Some(rewards) = &rewards {
+            scene.play_cut_feedback_scored(pieces, mirror_text, size.unwrap_or(1.), rewards)?
+        } else {
+            scene.play_cut_feedback_labeled(
+                pieces,
+                mirror_text,
+                size.unwrap_or(1.),
+                label.as_deref(),
+            )?
+        };
         Ok(serde_json::json!({"objects":objects,"duration":0.65}).to_string())
     })
 }
@@ -2010,12 +2061,14 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
         Ok((report, scene.projectile_contacts.saturating_sub(before)))
     })?;
     // cutting_command's mutable scene borrow must end before borrowing State again.
-    STATE.with(|slot| {
+    let score_awards = STATE.with(|slot| {
         if let Some(state) = slot.borrow().as_ref() {
-            state.borrow_mut().record_xr_cuts(&report.removed);
-        }
+            let mut state = state.borrow_mut();
+            state.record_xr_cuts(&report.removed);
+            state.xr_cut_rewards().iter().map(|reward| serde_json::json!({"original":reward.original,"points":reward.points,"totalPoints":reward.total_points})).collect::<Vec<_>>()
+        } else { Vec::new() }
     });
-    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts}).to_string())
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts,"scoreAwards":score_awards}).to_string())
 }
 
 #[wasm_bindgen]
@@ -2033,6 +2086,17 @@ pub fn clear_combo_display() {
             s.borrow_mut().clear_combo_display();
         }
     });
+}
+#[wasm_bindgen]
+pub fn xr_bank_chain(index: usize) -> bool {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return false;
+    }
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().bank_xr_chain(index))
+    })
 }
 #[wasm_bindgen]
 pub fn combo_display_state() -> String {

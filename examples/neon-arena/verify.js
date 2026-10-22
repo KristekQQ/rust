@@ -1,4 +1,4 @@
-import {NEON_GLOW,FLOOR_SSR,FRUIT_OPACITY,FRUIT_OPACITY_VARIATION,createFruitMesh} from './scene.js';
+import {ARENA_REVISION,NEON_GLOW,FLOOR_SSR,FRUIT_OPACITY,FRUIT_OPACITY_VARIATION,createFruitMesh} from './scene.js';
 /** @param {import('../../js/engine.d.ts').Engine} engine
  * @param {Awaited<ReturnType<typeof import('./scene.js').createScene>>} world
  * @param {HTMLCanvasElement} canvas
@@ -18,7 +18,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         await wait();
         const toggle=document.getElementById('ssr');
         const build=document.getElementById('build');
-        if(!(toggle instanceof HTMLInputElement)||!build?.textContent?.includes('cyber-neon-shader-25'))throw new Error('Missing loaded-version or SSR control');
+        if(!(toggle instanceof HTMLInputElement)||!build?.textContent?.includes(ARENA_REVISION))throw new Error('Missing loaded-version or SSR control');
         const mainModules=performance.getEntriesByType('resource').filter(resource=>new URL(resource.name).pathname.endsWith('/neon-arena/main.js'));
         if(mainModules.length!==1||!new URL(mainModules[0].name).searchParams.has('reload'))throw new Error('Entry module must have a fresh URL and initialize exactly once');
         toggle.click();await wait();
@@ -74,11 +74,13 @@ export async function verifyArena(engine, world, canvas, previewCut) {
                 throw new Error('Neon tubes need a blue base and a rounded surface for the shader profile');
         }
         const shared=engine.debugStats().sharedMeshes;
-        if(!shared||shared.assets!==12+font.glyphMeshes||shared.gpuMeshes!==12+font.glyphMeshes||shared.liveInstances!==70+font.liveGlyphs||shared.colorTableBytes<=0)
+        const glintAssets=world.launchGlintAssets.length;
+        if(glintAssets!==3)throw new Error('Launch show must reuse exactly three small color assets');
+        if(!shared||shared.assets!==12+glintAssets+font.glyphMeshes||shared.gpuMeshes!==12+glintAssets+font.glyphMeshes||shared.liveInstances!==70+font.liveGlyphs+(engine.xr.comboDisplayState?.chains?.reduce((sum,c)=>sum+c.frames.length+c.icons.length,0)??0)||shared.colorTableBytes<=0)
             throw new Error(`Fruit geometry is not shared by kind: ${JSON.stringify(shared)}`);
         // Thirty fruit icons use ten groups; forty frames use two more.
         // Their independent transforms and combo highlights remain instanced.
-        const expectedGlowDraws=shared.gpuMeshes-font.glyphMeshes;
+        const expectedGlowDraws=shared.gpuMeshes-font.glyphMeshes-glintAssets;
         if(engine.debugStats().neonGlow.draws!==expectedGlowDraws)
             throw new Error(`Gallery glow did not batch shared fruit (${engine.debugStats().neonGlow.draws} / ${expectedGlowDraws})`);
         if(shared.geometryBytes<=0||shared.instanceGeometryBytes-font.instanceGeometryBytes<(shared.geometryBytes-font.geometryBytes)*3)

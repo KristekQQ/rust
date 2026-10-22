@@ -154,12 +154,19 @@ export class WebXRHost extends EventTarget {
     }
     get isPresenting() { return this.#session !== null; }
     get roundState() { return JSON.parse(this.#engine.xr_round_state()); }
-    /** Bind a Rust-owned spatial triple display; no JS animation or score state. */
-    configureComboDisplay({timerPanel,scorePanel,awardPanels,...options}) {
-        if(this.#disposed||!this.#owns(timerPanel)||!this.#owns(scorePanel)||!Array.isArray(awardPanels)||awardPanels.length!==3||awardPanels.some(panel=>!this.#owns(panel)))
+    /** Bind a Rust-owned spatial triple display; no JS animation or score state.
+     * @param {import('./engine.d.ts').ComboDisplayOptions} options */
+    configureComboDisplay({timerPanel,scorePanel,awardPanels,stackScorePanel=undefined,stockScorePanels=undefined,...options}) {
+        if(this.#disposed||!this.#owns(timerPanel)||!this.#owns(scorePanel)||!Array.isArray(awardPanels)||awardPanels.length!==3||awardPanels.some(panel=>!this.#owns(panel))||(stackScorePanel!==undefined&&!this.#owns(stackScorePanel))||(stockScorePanels!==undefined&&(!Array.isArray(stockScorePanels)||stockScorePanels.length!==2||stockScorePanels.some(panel=>!this.#owns(panel)))))
             throw new Error('Panely combo ukazatele musí patřit tomuto enginu.');
-        if(!this.#engine.configure_combo_display(JSON.stringify({...options,timerPanel:timerPanel.id,scorePanel:scorePanel.id,awardPanels:awardPanels.map(panel=>panel.id)})))
+        if(!this.#engine.configure_combo_display(JSON.stringify({...options,timerPanel:timerPanel.id,scorePanel:scorePanel.id,awardPanels:awardPanels.map(panel=>panel.id),...(stackScorePanel?{stackScorePanel:stackScorePanel.id}:{}),...(stockScorePanels?{stockScorePanels:stockScorePanels.map(panel=>panel.id)}:{})})))
             throw new Error('Rust odmítl nastavení combo ukazatele.');
+    }
+    /** Bank one Rust-owned chain and release its fruit-kind slot. */
+    bankChain(hand) {
+        if (this.#disposed || !this.#session) throw new Error('Ulozeni serie vyzaduje aktivni VR.');
+        if (hand !== 'left' && hand !== 'right') throw new Error('Zasobnik vyzaduje left nebo right.');
+        return this.#engine.xr_bank_chain(hand === 'left' ? 0 : 1);
     }
     clearComboDisplay() {
         if(this.#disposed)throw new Error('WebXR byl ukončen.');
@@ -330,7 +337,8 @@ export class WebXRHost extends EventTarget {
                         else {
                             perfFrames++;perfElapsed+=elapsed;perfCpu+=performance.now()-cpuStart;
                             if(perfFrames===180){
-                                this.dispatchEvent(new CustomEvent('performance',{detail:{...runtimeSettings(),sample:perfReports+1,frames:perfFrames,fps:1000*perfFrames/perfElapsed,frameMs:perfElapsed/perfFrames,cpuSubmitMs:perfCpu/perfFrames,eyeViewports}}));
+                                this.dispatchEvent(new CustomEvent('performance',{detail:{...runtimeSettings(),sample:perfReports+1,frames:perfFrames,fps:1000*perfFrames/perfElapsed,frameMs:perfElapsed/perfFrames,cpuSubmitMs:perfCpu/perfFrames,eyeViewports,
+                                    headForward:pose?[-pose.transform.matrix[8],-pose.transform.matrix[9],-pose.transform.matrix[10]]:null}}));
                                 perfReports++;perfFrames=0;perfElapsed=0;perfCpu=0;
                             }
                         }

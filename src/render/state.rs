@@ -7,6 +7,13 @@ use std::ops::{Deref, DerefMut};
 use wasm_bindgen::JsValue;
 use web_sys::HtmlCanvasElement;
 
+#[derive(Clone, Copy)]
+pub struct XRCutReward {
+    pub original: u32,
+    pub points: u64,
+    pub total_points: u64,
+}
+
 struct ComboIndicator {
     id: u32,
     kind: String,
@@ -35,6 +42,7 @@ pub struct State {
     xr_view_slot: u32,
     xr_eye_count: u32,
     xr_cuts: u64,
+    xr_cut_rewards: Vec<XRCutReward>,
     pub combo_score: crate::xr_round::ComboScore,
     combo_indicators: Vec<ComboIndicator>,
     combo_display: Option<crate::combo_display::ComboDisplay>,
@@ -99,6 +107,7 @@ impl State {
             xr_view_slot: 0,
             xr_eye_count: 0,
             xr_cuts: 0,
+            xr_cut_rewards: Vec::with_capacity(32),
             combo_score: Default::default(),
             combo_indicators: Vec::new(),
             combo_display: None,
@@ -521,13 +530,21 @@ impl State {
             return false;
         };
         self.clear_combo_display();
+        if self.combo_score.chain_mode != display.chain_mode {
+            self.combo_score.set_chain_mode(display.chain_mode);
+        }
         display.reset(&mut self.renderer.scene);
+        if display.chain_mode {
+            display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+        }
         self.combo_display = Some(display);
+        self.xr_scene_pending = true;
+        self.invalidate_xr_hud();
         true
     }
     pub fn clear_combo_display(&mut self) {
         if let Some(mut display) = self.combo_display.take() {
-            display.reset(&mut self.renderer.scene);
+            display.clear(&mut self.renderer.scene);
         }
     }
     pub fn combo_display_state(&self) -> String {
@@ -569,7 +586,15 @@ impl State {
         self.combo_indicators
             .retain(|item| self.renderer.scene.object_exists(item.id));
         for item in &self.combo_indicators {
-            let active = item.kind == kind && item.slot < count;
+            let active = if self.combo_score.chain_mode {
+                self.combo_score
+                    .chains
+                    .iter()
+                    .flatten()
+                    .any(|c| c.kind == item.kind && item.slot < c.count)
+            } else {
+                item.kind == kind && item.slot < count
+            };
             self.renderer
                 .scene
                 .set_emission(item.id, if active { 8.0 } else { 0.65 });
@@ -583,6 +608,7 @@ impl State {
             .ok_or_else(|| JsValue::from_str("Round duration must be 1..3600 seconds"))?;
         self.xr_round = Some(round);
         self.xr_cuts = 0;
+        self.xr_cut_rewards.clear();
         self.combo_score.reset();
         if let Some(display) = &mut self.combo_display {
             display.reset(&mut self.renderer.scene);
@@ -593,6 +619,13 @@ impl State {
         self.invalidate_xr_hud();
         Ok(())
     }
+    pub fn xr_pending_bonus(&self) -> u64 {
+        if self.combo_score.chain_mode {
+            self.combo_score.pending_bonus()
+        } else {
+            0
+        }
+    }
     pub fn xr_round_state(&self) -> String {
         self.xr_round
             .map(|round| {
@@ -601,6 +634,10 @@ impl State {
                     "finished": round.finished(), "cuts": self.xr_cuts,
                     "score": self.combo_score.score, "streak": self.combo_score.streak,
                     "fruit": self.combo_score.kind, "triples": self.combo_score.triples,
+                    "mode": if self.combo_score.chain_mode { "chains" } else { "legacy" },
+                    "chains": self.combo_score.chains.iter().map(|c|c.as_ref().map(|c|serde_json::json!({"kind":c.kind,"count":c.count,"points":c.points,"potential":c.value()}))).collect::<Vec<_>>(),
+                    "rejected": self.combo_score.rejected,
+                    "pendingBonus": self.xr_pending_bonus(),
                 })
             })
             .unwrap_or(serde_json::Value::Null)
@@ -613,7 +650,11 @@ impl State {
             hud.invalidate();
         }
     }
+    pub fn xr_cut_rewards(&self) -> &[XRCutReward] {
+        &self.xr_cut_rewards
+    }
     pub fn record_xr_cuts(&mut self, removed: &[u32]) {
+        self.xr_cut_rewards.clear();
         let count = removed.len();
         if count > 0 {
             // Controller input follows advance_xr; new halves must be visible in
@@ -623,6 +664,25 @@ impl State {
         if count > 0 && !self.xr_round_finished() {
             self.xr_cuts = self.xr_cuts.saturating_add(count as u64);
             for id in removed {
+                if self.combo_score.chain_mode {
+                    let before = self.combo_score.score;
+                    if let Some(accepted) = self.combo_score.hit_chain(*id) {
+                        if self.xr_cut_rewards.len() < 32 {
+                            self.xr_cut_rewards.push(XRCutReward {
+                                original: *id,
+                                points: self.combo_score.score.saturating_sub(before),
+                                total_points: self.combo_score.last_chain_total_points(),
+                            });
+                        }
+                        if let Some(display) = &mut self.combo_display {
+                            display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+                            if !accepted {
+                                display.notice(&mut self.renderer.scene, "PLNO".into());
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if let Some(event) = self.combo_score.hit_event(*id) {
                     if let Some(display) = &mut self.combo_display {
                         display.event(&mut self.renderer.scene, event);
@@ -631,6 +691,23 @@ impl State {
             }
             self.invalidate_xr_hud();
         }
+    }
+    pub fn bank_xr_chain(&mut self, index: usize) -> bool {
+        if !self.combo_score.chain_mode || self.xr_round.is_none() || self.xr_round_finished() {
+            return false;
+        }
+        let Some(_) = self.combo_score.bank_chain(index) else {
+            return false;
+        };
+        if let Some(display) = &mut self.combo_display {
+            display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+        }
+        if let Some(display) = &mut self.combo_display {
+            display.notice(&mut self.renderer.scene, "SERIE ULOZENA".into());
+        }
+        self.xr_scene_pending = true;
+        self.invalidate_xr_hud();
+        true
     }
     pub fn frame_dt(&self) -> f32 {
         self.frame_dt
@@ -642,7 +719,14 @@ impl State {
         self.xr_view_slot = 0;
         if let Some(round) = &mut self.xr_round {
             let before = round.remaining.ceil();
+            let was_finished = round.finished();
             round.advance(dt);
+            if !was_finished && round.finished() && self.combo_score.chain_mode {
+                self.combo_score.bank_all();
+                if let Some(display) = &mut self.combo_display {
+                    display.sync_chains(&mut self.renderer.scene, &self.combo_score.chains);
+                }
+            }
             if before != round.remaining.ceil() {
                 self.invalidate_xr_hud();
             }
