@@ -323,3 +323,37 @@ fn bloom_bright(uv: vec2<f32>) -> vec3<f32> {
     }
     return vec4(source.rgb + glow * (uniforms.params.x * 0.22), select(source.a, 1.0, uniforms.params.y > 0.5));
 }
+
+// Compact directional FXAA, based on Timothy Lottes' local-contrast/directional
+// filtering approach: https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf
+// This chain stores linear RGB: use perceptual luma for edge detection, but blend
+// color in linear space. Transparent geometry, glow and UI are drawn afterward;
+// their edges are deliberately outside this opaque-scene filter.
+fn fxaa_luma(color: vec3<f32>) -> f32 {
+    return dot(sqrt(max(color, vec3(0.0))), vec3(0.299, 0.587, 0.114));
+}
+fn fxaa_at(uv: vec2<f32>, pixel: vec2<f32>) -> vec3<f32> {
+    return scene_at(clamp(uv, pixel * 0.5, vec2(1.0) - pixel * 0.5)).rgb;
+}
+@fragment fn fs_fxaa(input: Output) -> @location(0) vec4<f32> {
+    let source = scene_at(input.uv);
+    let alpha = select(source.a, 1.0, uniforms.params.y > 0.5);
+    let pixel = 1.0 / uniforms.params.zw;
+    let nw = fxaa_luma(fxaa_at(input.uv + vec2(-1.0, -1.0) * pixel, pixel));
+    let ne = fxaa_luma(fxaa_at(input.uv + vec2(1.0, -1.0) * pixel, pixel));
+    let sw = fxaa_luma(fxaa_at(input.uv + vec2(-1.0, 1.0) * pixel, pixel));
+    let se = fxaa_luma(fxaa_at(input.uv + vec2(1.0, 1.0) * pixel, pixel));
+    let center = fxaa_luma(source.rgb);
+    let low = min(center, min(min(nw, ne), min(sw, se)));
+    let high = max(center, max(max(nw, ne), max(sw, se)));
+    if high - low < max(0.03125, high * 0.125) { return vec4(source.rgb, alpha); }
+    // Follow the local edge, with an eight-texel maximum footprint.
+    var direction = vec2(-(nw + ne - sw - se), nw + sw - ne - se);
+    let reduction = max((nw + ne + sw + se) * 0.03125, 0.0078125);
+    direction = clamp(direction / (min(abs(direction.x), abs(direction.y)) + reduction), vec2(-8.0), vec2(8.0)) * pixel;
+    let narrow = (fxaa_at(input.uv - direction / 6.0, pixel) + fxaa_at(input.uv + direction / 6.0, pixel)) * 0.5;
+    let wide = narrow * 0.5 + (fxaa_at(input.uv - direction * 0.5, pixel) + fxaa_at(input.uv + direction * 0.5, pixel)) * 0.25;
+    let wide_luma = fxaa_luma(wide);
+    let filtered = select(wide, narrow, wide_luma < low || wide_luma > high);
+    return vec4(mix(source.rgb, filtered, clamp(uniforms.params.x, 0.0, 1.0)), alpha);
+}

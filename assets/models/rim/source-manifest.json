@@ -1,0 +1,45 @@
+{
+  "sourceDirectory": "/Users/Honza/Documents/Codex/2026-10-22/ude/outputs/anticke-mesto/dist",
+  "algorithm": "SHA-256",
+  "inputsBefore": {
+    "main.js": "986e0a60901b1a2fcb08578ecb38185d501967f5a78cd4d4a2b243d9c3321d98",
+    "../README.md": "a2456f9da4a85d6b88b90f881b75f4831286554de5c3ab9f43be55190def1e75",
+    "city.js": "1c8aa2e61f79a96c655481f4427388316526a8853c5c7742bdbadc8019fe55cd",
+    "collision-world.js": "50881d075344cda568c255960d7fc3a01776ecb4324cc68484472ba4cf2f5e6b",
+    "characters.js": "93feadb633d7be6ecd53a531a0d6e864fe6abc0d17aed7682333add80b6feb62",
+    "vendor/BufferGeometryUtils.js": "c25b7930e570e9ec56173cd3b866ec8d2e10016630db3937efb439daf1cedbf6",
+    "vendor/GLTFExporter.js": "76526d2be01c3fdf17c8efcf7c1c67dfd1ef30ede3196865eb69fa49196f80aa",
+    "vendor/GLTFLoader.js": "8a7db5a19d1018d79fb9a7a8b8372f317682027321a67d86023002e264ea479d",
+    "vendor/three.module.js": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+    "vendor/LICENSE-three.txt": "4c40a1ef62450b857c3b2aaf294936304cd552d965fbcd9d32d4c5bcf4ba4454",
+    "models/blade-wraith.glb": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+    "models/core-tank.glb": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+    "models/drone-orbiter.glb": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+    "models/madmechanic.glb": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f"
+  },
+  "inputsAfter": {
+    "main.js": "986e0a60901b1a2fcb08578ecb38185d501967f5a78cd4d4a2b243d9c3321d98",
+    "../README.md": "a2456f9da4a85d6b88b90f881b75f4831286554de5c3ab9f43be55190def1e75",
+    "city.js": "1c8aa2e61f79a96c655481f4427388316526a8853c5c7742bdbadc8019fe55cd",
+    "collision-world.js": "50881d075344cda568c255960d7fc3a01776ecb4324cc68484472ba4cf2f5e6b",
+    "characters.js": "93feadb633d7be6ecd53a531a0d6e864fe6abc0d17aed7682333add80b6feb62",
+    "vendor/BufferGeometryUtils.js": "c25b7930e570e9ec56173cd3b866ec8d2e10016630db3937efb439daf1cedbf6",
+    "vendor/GLTFExporter.js": "76526d2be01c3fdf17c8efcf7c1c67dfd1ef30ede3196865eb69fa49196f80aa",
+    "vendor/GLTFLoader.js": "8a7db5a19d1018d79fb9a7a8b8372f317682027321a67d86023002e264ea479d",
+    "vendor/three.module.js": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+    "vendor/LICENSE-three.txt": "4c40a1ef62450b857c3b2aaf294936304cd552d965fbcd9d32d4c5bcf4ba4454",
+    "models/blade-wraith.glb": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+    "models/core-tank.glb": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+    "models/drone-orbiter.glb": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+    "models/madmechanic.glb": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f"
+  },
+  "sourceUnchanged": true,
+  "cityGlbSha256": "73197d81c48db8a043b4c967b8d10dda35234954a338f6e0d8054bfa1e088a19",
+  "cityGlbBytes": 4485124,
+  "glb": {
+    "meshes": 19,
+    "materials": 19,
+    "buffers": 1,
+    "embedded": true
+  }
+}

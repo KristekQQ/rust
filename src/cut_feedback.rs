@@ -458,10 +458,13 @@ impl SceneManager {
             for p in old.pieces.into_iter().flatten() {
                 if !pieces.contains(&p.id) {
                     // The flash slot may be reused before real debris finishes falling.
-                    self.schedule_remove_object(p.id, (1.5 - old.elapsed).max(0.01));
                     if old.elapsed * p.angular.length() < p.angular_limit {
                         self.set_object_spin(p.id, p.angular);
                     }
+                    if self.fading_pieces.contains_key(&p.id) {
+                        continue;
+                    }
+                    self.schedule_remove_object(p.id, (1.5 - old.elapsed).max(0.01));
                     if self.feedback.retired_pieces.len() >= 64 {
                         let oldest = self.feedback.retired_pieces.remove(0);
                         self.remove_object(oldest);
@@ -562,6 +565,9 @@ impl SceneManager {
     /// Park visual effects and stop their fragment presentation immediately.
     pub fn clear_cut_feedback(&mut self) {
         let mut feedback = std::mem::take(&mut self.feedback);
+        while let Some((&id, _)) = self.fading_pieces.first_key_value() {
+            self.remove_object(id);
+        }
         for id in feedback.retired_pieces.drain(..) {
             self.remove_object(id);
         }
@@ -645,7 +651,7 @@ impl SceneManager {
             }
             for p in &mut b.pieces {
                 if let Some(m) = *p {
-                    if b.elapsed >= 1.5 {
+                    if b.elapsed >= 1.5 && !self.fading_pieces.contains_key(&m.id) {
                         self.remove_object(m.id);
                         *p = None;
                         continue;
@@ -1125,6 +1131,110 @@ mod tests {
         let after = scene.objects[&ids[0]].transform.position;
         assert!((after.x - before.x - 0.2).abs() < 1e-4);
         assert!(after.y > before.y + 0.2);
+    }
+    #[test]
+    fn piece_fade_uses_easing_and_removes_real_objects() {
+        let mut scene = SceneManager::default();
+        let ids = pieces(&mut scene);
+        scene.play_cut_feedback(&ids).unwrap();
+        scene.fade_cut_pieces(&ids, 0.125, 1.).unwrap();
+        scene.update(0.125);
+        assert_eq!(scene.objects[&ids[0]].visual_fade, 1.);
+        for expected in [0.84375, 0.5, 0.15625] {
+            scene.update(0.25);
+            assert!((scene.objects[&ids[0]].visual_fade - expected).abs() < 1e-6);
+        }
+        scene.update(0.25);
+        assert!(ids.iter().all(|id| !scene.object_exists(*id)
+            && !scene.projectiles.contains_key(id)
+            && !scene.triangle_meshes.contains_key(id)));
+    }
+    #[test]
+    fn piece_fade_ignores_ground_and_live_fruit_and_survives_pool_wrap() {
+        let mut scene = SceneManager::default();
+        let first = pieces(&mut scene);
+        scene.play_cut_feedback(&first).unwrap();
+        scene.fade_cut_pieces(&first, 0., 1.).unwrap();
+        let second = pieces(&mut scene);
+        scene.play_cut_feedback(&second).unwrap();
+        let third = pieces(&mut scene);
+        scene.play_cut_feedback(&third).unwrap();
+        scene.set_object_position(first[0], Vec3::new(0., 0.01, -1.));
+        scene.set_projectile(first[0], Vec3::new(2., -3., 0.), 9.81, 1.);
+        scene.set_object_position(second[0], Vec3::new(0.2, -0.34, -1.));
+        scene.set_projectile(second[0], Vec3::ZERO, 0., 0.);
+        scene.update(0.1);
+        let p = scene.objects[&first[0]].transform.position;
+        assert!((p.x - 0.2).abs() < 1e-5);
+        assert!(
+            (p.y - (0.01 - 0.3 - 0.04905)).abs() < 1e-5,
+            "debris passes through ground and live body"
+        );
+        assert!((scene.objects[&first[0]].visual_fade - 0.972).abs() < 1e-5);
+        assert!(scene.projectiles[&first[0]].0.y < -3.);
+        for _ in 0..10 {
+            scene.update(0.1);
+        }
+        assert!(first.iter().all(|id| !scene.object_exists(*id)));
+    }
+    #[test]
+    fn piece_fade_long_timing_owns_lifetime_after_pool_wrap() {
+        let mut scene = SceneManager::default();
+        let ids = pieces(&mut scene);
+        scene.play_cut_feedback(&ids).unwrap();
+        scene.fade_cut_pieces(&ids, 1., 1.).unwrap();
+        for _ in 0..3 {
+            let next = pieces(&mut scene);
+            scene.play_cut_feedback(&next).unwrap();
+        }
+        for _ in 0..7 {
+            scene.update(0.25);
+        }
+        assert!((scene.objects[&ids[0]].visual_fade - 0.15625).abs() < 1e-6);
+        scene.update(0.25);
+        assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+        let ids = pieces(&mut scene);
+        scene.play_cut_feedback(&ids).unwrap();
+        scene.fade_cut_pieces(&ids, 0., 3.).unwrap();
+        for _ in 0..3 {
+            let next = pieces(&mut scene);
+            scene.play_cut_feedback(&next).unwrap();
+        }
+        scene.clear_cut_feedback();
+        assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+    }
+    #[test]
+    fn piece_dissolve_shares_easing_collision_free_motion_and_cleanup() {
+        let mut scene = SceneManager::default();
+        let ids = pieces(&mut scene);
+        scene.play_cut_feedback(&ids).unwrap();
+        scene.dissolve_cut_pieces(&ids, 0., 1.).unwrap();
+        assert!(ids.iter().all(|id| scene.objects[id].visual_dissolve));
+        scene.set_object_position(ids[0], Vec3::ZERO);
+        scene.set_projectile(ids[0], -Vec3::Y, 0., 1.);
+        scene.update(0.25);
+        assert!((scene.objects[&ids[0]].visual_fade - 0.84375).abs() < 1e-6);
+        assert!((scene.objects[&ids[0]].transform.position.y + 0.25).abs() < 1e-6);
+        let mut queue = crate::visibility::RenderQueue::default();
+        queue.extract(&scene, glam::Mat4::IDENTITY, false);
+        let packed = queue.imported[&ids[0]][0].normal_matrix[3][3];
+        assert!((packed + 1.84375).abs() < 1e-6);
+        assert!(queue.imported[&ids[0]][0].needs_translucent_overlay());
+        for _ in 0..3 {
+            scene.update(0.25);
+        }
+        assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+    }
+    #[test]
+    fn piece_fade_invalid_options_are_atomic() {
+        let mut scene = SceneManager::default();
+        let ids = pieces(&mut scene);
+        for (delay, duration) in [(f32::NAN, 1.), (-1., 1.), (0., 0.), (0., f32::INFINITY)] {
+            assert!(scene.fade_cut_pieces(&ids, delay, duration).is_err());
+        }
+        assert!(scene.fade_cut_pieces(&[ids[0], u32::MAX], 0., 1.).is_err());
+        scene.update(0.25);
+        assert!(ids.iter().all(|id| scene.objects[id].visual_fade == 1.));
     }
     #[test]
     fn cut_feedback_debris_bounces_and_survives_flash_pool_wrap() {

@@ -21,6 +21,11 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:"gltf-visibility",path:"tests/gltf-visibility.html",status:"#result"},
+    {name:"scene-appearance",path:"tests/scene-appearance.html",status:"#result"},
+    {name:"antialias",path:"tests/antialias.html",status:"#result"},
+    {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
     { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
     { name: 'gltf-material-cache', path: 'tests/gltf-material-cache.html', status: '#result' },
     { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify' },
@@ -416,6 +421,17 @@ try {
         page.setDefaultNavigationTimeout(timeout);
         const errors = [], abortedRequests = [];
         page.on('pageerror', error => errors.push(`JS: ${error.message || String(error)}`));
+        // Dawn reports validation errors as warnings, not page/console errors.
+        // Observe the actual GPU error event before the engine requests a device.
+        await page.evaluateOnNewDocument(() => {
+            if (!globalThis.GPUAdapter) return;
+            const requestDevice = GPUAdapter.prototype.requestDevice;
+            GPUAdapter.prototype.requestDevice = async function (...args) {
+                const device = await requestDevice.apply(this, args);
+                device.addEventListener('uncapturederror', event => console.error(`GPU validation: ${event.error.message}`));
+                return device;
+            };
+        });
         page.on('console', message => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
         page.on('response', response => { if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) errors.push(`HTTP ${response.status()}: ${response.url()}`); });
         page.on('requestfailed', request => {

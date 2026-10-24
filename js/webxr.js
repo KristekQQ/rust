@@ -90,6 +90,23 @@ export class WebXRHost extends EventTarget {
         this.#buttonTouch = [false, false];
         this.#buttonPoints = [undefined, undefined];
     }
+    #rimSource=null;
+    #updateRim(session, frame, space, pose, tracked, dt) {
+        if(!this.#engine.rim_update_xr)return;
+        const sources=[...(session.inputSources??[])];
+        const left=sources.find(s=>s.handedness==='left'&&s.gamepad?.mapping==='xr-standard');
+        const right=sources.find(s=>s.handedness==='right'&&s.gamepad?.mapping==='xr-standard');
+        const changed=right!==this.#rimSource;this.#rimSource=right;
+        const leftPose=tracked&&left?.gripSpace?frame.getPose(left.gripSpace,space):null;
+        const ray=tracked&&right?.targetRaySpace?frame.getPose(right.targetRaySpace,space):null;
+        this.#engine.rim_xr_buttons?.(!!ray&&!!right?.gamepad?.buttons[0]?.pressed,!!ray&&!!right?.gamepad?.buttons[4]?.pressed);
+        const axes=source=>source?.gamepad?.axes??[];
+        const l=leftPose?axes(left):[],r=ray?axes(right):[];
+        // xr-standard thumbstick uses axes 2/3; two-axis generic sticks use 0/1.
+        this.#engine.rim_update_xr(tracked?pose.transform.matrix:new Float32Array(),ray?ray.transform.matrix:new Float32Array(),
+            [l[l.length>=4?2:0]??0,l[l.length>=4?3:1]??0,r[r.length>=4?2:0]??0],
+            changed||!!right?.gamepad?.buttons[5]?.pressed,dt);
+    }
     #updateControllers(session, frame, space, tracking) {
         const sources = [...(session.inputSources ?? [])];
         for (let index = 0; index < 2; index++) {
@@ -185,7 +202,8 @@ export class WebXRHost extends EventTarget {
     async isSupported() {
         return !!globalThis.isSecureContext && !!navigator.xr && (this.#engine.renderer_backend() === 'Gl' || (!this.#gpuSessionUnavailable && typeof globalThis.XRGPUBinding === 'function' && this.#engine.xr_gpu_supported())) && await navigator.xr.isSessionSupported('immersive-vr');
     }
-    async enter() {
+    async enter({resolutionScale=.75}={}) {
+        if(!Number.isFinite(resolutionScale)||resolutionScale<.5||resolutionScale>1.5)throw new RangeError('XR resolutionScale must be between 0.5 and 1.5.');
         if (this.#disposed) throw new Error('WebXR byl ukončen.');
         if (this.#pending || this.#session) throw new Error('WebXR již běží nebo se spouští.');
         if (!globalThis.isSecureContext) throw new Error('WebXR potřebuje důvěryhodné HTTPS nebo localhost přes ADB.');
@@ -227,7 +245,7 @@ export class WebXRHost extends EventTarget {
                 }
                 this.#gpuBinding = new XRGPUBinding(session, device);
                 this.#gpuLayer = this.#gpuBinding.createProjectionLayer({
-                    colorFormat:this.#engine.xr_gpu_color_format(), depthStencilFormat:'depth32float', textureUsage:GPUTextureUsage.RENDER_ATTACHMENT, scaleFactor:0.75,
+                    colorFormat:this.#engine.xr_gpu_color_format(), depthStencilFormat:'depth32float', textureUsage:GPUTextureUsage.RENDER_ATTACHMENT, scaleFactor:resolutionScale,
                 });
                 session.updateRenderState({layers:[this.#gpuLayer],depthNear:0.05,depthFar:100});
             } else {
@@ -237,7 +255,7 @@ export class WebXRHost extends EventTarget {
                 this.#gl = gl;
                 await gl.makeXRCompatible();
                 if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
-                layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: 0.75 });
+                layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: resolutionScale });
                 session.updateRenderState({ baseLayer: layer, depthNear: 0.05, depthFar: 100 });
             }
             let space;
@@ -260,6 +278,7 @@ export class WebXRHost extends EventTarget {
             const sessionId=Date.now();
             const runtimeSettings=()=>({
                 sessionId,
+                resolutionScale,
                 frameRate:Number.isFinite(session.frameRate)?session.frameRate:null,
                 supportedFrameRates:session.supportedFrameRates?Array.from(session.supportedFrameRates):null,
                 fixedFoveation:(gpu?this.#gpuLayer:layer)?.fixedFoveation??null,
@@ -275,6 +294,8 @@ export class WebXRHost extends EventTarget {
                     const elapsed=this.#previous===null?0:time-this.#previous;
                     const pose = xrFrame.getViewerPose(space);
                     const firstGpuEyes=firstFrame&&gpu?[]:null;
+                    const tracked = !!pose && (!session.visibilityState || session.visibilityState === 'visible');
+                    this.#updateRim(session, xrFrame, space, pose, tracked, Math.max(0, elapsed / 1000));
                     this.#engine.xr_begin_frame(this.#previous === null ? 0 : Math.max(0, (time - this.#previous) / 1000));
                     this.#previous = time;
                     const round = this.roundState;
@@ -282,9 +303,9 @@ export class WebXRHost extends EventTarget {
                         this.#roundEnded = true;
                         this.dispatchEvent(new CustomEvent('roundend', {detail: round}));
                     }
-                    const tracked = !!pose && (!session.visibilityState || session.visibilityState === 'visible');
                     this.#engine.xr_update_head(tracked ? pose.transform.matrix : new Float32Array());
                     this.#updateControllers(session, xrFrame, space, !!pose && (!session.visibilityState || session.visibilityState === 'visible'));
+                    this.#engine.xr_prepare_gameplay?.();
                     if (gpu) {
                         const images=[];
                         if (pose) for (const view of pose.views) {

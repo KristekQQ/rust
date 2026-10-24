@@ -188,6 +188,13 @@ export class SceneLight {
 }
 /** Commands to the Rust SceneManager. Contains no JS scene or animation state. */
 export class Scene {
+    configureRim(options:RimOptions|null):void;
+    rimInput(input:RimInput):void;
+    readonly rimState:RimState|null;
+    rimTakeCutJob():Uint8Array;
+    rimAcceptCut(bytes:Uint8Array):void;
+    rimCutFailed():void;
+
     private constructor();
     readonly objectCount: number;
     readonly lightCount: number;
@@ -266,7 +273,7 @@ export interface DebugStats {
     hudFrames: number; hudRefreshes: number;
     xrCuts: number; xrRoundRemaining: number|null;
 }
-export type PostEffectName = "ssr" | "godRays" | "bloom";
+export type PostEffectName = "ssr" | "godRays" | "bloom" | "fxaa";
 export interface FrameProfile {
     enabled: boolean;
     frame: number|null;
@@ -366,13 +373,25 @@ export interface WebXRHost extends EventTarget {
     readonly lastError?: unknown;
     isSupported(): Promise<boolean>;
     /** Call directly from a click. Requires WebGL backend and secure context. */
-    enter(): Promise<void>;
+    enter(options?: {resolutionScale?:number}): Promise<void>;
     exit(): Promise<void>;
     dispose(): void;
 }
 export type Engine = Readonly<RawEngine & {
     setBackgroundColor(color: Vector3): void;
+    /** Opt-in hemisphere/sun lighting, ACES exposure, fog and directional shadow volume. Linear RGB. Null restores legacy appearance. */
+    setSceneAppearance(options: {sky: Vector3; ground: Vector3; sunDirection: Vector3; exposure: number; fogColor: Vector3; fogNear: number; fogFar: number; shadowExtent: number; shadowTarget: Vector3; shadowNear: number; shadowFar: number; shadowNormalBias?: number; specularAA: boolean} | null): void;
     /** Additive glow radius in world meters; strength 0..2, radius .001.. .05. */
     setNeonGlow(options?: {strength?:number;radius?:number}): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; debugStats(): DebugStats; frameProfile(): FrameProfile; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl"; profiling?: boolean }): Promise<Engine>;
+
+/** Aurelia scene-authored Rust simulation. JSON collision data is exported offline. */
+export interface RimOptions {
+ enemies:{model:ModelObject;kind:string;height:number;offset:Vector3;scale:Vector3}[];
+ swords:[SceneObject,SceneObject];bolts:SceneObject[];beams:SceneObject[];charges:SceneObject[];healthBars?:[SceneObject,SceneObject][];hud:SceneObject[];marker:SceneObject;
+ shapes:{bounds:{minX:number;maxX:number;minY:number;maxY:number;minZ:number;maxZ:number};planes:{x:number;y:number;z:number;d:number}[]}[];
+ obstacles:[number,number,number,number][];
+}
+export interface RimInput{start?:boolean;pause?:boolean;reset?:boolean;movement?:[number,number];sprint?:boolean;aim?:boolean;dash?:boolean;slash?:number;look?:[number,number];teleport?:Vector3;death_mode?:'cut'|'dissolve'}
+export interface RimState{active:boolean;paused:boolean;health:number;dead:boolean;wave:number;kills:number;deaths:number;player:{position:{x:number;y:number;z:number};yaw:number;pitch:number;aiming:boolean;target:Vector3|null;jump:{active:boolean;count:number};dash:{active:boolean;count:number};stamina:{value:number;max:number}};frame:{simulation:number;visual:number};enemies:{id:number;slug:string;position:Vector3;height:number;hp:number;maxHp:number;phase:number;shotTimer:number;plasma:number}[];projectiles:{active:number;fired:number;reflected:number;hitEnemies:number;blockedWorld:number;bolts:{position:Vector3;velocity:Vector3;friendly:boolean}[]};cuts:{queued:number;pending:number;pieces:number;errors:number};xr:boolean}

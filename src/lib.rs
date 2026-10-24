@@ -19,7 +19,11 @@ pub mod postprocess_plan;
 mod projectile;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
+pub mod render_appearance;
 pub mod render_math;
+pub mod rim_cut;
+pub mod rim_game;
+pub mod rim_movement;
 pub mod scene;
 mod spatial;
 #[cfg(any(test, target_arch = "wasm32"))]

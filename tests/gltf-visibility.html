@@ -1,0 +1,75 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>glTF per-pass visibility regression</title>
+<canvas id="gpu-canvas" width="640" height="360"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels, assertForeground, assertChanged} from './pixels.js';
+const canvas = document.querySelector('canvas'), result = document.querySelector('#result');
+const assert = (value, message) => { if (!value) throw Error(message); };
+const differences = (a, b) => {
+    let changed = 0;
+    for (let i = 0; i < a.data.length; i += 4)
+        if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]) > 3) changed++;
+    return changed;
+};
+window.gltfVisibilityEvidence = [];
+try {
+    const engine = await initEngine(canvas, {backend: new URLSearchParams(location.search).get('backend') || 'auto'});
+    document.documentElement.dataset.rendererBackend = engine.renderer_backend();
+    engine.resize(640, 360);
+    engine.set_camera_mode('free');
+    engine.set_render_effects(false, false);
+    engine.set_grid_visible(false);
+    engine.set_light_helpers_visible(false);
+    engine.set_simulation_paused(true);
+    engine.setBackgroundColor([.008, .014, .032]);
+    engine.scene.createLight({position: [0, 5, 5], color: [20, 20, 20]});
+    const model = await engine.scene.loadModel(new URL('fixtures/gltf/full/full.gltf', location.href));
+    model.stopAnimation();
+    const snapshot = async () => {
+        const pixels = await capturePixels(canvas);
+        return {pixels, actual: engine.debugStats(), estimated: engine.renderer_stats()};
+    };
+    const checkDraws = (shot, expected, label) => {
+        assert(shot.actual.mainDrawCalls === expected, `${label}: actual glTF draws ${shot.actual.mainDrawCalls}, expected ${expected}`);
+        assert(shot.estimated.drawCalls === expected, `${label}: estimated glTF draws ${shot.estimated.drawCalls}, expected ${expected}`);
+    };
+    // Covers sorted BLEND with and without the fused postprocess overlay pass.
+    for (const bloom of [false, true]) {
+        if (bloom) engine.postprocessing.enable('bloom', {strength: .3});
+        else engine.postprocessing.disable('bloom');
+        engine.setCameraView([0, 3, 12], [0, 1, 0]);
+        model.setPosition([0, 0, 0]);
+        engine.set_frustum_culling(true);
+        const visible = await snapshot();
+        assertForeground(visible.pixels, 'OPAQUE/MASK/BLEND fixture');
+        checkDraws(visible, 3, 'Visible');
+
+        // Warm allocations must survive, but cannot authorize later draws.
+        model.setPosition([1000, 0, 0]);
+        const hidden = await snapshot();
+        checkDraws(hidden, 0, 'Culled model');
+        assert(hidden.actual.visible === 0, 'Moved model is outside the current view');
+        assertChanged(visible.pixels, hidden.pixels, 'Moving the model outside the frustum');
+        engine.set_frustum_culling(false);
+        const uncull = await snapshot();
+        checkDraws(uncull, 3, 'Culling disabled');
+        assert(differences(hidden.pixels, uncull.pixels) === 0, 'Culling preserves offscreen-model pixels');
+
+        engine.set_frustum_culling(true);
+        model.setPosition([0, 0, 0]);
+        const restored = await snapshot();
+        checkDraws(restored, 3, 'Restored model');
+        assert(differences(visible.pixels, restored.pixels) === 0, 'Restore reproduces visible pixels');
+        // A view-only change must invalidate visibility even with a static model.
+        engine.setCameraView([0, 3, 12], [0, 3, 24]);
+        const away = await snapshot();
+        checkDraws(away, 0, 'Camera looking away');
+        engine.setCameraView([0, 3, 12], [0, 1, 0]);
+        const returned = await snapshot();
+        checkDraws(returned, 3, 'Camera returned');
+        assert(differences(visible.pixels, returned.pixels) === 0, 'Camera return reproduces visible pixels');
+        window.gltfVisibilityEvidence.push({bloom, visible: visible.actual.mainDrawCalls, hidden: hidden.actual.mainDrawCalls, uncull: uncull.actual.mainDrawCalls, restored: restored.actual.mainDrawCalls, away: away.actual.mainDrawCalls, returned: returned.actual.mainDrawCalls});
+    }
+    result.textContent = 'PASS: glTF OPAQUE/MASK/BLEND visibility removes all three draws and restores identical pixels; model and camera changes, culling toggle, bloom off/on.';
+} catch (error) { result.textContent = `FAIL: ${error.stack ?? error}`; console.error(error); }
+</script></html>

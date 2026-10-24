@@ -12,6 +12,13 @@ struct SceneUniforms {
     camera_pos: vec3<f32>,
     _pad0: f32,
     lights: array<Light, LIGHT_COUNT>,
+    guide_padding: array<vec4<f32>,3>,
+    appearance_sky: vec4<f32>,
+    appearance_ground: vec4<f32>,
+    appearance_sun: vec4<f32>,
+    appearance_fog: vec4<f32>,
+    appearance_params: vec4<f32>,
+    appearance_shadow: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -42,7 +49,9 @@ fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
     }
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
-    let clip=effects.shadow_matrices[index]*vec4(world,1.0);
+    // Receiver normal offset follows the authored shadow profile; zero for legacy scenes.
+    let shadow_world=world+normal*scene.appearance_ground.w;
+    let clip=effects.shadow_matrices[index]*vec4(shadow_world,1.0);
     let ndc=clip.xyz/clip.w;
     if (clip.w<=0.0 || ndc.z<=0.0 || ndc.z>=1.0 || any(abs(ndc.xy)>vec2(1.0))) {return 1.0;}
     let uv=ndc.xy*vec2(0.5,-0.5)+vec2(0.5);
@@ -93,10 +102,11 @@ fn surface_alpha_clip(v:Output,alpha:f32) {
 }
 fn unit(v:vec3<f32>)->vec3<f32> { return v*inverseSqrt(max(dot(v,v),0.000000000001)); }
 fn surface(v:Output,front:bool)->vec4<f32> {
+    let normal_variation=max(abs(dpdx(unit(v.normal))),abs(dpdy(unit(v.normal))));
     let p1=dpdx(v.world); let p2=dpdy(v.world); let u1=dpdx(v.uv2); let u2=dpdy(v.uv2);
     let base=base_color(v); let emission=sample_emissive(v.uv4).rgb*material.emissive.rgb;
     surface_alpha_clip(v,base.a);
-    if(material.extra.w>0.5) { return vec4(base.rgb+emission,base.a); }
+    if(material.extra.w>0.5) { return vec4(appearance_color(base.rgb+emission,1.0/v.pos.w),base.a); }
     var n=unit(v.normal); let view=unit(scene.camera_pos-v.world);
     if(material.options.w>0.5) {
         let geometric=cross(p1,p2);
@@ -118,12 +128,13 @@ fn surface(v:Output,front:bool)->vec4<f32> {
     }
     n=unit(t*scaled.x+b*scaled.y+n*scaled.z);
     let mr=sample_mr(v.uv1);
-    let metallic=clamp(material.factors.x*mr.b,0.0,1.0); let rough=max(0.045,material.factors.y*mr.g);
+    let metallic=clamp(material.factors.x*mr.b,0.0,1.0); let rough=clamp(max(0.045,material.factors.y*mr.g)+select(0.0,max(max(normal_variation.x,normal_variation.y),normal_variation.z),scene.appearance_sky.w>0.5 && scene.appearance_params.y>0.5),0.045,1.0);
     let ao=mix(1.0,sample_ao(v.uv3).r,material.factors.w);
     let f0=mix(vec3(0.04),base.rgb,metallic); let nv=max(dot(n,view),0.0001); let a=rough*rough; let a2=a*a;
-    var color=base.rgb*(1.0-metallic)*0.1*ao;
+    var color=base.rgb*(1.0-metallic)*select(vec3(0.1),appearance_ambient(n),scene.appearance_sky.w>0.5)*ao;
     for(var i=0u;i<LIGHT_COUNT;i++) {
-        let delta=scene.lights[i].position-v.world; let l=unit(delta); let h=unit(l+view); let nl=max(dot(n,l),0.0); let nh=max(dot(n,h),0.0); let vh=max(dot(view,h),0.0);
+        if(all(scene.lights[i].color==vec3(0.0))) {continue;}
+        let delta=scene.lights[i].position-v.world; let l=select(unit(delta),scene.appearance_sun.xyz,scene.appearance_sky.w>0.5 && i==0u); let h=unit(l+view); let nl=max(dot(n,l),0.0); let nh=max(dot(n,h),0.0); let vh=max(dot(view,h),0.0);
         let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
         let gv=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv)); let gl=2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
         let f=f0+(vec3(1.0)-f0)*pow(1.0-vh,5.0); let spec=d*gv*gl*f/max(4.0*nv*nl,0.0001);
@@ -135,7 +146,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
         let r=effects.reflection_matrix*vec4(v.world,1.0); let u=r.xy/r.w*vec2(0.5,-0.5)+vec2(0.5);
         if(r.w>0.0 && all(u>=vec2(0.0)) && all(u<=vec2(1.0))) { color=mix(color,textureSampleLevel(reflection_texture,reflection_sampler,u,0.0).rgb,material.options.x); }
     }
-    return vec4(color,base.a);
+    return vec4(appearance_color(color,1.0/v.pos.w),base.a);
 }
 @fragment fn fs_main(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,select(1.0,c.a,material.extra.y==2.0)); }
 @fragment fn fs_material_mask(v:Output,@builtin(front_facing) front:bool)->@location(0) vec4<f32> { let c=surface(v,front); return vec4(c.rgb,material.options.x); }

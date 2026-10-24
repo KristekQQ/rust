@@ -208,6 +208,22 @@ export class Scene {
     #loads = new Map();
     /** @param {Wasm} wasm */
     constructor(wasm) { this.#wasm = wasm; Object.freeze(this); }
+    /** @param {import('./engine.d.ts').RimOptions|null} options */
+    configureRim(options){
+        if(options===null){this.#wasm.configure_rim('null');return;}
+        const {enemies,swords,bolts,beams,charges,healthBars=[],hud,marker,shapes,obstacles}=options;
+        const handles=[...enemies.map(e=>e.model),...swords,...bolts,...beams,...charges,...healthBars.flat(),...hud,marker];
+        if(handles.some(o=>handleBindings.get(o)!==this.#wasm))throw new Error('Objekty Říma musí patřit této scéně.');
+        this.#wasm.configure_rim(JSON.stringify({enemies:enemies.map(({model,...spec})=>({...spec,id:model.id})),swords:swords.map(o=>o.id),bolts:bolts.map(o=>o.id),beams:beams.map(o=>o.id),charges:charges.map(o=>o.id),healthBars:healthBars.map(pair=>pair.map(o=>o.id)),hud:hud.map(o=>o.id),marker:marker.id,shapes,obstacles}));
+    }
+    /** @param {import('./engine.d.ts').RimInput} input */
+    rimInput(input){this.#wasm.rim_input(JSON.stringify(input));}
+    /** @returns {import('./engine.d.ts').RimState|null} */
+    get rimState(){return JSON.parse(this.#wasm.rim_state());}
+    rimTakeCutJob(){return this.#wasm.rim_take_cut_job();}
+    /** @param {Uint8Array} bytes */
+    rimAcceptCut(bytes){this.#wasm.rim_accept_cut(bytes);}
+    rimCutFailed(){this.#wasm.rim_cut_failed();}
     get objectCount() { return this.#wasm.scene_object_count(); }
     get lightCount() { return this.#wasm.scene_light_count(); }
     /** Resolve a live Rust-owned object ID returned by diagnostics or bindings.
@@ -526,6 +542,7 @@ async function initializeEngine(canvas, backend, initialization) {
         },
         /** @param {Vector3} color Linear RGB clear color. */
         setBackgroundColor(color) { accepted(wasm.set_background_color(...color)); },
+        setSceneAppearance(options) { wasm.set_scene_appearance(JSON.stringify(options)); },
         /** Geometry glow in both eyes, independent of postprocessing. Zero strength releases caches.
          * @param {{strength?:number,radius?:number}} [options] */
         setNeonGlow({strength=.6,radius=.015} = {}) { accepted(wasm.set_neon_glow(strength,radius)); },

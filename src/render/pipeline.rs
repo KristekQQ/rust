@@ -64,7 +64,17 @@ fn build_surface(
     double_sided: bool,
     translucent_cull: Option<wgpu::Face>,
 ) -> RenderPipeline {
-    let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("scene shader"),
+        source: wgpu::ShaderSource::Wgsl(
+            concat!(
+                include_str!("../shader.wgsl"),
+                "\n",
+                include_str!("appearance.wgsl")
+            )
+            .into(),
+        ),
+    });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("pipeline layout"),
         bind_group_layouts: &[Some(layout), Some(effects)],
@@ -149,7 +159,17 @@ pub fn build_lines(
     depth_format: TextureFormat,
     layout: &BindGroupLayout,
 ) -> RenderPipeline {
-    let shader = device.create_shader_module(wgpu::include_wgsl!("../shader.wgsl"));
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("scene shader"),
+        source: wgpu::ShaderSource::Wgsl(
+            concat!(
+                include_str!("../shader.wgsl"),
+                "\n",
+                include_str!("appearance.wgsl")
+            )
+            .into(),
+        ),
+    });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("grid pipeline layout"),
         bind_group_layouts: &[Some(layout)],

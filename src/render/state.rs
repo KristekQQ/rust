@@ -712,7 +712,7 @@ impl State {
     pub fn frame_dt(&self) -> f32 {
         self.frame_dt
     }
-    pub fn advance_xr(&mut self, dt: f32) {
+    pub fn advance_xr(&mut self, dt: f32, time_scale: f32) {
         self.frame_dt = dt;
         self.xr_hud_pending = true;
         self.xr_eye_count = 0;
@@ -739,7 +739,7 @@ impl State {
         if let Some(display) = &mut self.combo_display {
             display.advance(&mut self.renderer.scene, dt);
         }
-        self.renderer.advance_xr_scene(dt);
+        self.renderer.advance_xr_scene(dt, time_scale);
         self.xr_scene_pending = true;
         self.refresh_info_panels(dt);
     }

@@ -234,6 +234,8 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         style.click();await wait();
         if(style.checked)throw new Error('Fruit style did not switch to open seams');
         const demo=previewCut(1,false); // Verify the alpha material at full diagnostic size.
+        // Freeze the depth probe pose before wall-clock feedback animation moves/rotates it.
+        const cutPoses=new Map(demo.report.pieces.map(piece=>[piece.id,piece.meshInfo]));
         // Warm the first-use texture pipeline while native effect time is frozen.
         await wait();
         engine.set_simulation_paused(false);await wait();engine.set_simulation_paused(true);
@@ -243,26 +245,55 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         const effectPositions=demo.feedback.objects.map(object=>object.meshInfo.position);
         demo.feedback.objects.forEach(object=>object.setPosition([100,100,100]));await wait();
         assertChanged(hitFrame,await capturePixels(canvas),'real cut shockwave, sparks and bitmap hit popup',80);
-        // Look directly through the newly cut face: a solid blue marker behind
-        // the remaining half must reach the framebuffer, including its depth.
-        const halves=demo.report.pieces.map(piece=>({piece,position:piece.meshInfo.position}));
+        // Look directly through the newly cut face: a solid blue marker inside
+        // the half must reach the framebuffer only when the cap is discarded.
+        const halves=demo.report.pieces.map(piece=>({piece,position:piece.meshInfo.position,rotation:piece.meshInfo.rotation}));
         const openHalf=halves.reduce((a,b)=>a.position[0]<b.position[0]?a:b);
         halves.filter(half=>half!==openHalf).forEach(half=>half.piece.setPosition([100,100,100]));
-        marker=engine.scene.createMesh({positions:geometry.positions,indices:geometry.indices,color:[0,0,1]}).setPosition([-.6,1.35,-1.15]).setScale([.2,.4,.4]).setEmission(2);
-        engine.setCameraView([1.2,1.35,-1.15],[0,1.35,-1.15]);await wait();
+        const cutPose=cutPoses.get(openHalf.piece.id);
+        if(!cutPose)throw new Error("Missing original cut pose");
+        openHalf.piece.setPosition(cutPose.position).setRotation(cutPose.rotation);
+        // Put the marker inside the half, immediately behind its cap. A marker
+        // behind the entire fruit also intersects opaque neon seams on the rind.
+        if(cutPose.rotation.some(angle=>Math.abs(angle)>1e-6))throw new Error('Cut depth fixture must start unrotated');
+        const vertices=openHalf.piece.meshSnapshot.positions;
+        const minX=Math.min(...vertices.map(vertex=>vertex[0])),capX=Math.max(...vertices.map(vertex=>vertex[0]));
+        const capVertices=vertices.filter(vertex=>Math.abs(vertex[0]-capX)<1e-5);
+        if(capVertices.length<3)throw new Error('Missing planar positive-X cut cap');
+        const capMin=[1,2].map(axis=>Math.min(...capVertices.map(vertex=>vertex[axis])));
+        const capMax=[1,2].map(axis=>Math.max(...capVertices.map(vertex=>vertex[axis])));
+        const capCenter=/** @type {[number,number,number]} */([
+            cutPose.position[0]+capX*cutPose.scale[0],
+            cutPose.position[1]+(capMin[0]+capMax[0])*.5*cutPose.scale[1],
+            cutPose.position[2]+(capMin[1]+capMax[1])*.5*cutPose.scale[2],
+        ]);
+        const depth=(capX-minX)*cutPose.scale[0];
+        marker=engine.scene.createMesh({
+            positions:[-.5,-.5,-.5,.5,-.5,-.5,.5,.5,-.5,-.5,.5,-.5,-.5,-.5,.5,.5,-.5,.5,.5,.5,.5,-.5,.5,.5],
+            indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5],color:[0,0,1],
+        }).setPosition([capCenter[0]-depth*.25,capCenter[1],capCenter[2]])
+            .setScale([depth*.1,(capMax[0]-capMin[0])*cutPose.scale[1]*.5,(capMax[1]-capMin[1])*cutPose.scale[2]*.5])
+            .setEmission(2);
+        engine.setCameraView([capCenter[0]+1.2,capCenter[1],capCenter[2]],capCenter);await wait();
         engine.setNeonGlow({strength:0});await wait();
         const openFace=await capturePixels(canvas);
-        let throughCut=0,totalCut=0;
+        openHalf.piece.setColorCutout(0);await wait();
+        const closedFace=await capturePixels(canvas);
+        openHalf.piece.setColorCutout(.25);
+        let throughCut=0,throughClosed=0,totalCut=0;
         const radius=Math.max(3,Math.floor(Math.min(openFace.width,openFace.height)*.01));
+        const isBlue=(/** @type {Uint8ClampedArray} */ data,/** @type {number} */ i)=>
+            data[i+2]>80&&data[i+2]>data[i]*1.5+20&&data[i+2]>data[i+1]*1.4;
         for(let y=Math.floor(openFace.height/2)-radius;y<=Math.floor(openFace.height/2)+radius;y++)
             for(let x=Math.floor(openFace.width/2)-radius;x<=Math.floor(openFace.width/2)+radius;x++){
                 const i=(y*openFace.width+x)*4;totalCut++;
-                if(openFace.data[i+2]>80&&openFace.data[i+2]>openFace.data[i]*1.5+20&&openFace.data[i+2]>openFace.data[i+1]*1.4)throughCut++;
+                if(isBlue(openFace.data,i))throughCut++;
+                if(isBlue(closedFace.data,i))throughClosed++;
             }
-        if(throughCut<totalCut*.7)throw new Error(`Cut face still occludes the object behind it (${throughCut}/${totalCut})`);
+        if(throughCut<totalCut*.7||throughClosed>totalCut*.3)throw new Error(`Cut cap depth failed (${throughCut} open, ${throughClosed} closed / ${totalCut})`);
         marker.remove();marker=undefined;
         engine.setNeonGlow(NEON_GLOW);
-        halves.forEach(half=>half.piece.setPosition(half.position));
+        halves.forEach(half=>half.piece.setPosition(half.position).setRotation(half.rotation));
         engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         demo.feedback.objects.forEach((object,i)=>object.setPosition(effectPositions[i]));
         if(demo.report.pieces.length!==2||!demo.report.pieces.every(piece=>piece.meshInfo.closed))throw new Error('Preview must show two real closed fruit halves');

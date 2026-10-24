@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<title>Rust · vzhled scény a skutečné pixely</title>
+<h1>Vzhled scény · mesh a glTF</h1>
+<pre id="result" role="status">Probíhá test…</pre>
+<canvas id="gpu-canvas" width="640" height="360" style="width:640px;height:360px"></canvas>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels, assertForeground, assertChanged} from './pixels.js';
+import {createScene as createMirrorScene} from '../examples/mirror/scene.js';
+const result = document.getElementById('result');
+const canvas = document.getElementById('gpu-canvas');
+const assert = (ok, message) => { if (!ok) throw new Error(message); };
+const samePixels = (a, b, label) => {
+    assert(a.width === b.width && a.height === b.height, `${label}: rozměry`);
+    let differences = 0;
+    for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) differences++;
+    assert(differences === 0, `${label}: ${differences} odlišných kanálů`);
+};
+const foregroundMask = image => {
+    const mask = [];
+    for (let i = 0; i < image.data.length; i += 4) {
+        if (Math.abs(image.data[i] - image.data[0]) + Math.abs(image.data[i + 1] - image.data[1]) + Math.abs(image.data[i + 2] - image.data[2]) > 30) mask.push(i);
+    }
+    return mask;
+};
+const luminance = (image, mask) => mask.reduce((sum, i) => sum + .2126 * image.data[i] + .7152 * image.data[i + 1] + .0722 * image.data[i + 2], 0) / mask.length;
+const appearance = {
+    sky: [1.4, 1.1, .8], ground: [.04, .06, .1], sunDirection: [0, 1, 1], exposure: .8,
+    fogColor: [0, 1, 0], fogNear: 100, fogFar: 200,
+    shadowExtent: 20, shadowTarget: [0, 0, 0], shadowNear: .1, shadowFar: 60, specularAA: true,
+};
+let engine;
+try {
+    engine = await initEngine(canvas, {backend: new URLSearchParams(location.search).get('backend') === 'webgl' ? 'webgl' : 'auto'});
+    engine.resize(640, 360);
+    engine.set_camera_mode('free');
+    engine.set_grid_visible(false);
+    engine.set_light_helpers_visible(false);
+    engine.set_render_effects(false, false);
+    engine.set_simulation_paused(true);
+    engine.setBackgroundColor([.01, .015, .025]);
+    engine.clear_lights();
+    engine.scene.createLight({position: [0, 5, 5], color: [1, 1, 1]});
+    const check = async label => {
+        engine.setSceneAppearance(null);
+        const legacy = await capturePixels(canvas);
+        assertForeground(legacy, `${label}: geometrie`);
+        const mask = foregroundMask(legacy);
+        assert(mask.length > 100, `${label}: kontrolovaná geometrie`);
+        engine.setSceneAppearance(appearance);
+        const lit = await capturePixels(canvas);
+        assertChanged(legacy, lit, `${label}: hemisphere/sun/ACES`);
+        engine.setSceneAppearance({...appearance, exposure: .2});
+        const dark = await capturePixels(canvas);
+        engine.setSceneAppearance({...appearance, exposure: 1.6});
+        const bright = await capturePixels(canvas);
+        assertChanged(dark, bright, `${label}: expozice`);
+        assert(luminance(bright, mask) > luminance(dark, mask) + 8, `${label}: vyšší expozice musí zesvětlit geometrii`);
+        engine.setSceneAppearance({...appearance, sunDirection: [0, -1, -1]});
+        assertChanged(lit, await capturePixels(canvas), `${label}: směr slunce`);
+        // Both camera setups place all geometry beyond fogFar. At full fog the
+        // final linear color is pure green, whose sRGB output is also [0,255,0].
+        const fog = {...appearance, fogNear: .1, fogFar: .2};
+        engine.setSceneAppearance(fog);
+        const fogged = await capturePixels(canvas);
+        assertChanged(lit, fogged, `${label}: mlha`);
+        let green = 0;
+        for (const i of mask) if (fogged.data[i] < 8 && fogged.data[i + 1] > 245 && fogged.data[i + 2] < 8) green++;
+        assert(green > 100, `${label}: známá barva vzdálené mlhy chybí (${green} pixelů)`);
+        for (const invalid of [
+            {...fog, exposure: 0}, {...fog, fogFar: fog.fogNear},
+            {...fog, sunDirection: [0, 0, 0]}, {...fog, sky: [-1, 0, 0]},
+            {...fog, sunDirection: [1e20, 0, 0]}, {...fog, shadowExtent: 1e-40},
+        ]) {
+            let rejected = false;
+            try { engine.setSceneAppearance(invalid); } catch { rejected = true; }
+            assert(rejected, `${label}: neplatná konfigurace nebyla odmítnuta`);
+        }
+        samePixels(fogged, await capturePixels(canvas), `${label}: odmítnutí zachová vzhled`);
+        engine.setSceneAppearance(null);
+        samePixels(legacy, await capturePixels(canvas), `${label}: null obnoví původní pixely`);
+    };
+    engine.setCameraView([3, 2, 7], [0, 0, 0]);
+    const mesh = engine.scene.createMesh({
+        positions: [-1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1, -1,-1,1, 1,-1,1, 1,1,1, -1,1,1],
+        indices: [4,5,6,4,6,7, 0,3,2,0,2,1, 0,1,5,0,5,4, 3,7,6,3,6,2, 0,4,7,0,7,3, 1,2,6,1,6,5],
+        color: [.35, .35, .35],
+    });
+    await check('Triangle mesh');
+    mesh.remove();
+    const fixture = await engine.scene.loadModel(new URL('fixtures/gltf/full/full.gltf', location.href));
+    assert(fixture.info.primitives === 3 && fixture.info.textures === 1, 'Texturovaný glTF fixture OPAQUE/MASK/BLEND');
+    fixture.stopAnimation();
+    engine.setCameraView([0, 3, 12], [0, 1, 0]);
+    await check('glTF PBR');
+    fixture.remove();
+    createMirrorScene(engine.scene);
+    // createScene clears the scene, which also clears its pause flag.
+    engine.set_simulation_paused(true);
+    engine.set_camera_mode('free');
+    engine.setCameraView([5, 3, 9], [0, .5, -1]);
+    engine.set_render_effects(true, true);
+    engine.setSceneAppearance(null);
+    const mirrorLegacy = await capturePixels(canvas);
+    assertForeground(mirrorLegacy, 'Zrcadlová scéna');
+    const cached = engine.effects_stats();
+    assert(cached.reflectionVisible > 0 && cached.reflectionWidth > 0 && cached.reflectionHeight > 0, 'Odraz musí obsahovat skutečnou geometrii');
+    samePixels(mirrorLegacy, await capturePixels(canvas), 'Pozastavený odraz je stabilní');
+    assert(engine.effects_stats().reflectionUpdates === cached.reflectionUpdates, 'Pozastavený odraz musí používat cache');
+    const reflectionEvidence = [{label: 'legacy', updates: cached.reflectionUpdates}];
+    const changeReflection = async (options, label, previousPixels) => {
+        const before = engine.effects_stats().reflectionUpdates;
+        engine.setSceneAppearance(options);
+        const pixels = await capturePixels(canvas);
+        const after = engine.effects_stats().reflectionUpdates;
+        assert(after === before + 1, `${label}: odraz se má obnovit právě jednou (${before} → ${after})`);
+        assertChanged(previousPixels, pixels, label);
+        samePixels(pixels, await capturePixels(canvas), `${label}: stabilní pixely po obnově`);
+        assert(engine.effects_stats().reflectionUpdates === after, `${label}: další snímky musí použít cache`);
+        reflectionEvidence.push({label, updates: after});
+        return pixels;
+    };
+    const mirrorLit = await changeReflection(appearance, 'Zrcadlo: nový vzhled', mirrorLegacy);
+    const mirrorBright = await changeReflection({...appearance, exposure: 1.6}, 'Zrcadlo: expozice', mirrorLit);
+    const mirrorReset = await changeReflection(null, 'Zrcadlo: reset', mirrorBright);
+    samePixels(mirrorLegacy, mirrorReset, 'Zrcadlo: null obnoví přesné původní pixely');
+    // Exercise glTF's orthographic depth shader, not only its main PBR shader.
+    // Compare only ground pixels that remain uncovered by the visible caster.
+    engine.scene.clear();
+    engine.set_simulation_paused(true);
+    engine.setCameraView([8, 7, 11], [0, 0, 0]);
+    engine.set_render_effects(false, false);
+    engine.setSceneAppearance({...appearance, sky: [.03, .03, .03], ground: [.01, .01, .01], sunDirection: [.4, 1, .6], fogNear: 500, fogFar: 1000, shadowExtent: 12, shadowFar: 60, shadowNormalBias: .12});
+    engine.scene.createLight({position: [8, 20, 12], color: [1, 1, 1]});
+    engine.scene.createPlane([0, -.02, 0]).setScale([8, 1, 8])
+        .setRenderOptions({isStatic: true, castsShadow: false, receivesShadow: true});
+    const emptyGround = await capturePixels(canvas);
+    assertForeground(emptyGround, 'Osvětlená přijímací plocha');
+    const caster = await engine.scene.loadModel(new URL('fixtures/gltf/full/full.gltf', location.href));
+    caster.stopAnimation().setScale([1.3, 1.5, 1.3])
+        .setRenderOptions({isStatic: true, castsShadow: true, receivesShadow: false});
+    const shadowsOff = await capturePixels(canvas);
+    assertChanged(emptyGround, shadowsOff, 'Viditelný glTF caster');
+    engine.set_render_effects(true, false);
+    const shadowsOn = await capturePixels(canvas);
+    const shadowStats = engine.effects_stats();
+    assert(shadowStats.shadowLightCount === 1 && shadowStats.staticUpdatesByLight[0] > 0, 'Ortografická stínová mapa musí být vykreslena');
+    let groundPixels = 0, shadowPixels = 0, directlyLitPixels = 0;
+    const rgbDelta = (a, b, i) => Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]);
+    const pixelLuminance = (image, i) => .2126 * image.data[i] + .7152 * image.data[i + 1] + .0722 * image.data[i + 2];
+    for (const i of foregroundMask(emptyGround)) {
+        if (rgbDelta(emptyGround, shadowsOff, i) > 3 || pixelLuminance(shadowsOff, i) < 70) continue;
+        groundPixels++;
+        const darkening = pixelLuminance(shadowsOff, i) - pixelLuminance(shadowsOn, i);
+        if (darkening > 12) shadowPixels++;
+        if (Math.abs(darkening) <= 3 && pixelLuminance(shadowsOn, i) > 70) directlyLitPixels++;
+    }
+    assert(groundPixels > 2000, `Přijímací plocha má málo kontrolovaných pixelů (${groundPixels})`);
+    assert(shadowPixels > 80, `glTF musí vrhat místní stín (${shadowPixels}/${groundPixels})`);
+    assert(directlyLitPixels > groundPixels * .35, `Stínová mapa nesmí zhasnout celou plochu (${directlyLitPixels}/${groundPixels} přímo osvětlených)`);
+    engine.set_render_effects(false, false);
+    samePixels(shadowsOff, await capturePixels(canvas), 'Vypnutí stínů obnoví osvětlení');
+    window.sceneAppearanceEvidence = {backend: engine.renderer_backend(), reflection: reflectionEvidence, orthographicShadows: {groundPixels, shadowPixels, directlyLitPixels}};
+    result.textContent = `PASS: ${engine.renderer_backend()} · triangle mesh + glTF PBR: appearance, exposure, directional sun, fog pixels, invalid-input atomicity, exact reset; paused mirror cache; glTF orthographic shadows: local shadow and preserved direct ground lighting.`;
+} catch (error) {
+    result.textContent = `FAIL: ${error.message ?? error}`;
+    console.error(error);
+}
+</script>
+</html>

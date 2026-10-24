@@ -1,0 +1,513 @@
+{
+  "schemaVersion": 1,
+  "units": "metres",
+  "upAxis": "Y",
+  "sourceScene": "Aurelia — antické město ve VR",
+  "cityFile": "rim-city.glb",
+  "decorationsFile": "rim-decorations.glb",
+  "sourceRenderSettings": {
+    "referenceFile": "source-gate.png",
+    "referenceViewport": [
+      1280,
+      800
+    ],
+    "referencePose": "initial unadvanced character pose",
+    "background": "#b8d0ca",
+    "fog": {
+      "color": "#b8d0ca",
+      "near": 90,
+      "far": 245
+    },
+    "hemisphere": {
+      "sky": "#e5f4ff",
+      "ground": "#b79868",
+      "intensity": 2.5
+    },
+    "sun": {
+      "color": "#ffe0ab",
+      "intensity": 3.1,
+      "position": [
+        -45,
+        75,
+        35
+      ],
+      "target": [
+        0,
+        0,
+        -15
+      ]
+    },
+    "toneMapping": "ACESFilmic",
+    "exposure": 1.25,
+    "outputColorSpace": "sRGB",
+    "antialias": true,
+    "shadows": "PCFSoft",
+    "shadowMapSize": 2048
+  },
+  "cameras": [
+    {
+      "name": "gate",
+      "position": [
+        0,
+        1.7,
+        42
+      ],
+      "target": [
+        0,
+        1.7,
+        -20
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "fovDegrees": 65,
+      "near": 0.08,
+      "far": 350,
+      "nodeIndex": 19
+    },
+    {
+      "name": "forum",
+      "position": [
+        0,
+        1.7,
+        8
+      ],
+      "target": [
+        0,
+        3,
+        -20
+      ],
+      "quaternion": [
+        0.023195546421964544,
+        0,
+        0,
+        0.9997309471183667
+      ],
+      "fovDegrees": 65,
+      "near": 0.08,
+      "far": 350,
+      "nodeIndex": 20
+    },
+    {
+      "name": "temple",
+      "position": [
+        0,
+        2.4,
+        -8
+      ],
+      "target": [
+        0,
+        7,
+        -36
+      ],
+      "quaternion": [
+        0.08132567817783222,
+        0,
+        0,
+        0.9966875809745578
+      ],
+      "fovDegrees": 65,
+      "near": 0.08,
+      "far": 350,
+      "nodeIndex": 21
+    },
+    {
+      "name": "market",
+      "position": [
+        0,
+        1.7,
+        30
+      ],
+      "target": [
+        8,
+        2,
+        15
+      ],
+      "quaternion": [
+        0.008559081421219967,
+        -0.2425261857915373,
+        0.0021397703553049916,
+        0.970104743166149
+      ],
+      "fovDegrees": 65,
+      "near": 0.08,
+      "far": 350,
+      "nodeIndex": 22
+    },
+    {
+      "name": "characters",
+      "position": [
+        0,
+        1.7,
+        8
+      ],
+      "target": [
+        0,
+        1.6,
+        -12
+      ],
+      "quaternion": [
+        -0.002499976562878408,
+        0,
+        0,
+        0.9999968750537098
+      ],
+      "fovDegrees": 65,
+      "near": 0.08,
+      "far": 350,
+      "nodeIndex": 23
+    },
+    {
+      "name": "aerial",
+      "position": [
+        65,
+        85,
+        85
+      ],
+      "target": [
+        0,
+        0,
+        -12
+      ],
+      "quaternion": [
+        -0.2960727959254295,
+        0.2766402696362217,
+        0.0900276325868507,
+        0.909783538045894
+      ],
+      "fovDegrees": 65,
+      "near": 0.08,
+      "far": 350,
+      "nodeIndex": 24
+    }
+  ],
+  "city": {
+    "meshes": 19,
+    "triangles": 62076,
+    "materials": 19,
+    "bounds": {
+      "min": [
+        -88,
+        -0.6000000238418579,
+        -93
+      ],
+      "max": [
+        88,
+        17.25,
+        69
+      ]
+    }
+  },
+  "sourceStats": {
+    "triangles": 62076,
+    "drawCalls": 19,
+    "buildings": 26,
+    "materials": 19
+  },
+  "landmarks": [
+    {
+      "name": "Brána města",
+      "x": 0,
+      "z": 48
+    },
+    {
+      "name": "Římské fórum",
+      "x": 0,
+      "z": -8
+    },
+    {
+      "name": "Chrám",
+      "x": 0,
+      "z": -20
+    },
+    {
+      "name": "Tržiště",
+      "x": 0,
+      "z": 24
+    },
+    {
+      "name": "Zahrada",
+      "x": 31,
+      "z": -46
+    },
+    {
+      "name": "Akvadukt",
+      "x": -57,
+      "z": 9
+    },
+    {
+      "name": "Naše postavy",
+      "x": 0,
+      "z": 8
+    }
+  ],
+  "camera": {
+    "position": [
+      0,
+      1.7,
+      42
+    ],
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "fovDegrees": 65,
+    "near": 0.08,
+    "far": 350
+  },
+  "models": [
+    {
+      "slug": "blade-wraith",
+      "name": "Blade Wraith",
+      "file": "blade-wraith.glb",
+      "height": 2.8,
+      "holder": {
+        "position": [
+          -7,
+          0.13,
+          -12
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "root": {
+        "position": [
+          0,
+          -5.60984865029045e-8,
+          -0.024965060660495565
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          0.9411764253323134,
+          0.9411764253323134,
+          0.9411764253323134
+        ]
+      },
+      "clips": [
+        "Idle",
+        "Run",
+        "Attack2",
+        "Attack3",
+        "Attack4",
+        "Attack",
+        "Explode",
+        "Assemble"
+      ],
+      "bounds": {
+        "min": [
+          -8.439513361657726,
+          0.13,
+          -12.342612095795378
+        ],
+        "max": [
+          -5.560486638342274,
+          2.93,
+          -11.65738790420462
+        ]
+      }
+    },
+    {
+      "slug": "core-tank",
+      "name": "Core Tank",
+      "file": "core-tank.glb",
+      "height": 1.05,
+      "holder": {
+        "position": [
+          7,
+          0.13,
+          -12
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "root": {
+        "position": [
+          -9.294458140816877e-8,
+          -2.8824156345214526e-9,
+          -0.02858181000007922
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          0.43894325652792576,
+          0.43894325652792576,
+          0.43894325652792576
+        ]
+      },
+      "clips": [
+        "Idle",
+        "Run",
+        "Attack2",
+        "Attack3",
+        "Attack4",
+        "Attack",
+        "Explode",
+        "Assemble"
+      ],
+      "bounds": {
+        "min": [
+          6.372936277246368,
+          0.13,
+          -12.340231512716205
+        ],
+        "max": [
+          7.627063722753631,
+          1.1800000000000002,
+          -11.659768487283793
+        ]
+      }
+    },
+    {
+      "slug": "drone-orbiter",
+      "name": "Drone Orbiter",
+      "file": "drone-orbiter.glb",
+      "height": 0.82,
+      "holder": {
+        "position": [
+          13,
+          0.13,
+          -18
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "root": {
+        "position": [
+          0.020397020945011977,
+          0,
+          -0.012121928995202216
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ]
+      },
+      "clips": [
+        "Idle",
+        "Run",
+        "Attack2",
+        "Attack3",
+        "Attack4",
+        "Attack",
+        "Explode",
+        "Assemble"
+      ],
+      "bounds": {
+        "min": [
+          12.572513123148935,
+          0.13000000000000003,
+          -18.211791122681024
+        ],
+        "max": [
+          13.427486876851065,
+          0.95,
+          -17.788208877318972
+        ]
+      }
+    },
+    {
+      "slug": "madmechanic",
+      "name": "Madmechanic",
+      "file": "madmechanic.glb",
+      "height": 2.2,
+      "holder": {
+        "position": [
+          -15,
+          0.13,
+          -12
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "root": {
+        "position": [
+          -0.06996822062375564,
+          0,
+          0.10987871700327416
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1.0719874387384591,
+          1.0719874387384591,
+          1.0719874387384591
+        ]
+      },
+      "clips": [
+        "Idle"
+      ],
+      "bounds": {
+        "min": [
+          -15.704542705372619,
+          0.12999999999999998,
+          -12.45291469472396
+        ],
+        "max": [
+          -14.29545729462738,
+          2.3300000000000005,
+          -11.547085305276038
+        ]
+      }
+    }
+  ]
+}

@@ -376,6 +376,7 @@ fn build_uniform(
         _pad0: 0.0,
         lights,
         cutting_guide: [[0.0; 4]; 3],
+        appearance: Default::default(),
     }
 }
 
@@ -436,6 +437,7 @@ pub struct SceneRenderer {
     _default_colors: VariantColors,
     variant_colors: HashMap<u32, VariantColors>,
     pub scene: SceneManager,
+    pub appearance: crate::render_appearance::Appearance,
     passes: Vec<PassCache>,
     active_cache: usize,
     main_view_slot: u32,
@@ -462,6 +464,14 @@ pub struct SceneRenderer {
 }
 
 impl SceneRenderer {
+    pub fn set_appearance(&mut self, value: crate::render_appearance::Appearance) {
+        if self.appearance != value {
+            self.appearance = value;
+            if let Some(effects) = self.effects.as_mut() {
+                effects.reflection_key = None;
+            }
+        }
+    }
     pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Self {
         let cube_mesh = Mesh::new(&device, "cube", data::VERTICES, data::INDICES);
         let (plane_vertices, plane_indices) = data::plane_mesh();
@@ -570,6 +580,7 @@ impl SceneRenderer {
             _default_colors: default_colors,
             variant_colors: HashMap::new(),
             scene: SceneManager::default(),
+            appearance: Default::default(),
             passes,
             active_cache: 0,
             main_view_slot: 0,
@@ -705,8 +716,8 @@ impl SceneRenderer {
         self.advance_scene_timed(dt, dt);
         self.finish_scene_updates();
     }
-    pub fn advance_xr_scene(&mut self, elapsed: f32) {
-        self.advance_scene_timed(elapsed, elapsed.min(0.1));
+    pub fn advance_xr_scene(&mut self, elapsed: f32, time_scale: f32) {
+        self.advance_scene_timed(elapsed, elapsed.min(0.1) * time_scale);
     }
     fn advance_scene_timed(&mut self, elapsed: f32, simulation_dt: f32) {
         let _cpu_scope = super::profiler::cpu_scope("simulation");
@@ -1015,6 +1026,12 @@ impl SceneRenderer {
             self.main_instance_upload_bytes += (self.upload_bytes - instance_upload_start) as u64;
         }
         let mut grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
+        grid_uniform.appearance = self.appearance;
+        // Reflection textures contain linear lighting; display transform belongs
+        // to the final visible surface, not both the reflected and main draw.
+        if pass == RenderPassKind::Reflection {
+            grid_uniform.appearance.sun[3] = 0.0;
+        }
         // Surface-only preview in the main color pass, never shadows/reflections.
         if pass == RenderPassKind::Main {
             grid_uniform.cutting_guide = self.scene.cutting_guide_uniforms();
@@ -1058,8 +1075,7 @@ impl SceneRenderer {
                     .count()
                 + cache
                     .queue
-                    .imported
-                    .keys()
+                    .visible_imported_ids()
                     .filter_map(|id| self.gltf_models.get(id))
                     .map(|m| {
                         super::gltf_gpu::draw_count(m, false) + super::gltf_gpu::draw_count(m, true)
@@ -1067,8 +1083,7 @@ impl SceneRenderer {
                     .sum::<usize>()
                 - cache
                     .queue
-                    .imported
-                    .keys()
+                    .visible_imported_ids()
                     .filter(|id| self.gltf_models.contains_key(id))
                     .count()) as f64,
             self.upload_bytes as f64,
@@ -1441,7 +1456,7 @@ impl SceneRenderer {
             packed_depth: false,
             shadow: true,
         };
-        for id in self.passes[self.active_cache].queue.imported.keys() {
+        for id in self.passes[self.active_cache].queue.visible_imported_ids() {
             if let Some(model) = self.gltf_models.get(id) {
                 self.gltf_gpu
                     .prepare_pipeline(&self.device, gltf_key, model);
@@ -1533,7 +1548,7 @@ impl SceneRenderer {
                 pass.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
                 draws += 1;
             }
-            for id in cache.queue.imported.keys() {
+            for id in cache.queue.visible_imported_ids() {
                 if let Some(model) = self.gltf_models.get(id) {
                     draws += self.gltf_gpu.draw(
                         &mut pass,
@@ -1627,7 +1642,7 @@ impl SceneRenderer {
             packed_depth: target.auxiliary.is_some(),
             shadow: false,
         };
-        for id in self.passes[self.active_cache].queue.imported.keys() {
+        for id in self.passes[self.active_cache].queue.visible_imported_ids() {
             if let Some(model) = self.gltf_models.get(id) {
                 self.gltf_gpu
                     .prepare_pipeline(&self.device, gltf_key, model);
@@ -1793,7 +1808,7 @@ impl SceneRenderer {
                 rp.draw_indexed(0..mesh.index_count, 0, 0..instances.len() as u32);
                 draws += 1;
             }
-            for id in cache.queue.imported.keys() {
+            for id in cache.queue.visible_imported_ids() {
                 if let Some(model) = self.gltf_models.get(id) {
                     draws +=
                         self.gltf_gpu
@@ -1805,8 +1820,7 @@ impl SceneRenderer {
                     &mut rp,
                     cache
                         .queue
-                        .imported
-                        .keys()
+                        .visible_imported_ids()
                         .filter_map(|id| self.gltf_models.get(id)),
                     gltf_key,
                     true,
@@ -1928,10 +1942,16 @@ impl SceneRenderer {
             .batches
             .iter()
             .chain(cache.mirrored_batches.iter())
-            .any(|b| b.instances().iter().any(|i| i.emission[2] < 1.0))
+            .any(|b| {
+                b.instances()
+                    .iter()
+                    .any(InstanceData::needs_translucent_overlay)
+            })
             || cache.queue.imported.iter().any(|(id, instances)| {
                 self.imported_meshes.contains_key(id)
-                    && instances.iter().any(|i| i.emission[2] < 1.0)
+                    && instances
+                        .iter()
+                        .any(InstanceData::needs_translucent_overlay)
             })
     }
 
@@ -2049,9 +2069,7 @@ impl SceneRenderer {
                 (true, &cache.mirrored_batches[index]),
             ] {
                 for (instance, data) in batch.instances().iter().enumerate() {
-                    if data.emission[2] >= 1.0
-                        || (data.emission[2] <= 0.0 && data.surface_params[0] <= 0.0)
-                    {
+                    if !data.needs_translucent_overlay() {
                         continue;
                     }
                     let center = Mat4::from_cols_array_2d(&data.model).w_axis.truncate();
@@ -2060,6 +2078,7 @@ impl SceneRenderer {
                         kind,
                         mirrored,
                         instance as u32,
+                        data.visual_fade() < 1.0,
                     ));
                 }
             }
@@ -2069,9 +2088,7 @@ impl SceneRenderer {
                 continue;
             }
             for (instance, data) in instances.iter().enumerate() {
-                if data.emission[2] >= 1.0
-                    || (data.emission[2] <= 0.0 && data.surface_params[0] <= 0.0)
-                {
+                if !data.needs_translucent_overlay() {
                     continue;
                 }
                 let model = Mat4::from_cols_array_2d(&data.model);
@@ -2083,18 +2100,20 @@ impl SceneRenderer {
                     MeshKind::Imported(*id),
                     model.determinant() < 0.0,
                     instance as u32,
+                    data.visual_fade() < 1.0,
                 ));
             }
         }
         draws.sort_by(|a, b| b.0.total_cmp(&a.0));
         let mut submitted_draws = 0;
-        for (_, kind, mirrored, instance) in &draws {
+        for (_, kind, mirrored, instance, fading) in &draws {
             let mesh = self.mesh(*kind);
             if mesh.index_count == 0 {
                 continue;
             }
             let subset = match kind {
-                MeshKind::Imported(id) => self.alpha_indices.get(id),
+                // A fading object also needs its normally opaque neon seams.
+                MeshKind::Imported(id) if !*fading => self.alpha_indices.get(id),
                 _ => None,
             };
             let index_count = subset.map_or(mesh.index_count, |entry| entry.count);
@@ -2161,8 +2180,7 @@ impl SceneRenderer {
         let has_rings = rings.iter().any(Option::is_some);
         let has_transparent = self.passes[self.last_main_cache]
             .queue
-            .imported
-            .keys()
+            .visible_imported_ids()
             .filter_map(|id| self.gltf_models.get(id))
             .any(|model| super::gltf_gpu::draw_count(model, true) > 0);
         let has_mesh_transparency = self.has_translucent(cache_index);
@@ -2223,7 +2241,7 @@ impl SceneRenderer {
             shadow: false,
         };
         if has_transparent {
-            for id in cache.queue.imported.keys() {
+            for id in cache.queue.visible_imported_ids() {
                 if let Some(model) = self.gltf_models.get(id) {
                     self.gltf_gpu.prepare_pipeline(&self.device, key, model);
                 }
@@ -2292,8 +2310,7 @@ impl SceneRenderer {
                     &mut pass,
                     cache
                         .queue
-                        .imported
-                        .keys()
+                        .visible_imported_ids()
                         .filter_map(|id| self.gltf_models.get(id)),
                     key,
                     true,

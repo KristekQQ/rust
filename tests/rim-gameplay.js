@@ -1,0 +1,43 @@
+import {configureAppearance} from '../examples/rim/appearance.js';
+import {initEngine} from '../js/engine.js';
+import {createScene,createGameplay} from '../examples/rim/scene.js';
+import {installCutTransport} from '../examples/rim/cut-transport.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport} from './xr/testkit.js';
+import {assertForeground} from './pixels.js';
+const sim=installXRSimulator({profile:{id:'aurelia-72',hz:72,eyeWidth:320,eyeHeight:320},clockTimers:false});
+const run=new XRTestRun('rim-gameplay',sim,publishXRReport);let engine,stop;
+await run.execute(async test=>{
+ engine=await initEngine(document.querySelector('#gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+ configureAppearance(engine);
+ const content=await createScene(engine.scene);const game=await createGameplay(engine,content);stop=installCutTransport(engine.scene);const input=v=>engine.scene.rimInput(v),state=()=>engine.scene.rimState;
+ input({start:true});await engine.xr.enter({resolutionScale:1});
+ const frame=(v={})=>{sim.frame(v);if(engine.xr.lastError)throw Error(String(engine.xr.lastError));};
+ frame({head:{position:[0,1.7,0]},controllers:{left:{position:[-.3,1.4,-.1]},right:{position:[.3,1.4,-.1]}}});frame();
+ test.assert(state().enemies.length===6,'six-orbiter first wave');
+ test.assert(Math.abs(engine.xr.player.head.position[2]-42)<.1,'XR eyes/head share original gate spawn');
+ test.assert(engine.xr.player.state.leftHand.object.id===game.swords[0].id&&engine.xr.player.state.rightHand.object.id===game.swords[1].id,'both tracked hands hold original gladii');
+ assertForeground(sim.pixels('left'),'Aurelia left eye');assertForeground(sim.pixels('right'),'Aurelia right eye');
+ const z=state().player.position.z;for(let i=0;i<15;i++)frame({controllers:{left:{axes:[0,0,0,-1]}}});frame({controllers:{left:{axes:[0,0,0,0]}}});
+ test.assert(state().player.position.z<z-.3,'left stick moves native player through city',{z,player:state().player});
+ frame({controllers:{right:{buttons:[1,0,0,0,0,0]}}});test.assert(state().player.aiming,'right trigger starts bullet-time jump aiming');
+ frame({controllers:{right:{buttons:[0,0,0,0,0,0]}}});test.assert(state().player.jump.count===1,'trigger release launches ballistic jump');
+ input({teleport:[0,0,42]});frame();test.assert(Math.abs(engine.xr.player.head.position[2]-42)<.1,'native teleport updates same XR origin');
+ frame({controllers:{right:{buttons:[0,0,0,0,1,0]}}});for(let i=0;i<16;i++)frame();frame({controllers:{right:{buttons:[0,0,0,0,0,0]}}});
+ test.assert(state().player.dash.count===1&&state().player.stamina.value<3,'A dashes and spends native stamina');
+ input({teleport:[0,0,42]});frame();const enemy=state().enemies[0];input({teleport:[enemy.position[0],0,enemy.position[2]+1.05]});frame({controllers:{right:{tracked:false}}});frame({controllers:{right:{tracked:true,position:[.6,1.4,-.4]}}});test.assert(state().kills===0,'tracking reentry never invents a slash');
+ for(const x of [.45,.3,.15,0,-.15,-.3,-.45])frame({controllers:{right:{position:[x,1.4,-.4]}}});
+ const wounded=state().enemies.find(e=>e.id===enemy.id);
+ test.assert(wounded?.hp===50&&wounded.phase!==3&&state().kills===0,'first tracked blade swing removes 50 HP without killing');
+ test.assert(state().cuts.queued===0&&state().cuts.pending===0&&state().cuts.pieces===0,'nonfatal tracked strike never requests worker cuts');
+ for(let i=0;i<25;i++)frame({controllers:{right:{position:[-.9,1.4,-.4]}}});
+ const target=state().enemies.find(e=>e.id===enemy.id);input({teleport:[target.position[0],0,target.position[2]+1.05]});frame({controllers:{right:{position:[-.9,1.4,-.4]}}});
+ for(const x of [-.75,-.6,-.45,-.3,-.15,0,.15,.3,.45])frame({controllers:{right:{position:[x,1.4,-.4]}}});
+ test.assert(state().kills>=1&&state().enemies.find(e=>e.id===enemy.id)?.hp===0,'second separated tracked blade swing kills original orbiter');test.assert(state().frame.simulation===state().frame.visual,'gameplay updates before the current stereo frame');
+ // Let the platform worker run while simulation remains explicitly frame driven.
+ for(let i=0;i<100&&state().cuts.pieces===0;i++){await new Promise(r=>setTimeout(r,20));frame();}
+ test.assert(state().cuts.pieces>0&&state().cuts.errors===0,'worker Rust slice produces actual visible halves');
+ const stereo=sim.pixels(),preview=document.querySelector('#stereo');preview.width=stereo.width;preview.height=stereo.height;preview.getContext('2d').putImageData(stereo,0,0);
+ await engine.xr.exit();await engine.xr.enter({resolutionScale:1});frame();test.assert(state().kills>=1,'XR reentry preserves encounter state');await engine.xr.exit();
+});stop?.();engine?.dispose();

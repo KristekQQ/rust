@@ -196,12 +196,22 @@ impl Default for RenderOptions {
     }
 }
 
+#[derive(Clone, Copy)]
+struct PieceFade {
+    elapsed: f32,
+    delay: f32,
+    duration: f32,
+    start: f32,
+}
+
 pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
     pub render_options: RenderOptions,
     pub emission: f32,
     pub color_cutout: f32,
+    pub visual_fade: f32,
+    pub visual_dissolve: bool,
     pub opacity: f32,
     pub opaque_above: f32,
     pub opacity_variation: f32,
@@ -286,6 +296,8 @@ pub struct SceneManager {
     projectiles: BTreeMap<u32, (Vec3, f32, f32)>,
     projectile_scratch: Vec<crate::projectile::Body>,
     cut_fragments: BTreeMap<u32, CutFragment>,
+    fading_pieces: BTreeMap<u32, PieceFade>,
+    fade_removals: Vec<u32>,
     projectile_order: Vec<usize>,
     projectile_pairs: Vec<(usize, usize)>,
     pub projectile_contacts: u32,
@@ -519,6 +531,9 @@ impl SceneManager {
         let mut bodies = std::mem::take(&mut self.projectile_scratch);
         bodies.clear();
         for (&id, &(velocity, gravity, bounce)) in &self.projectiles {
+            if self.fading_pieces.contains_key(&id) {
+                continue;
+            }
             if self.blade_cut_states.get(&id).is_some_and(|s| s.jammed) {
                 continue;
             }
@@ -559,6 +574,106 @@ impl SceneManager {
             }
         }
         self.projectile_scratch = bodies;
+        let duration = dt.min(0.25);
+        for &id in self.fading_pieces.keys() {
+            let Some((velocity, gravity, _)) = self.projectiles.get_mut(&id) else {
+                continue;
+            };
+            let Some(object) = self.objects.get_mut(&id) else {
+                continue;
+            };
+            object.transform.position +=
+                *velocity * duration - Vec3::Y * (*gravity * duration * duration * 0.5);
+            velocity.y -= *gravity * duration;
+            object.refresh_render_data();
+            self.render_revision = self.render_revision.wrapping_add(1);
+            if object.render_options.is_static {
+                self.static_revision = self.static_revision.wrapping_add(1);
+            }
+        }
+    }
+    /// Explicit presentation lifecycle: contact-free ballistic pieces, eased fade,
+    /// then actual scene removal. Separate from the bounded flash pool.
+    pub fn fade_cut_pieces(
+        &mut self,
+        ids: &[u32],
+        delay: f32,
+        duration: f32,
+    ) -> Result<(), String> {
+        if !delay.is_finite()
+            || delay < 0.
+            || !duration.is_finite()
+            || duration <= 0.
+            || !(delay + duration).is_finite()
+            || ids.is_empty()
+            || ids.len() > 32
+            || ids
+                .iter()
+                .enumerate()
+                .any(|(i, id)| ids[..i].contains(id) || !self.triangle_meshes.contains_key(id))
+        {
+            return Err(
+                "Piece fade requires live unique meshes and finite delay>=0, duration>0".into(),
+            );
+        }
+        for &id in ids {
+            self.objects.get_mut(&id).unwrap().visual_dissolve = false;
+            let start = self.objects[&id].visual_fade;
+            self.fading_pieces.insert(
+                id,
+                PieceFade {
+                    elapsed: 0.,
+                    delay,
+                    duration,
+                    start,
+                },
+            );
+            self.remove_collider(id);
+            self.blade_cut_states.remove(&id);
+            self.triangle_meshes.get_mut(&id).unwrap().cuttable = false;
+        }
+        Ok(())
+    }
+    /// Shares native easing, collision exclusions and cleanup with ordinary fade.
+    pub fn dissolve_cut_pieces(
+        &mut self,
+        ids: &[u32],
+        delay: f32,
+        duration: f32,
+    ) -> Result<(), String> {
+        self.fade_cut_pieces(ids, delay, duration)?;
+        for id in ids {
+            self.objects.get_mut(id).unwrap().visual_dissolve = true;
+            self.changed(*id);
+        }
+        Ok(())
+    }
+    fn update_piece_fades(&mut self, dt: f32) {
+        let mut completed = std::mem::take(&mut self.fade_removals);
+        completed.clear();
+        for (&id, fade) in &mut self.fading_pieces {
+            fade.elapsed += dt;
+            let t = ((fade.elapsed - fade.delay) / fade.duration).clamp(0., 1.);
+            if t >= 1. {
+                completed.push(id);
+                continue;
+            }
+            if let Some(object) = self.objects.get_mut(&id) {
+                // Smoothstep has zero velocity at both endpoints; no JS tween loop.
+                let value = fade.start * (1. - t * t * (3. - 2. * t));
+                if value != object.visual_fade {
+                    object.visual_fade = value;
+                    self.render_revision = self.render_revision.wrapping_add(1);
+                    if object.render_options.is_static {
+                        self.static_revision = self.static_revision.wrapping_add(1);
+                    }
+                }
+            }
+        }
+        for id in completed.drain(..) {
+            self.remove_object(id);
+        }
+        self.fade_removals = completed;
     }
     pub fn render_revision(&self) -> u64 {
         self.render_revision
@@ -694,6 +809,8 @@ impl SceneManager {
                 transform,
                 render_options: RenderOptions::default(),
                 emission: 0.0,
+                visual_fade: 1.0,
+                visual_dissolve: false,
                 opacity: 1.0,
                 opaque_above: 8.0,
                 opacity_variation: 0.0,
@@ -1250,6 +1367,7 @@ impl SceneManager {
         let assisted_contacts = self.cut_assist(id) > 0. && self.blade_contact_response(id);
         for (&target, &(velocity, _, bounce)) in &self.projectiles {
             if target == id
+                || self.fading_pieces.contains_key(&target)
                 || self
                     .cut_fragments
                     .get(&target)
@@ -2291,6 +2409,7 @@ impl SceneManager {
         self.projectiles.clear();
         self.projectile_scratch.clear();
         self.cut_fragments.clear();
+        self.fading_pieces.clear();
         self.projectile_order.clear();
         self.projectile_pairs.clear();
         self.projectile_contacts = 0;
@@ -2377,6 +2496,7 @@ impl SceneManager {
         self.spins.remove(&id);
         self.projectiles.remove(&id);
         self.cut_fragments.remove(&id);
+        self.fading_pieces.remove(&id);
         self.rotations.retain(|r| r.id != id);
         self.removals
             .retain(|r| r.id != id || !matches!(r.kind, RemovalKind::Object));
@@ -2627,6 +2747,7 @@ impl SceneManager {
                 }
             }
         }
+        self.update_piece_fades(dt);
         self.update_cut_feedback(dt);
         self.time += dt;
         let now = self.time;

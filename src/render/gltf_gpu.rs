@@ -659,6 +659,12 @@ impl GltfGpu {
             let topology = draw.topology;
             let material = &model.materials[draw.material];
             let blend = material.alpha == AlphaMode::Blend;
+            // Transparent glTF is drawn into the final single-color overlay.
+            // Do not create an unused MRT alpha pipeline: baseline WebGL2 has
+            // no independent blending between color and packed-depth targets.
+            if blend && (key.material_mask || key.packed_depth) {
+                continue;
+            }
             let double_sided = material.double_sided;
             for negative in [false, true] {
                 let variant = Variant {
@@ -870,7 +876,12 @@ impl GltfGpu {
 // Replace sample expressions before compilation so absent maps incur no texture
 // operation on either backend. Raw fallback texels preserve the original decoder.
 fn material_shader_source(texture_mask: u8, shadow: bool, opaque_unclipped: bool) -> String {
-    let mut source = include_str!("gltf_pbr.wgsl").to_owned();
+    let mut source = concat!(
+        include_str!("gltf_pbr.wgsl"),
+        "\n",
+        include_str!("appearance.wgsl")
+    )
+    .to_owned();
     for (i, (sample, fallback)) in [
         ("textureSample(base_map,base_sampler,uv)", "vec4<f32>(1.0)"),
         ("textureSample(mr_map,mr_sampler,uv)", "vec4<f32>(1.0)"),
@@ -905,6 +916,17 @@ fn material_shader_source(texture_mask: u8, shadow: bool, opaque_unclipped: bool
             .replace("scene.view_projection", "shadow_view")
             .replace("scene.camera_pos", "vec3(0.0)")
             .replace("scene.lights[i]", "Light(vec3(0.0),0.0,vec3(0.0),0.0)");
+        // Shadow variants expose only the view matrix. Color-only helpers are
+        // still parsed by both backends even though fs_shadow cannot reach them.
+        for field in ["sky", "ground", "sun", "fog", "params", "shadow"] {
+            // Keep fog edges distinct: WebGPU rejects constant smoothstep(0,0).
+            let value = if field == "params" {
+                "vec4<f32>(1.0)"
+            } else {
+                "vec4<f32>(0.0)"
+            };
+            source = source.replace(&format!("scene.appearance_{field}"), value);
+        }
     }
     source
 }

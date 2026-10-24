@@ -15,6 +15,12 @@ struct SceneUniforms {
     guide_plane: vec4<f32>,
     guide_origin: vec4<f32>,
     guide_axis: vec4<f32>,
+    appearance_sky: vec4<f32>,
+    appearance_ground: vec4<f32>,
+    appearance_sun: vec4<f32>,
+    appearance_fog: vec4<f32>,
+    appearance_params: vec4<f32>,
+    appearance_shadow: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneUniforms;
@@ -38,6 +44,8 @@ struct VertexOutput {
     @location(7) @interpolate(flat) opacity_controls: vec2<f32>,
     @location(8) @interpolate(flat) facet_key: vec4<f32>,
     @location(9) numeric_axis: vec3<f32>,
+    @location(10) @interpolate(flat) visual_fade: f32,
+    @location(11) local_pos: vec3<f32>,
 };
 
 struct InstanceInput {
@@ -72,6 +80,8 @@ fn vs_main(input: VertexInput, instance: InstanceInput) -> VertexOutput {
         color = vec3<f32>(0.015,0.32,1.0);
     }
     out.color = color;
+    out.visual_fade = instance.normal3.w;
+    out.local_pos = input.position;
     out.material = instance.material;
     out.emission = instance.emission.x;
     out.color_cutout = instance.emission.y;
@@ -90,6 +100,8 @@ fn vs_lines(input: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.pos = scene.view_projection * vec4<f32>(input.position, 1.0);
     out.color = input.color;
+    out.visual_fade = 1.0;
+    out.local_pos = input.position;
     out.numeric_axis = vec3<f32>(0.0);
     out.material = vec4(0.0);
     out.emission = 0.0;
@@ -128,7 +140,9 @@ fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
     }
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
-    let clip=effects.shadow_matrices[index]*vec4(world,1.0);
+    // Receiver normal offset follows the authored shadow profile; zero for legacy scenes.
+    let shadow_world=world+normal*scene.appearance_ground.w;
+    let clip=effects.shadow_matrices[index]*vec4(shadow_world,1.0);
     let ndc=clip.xyz/clip.w;
     if (clip.w<=0.0 || ndc.z<=0.0 || ndc.z>=1.0 || any(abs(ndc.xy)>vec2(1.0))) {return 1.0;}
     let uv=ndc.xy*vec2(0.5,-0.5)+vec2(0.5);
@@ -144,14 +158,57 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
     return visibility/9.0;
 }
 
-fn surface_translucent(input: VertexOutput) -> bool {
+// Keep identical in the surface and edge-glow shaders. Mesh-local cells stay
+// attached during motion; two scales make connected angular clusters, with
+// slanted fronts inside the small cells rather than whole-face popping.
+fn dissolve_hash(cell: vec3<f32>) -> f32 {
+    let seed = fract(cell * vec3<f32>(0.1031, 0.1030, 0.0973));
+    let mixed = seed + dot(seed, seed.yzx + vec3<f32>(33.33));
+    return fract((mixed.x + mixed.y) * mixed.z);
+}
+fn dissolve_field(local_pos: vec3<f32>) -> f32 {
+    let grid = local_pos * 5.0;
+    let coarse = dissolve_hash(floor(grid * 0.5));
+    let fine = dissolve_hash(floor(grid));
+    let slope = dot(fract(grid), vec3<f32>(0.43, 0.35, 0.22));
+    return 0.02 + 0.96 * (coarse * 0.58 + fine * 0.27 + slope * 0.15);
+}
+fn visual_remaining(raw: f32) -> f32 {
+    if (raw < 0.0) { return clamp(-raw - 1.0, 0.0, 1.0); }
+    return raw;
+}
+
+fn authored_surface_translucent(input: VertexOutput) -> bool {
     return input.transparency.x < 1.0 && max(max(input.color.r, input.color.g), input.color.b) < input.transparency.y;
+}
+fn surface_translucent(input: VertexOutput) -> bool {
+    return visual_remaining(input.visual_fade) < 1.0 || authored_surface_translucent(input);
 }
 fn opaque_surface(input: VertexOutput) -> vec4<f32> {
     if (surface_translucent(input)) { discard; }
-    return shade_surface(input);
+    let color=shade_surface(input);
+    return vec4(appearance_color(color.rgb,1.0/input.pos.w),color.a);
 }
 fn shade_surface(input: VertexOutput) -> vec4<f32> {
+    var rim = 0.0;
+    if (input.visual_fade < 0.0) {
+        let progress = sqrt(clamp(2.0 + input.visual_fade, 0.0, 1.0));
+        if (progress >= 1.0) { discard; }
+        if (progress > 0.0) {
+            let frontier = dissolve_field(input.local_pos) - progress;
+            if (frontier <= 0.0) { discard; }
+            rim = 1.0 - smoothstep(0.0, 0.075, frontier);
+        }
+    }
+    let surface = shade_surface_base(input);
+    if (rim <= 0.0) { return surface; }
+    let peak = max(max(input.color.r, input.color.g), input.color.b);
+    let hue = max(input.color, vec3<f32>(0.0)) / max(peak, 0.001);
+    let rim_color = mix(vec3<f32>(0.015, 0.75, 1.0), hue, 0.12);
+    let radiance = rim_color * rim * 3.5 + vec3<f32>(1.0) * pow(rim, 4.0) * 2.8;
+    return vec4<f32>(surface.rgb + radiance, surface.a);
+}
+fn shade_surface_base(input: VertexOutput) -> vec4<f32> {
     if (max(max(input.color.r, input.color.g), input.color.b) < input.color_cutout) { discard; }
     if (effects.params.z>0.5 && dot(effects.clip_plane,vec4(input.world_pos,1.0)) < -0.001) { discard; }
     // Numeric tubes radiate continuously across their smooth surface. Build the
@@ -180,7 +237,7 @@ fn shade_surface(input: VertexOutput) -> vec4<f32> {
     if (input.material.w < -0.5) { return vec4<f32>(input.color, 0.0); }
     let normal = normalize(input.world_normal);
     let view_dir = normalize(scene.camera_pos - input.world_pos);
-    var result = input.color * 0.1; // ambient
+    var result = input.color * select(vec3(0.1),appearance_ambient(normal),scene.appearance_sky.w>0.5);
 
     for (var i: u32 = 0u; i < LIGHT_COUNT; i = i + 1u) {
         let light = scene.lights[i];
@@ -188,7 +245,7 @@ fn shade_surface(input: VertexOutput) -> vec4<f32> {
             continue;
         }
         let light_delta = light.position - input.world_pos;
-        let l_dir = light_delta / max(length(light_delta), 0.00001);
+        let l_dir = select(light_delta / max(length(light_delta), 0.00001),scene.appearance_sun.xyz,scene.appearance_sky.w>0.5 && i==0u);
         let diff = max(dot(normal, l_dir), 0.0);
         // Blinn-Phong: an unlit/back-facing surface cannot reflect this light.
         var spec = 0.0;
@@ -254,7 +311,9 @@ struct PostSurface {
 
 // Straight alpha blends linear lighting into the final target (sRGB encoding is hardware-owned).
 @fragment fn fs_translucent(input: VertexOutput, @builtin(front_facing) _front: bool) -> @location(0) vec4<f32> {
-    if (!surface_translucent(input) || (input.transparency.x <= 0.0 && input.opacity_controls.x <= 0.0)) { discard; }
+    if (!surface_translucent(input) || visual_remaining(input.visual_fade) <= 0.0) { discard; }
+    let authored_translucent = authored_surface_translucent(input);
+    if (authored_translucent && input.transparency.x <= 0.0 && input.opacity_controls.x <= 0.0) { discard; }
     var surface = input;
     // LH projection reverses winding; light the inside of the rear surface too.
     surface.world_normal = select(-input.world_normal, input.world_normal, dot(input.world_normal, scene.camera_pos - input.world_pos) >= 0.0);
@@ -275,5 +334,17 @@ struct PostSurface {
         weight = smoothstep(threshold - 0.06, threshold + 0.06, facet_hash);
     }
     let alpha = clamp(input.transparency.x + (1.0 - input.transparency.x) * input.opacity_controls.x * weight, 0.0, 1.0);
-    return vec4(shade_surface(surface).rgb, alpha);
+    // Originally opaque seams keep their full authored alpha until object fade.
+    let fade_alpha = select(input.visual_fade, 1.0, input.visual_fade < 0.0);
+    let faded_alpha = select(1.0, alpha, authored_translucent) * fade_alpha;
+    var output_alpha = faded_alpha;
+    if (input.visual_fade > -2.0 && input.visual_fade < -1.0) {
+        // Glass must not hide the luminous dissolution frontier behind its
+        // authored low facet opacity; boost only this narrow surviving band.
+        let progress = sqrt(clamp(2.0 + input.visual_fade, 0.0, 1.0));
+        let frontier = dissolve_field(input.local_pos) - progress;
+        let rim = 1.0 - smoothstep(0.0, 0.075, max(frontier, 0.0));
+        output_alpha = max(output_alpha, rim * 0.95);
+    }
+    return vec4(appearance_color(shade_surface(surface).rgb,1.0/input.pos.w), output_alpha);
 }

@@ -65,6 +65,12 @@ const EFFECTS: &[EffectDescriptor] = &[
         entry_point: "fs_bloom",
         shader_source: include_str!("postprocess.wgsl"),
     },
+    // Filter the completed opaque color chain before transparent/UI overlays.
+    EffectDescriptor {
+        name: "fxaa",
+        entry_point: "fs_fxaa",
+        shader_source: include_str!("postprocess.wgsl"),
+    },
 ];
 struct Effect {
     name: &'static str,
@@ -1057,7 +1063,7 @@ impl PostProcessor {
             .map(|(index, effect)| EffectSpec {
                 index,
                 name: effect.name,
-                reads_depth: effect.name != "bloom",
+                reads_depth: !matches!(effect.name, "bloom" | "fxaa"),
                 half_trace: effect.name == "ssr" && key.1,
             })
             .collect();

@@ -12,6 +12,27 @@ pub struct InstanceData {
     pub surface_params: [f32; 4],
 }
 
+impl InstanceData {
+    /// Per-object visual fade packed into the homogeneous normal-matrix element.
+    /// Normal directions use w=0, so this never changes their transformed xyz.
+    pub fn visual_fade(&self) -> f32 {
+        let packed = self.normal_matrix[3][3];
+        if packed < 0.0 {
+            -packed - 1.0
+        } else {
+            packed
+        }
+    }
+
+    /// Fading opaque surfaces join the existing transparent overlay as well.
+    pub fn needs_translucent_overlay(&self) -> bool {
+        self.visual_fade() > 0.0
+            && (self.visual_fade() < 1.0
+                || (self.emission[2] < 1.0
+                    && (self.emission[2] > 0.0 || self.surface_params[0] > 0.0)))
+    }
+}
+
 pub(crate) struct ObjectRenderData {
     instance: InstanceData,
     center: Vec3,
@@ -290,6 +311,11 @@ impl RenderQueue {
                 MeshKind::Imported(_) => 3,
             };
             let mut instance = data.instance;
+            instance.normal_matrix[3][3] = if object.visual_dissolve {
+                -(1.0 + object.visual_fade)
+            } else {
+                object.visual_fade
+            };
             instance.emission[0] = object.emission;
             instance.emission[1] = object.color_cutout;
             instance.emission[2] = object.opacity;
@@ -327,6 +353,13 @@ impl RenderQueue {
             }
             self.visible += 1;
         }
+    }
+    /// Retained allocations are not proof of visibility in the current pass/eye.
+    pub fn visible_imported_ids(&self) -> impl Iterator<Item = &u32> {
+        self.imported
+            .iter()
+            .filter(|(_, instances)| !instances.is_empty())
+            .map(|(id, _)| id)
     }
     pub fn draw_calls(&self) -> usize {
         self.batches
@@ -740,6 +773,64 @@ mod tests {
             .intersects_aabb(Vec3::new(2.0, 0.0, 1.0), Vec3::new(2.0, 0.1, 0.1),));
     }
     #[test]
+    fn visual_fade_packing_preserves_direction_normals_and_instance_layout() {
+        let transform = Transform::new(
+            Vec3::new(3.0, -2.0, 4.0),
+            Vec3::new(0.2, 0.7, -0.3),
+            Vec3::new(-2.0, 0.5, 3.0),
+        );
+        let mut data = ObjectRenderData::new(MeshKind::Cube, transform);
+        let normal = Vec3::new(0.3, 0.7, -0.2).normalize();
+        let expected = crate::scene::normal_matrix(transform.model()).transform_vector3(normal);
+        assert_eq!(data.instance.visual_fade(), 1.0);
+        assert!(!data.instance.needs_translucent_overlay());
+        for fade in [0.75, 0.2, 0.0] {
+            data.instance.normal_matrix[3][3] = fade;
+            assert_eq!(data.instance.visual_fade(), fade);
+            assert_eq!(data.instance.needs_translucent_overlay(), fade > 0.0);
+            let transformed =
+                Mat4::from_cols_array_2d(&data.instance.normal_matrix).transform_vector3(normal);
+            assert!(transformed.abs_diff_eq(expected, 1e-6));
+        }
+        for fade in [1.0, 0.75, 0.0] {
+            data.instance.normal_matrix[3][3] = -(1.0 + fade);
+            assert_eq!(data.instance.visual_fade(), fade);
+            assert_eq!(
+                data.instance.needs_translucent_overlay(),
+                fade > 0.0 && fade < 1.0
+            );
+            let transformed =
+                Mat4::from_cols_array_2d(&data.instance.normal_matrix).transform_vector3(normal);
+            assert!(transformed.abs_diff_eq(expected, 1e-6));
+        }
+        // Existing glass alpha and coverage still control its overlay at full fade.
+        data.instance.normal_matrix[3][3] = 1.0;
+        data.instance.emission[2] = 0.06;
+        assert!(data.instance.needs_translucent_overlay());
+        data.instance.emission[2] = 0.0;
+        assert!(!data.instance.needs_translucent_overlay());
+        data.instance.surface_params[0] = 1.0;
+        assert!(data.instance.needs_translucent_overlay());
+        assert_eq!(std::mem::size_of::<InstanceData>(), 176);
+        assert_eq!(std::mem::offset_of!(InstanceData, surface_params), 160);
+    }
+
+    #[test]
+    fn extraction_defaults_visual_fade_to_one_without_changing_normals() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::new(0.0, 0.0, 2.0));
+        scene.set_object_scale(id, Vec3::new(2.0, 0.5, 1.0));
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, Mat4::IDENTITY, false);
+        let instance = &queue.batches[0][0];
+        assert_eq!(instance.visual_fade(), 1.0);
+        assert_eq!(
+            instance.normal_matrix,
+            crate::scene::normal_matrix(scene.objects()[&id].transform.model()).to_cols_array_2d()
+        );
+    }
+
+    #[test]
     fn animation_refreshes_cached_instance_and_normal_matrices() {
         let mut scene = SceneManager::default();
         let id = scene.add_cube(Vec3::new(0.0, 0.0, 2.0));
@@ -851,6 +942,48 @@ mod tests {
         scene.remove_object(id);
         q.extract(&scene, camera(), true);
         assert!(q.imported.is_empty());
+    }
+    #[test]
+    fn visible_imported_ids_exclude_retained_pass_and_view_allocations() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_imported(Vec3::new(-0.1, -0.1, 0.9), Vec3::new(0.1, 0.1, 1.1));
+        let mut queue = RenderQueue::default();
+        queue.extract(&scene, camera(), false);
+        assert_eq!(
+            queue.visible_imported_ids().copied().collect::<Vec<_>>(),
+            [id]
+        );
+        let capacity = queue.imported[&id].capacity();
+
+        // The same allocation survives a pass where this dynamic mesh is absent.
+        queue.extract_pass(&scene, camera(), false, RenderPassKind::ShadowStatic);
+        assert!(queue.imported.contains_key(&id));
+        assert_eq!(queue.imported[&id].capacity(), capacity);
+        assert_eq!(queue.visible_imported_ids().count(), 0);
+        queue.extract_pass(&scene, camera(), false, RenderPassKind::ShadowDynamic);
+        assert_eq!(
+            queue.visible_imported_ids().copied().collect::<Vec<_>>(),
+            [id]
+        );
+
+        // Independent eye queues must not inherit the other eye's visible IDs.
+        let mut other_eye = RenderQueue::default();
+        other_eye.extract(&scene, camera(), false);
+        let shifted_view = camera() * Mat4::from_translation(Vec3::new(-100.0, 0.0, 0.0));
+        queue.extract(&scene, shifted_view, true);
+        assert_eq!(queue.visible_imported_ids().count(), 0);
+        assert_eq!(
+            other_eye
+                .visible_imported_ids()
+                .copied()
+                .collect::<Vec<_>>(),
+            [id]
+        );
+        queue.extract(&scene, camera(), true);
+        assert_eq!(
+            queue.visible_imported_ids().copied().collect::<Vec<_>>(),
+            [id]
+        );
     }
     #[test]
     fn non_origin_bounds_contain_rotated_negative_scaled_corners() {

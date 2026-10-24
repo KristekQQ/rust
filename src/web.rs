@@ -17,6 +17,8 @@ thread_local! {
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
     static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static RIM: RefCell<Option<crate::rim_game::Game>> = const { RefCell::new(None) };
+    static RIM_REAL_DT: std::cell::Cell<f32> = const { std::cell::Cell::new(0.) };
     static XR_PLAYER: RefCell<crate::xr_player::XrPlayer> = RefCell::new(Default::default());
     static RESET_FRAME_CLOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static XR_ACTIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -41,6 +43,7 @@ impl Drop for Runtime {
 /// Release the frame loop, input listeners, camera and GPU scene resources.
 #[wasm_bindgen]
 pub fn dispose() {
+    RIM.with(|slot| slot.borrow_mut().take());
     crate::render::profiler::reset();
     XR_ACTIVE.with(|active| active.set(false));
     XR_PLAYER.with(|player| *player.borrow_mut() = Default::default());
@@ -435,6 +438,24 @@ pub fn set_neon_glow(strength: f32, radius: f32) -> bool {
         slot.borrow()
             .as_ref()
             .is_some_and(|state| state.borrow_mut().configure_neon_glow(strength, radius))
+    })
+}
+#[wasm_bindgen]
+pub fn set_scene_appearance(input: &str) -> Result<(), JsValue> {
+    let config: Option<crate::render_appearance::Config> =
+        serde_json::from_str(input).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let appearance = config
+        .map(crate::render_appearance::Appearance::from_config)
+        .transpose()
+        .map_err(|e| JsValue::from_str(&e))?
+        .unwrap_or_default();
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine not initialized"))?;
+        state.borrow_mut().set_appearance(appearance);
+        Ok(())
     })
 }
 #[wasm_bindgen]
@@ -976,6 +997,7 @@ pub fn resize(width: u32, height: u32) {
 
 #[wasm_bindgen]
 pub fn clear_scene() {
+    RIM.with(|slot| slot.borrow_mut().take());
     STATE.with(|s| {
         if let Some(st) = &*s.borrow() {
             let mut state = st.borrow_mut();
@@ -1898,6 +1920,52 @@ pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> boo
     ok
 }
 
+// Apply the same rig origin to platform eyes, head, hands and interaction rays.
+fn xr_world(matrix: glam::Mat4) -> glam::Mat4 {
+    RIM.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map_or(matrix, |game| game.xr_origin * matrix)
+    })
+}
+fn xr_world_array(matrix: &[f32]) -> Result<[f32; 16], JsValue> {
+    let values: &[f32; 16] = matrix
+        .try_into()
+        .map_err(|_| JsValue::from_str("Invalid XR matrix"))?;
+    let pose = glam::Mat4::from_cols_array(values);
+    if !crate::xr_input::valid_pose(pose) {
+        return Err(JsValue::from_str("Invalid XR pose"));
+    }
+    Ok(xr_world(pose).to_cols_array())
+}
+/// Raw platform input; Aurelia owns movement and simulation time.
+#[wasm_bindgen]
+pub fn rim_update_xr(
+    head: &[f32],
+    ray: &[f32],
+    axes: &[f32],
+    cancel: bool,
+    dt: f32,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) || !dt.is_finite() || dt < 0.0 {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    let pose = |matrix: &[f32]| {
+        <&[f32; 16]>::try_from(matrix)
+            .ok()
+            .map(glam::Mat4::from_cols_array)
+    };
+    let axes: [f32; 3] = axes
+        .try_into()
+        .map_err(|_| JsValue::from_str("Three movement axes required"))?;
+    RIM.with(|slot| {
+        if let Some(game) = slot.borrow_mut().as_mut() {
+            game.xr_move(pose(head), pose(ray), axes, cancel, dt);
+        }
+    });
+    Ok(())
+}
+
 fn xr_pose_state(
     pose: Option<crate::xr_player::TrackedPoseState>,
     object: Option<u32>,
@@ -1953,7 +2021,7 @@ pub fn xr_update_head(matrix: &[f32]) -> Result<(), JsValue> {
         let matrix: &[f32; 16] = matrix
             .try_into()
             .map_err(|_| JsValue::from_str("Invalid head matrix"))?;
-        Some(glam::Mat4::from_cols_array(matrix))
+        Some(xr_world(glam::Mat4::from_cols_array(matrix)))
     };
     cutting_command(|scene| XR_PLAYER.with(|player| player.borrow_mut().update_head(scene, pose)))
 }
@@ -2015,7 +2083,7 @@ pub fn xr_panel_hit(id: u32, matrix: &[f32]) -> Vec<f32> {
             return vec![];
         };
         crate::xr_buttons::ray_panel_intersection(
-            glam::Mat4::from_cols_array(matrix),
+            xr_world(glam::Mat4::from_cols_array(matrix)),
             object.transform.model(),
             panel.width,
             panel.height,
@@ -2051,10 +2119,10 @@ pub fn xr_panel_blade_hit(panel_id: u32, cutter_id: u32, from: &[f32], to: &[f32
         };
         let from = <&[f32; 16]>::try_from(from)
             .ok()
-            .map(glam::Mat4::from_cols_array);
+            .map(|matrix| xr_world(glam::Mat4::from_cols_array(matrix)));
         crate::xr_buttons::blade_panel_contact(
             from,
-            glam::Mat4::from_cols_array(to),
+            xr_world(glam::Mat4::from_cols_array(to)),
             blade,
             cutter.transform.scale,
             panel_object.transform.model(),
@@ -2079,7 +2147,7 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
         let matrix: &[f32; 16] = matrix
             .try_into()
             .map_err(|_| JsValue::from_str("Invalid grip matrix"))?;
-        Some(glam::Mat4::from_cols_array(matrix))
+        Some(xr_world(glam::Mat4::from_cols_array(matrix)))
     };
     let (dt, round_finished) = STATE.with(|slot| {
         slot.borrow().as_ref().map_or((0., false), |state| {
@@ -2216,6 +2284,11 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
             let mut state = state.borrow_mut();
             XR_PLAYER.with(|player| player.borrow_mut().reset_tracking(&mut state.scene));
         }
+        RIM.with(|slot| {
+            if let Some(game) = slot.borrow_mut().as_mut() {
+                game.set_xr(active);
+            }
+        });
         XR_ACTIVE.with(|flag| flag.set(active));
         RESET_FRAME_CLOCK.with(|reset| reset.set(true));
         Ok(())
@@ -2262,7 +2335,7 @@ pub fn xr_render_gpu_eye(
     if !XR_ACTIVE.with(|active| active.get()) {
         return Err(JsValue::from_str("Invalid XR frame"));
     }
-    let (matrix, position) = crate::render_math::xr_gpu_view(projection, world)
+    let (matrix, position) = crate::render_math::xr_gpu_view(projection, &xr_world_array(world)?)
         .ok_or_else(|| JsValue::from_str("Invalid XR matrices"))?;
     STATE.with(|slot| {
         let state = slot.borrow();
@@ -2311,7 +2384,13 @@ pub fn xr_begin_frame(dt: f32) -> Result<(), JsValue> {
         let state = state
             .as_ref()
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
-        state.borrow_mut().advance_xr(dt);
+        let scale = RIM.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .map_or(1.0, |game| if dt > 0.0 { game.sim_dt / dt } else { 1.0 })
+        });
+        RIM_REAL_DT.with(|value| value.set(dt));
+        state.borrow_mut().advance_xr(dt, scale);
         Ok(())
     })
 }
@@ -2327,7 +2406,7 @@ pub fn xr_render_eye(
     if !XR_ACTIVE.with(|active| active.get()) || width == 0 || height == 0 {
         return Err(JsValue::from_str("Invalid XR eye"));
     }
-    let (matrix, position) = crate::render_math::xr_view(projection, world)
+    let (matrix, position) = crate::render_math::xr_view(projection, &xr_world_array(world)?)
         .ok_or_else(|| JsValue::from_str("Invalid XR matrices"))?;
     STATE.with(|slot| {
         let state = slot.borrow();
@@ -2442,7 +2521,21 @@ async fn start_runtime(generation: u64) -> Result<(), JsValue> {
             cam.update_scene(&mut st.scene, dt);
             let cam_pos = cam.position();
             let cam_matrix = cam.matrix();
-            st.update(dt, cam_matrix, cam_pos);
+            let game_view = RIM.with(|slot| {
+                let mut slot = slot.borrow_mut();
+                let game = slot.as_mut()?;
+                let sim = game.tick(&mut st.scene, dt, None, [None; 2]);
+                game.playing().then(|| {
+                    let (matrix, pos) = game.camera(st.aspect);
+                    (sim, matrix, pos)
+                })
+            });
+            if let Some((sim, matrix, pos)) = game_view {
+                st.clear_model_camera();
+                st.update(sim, matrix, pos);
+            } else {
+                st.update(dt, cam_matrix, cam_pos);
+            }
 
             if let Err(error) = st.render() {
                 web_sys::console::error_1(&error);
@@ -2480,4 +2573,105 @@ async fn start_runtime(generation: u64) -> Result<(), JsValue> {
         })
     });
     Ok(())
+}
+
+// Explicit Aurelia scene configuration and input; never spawns a runtime scene.
+#[wasm_bindgen]
+pub fn configure_rim(input: &str) -> Result<(), JsValue> {
+    let config: Option<crate::rim_game::Config> =
+        serde_json::from_str(input).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    cutting_command(|scene| {
+        let game = config
+            .map(|c| crate::rim_game::Game::new(c, scene))
+            .transpose()?;
+        RIM.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            if let Some(old) = slot.as_mut() {
+                old.teardown(scene);
+            }
+            *slot = game;
+        });
+        Ok(())
+    })
+}
+#[wasm_bindgen]
+pub fn rim_input(input: &str) -> Result<(), JsValue> {
+    let input = serde_json::from_str(input).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    cutting_command(|scene| {
+        RIM.with(|slot| {
+            slot.borrow_mut()
+                .as_mut()
+                .ok_or("Aurelia is not configured")?
+                .input(input, scene)
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn rim_state() -> String {
+    RIM.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map_or("null".into(), |g| g.state().to_string())
+    })
+}
+#[wasm_bindgen]
+pub fn rim_take_cut_job() -> Result<Vec<u8>, JsValue> {
+    RIM.with(|slot| {
+        slot.borrow_mut()
+            .as_mut()
+            .map_or(Ok(Vec::new()), |g| g.take_cut_job())
+            .map_err(|e| JsValue::from_str(&e))
+    })
+}
+#[wasm_bindgen]
+pub fn rim_accept_cut(bytes: &[u8]) -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        RIM.with(|slot| {
+            slot.borrow_mut()
+                .as_mut()
+                .map_or(Ok(()), |g| g.accept_cut(scene, bytes))
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn rim_cut_failed() {
+    RIM.with(|slot| {
+        if let Some(g) = slot.borrow_mut().as_mut() {
+            g.cut_failed();
+        }
+    })
+}
+#[wasm_bindgen]
+pub fn rim_split_geometry(bytes: &[u8]) -> Result<Vec<u8>, JsValue> {
+    crate::rim_cut::split(bytes).map_err(|e| JsValue::from_str(&e))
+}
+#[wasm_bindgen]
+pub fn rim_xr_buttons(aim: bool, dash: bool) {
+    RIM.with(|slot| {
+        if let Some(g) = slot.borrow_mut().as_mut() {
+            g.xr_buttons(aim, dash);
+        }
+    })
+}
+/// Called after current platform hand/head poses and before either eye is drawn.
+#[wasm_bindgen]
+pub fn xr_prepare_gameplay() {
+    STATE.with(|slot| {
+        if let Some(state) = slot.borrow().as_ref() {
+            let mut state = state.borrow_mut();
+            RIM.with(|slot| {
+                if let Some(g) = slot.borrow_mut().as_mut() {
+                    XR_PLAYER.with(|player| {
+                        let p = player.borrow();
+                        g.tick(
+                            &mut state.scene,
+                            RIM_REAL_DT.with(|d| d.get()),
+                            p.head().map(|p| p.matrix),
+                            [p.hand(0).map(|p| p.matrix), p.hand(1).map(|p| p.matrix)],
+                        );
+                    });
+                }
+            });
+        }
+    })
 }

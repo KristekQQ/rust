@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>FXAA opaque geometry regression</title>
+<canvas id="gpu-canvas" width="256" height="192"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels, assertForeground, assertChanged} from './pixels.js';
+const canvas = document.querySelector('canvas'), result = document.querySelector('#result');
+const assert = (value, message) => { if (!value) throw Error(message); };
+window.antialiasEvidence = [];
+try {
+    const engine = await initEngine(canvas, {backend: new URLSearchParams(location.search).get('backend') || 'auto'});
+    document.documentElement.dataset.rendererBackend = engine.renderer_backend();
+    engine.set_render_effects(false, false);
+    engine.set_grid_visible(false);
+    engine.set_light_helpers_visible(false);
+    engine.set_simulation_paused(true);
+    engine.setBackgroundColor([.01, .01, .01]);
+    engine.setCameraView([0, 0, 4], [0, 0, 0]);
+    // Closed tetrahedron with a bright front face and deliberately oblique edges.
+    engine.scene.createMesh({positions: [-1, -.8, 0, 1, -.45, 0, -.6, .9, 0, 0, 0, -.1], indices: [0, 1, 2, 0, 3, 1, 1, 3, 2, 2, 3, 0], color: [1, 1, 1]}).setEmission(1);
+    const changedPixels = (a, b) => {
+        let changed = 0;
+        for (let i = 0; i < a.data.length; i += 4)
+            if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2]) > 3) changed++;
+        return changed;
+    };
+    for (const [width, height] of [[256, 192], [319, 237]]) {
+        engine.resize(width, height);
+        engine.postprocessing.disable('fxaa');
+        const raw = await capturePixels(canvas);
+        assertForeground(raw, 'Oblique opaque geometry');
+        const background = raw.data[0];
+        let peak = 0;
+        for (let i = 0; i < raw.data.length; i += 4) peak = Math.max(peak, raw.data[i]);
+        assert(peak - background > 150, 'Fixture has a sharp high-contrast silhouette');
+        const transitions = image => {
+            let count = 0;
+            for (let i = 0; i < image.data.length; i += 4)
+                if (image.data[i] > background + 8 && image.data[i] < peak - 8) count++;
+            return count;
+        };
+        engine.postprocessing.enable('fxaa', {strength: 1});
+        const smooth = await capturePixels(canvas);
+        const changed = assertChanged(raw, smooth, 'FXAA changes actual edge pixels', 20);
+        const before = transitions(raw), after = transitions(smooth);
+        assert(after > before + 20, `FXAA creates silhouette coverage transitions: ${before} -> ${after}`);
+        // Interior/background pixels with a broad uniform neighbourhood stay sharp.
+        let flat = 0;
+        for (let y = 4; y < height - 4; y += 4) for (let x = 4; x < width - 4; x += 4) {
+            const at = (px, py) => (py * width + px) * 4;
+            const index = at(x, y), reference = raw.data[index];
+            let uniform = true;
+            for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++)
+                if (Math.abs(raw.data[at(x + dx, y + dy)] - reference) > 1) uniform = false;
+            if (!uniform) continue;
+            flat++;
+            for (let channel = 0; channel < 4; channel++)
+                assert(Math.abs(raw.data[index + channel] - smooth.data[index + channel]) <= 1, 'FXAA preserves flat color and opaque alpha');
+        }
+        assert(flat > 500, 'Flat-color preservation covers image interior and background');
+        const graph = engine.postprocessing.graph();
+        assert(graph.passes.at(-1) === 'fxaa.compose', 'FXAA is the final color effect');
+        engine.postprocessing.enable('bloom', {strength: .1});
+        await capturePixels(canvas);
+        const chain = engine.postprocessing.graph().passes;
+        assert(chain.indexOf('bloom.compose') < chain.indexOf('fxaa.compose'), 'FXAA follows bloom');
+        engine.postprocessing.disable('bloom');
+        engine.postprocessing.disable('fxaa');
+        const disabled = await capturePixels(canvas);
+        assert(changedPixels(raw, disabled) === 0, 'Disabling FXAA restores baseline pixels');
+        engine.postprocessing.enable('fxaa', {strength: 1});
+        assert(changedPixels(smooth, await capturePixels(canvas)) === 0, 'Re-enabling FXAA restores filtered pixels');
+        window.antialiasEvidence.push({width, height, changed, transitionsBefore: before, transitionsAfter: after, flatPixels: flat});
+    }
+    result.textContent = 'PASS: FXAA smooths actual oblique opaque edges, preserves flat colors/alpha, orders after bloom, survives enable/disable and resize. Transparency/glow/UI are rendered after FXAA.';
+} catch (error) { result.textContent = `FAIL: ${error.stack ?? error}`; console.error(error); }
+</script></html>

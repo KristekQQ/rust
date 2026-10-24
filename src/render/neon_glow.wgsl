@@ -10,7 +10,9 @@ struct VertexOutput {
     @location(0) @interpolate(flat) endpoints: vec4<f32>,
     @location(1) @interpolate(flat) color_radius: vec4<f32>,
     @location(2) coord: vec2<f32>,
-    @location(3) @interpolate(flat) depths: vec2<f32>,
+    @location(3) @interpolate(flat) depths: vec4<f32>,
+    @location(4) @interpolate(flat) local_a_fade: vec4<f32>,
+    @location(5) @interpolate(flat) local_b: vec3<f32>,
 };
 
 @vertex fn vs_main(
@@ -22,6 +24,7 @@ struct VertexOutput {
     @location(4) model1: vec4<f32>,
     @location(5) model2: vec4<f32>,
     @location(6) model3: vec4<f32>,
+    @location(10) normal3: vec4<f32>,
     @location(11) material: vec4<f32>,
     @location(12) emission: vec4<f32>,
     @location(13) surface_params: vec4<f32>,
@@ -32,12 +35,14 @@ struct VertexOutput {
     out.endpoints = vec4<f32>(0.0);
     out.color_radius = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     out.coord = vec2<f32>(0.0);
-    out.depths = vec2<f32>(0.0);
+    out.depths = vec4<f32>(0.0);
+    out.local_a_fade = vec4<f32>(edge_a, normal3.w);
+    out.local_b = edge_b;
     let model = mat4x4<f32>(model0, model1, model2, model3);
     let a = glow.view_projection * model * vec4<f32>(edge_a, 1.0);
     let b = glow.view_projection * model * vec4<f32>(edge_b, 1.0);
     let peak = max(max(color.r, color.g), color.b);
-    if a.w <= 0.01 || b.w <= 0.01 || emission.x <= 0.0 || peak < emission.y { return out; }
+    if a.w <= 0.01 || b.w <= 0.01 || emission.x <= 0.0 || visual_remaining(normal3.w) <= 0.0 || peak < emission.y { return out; }
     let viewport = glow.params.xy;
     let screen_scale = viewport * vec2<f32>(0.5, -0.5);
     let pa = (a.xy / a.w) * screen_scale + viewport * 0.5;
@@ -71,7 +76,7 @@ struct VertexOutput {
     let pixel = mix(pa, pb, t) + tangent * corner.x * radius + side * corner.y * radius;
     // Interpolate viewport-local pixels instead of reading absolute fragment position.
     out.coord = pixel;
-    out.depths = vec2<f32>(a.z/a.w,b.z/b.w);
+    out.depths = vec4<f32>(a.z/a.w,b.z/b.w,1.0/a.w,1.0/b.w);
     // NDC depth varies linearly in screen space, including clamped capsule endcaps.
     let depth_t = clamp(dot(pixel - pa, tangent) / length_px, 0.0, 1.0);
     out.position = vec4<f32>((pixel - viewport * 0.5) / screen_scale, mix(a.z / a.w, b.z / b.w, depth_t), 1.0);
@@ -80,9 +85,30 @@ struct VertexOutput {
     let hue = max(color, vec3<f32>(0.0)) / max(peak, 1.0);
     // A bright tube profile must be visible along the whole edge, even at low
     // scene emission; max-compositing prevents this energy accumulating at joins.
-    let energy = sqrt(min(emission.x, 8.0)) * glow.params.z * 0.65 * text_energy;
+    let fade_energy = select(normal3.w, 1.0, normal3.w < 0.0);
+    let energy = sqrt(min(emission.x, 8.0)) * glow.params.z * 0.65 * text_energy * fade_energy;
     out.color_radius = vec4<f32>(hue * energy, radius);
     return out;
+}
+
+// Keep identical in the surface and edge-glow shaders. Mesh-local cells stay
+// attached during motion; two scales make connected angular clusters, with
+// slanted fronts inside the small cells rather than whole-face popping.
+fn dissolve_hash(cell: vec3<f32>) -> f32 {
+    let seed = fract(cell * vec3<f32>(0.1031, 0.1030, 0.0973));
+    let mixed = seed + dot(seed, seed.yzx + vec3<f32>(33.33));
+    return fract((mixed.x + mixed.y) * mixed.z);
+}
+fn dissolve_field(local_pos: vec3<f32>) -> f32 {
+    let grid = local_pos * 5.0;
+    let coarse = dissolve_hash(floor(grid * 0.5));
+    let fine = dissolve_hash(floor(grid));
+    let slope = dot(fract(grid), vec3<f32>(0.43, 0.35, 0.22));
+    return 0.02 + 0.96 * (coarse * 0.58 + fine * 0.27 + slope * 0.15);
+}
+fn visual_remaining(raw: f32) -> f32 {
+    if (raw < 0.0) { return clamp(-raw - 1.0, 0.0, 1.0); }
+    return raw;
 }
 
 struct FragmentOutput {
@@ -95,6 +121,17 @@ struct FragmentOutput {
     let t = clamp(dot(input.coord - a, delta) / max(dot(delta, delta), 0.000001), 0.0, 1.0);
     let d = length(input.coord - (a + delta * t)) / input.color_radius.w;
     if d >= 1.0 { discard; }
+    if (input.local_a_fade.w < 0.0) {
+        let progress = sqrt(clamp(2.0 + input.local_a_fade.w, 0.0, 1.0));
+        if (progress >= 1.0) { discard; }
+        if (progress > 0.0) {
+            // The closest screen point maps perspective-correctly onto the
+            // local edge; the same surface field cuts the entire halo capsule.
+            let local_t = t * input.depths.w / max(mix(input.depths.z, input.depths.w, t), 0.000001);
+            let local_pos = mix(input.local_a_fade.xyz, input.local_b, local_t);
+            if (dissolve_field(local_pos) <= progress) { discard; }
+        }
+    }
     // Narrow luminous tube + a broad colored skirt. Their union stays equally
     // bright at a line midpoint and at a vertex shared by several strokes.
     let falloff = (0.65 * exp(-40.0*d*d) + 0.35 * exp(-4.0*d*d))

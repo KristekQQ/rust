@@ -139,8 +139,8 @@ impl Effects {
         let comparison = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("shadow PCF sampler"),
             compare: Some(wgpu::CompareFunction::LessEqual),
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -243,12 +243,19 @@ impl Effects {
         self.last_uniform = value;
         std::mem::size_of::<EffectsUniforms>()
     }
-    pub fn ensure(&mut self, device: &wgpu::Device, width: u32, height: u32, light_count: usize) {
+    pub fn ensure(
+        &mut self,
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+        light_count: usize,
+        shadow_size: u32,
+    ) {
         let mut changed = false;
         for i in 0..light_count {
-            if self.shadows && self.static_shadow[i].size != 1024 {
-                self.static_shadow[i] = DepthTarget::new(device, "static shadows", 1024);
-                self.dynamic_shadow[i] = DepthTarget::new(device, "dynamic shadows", 1024);
+            if self.shadows && self.static_shadow[i].size != shadow_size {
+                self.static_shadow[i] = DepthTarget::new(device, "static shadows", shadow_size);
+                self.dynamic_shadow[i] = DepthTarget::new(device, "dynamic shadows", shadow_size);
                 self.static_key[i] = None;
                 self.dynamic_key[i] = None;
                 changed = true;
@@ -303,7 +310,17 @@ impl Effects {
         target: &RenderTarget<'_>,
     ) -> Result<wgpu::CommandBuffer, String> {
         let light_count = renderer.scene.lights().len().min(MAX_LIGHTS);
-        self.ensure(&renderer.device, target.width, target.height, light_count);
+        self.ensure(
+            &renderer.device,
+            target.width,
+            target.height,
+            light_count,
+            if renderer.appearance.enabled() {
+                2048
+            } else {
+                1024
+            },
+        );
         let mut lights = [super::data::EMPTY_LIGHT; MAX_LIGHTS];
         for (dst, light) in lights.iter_mut().zip(renderer.scene.lights().values()) {
             *dst = Light {
@@ -317,8 +334,13 @@ impl Effects {
         self.stats.shadow_light_count = shadow_count;
         let mut shadow_matrices = [Mat4::IDENTITY; MAX_LIGHTS];
         for i in 0..shadow_count {
-            shadow_matrices[i] =
-                crate::render_math::shadow_view_projection(Vec3::from_array(lights[i].position));
+            shadow_matrices[i] = if i == 0 && renderer.appearance.enabled() {
+                renderer
+                    .appearance
+                    .shadow_matrix(Vec3::from_array(lights[i].position))
+            } else {
+                crate::render_math::shadow_view_projection(Vec3::from_array(lights[i].position))
+            };
             for pass in [RenderPassKind::ShadowStatic, RenderPassKind::ShadowDynamic] {
                 let key = (
                     shadow_matrices[i],
