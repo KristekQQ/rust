@@ -1,0 +1,16 @@
+<!doctype html><html><meta charset="utf-8"><canvas id="gpu-canvas" width="960" height="640"></canvas><script type="module">
+import {initEngine} from '/js/engine.js';
+const q=new URLSearchParams(location.search), kind=q.get('kind');
+const engine=await initEngine(document.querySelector('canvas'),{backend:q.get('backend')==='webgl'?'webgl':'auto',profiling:q.get('profile')!=='0'});
+engine.resize(960,640);engine.set_camera_mode('free');engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.setCameraView([0,2,9],[0,0,0]);
+engine.scene.createLight({position:[-3,6,5],color:[15,15,15]});
+const paths={rigid:'/assets/models/damaged-helmet/DamagedHelmet.glb',skin:'/assets/models/fox/Fox.glb',morph:'/tests/fixtures/gltf/full/full.gltf'};
+const models=[];for(let i=0;i<(kind==='morph'?1:6);i++){
+const m=await engine.scene.loadModel(paths[kind]);m.setPosition([(i%3-1)*2.7,Math.floor(i/3)*2-1,0]);
+if(kind==='skin')m.setScale([.017,.017,.017]).playAnimation('Walk').pauseAnimation();models.push(m);
+}
+let moving=false,frame=0;
+function pose(t){for(let i=0;i<models.length;i++){const m=models[i];if(kind==='rigid')m.setRotation([.12*Math.sin(t),t+i*.12,0]);if(kind==='skin')m.seekAnimation(t%.7);if(kind==='morph')for(let j=0;j<3;j++)m.setMorphWeights(j,[(Math.sin(t)+1)*.5]);}}
+function tick(){if(moving)pose((frame++%240)/120);requestAnimationFrame(tick)}requestAnimationFrame(tick);
+window.bench={engine,models,kind,start(){frame=0;moving=true;},stop(){moving=false;pose(.3);}};bench.stop();
+</script></html>

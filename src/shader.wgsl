@@ -116,7 +116,7 @@ fn vs_lines(input: VertexInput) -> VertexOutput {
 
 struct EffectsUniforms {
     shadow_matrices:array<mat4x4<f32>,4>, reflection_matrix:mat4x4<f32>,
-    clip_plane:vec4<f32>, params:vec4<f32>,
+    clip_plane:vec4<f32>, params:vec4<f32>, shadow_layers:vec4<u32>,
 };
 @group(1) @binding(0) var<uniform> effects:EffectsUniforms;
 @group(1) @binding(1) var static_shadow:texture_depth_2d;
@@ -131,15 +131,33 @@ struct EffectsUniforms {
 @group(1) @binding(10) var static_shadow_3:texture_depth_2d;
 @group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
 fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
+    let layers=effects.shadow_layers[index];
+    var visibility=1.0;
+    // Uniform branches skip only maps known to contain no casters. Preserve
+    // per-texel min(static,dynamic) before the unchanged 3x3 PCF filter.
     switch index {
-        case 0u: { return min(textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
-        case 1u: { return min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
-        case 2u: { return min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
-        case 3u: { return min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
-        default: { return 1.0; }
+        case 0u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
+        }
+        case 1u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
+        }
+        case 2u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
+        }
+        case 3u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
+        }
+        default: {}
     }
+    return visibility;
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
+    if(effects.shadow_layers[index]==0u) { return 1.0; }
     // Receiver normal offset follows the authored shadow profile; zero for legacy scenes.
     let shadow_world=world+normal*scene.appearance_ground.w;
     let clip=effects.shadow_matrices[index]*vec4(shadow_world,1.0);

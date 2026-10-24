@@ -372,20 +372,35 @@ impl Effects {
                 } else {
                     &self.dynamic_shadow[i]
                 };
-                renderer.draw_depth(&map.target())?;
                 let visible = renderer.pass_visible();
+                let previous_visible = if pass == RenderPassKind::ShadowStatic {
+                    self.stats.static_visible_by_light[i]
+                } else {
+                    self.stats.dynamic_visible_by_light[i]
+                };
+                // A valid empty map remains fully lit regardless of scene/light
+                // motion. Clear once on allocation or when the last caster leaves;
+                // never resubmit empty clears for unrelated non-caster animation.
+                let render_map = previous.is_none() || visible != 0 || previous_visible != 0;
+                if render_map {
+                    renderer.draw_depth(&map.target())?;
+                    self.stats.passes += 1;
+                }
                 if pass == RenderPassKind::ShadowStatic {
                     self.static_key[i] = Some(key);
-                    self.stats.static_updates += 1;
-                    self.stats.static_updates_by_light[i] += 1;
+                    if render_map {
+                        self.stats.static_updates += 1;
+                        self.stats.static_updates_by_light[i] += 1;
+                    }
                     self.stats.static_visible_by_light[i] = visible;
                 } else {
                     self.dynamic_key[i] = Some(key);
-                    self.stats.dynamic_updates += 1;
-                    self.stats.dynamic_updates_by_light[i] += 1;
+                    if render_map {
+                        self.stats.dynamic_updates += 1;
+                        self.stats.dynamic_updates_by_light[i] += 1;
+                    }
                     self.stats.dynamic_visible_by_light[i] = visible;
                 }
-                self.stats.passes += 1;
             }
         }
         self.stats.static_visible = self.stats.static_visible_by_light[..shadow_count]
@@ -399,6 +414,10 @@ impl Effects {
             ..Default::default()
         };
         uniforms.params[0] = shadow_count as f32;
+        for i in 0..shadow_count {
+            uniforms.shadow_layers[i] = u32::from(self.stats.static_visible_by_light[i] != 0)
+                | (u32::from(self.stats.dynamic_visible_by_light[i] != 0) << 1);
+        }
         if let Some(plane) = renderer.scene.mirror_plane().filter(|_| {
             self.reflections
                 && renderer

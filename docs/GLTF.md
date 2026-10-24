@@ -16,6 +16,42 @@ model.stopAnimation(); // výchozí póza souboru
 console.log(model.info); // snímek metadat a přehrávání z Rustu
 ```
 
+## Shared instances and GPU deformation
+
+`model.createInstance()` creates a new default pose/root from the same immutable
+Rust asset. It does not copy the source transform, animation playback or physics.
+Configure each instance normally; removing the source does not invalidate its
+instances. Calling it on a removed/disposed handle fails. Repeated `loadModel()`
+calls are separate imports; use `createInstance()` to share geometry/materials.
+
+```js
+const second = model.createInstance();
+second.setPosition([2, 0, 0]).playAnimation('Run');
+```
+
+Rigid primitives keep immutable local-space GPU vertices and upload only changed
+model/normal uniforms. Skinned primitives use a GPU palette on both backends when
+there are at most 128 joints, at most 8 nonzero ordered influences per vertex,
+no morph targets, and the actual device supports the required 13 attributes and
+8 KiB vertex uniform binding. No influence truncation or renormalization occurs.
+Other cases retain exact CPU deformation. Normal inverse-transpose is computed
+from the weighted skin matrix; tangents, mirrored winding and singular handling
+retain the CPU contract. Exact affine vertex means preserve transparency sorting.
+
+Material/geometry sharing is keyed by live `Arc<ModelAsset>` identity. The weak
+cache owns no orphaned assets; the last model releases shared resources. Each
+instance keeps its own pose, palette and draw uniforms. This is resource sharing,
+not glTF draw instancing; compatible built-in/triangle instances continue to use
+the engine's existing instancing paths.
+
+Animated render bounds use cached conservative per-joint/rigid bounds with
+outward rounding. Morphs and unsafe/unsupported weights/transforms fall back to
+exact deformation. Public CPU `model_bounds` and cutting geometry remain exact.
+`debugStats().gltf` exposes cumulative uploads/deformed vertices/state changes and
+live resource counts; `frameProfile()` adds `gltf.animation`, `gltf.bounds`,
+`gltf.update` and fallback `gltf.deform` CPU scopes. Scopes can nest; do not sum
+nested scopes as frame time. Physical Quest performance must be measured separately.
+
 ## Import a materiály
 
 `.gltf` a `.glb` mohou obsahovat externí buffery, relativní PNG/JPEG, data URI i vložené bufferView obrázky. URI se řeší vůči finální URL modelu po přesměrování. SDK načítá zdroje postupně; celkový přenos je omezen na 128 MiB. `scene.clear()` zneplatní čekající importy a zruší jejich stahování i čtení streamů. Chyba importu nepřidá částečný model do scény.
@@ -32,7 +68,7 @@ texelům; normálová mapa zachovává přesně hodnotu 128/255, ne aproximaci 0
 OPAQUE hlavní průchod bez clip roviny neobsahuje dosažitelný `discard`. MASK,
 BLEND, stíny a průchody s clip rovinou zachovávají původní testy. `clipped` je
 samostatný klíč, nezaměňovat s obráceným windingem (`reflected`). Shader moduly
-vznikají líně a sdílejí se mezi pipeline (nejvýše 32 × 3 tříd); nemění se každý frame.
+vznikají líně a sdílejí se mezi pipeline (nejvýše 32 × 3 × 2 tříd včetně rigidní/skinning varianty); nemění se každý frame.
 Ověření zahrnuje `gltf-full`, `gltf-sdk`, `gltf-material-cache` a `render-mirrored` na obou
 backendech. Změna kompilace může mírně změnit zaokrouhlení odlesků; pixelová
 shoda není zaručena. Desktop čas neprokazuje zrychlení na Questu.
@@ -43,7 +79,7 @@ Každý model má jedno ID scény a uvnitř Rustu vlastní strom uzlů, mesh pri
 
 `playAnimation(indexOrName, {loop, speed})`, `pauseAnimation(bool)`, `seekAnimation(seconds)` a `stopAnimation()` řídí jeden aktivní klip modelu. Smíchávání více klipů není součástí současného API. Rust aktualizuje animace jednou za frame, bez JS animační smyčky. Změněná póza obnoví bounds i statickou stínovou cache; označení `isStatic` animaci nezamyká.
 
-První portable implementace deformuje vrcholy v Rustu na CPU a uploaduje je jen při změně pózy či kořenové transformace. Stejné buffery pak používá hlavní pohled, odraz i stíny. Statický model se každý frame znovu nedeformuje. Mnoho animovaných postav bude vyžadovat další optimalizaci GPU skinningu; tato verze neslibuje maximální výkon davových scén.
+Rigid transforms and eligible skinning use the GPU paths described above. Morph/unsupported deformation keeps the portable CPU fallback and uploads only changed poses. Main, reflection and shadow passes share the same geometry and pose resources; immutable models are not reuploaded each frame.
 
 `model.setMorphWeights(nodeIndex, weights)` nastaví váhy bez spuštění klipu. `model.selectScene(index)` přepne glTF scénu. `model.useCamera(nodeIndex)` explicitně zapne perspektivní nebo ortografickou kameru modelu (včetně perspektivy bez zfar). `engine.setCameraView()` nebo `set_camera_mode()` vrátí ovládání běžné kameře. Dostupné uzly, scény a klipy jsou v `model.info`.
 

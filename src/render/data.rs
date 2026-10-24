@@ -431,13 +431,14 @@ mod tests {
     }
     #[test]
     fn effects_uniform_layout_matches_wgsl() {
-        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 352);
+        assert_eq!(std::mem::size_of::<EffectsUniforms>(), 368);
         assert_eq!(
             std::mem::offset_of!(EffectsUniforms, reflection_matrix),
             256
         );
         assert_eq!(std::mem::offset_of!(EffectsUniforms, clip_plane), 320);
         assert_eq!(std::mem::offset_of!(EffectsUniforms, params), 336);
+        assert_eq!(std::mem::offset_of!(EffectsUniforms, shadow_layers), 352);
     }
     #[test]
     fn instance_material_layout_matches_shader() {
@@ -489,6 +490,8 @@ pub struct EffectsUniforms {
     pub reflection_matrix: [[f32; 4]; 4],
     pub clip_plane: [f32; 4],
     pub params: [f32; 4],
+    /// Per-light bit mask: static=1, dynamic=2. Empty maps are fully lit.
+    pub shadow_layers: [u32; MAX_LIGHTS],
 }
 impl Default for EffectsUniforms {
     fn default() -> Self {
@@ -497,6 +500,7 @@ impl Default for EffectsUniforms {
             reflection_matrix: glam::Mat4::IDENTITY.to_cols_array_2d(),
             clip_plane: [0.0; 4],
             params: [0.0, 0.0, 0.0, 0.00005],
+            shadow_layers: [0; MAX_LIGHTS],
         }
     }
 }

@@ -281,8 +281,9 @@ pub fn stats() -> serde_json::Value {
             let history = &history.samples;
             let mut sorted: Vec<_> = history.iter().copied().collect();
             sorted.sort_by(f64::total_cmp);
+            let p99 = sorted[((sorted.len() as f64 * 0.99).ceil() as usize).saturating_sub(1)];
             let p95 = sorted[((sorted.len() as f64 * 0.95).ceil() as usize).saturating_sub(1)];
-            (label, serde_json::json!({"lastMs":history.back(),"meanMs":history.iter().sum::<f64>() / history.len() as f64,"p95Ms":p95,"samples":history.len()}))
+            (label, serde_json::json!({"lastMs":history.back(),"meanMs":history.iter().sum::<f64>() / history.len() as f64,"p95Ms":p95,"p99Ms":p99,"maxMs":sorted.last(),"samples":history.len()}))
         }).collect();
         serde_json::json!({
             "enabled":true,"frame":c.frame,"cpu":cpu,

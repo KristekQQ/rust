@@ -11,6 +11,7 @@ pub mod debug_overlay;
 pub mod frame_graph;
 pub mod frame_metrics;
 pub mod gltf_animation;
+mod gltf_bounds;
 pub mod gltf_loader;
 pub mod gltf_model;
 pub mod info_panel;

@@ -1,0 +1,61 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>GPU glTF transforms and CPU parity</title>
+<canvas id="gpu-canvas" width="640" height="480"></canvas><pre id="result">RUNNING…</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground} from './pixels.js';
+const result=document.querySelector('#result'),canvas=document.querySelector('canvas');
+const assert=(ok,message)=>{if(!ok)throw Error(message)};
+// A zero-weight morph target forces the exact CPU deformation fallback without
+// changing any vertex, material, skin, animation or camera in the reference.
+function cpuReference(bytes,influenceSets=1,forceCPU=true){
+ const d=new DataView(bytes),jl=d.getUint32(12,true),json=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,20,jl))),bo=20+jl,bl=d.getUint32(bo,true),binary=new Uint8Array(bytes,bo+8,bl);
+ const additions=[];let size=binary.length;
+ for(const mesh of json.meshes)for(const p of mesh.primitives){for(let set=1;set<influenceSets;set++){p.attributes['JOINTS_'+set]=p.attributes.JOINTS_0;p.attributes['WEIGHTS_'+set]=p.attributes.WEIGHTS_0;}if(!forceCPU||p.targets?.length)continue;const count=json.accessors[p.attributes.POSITION].count;const view=json.bufferViews.length;json.bufferViews.push({buffer:0,byteOffset:size,byteLength:count*12});const accessor=json.accessors.length;json.accessors.push({bufferView:view,componentType:5126,count,type:'VEC3',min:[0,0,0],max:[0,0,0]});p.targets=[{POSITION:accessor}];additions.push(new Uint8Array(count*12));size+=count*12;}
+ json.buffers[0].byteLength=size;let text=new TextEncoder().encode(JSON.stringify(json));const padded=(text.length+3)&~3,binSize=(size+3)&~3,out=new ArrayBuffer(28+padded+binSize),v=new DataView(out),u=new Uint8Array(out);v.setUint32(0,0x46546c67,true);v.setUint32(4,2,true);v.setUint32(8,out.byteLength,true);v.setUint32(12,padded,true);v.setUint32(16,0x4e4f534a,true);u.fill(32,20,20+padded);u.set(text,20);v.setUint32(20+padded,binSize,true);v.setUint32(24+padded,0x004e4942,true);let off=28+padded;u.set(binary,off);off+=binary.length;for(const a of additions){u.set(a,off);off+=a.length;}return out;
+}
+function difference(a,b){let sum=0,changed=0,max=0;for(let i=0;i<a.data.length;i+=4){let delta=0;for(let j=0;j<3;j++){const d=Math.abs(a.data[i+j]-b.data[i+j]);sum+=d;delta+=d;max=Math.max(max,d);}if(delta>24)changed++;}return{mean:sum/(a.width*a.height*3),changedFraction:changed/(a.width*a.height),max};}
+window.gltfGpuEvidence=[];
+try{
+ const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto',profiling:true});document.documentElement.dataset.rendererBackend=engine.renderer_backend();engine.resize(640,480);engine.set_camera_mode('free');engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_simulation_paused(true);
+ for(const kind of ['rigid','skin','skin8','skin12']){
+  const isSkin=kind.startsWith('skin');
+  const path=isSkin?'../assets/models/fox/Fox.glb':'../assets/models/damaged-helmet/DamagedHelmet.glb',original=await(await fetch(path)).arrayBuffer();
+  const bytes=kind==='skin8'?cpuReference(original,2,false):kind==='skin12'?cpuReference(original,3,false):original;
+  const candidate=URL.createObjectURL(new Blob([bytes],{type:'model/gltf-binary'}));
+  const reference=URL.createObjectURL(new Blob([cpuReference(bytes)],{type:'model/gltf-binary'}));
+  const captured=[];
+  for(const [index,url]of [candidate,reference].entries()){
+   engine.scene.clear();engine.scene.createLight({position:[-3,6,5],color:[12,12,12]});
+   engine.setCameraView(isSkin?[3,2,5]:[0,0,4],isSkin?[0,1,0]:[0,0,0]);
+   const model=await engine.scene.loadModel(url);if(isSkin)model.playAnimation('Walk').pauseAnimation();
+   const images=[];const before=engine.debugStats().gltf;
+   for(let pose=0;pose<3;pose++){
+    const s=isSkin?.025:1;model.setScale([(pose===1?-1:1)*s,s*(pose===2?1.4:1),s*.8]).setRotation([.1,pose*.17,0]);if(isSkin)model.seekAnimation(pose*.23);
+    const image=await capturePixels(canvas);assertForeground(image,`${kind} ${index}/${pose}`);images.push(image);
+   }
+   const after=engine.debugStats().gltf;
+   if(index===0&&kind!=='skin12'){assert(after.cpuDeformedVertices===before.cpuDeformedVertices,`${kind}: supported transform still uploads CPU-deformed geometry`);assert(after.rigidUploadBytes===before.rigidUploadBytes,`${kind}: immutable geometry reuploaded`);}
+   if(index===1||kind==='skin12')assert(after.cpuDeformedVertices>before.cpuDeformedVertices,`${kind}: reference did not exercise CPU fallback`);
+   captured.push(images);
+  }
+  URL.revokeObjectURL(reference);URL.revokeObjectURL(candidate);
+  for(let pose=0;pose<3;pose++){const delta=difference(captured[0][pose],captured[1][pose]);gltfGpuEvidence.push({kind,pose,...delta});assert(delta.mean<1&&delta.changedFraction<.005,`${kind}/${pose}: GPU/CPU pixel mismatch ${JSON.stringify(delta)}`);}
+ }
+ engine.scene.clear();
+ const source=await engine.scene.loadModel('../assets/models/fox/Fox.glb');
+ const sharedBefore=engine.debugStats().gltf;
+ const copies=[source.createInstance(),source.createInstance()];
+ const sharedAfter=engine.debugStats().gltf;
+ assert(sharedAfter.geometryResources===sharedBefore.geometryResources&&sharedAfter.materialResources===sharedBefore.materialResources,'Instances duplicated immutable resources');
+ assert(sharedAfter.geometryCacheHits>sharedBefore.geometryCacheHits&&sharedAfter.materialCacheHits>sharedBefore.materialCacheHits,'Instances missed same-asset cache');
+ copies[0].setScale([.025,.025,.025]).playAnimation('Walk').pauseAnimation().seekAnimation(.2);
+ copies[1].setScale([.025,.025,.025]).setPosition([2,0,0]).playAnimation('Run').pauseAnimation().seekAnimation(.4);
+ assert(copies[0].info.playback.time!==copies[1].info.playback.time,'Instance poses are not independent');
+ source.remove();await capturePixels(canvas);
+ assert(copies.every(m=>m.exists),'Removing source destroyed instances');
+ let rejected=false;try{source.createInstance()}catch{rejected=true}assert(rejected,'Removed source can still instantiate');
+ for(const model of copies)model.remove();
+ engine.scene.clear();await capturePixels(canvas);const empty=engine.debugStats().gltf;assert(empty.geometryResources===0&&empty.materialResources===0&&empty.cachedAssets===0,'Last instance removal must release shared GPU resources');
+ result.textContent=`PASS: rigid + skin GPU/CPU pixels, negative/nonuniform transforms, immutable uploads, morph fallback and resource cleanup. ${JSON.stringify(gltfGpuEvidence)}`;
+}catch(error){result.textContent=`FAIL: ${error.stack??error}`;console.error(error);}
+</script></html>

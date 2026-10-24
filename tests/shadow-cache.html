@@ -50,8 +50,19 @@ try {
     const moved = engine.effects_stats();
     if (moved.staticUpdates - after.staticUpdates !== 3) throw Error('Actual caster movement did not refresh three shadow maps');
     assertChanged(firstPixels, snapshot(), 'Static caster movement');
+    // Moving real non-casters must not repeatedly clear an already empty map.
+    const emptyDynamic = moved.dynamicUpdates;
+    for (let i=0;i<8;i++) { marker.setPosition([i, -10000, 0]); await frame(); }
+    if(engine.effects_stats().dynamicUpdates!==emptyDynamic)throw Error('Non-caster motion redraws an empty dynamic map');
+    const dynamic=engine.scene.createCube([-1,0,0]).setRenderOptions({isStatic:false,castsShadow:true});
+    await frame();const occupied=engine.effects_stats();
+    if(occupied.dynamicUpdates-emptyDynamic!==3)throw Error('New dynamic caster must redraw every light');
+    dynamic.remove();await frame();const cleared=engine.effects_stats();
+    if(cleared.dynamicUpdates-occupied.dynamicUpdates!==3)throw Error('Last caster removal must clear stale shadows');
+    for(let i=0;i<5;i++){marker.setPosition([-i,-10000,0]);await frame();}
+    if(engine.effects_stats().dynamicUpdates!==cleared.dynamicUpdates)throw Error('Cleared shadow maps were resubmitted');
     window.shadowCacheEvidence = {before, after, moved, noopStaticUpdates, movedStaticUpdates: moved.staticUpdates - after.staticUpdates};
-    document.querySelector('#result').textContent = 'PASS: 20 identical marker commands reuse shadows; moving the caster refreshes three maps and actual pixels';
+    document.querySelector('#result').textContent = 'PASS: static cache, empty dynamic-map reuse, new/removed casters, actual pixels';
 } catch (error) {
     document.querySelector('#result').textContent = 'FAIL: ' + error.stack;
     console.error(error);

@@ -1239,6 +1239,7 @@ impl SceneRenderer {
         stats
     }
     pub fn debug_values(&self) -> serde_json::Value {
+        let gltf = self.gltf_gpu.stats();
         let stats = self.render_stats();
         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
         serde_json::json!({
@@ -1277,6 +1278,21 @@ impl SceneRenderer {
                 "misses": self.main_cache_misses,
                 "instanceUploadBytes": self.main_instance_upload_bytes,
                 "slots": 1 + self.passes.len() - BASE_PASS_CACHE_COUNT,
+            },
+            "gltf": {
+                "cpuDeformedVertices": gltf.cpu_deformed_vertices,
+                "rigidUploadBytes": gltf.rigid_upload_bytes,
+                "uniformUploadBytes": gltf.uniform_upload_bytes,
+                "skinUploadBytes": gltf.skin_upload_bytes,
+                "skinPaletteUploadBytes": gltf.skin_palette_upload_bytes,
+                "drawCalls": gltf.draw_calls,
+                "pipelineChanges": gltf.pipeline_changes,
+                "bindGroupChanges": gltf.bind_group_changes,
+                "geometryCacheHits": gltf.geometry_cache_hits,
+                "materialCacheHits": gltf.material_cache_hits,
+                "geometryResources": gltf.geometry_resources,
+                "materialResources": gltf.material_resources,
+                "cachedAssets": gltf.cached_assets,
             },
             "instanceUploadPages": self.passes.iter().map(|cache| cache.imported.pages.len()).sum::<usize>(),
             "fps": stats[6], "frameMs": stats[7], "cpuMs": stats[5],

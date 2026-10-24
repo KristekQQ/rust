@@ -705,7 +705,7 @@ impl SceneManager {
         asset: std::sync::Arc<crate::gltf_model::ModelAsset>,
     ) -> Result<u32, String> {
         let model = crate::gltf_model::ModelInstance::new(asset, None)?;
-        let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose)?;
+        let (min, max) = model.render_bounds()?;
         let id = self.add_imported(min, max);
         if id == INVALID_ID {
             return Err("Cannot allocate model root".into());
@@ -718,7 +718,7 @@ impl SceneManager {
         id: u32,
         model: crate::gltf_model::ModelInstance,
     ) -> Result<(), String> {
-        let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose)?;
+        let (min, max) = model.render_bounds()?;
         let object = self
             .objects
             .get_mut(&id)

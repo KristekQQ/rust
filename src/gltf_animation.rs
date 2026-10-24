@@ -283,7 +283,9 @@ impl ModelInstance {
     pub fn new(asset: Arc<ModelAsset>, scene: Option<usize>) -> Result<Self, String> {
         let scene = scene.or(asset.default_scene).unwrap_or(0);
         let pose = default_pose(&asset, scene)?;
+        let render_bounds_cache = Arc::new(crate::gltf_bounds::RenderBoundsCache::new(&asset));
         Ok(Self {
+            render_bounds_cache,
             asset,
             pose,
             playback: None,
@@ -293,6 +295,9 @@ impl ModelInstance {
             last_error: None,
             morph_overrides: Default::default(),
         })
+    }
+    pub(crate) fn render_bounds(&self) -> Result<(Vec3, Vec3), String> {
+        self.render_bounds_cache.bounds(&self.asset, &self.pose)
     }
     pub fn play(&mut self, clip: usize, looping: bool) -> Result<(), String> {
         if clip >= self.asset.animations.len() {
@@ -339,6 +344,8 @@ impl ModelInstance {
         Ok(())
     }
     pub fn update(&mut self, delta: f32) -> Result<bool, String> {
+        #[cfg(target_arch = "wasm32")]
+        let _scope = crate::render::profiler::cpu_scope("gltf.animation");
         if !delta.is_finite() || delta < 0. {
             return Err("Invalid animation delta".into());
         }

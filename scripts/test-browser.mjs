@@ -21,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:"gltf-gpu-transforms",path:"tests/gltf-gpu-transforms.html",status:"#result"},
     {name:"gltf-visibility",path:"tests/gltf-visibility.html",status:"#result"},
     {name:"scene-appearance",path:"tests/scene-appearance.html",status:"#result"},
     {name:"antialias",path:"tests/antialias.html",status:"#result"},

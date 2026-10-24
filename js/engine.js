@@ -178,6 +178,10 @@ export class SceneLight {
 
 /** glTF root handle. Pose, playback and imported hierarchy remain in Rust. */
 export class ModelObject extends SceneObject {
+    /** Independent default pose/root sharing immutable Rust asset and GPU resources.
+     * Does not copy transforms, animation playback or physics from this object.
+     * @returns {ModelObject} */
+    createInstance() { return new ModelObject(this.#wasm, this.#wasm.instantiate_model(this.id)); }
     #wasm;
     /** @param {Wasm} wasm @param {number} id */
     constructor(wasm, id) { super(wasm, id); this.#wasm = wasm; }

@@ -25,7 +25,7 @@ struct SceneUniforms {
 
 struct EffectsUniforms {
     shadow_matrices:array<mat4x4<f32>,4>, reflection_matrix:mat4x4<f32>,
-    clip_plane:vec4<f32>, params:vec4<f32>,
+    clip_plane:vec4<f32>, params:vec4<f32>, shadow_layers:vec4<u32>,
 };
 @group(1) @binding(0) var<uniform> effects:EffectsUniforms;
 @group(1) @binding(1) var static_shadow:texture_depth_2d;
@@ -40,15 +40,33 @@ struct EffectsUniforms {
 @group(1) @binding(10) var static_shadow_3:texture_depth_2d;
 @group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
 fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
+    let layers=effects.shadow_layers[index];
+    var visibility=1.0;
+    // Uniform branches skip only maps known to contain no casters. Preserve
+    // per-texel min(static,dynamic) before the unchanged 3x3 PCF filter.
     switch index {
-        case 0u: { return min(textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
-        case 1u: { return min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
-        case 2u: { return min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
-        case 3u: { return min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
-        default: { return 1.0; }
+        case 0u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
+        }
+        case 1u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
+        }
+        case 2u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
+        }
+        case 3u: {
+            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth); }
+            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
+        }
+        default: {}
     }
+    return visibility;
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
+    if(effects.shadow_layers[index]==0u) { return 1.0; }
     // Receiver normal offset follows the authored shadow profile; zero for legacy scenes.
     let shadow_world=world+normal*scene.appearance_ground.w;
     let clip=effects.shadow_matrices[index]*vec4(shadow_world,1.0);
@@ -68,7 +86,7 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
 }
 
 
-struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4<u32>, extra:vec4<f32>, options:vec4<f32> };
+struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4<u32>, extra:vec4<f32>, options:vec4<f32>, model:mat4x4<f32>, normal:mat4x4<f32>, transform:vec4<f32> };
 @group(3) @binding(0) var<uniform> material:Material;
 @group(2) @binding(0) var base_map:texture_2d<f32>;
 @group(2) @binding(1) var base_sampler:sampler;
@@ -82,7 +100,30 @@ struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4
 @group(2) @binding(9) var emissive_sampler:sampler;
 struct Input { @location(0) position:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32> };
 struct Output { @builtin(position) pos:vec4<f32>, @location(0) world:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32> };
-@vertex fn vs_main(v:Input)->Output { var o:Output; o.pos=scene.view_projection*vec4(v.position,1.0); o.world=v.position; o.normal=v.normal; o.tangent=v.tangent; o.uv0=v.uv0; o.uv1=v.uv1; o.uv2=v.uv2; o.uv3=v.uv3; o.uv4=v.uv4; o.color=v.color; return o; }
+// CPU-deformed draws retain the existing world-space path.
+fn transform_unit(v:vec3<f32>)->vec3<f32> {
+    let length_squared=dot(v,v);
+    if(length_squared>0.0) {
+        let inverse_length=1.0/sqrt(length_squared);
+        // Match normalize_or_zero for overflow/underflow as well as zero.
+        if(inverse_length>0.0 && inverse_length<=3.402823466e38) { return v*inverse_length; }
+    }
+    return vec3(0.0);
+}
+@vertex fn vs_main(v:Input)->Output {
+    var o:Output;
+    var local_position=v.position; var local_normal=v.normal; var local_tangent=v.tangent;
+    // GPU_SKIN_VERTEX
+    o.world=local_position; o.normal=local_normal; o.tangent=local_tangent;
+    if(material.transform.y>0.5) {
+        o.world=(material.model*vec4(local_position,1.0)).xyz;
+        o.normal=transform_unit((material.normal*vec4(local_normal,0.0)).xyz);
+        o.tangent=vec4(transform_unit((material.model*vec4(local_tangent.xyz,0.0)).xyz),local_tangent.w*material.transform.x);
+    }
+    o.pos=scene.view_projection*vec4(o.world,1.0);
+    o.uv0=v.uv0; o.uv1=v.uv1; o.uv2=v.uv2; o.uv3=v.uv3; o.uv4=v.uv4; o.color=v.color;
+    return o;
+}
 fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }
 fn linear_color(c:vec3<f32>)->vec3<f32> { return select(c/12.92,pow((c+vec3(0.055))/1.055,vec3(2.4)),c>vec3(0.04045)); }
 // Rust specializes these sample expressions by actual map presence. Keep the
@@ -153,3 +194,33 @@ fn surface(v:Output,front:bool)->vec4<f32> {
 struct PostSurface { @location(0) color:vec4<f32>, @location(1) depth:vec4<f32> };
 @fragment fn fs_postprocess(v:Output,@builtin(front_facing) front:bool)->PostSurface { var o:PostSurface; let c=surface(v,front); o.color=vec4(c.rgb,material.options.x); var e=fract(min(v.pos.z,0.9999999)*vec3(1.0,255.0,65025.0)); e-=e.yzz*vec3(1.0/255.0,1.0/255.0,0.0); o.depth=vec4(e,1.0); return o; }
 @fragment fn fs_shadow(v:Output) { alpha_test(base_color(v).a); if(material.extra.y==2.0 && base_color(v).a<0.5) { discard; } }
+
+// GPU_SKIN_BEGIN
+@group(3) @binding(1) var<uniform> skin_palette:array<mat4x4<f32>,128>;
+struct DeformedVertex { position:vec3<f32>, normal:vec3<f32>, tangent:vec4<f32> };
+fn finite_vector(v:vec3<f32>)->bool { return all(abs(v)<=vec3(3.402823466e38)); }
+fn skin_vertex(v:Input)->DeformedVertex {
+    var skin=mat4x4<f32>(vec4(0.0),vec4(0.0),vec4(0.0),vec4(0.0));
+    var influenced=false;
+    for(var i=0u;i<4u;i=i+1u) {
+        if(v.weights0[i]!=0.0) { skin=skin+skin_palette[v.joints0[i]]*v.weights0[i]; influenced=true; }
+    }
+    for(var i=0u;i<4u;i=i+1u) {
+        if(v.weights1[i]!=0.0) { skin=skin+skin_palette[v.joints1[i]]*v.weights1[i]; influenced=true; }
+    }
+    if(!influenced) { skin=mat4x4<f32>(vec4(1.0,0.0,0.0,0.0),vec4(0.0,1.0,0.0,0.0),vec4(0.0,0.0,1.0,0.0),vec4(0.0,0.0,0.0,1.0)); }
+    let linear=mat3x3<f32>(skin[0].xyz,skin[1].xyz,skin[2].xyz);
+    let cofactors=mat3x3<f32>(cross(linear[1],linear[2]),cross(linear[2],linear[0]),cross(linear[0],linear[1]));
+    let determinant=dot(linear[0],cofactors[0]);
+    var n=linear*v.normal;
+    if(determinant!=0.0) {
+        let inverse_transpose=cofactors*(1.0/determinant);
+        if(finite_vector(inverse_transpose[0]) && finite_vector(inverse_transpose[1]) && finite_vector(inverse_transpose[2])) { n=inverse_transpose*v.normal; }
+    }
+    n=transform_unit(n);
+    if(dot(n,n)==0.0) { n=vec3(0.0,1.0,0.0); }
+    let transformed_tangent=linear*v.tangent.xyz;
+    let t=transform_unit(transformed_tangent-n*dot(n,transformed_tangent));
+    return DeformedVertex((skin*vec4(v.position,1.0)).xyz,n,vec4(t,v.tangent.w*select(1.0,-1.0,determinant<0.0)));
+}
+// GPU_SKIN_END

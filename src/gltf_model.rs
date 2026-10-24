@@ -232,6 +232,7 @@ pub struct AnimationPlayback {
 }
 #[derive(Clone, Debug)]
 pub struct ModelInstance {
+    pub(crate) render_bounds_cache: std::sync::Arc<crate::gltf_bounds::RenderBoundsCache>,
     pub asset: std::sync::Arc<ModelAsset>,
     pub pose: ModelPose,
     pub playback: Option<AnimationPlayback>,

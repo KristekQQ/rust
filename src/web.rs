@@ -153,6 +153,26 @@ pub fn load_gltf_model(
         result
     })
 }
+/// New independent pose/root referencing the existing immutable model asset.
+#[wasm_bindgen]
+pub fn instantiate_model(id: u32) -> Result<u32, JsValue> {
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let state = slot
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine není inicializován"))?;
+        let mut state = state.borrow_mut();
+        let asset = state
+            .scene
+            .model(id)
+            .ok_or_else(|| JsValue::from_str("Model neexistuje"))?
+            .asset
+            .clone();
+        state
+            .import_gltf_model(asset)
+            .map_err(|error| JsValue::from_str(&error))
+    })
+}
 #[wasm_bindgen]
 pub fn model_info(id: u32) -> Result<String, JsValue> {
     STATE.with(|s| {

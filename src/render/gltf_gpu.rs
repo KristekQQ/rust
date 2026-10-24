@@ -1,9 +1,12 @@
-//! Portable glTF rendering: deformation is computed in Rust once per changed pose,
-//! and the same world-space vertex buffers serve main/reflection/shadow passes.
+//! Portable glTF rendering: immutable rigid geometry is transformed on the GPU;
+//! supported skins use joint palettes, while morph/arbitrary skins retain CPU deformation.
 use super::data::as_bytes;
 use crate::gltf_model::*;
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec3, Vec4};
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::rc::{Rc, Weak};
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -34,6 +37,9 @@ struct Uniform {
     uv: [u32; 4],
     extra: [f32; 4],
     options: [f32; 4],
+    model: [[f32; 4]; 4],
+    normal: [[f32; 4]; 4],
+    transform: [f32; 4],
 }
 struct Material {
     textures: wgpu::BindGroup,
@@ -41,6 +47,75 @@ struct Material {
     uniform: Uniform,
     alpha: AlphaMode,
     double_sided: bool,
+}
+const MAX_GPU_JOINTS: usize = 128;
+const PALETTE_BYTES: u64 = (MAX_GPU_JOINTS * 64) as u64;
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct SkinInfluences {
+    joints0: [u16; 4],
+    joints1: [u16; 4],
+    weights0: [f32; 4],
+    weights1: [f32; 4],
+}
+impl SkinInfluences {
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        const A: [wgpu::VertexAttribute; 4] =
+            wgpu::vertex_attr_array![9=>Uint16x4,10=>Uint16x4,11=>Float32x4,12=>Float32x4];
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Self>() as u64,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &A,
+        }
+    }
+}
+struct PreparedSkin {
+    vertices: Vec<Vertex>,
+    influences: Vec<SkinInfluences>,
+    mean_terms: Vec<(usize, Vec4)>,
+    identity_mean: Vec4,
+}
+struct SharedSkin {
+    vertex: wgpu::Buffer,
+    influences: wgpu::Buffer,
+    // Sum of w*[position,1]/vertex_count per joint, plus uninfluenced vertices.
+    mean_terms: Vec<(usize, Vec4)>,
+    identity_mean: Vec4,
+}
+struct SkinPalette {
+    buffer: wgpu::Buffer,
+    last: Vec<[[f32; 4]; 4]>,
+}
+struct Geometry {
+    vertex: Option<wgpu::Buffer>,
+    skin: Option<Rc<SharedSkin>>,
+    index: wgpu::Buffer,
+    count: u32,
+    topology: wgpu::PrimitiveTopology,
+    center: Vec3,
+}
+struct SharedAsset {
+    asset: Arc<ModelAsset>,
+    materials: Rc<Vec<Material>>,
+    geometry: Vec<Option<Geometry>>,
+}
+/// Cumulative work counters; resource counts describe currently live shared assets.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct GltfGpuStats {
+    pub cpu_deformed_vertices: u64,
+    pub rigid_upload_bytes: u64,
+    pub skin_upload_bytes: u64,
+    /// Included in uniform_upload_bytes as well.
+    pub skin_palette_upload_bytes: u64,
+    pub draw_calls: u64,
+    pub pipeline_changes: u64,
+    pub bind_group_changes: u64,
+    pub uniform_upload_bytes: u64,
+    pub geometry_cache_hits: u64,
+    pub material_cache_hits: u64,
+    pub geometry_resources: usize,
+    pub material_resources: usize,
+    pub cached_assets: usize,
 }
 struct Draw {
     node: usize,
@@ -54,10 +129,17 @@ struct Draw {
     bind: wgpu::BindGroup,
     center: Vec3,
     negative: bool,
+    rigid: bool,
+    skin: Option<Rc<SharedSkin>>,
+    local_center: Vec3,
+    last_uniform: Uniform,
+    scratch: Vec<Vertex>,
 }
 pub struct GpuModel {
     draws: Vec<Draw>,
-    materials: Vec<Material>,
+    materials: Rc<Vec<Material>>,
+    _shared: Rc<SharedAsset>,
+    palettes: HashMap<usize, SkinPalette>,
     last_pose: Option<(u64, Mat4, [f32; 4])>,
     active: HashSet<usize>,
 }
@@ -81,17 +163,21 @@ struct Variant {
     blend: bool,
     double_sided: bool,
     negative: bool,
+    skinned: bool,
 }
 pub struct GltfGpu {
     global: wgpu::BindGroupLayout,
     effects: wgpu::BindGroupLayout,
     textures: wgpu::BindGroupLayout,
     material: wgpu::BindGroupLayout,
+    skin_material: Option<wgpu::BindGroupLayout>,
     // 32 map classes x (generic color, opaque unclipped color, shadow).
-    shaders: HashMap<(u8, bool, bool), wgpu::ShaderModule>,
+    shaders: HashMap<(u8, bool, bool, bool), wgpu::ShaderModule>,
     empty_layout: wgpu::BindGroupLayout,
     empty_bind: wgpu::BindGroup,
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
+    assets: RefCell<HashMap<usize, Weak<SharedAsset>>>,
+    counters: Cell<GltfGpuStats>,
 }
 impl GltfGpu {
     pub fn new(
@@ -126,15 +212,48 @@ impl GltfGpu {
             label: Some("glTF material"),
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(96),
+                    min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<Uniform>() as u64),
                 },
                 count: None,
             }],
         });
+        let limits = device.limits();
+        let skin_material = (limits.max_vertex_attributes >= 13
+            && limits.max_vertex_buffers >= 2
+            && limits.max_uniform_buffer_binding_size >= PALETTE_BYTES)
+            .then(|| {
+                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("glTF GPU skin material and palette"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: wgpu::BufferSize::new(
+                                    std::mem::size_of::<Uniform>() as u64,
+                                ),
+                            },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1,
+                            visibility: wgpu::ShaderStages::VERTEX,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: wgpu::BufferSize::new(PALETTE_BYTES),
+                            },
+                            count: None,
+                        },
+                    ],
+                })
+            });
         let empty_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("glTF empty shadow effects"),
             entries: &[],
@@ -149,18 +268,34 @@ impl GltfGpu {
             effects: effects.clone(),
             textures,
             material,
+            skin_material,
             shaders: HashMap::new(),
             empty_layout,
             empty_bind,
             pipelines: HashMap::new(),
+            assets: RefCell::new(HashMap::new()),
+            counters: Cell::new(GltfGpuStats::default()),
         }
     }
     pub fn upload(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        asset: &ModelAsset,
+        asset: &Arc<ModelAsset>,
     ) -> Result<GpuModel, String> {
+        let identity = Arc::as_ptr(asset) as usize;
+        let shared = {
+            let mut cache = self.assets.borrow_mut();
+            cache.retain(|_, entry| entry.strong_count() > 0);
+            cache.get(&identity).and_then(Weak::upgrade)
+        };
+        if let Some(shared) = shared {
+            let mut stats = self.counters.get();
+            stats.geometry_cache_hits += shared.geometry.iter().flatten().count() as u64;
+            stats.material_cache_hits += shared.materials.len() as u64;
+            self.counters.set(stats);
+            return Ok(self.create_model(device, shared));
+        }
         let limits = device.limits();
         for image in &asset.images {
             if image.width == 0
@@ -235,8 +370,20 @@ impl GltfGpu {
                     budget = budget.saturating_add(
                         primitive.vertices.len() as u64 * 96
                             + primitive.indices.len().max(primitive.vertices.len()) as u64 * 12
-                            + 96,
+                            + std::mem::size_of::<Uniform>() as u64,
                     );
+                    if self.skin_material.is_some()
+                        && node
+                            .skin
+                            .and_then(|i| asset.skins.get(i))
+                            .is_some_and(|s| s.joints.len() <= MAX_GPU_JOINTS)
+                        && primitive.morph_targets.is_empty()
+                    {
+                        // Existing budget covers source vertices; add influence
+                        // attributes and one conservative palette per draw.
+                        budget = budget
+                            .saturating_add(primitive.vertices.len() as u64 * 48 + PALETTE_BYTES);
+                    }
                 }
             }
         }
@@ -502,6 +649,9 @@ impl GltfGpu {
                     0.0,
                 ],
                 options: [0.0; 4],
+                model: Mat4::IDENTITY.to_cols_array_2d(),
+                normal: Mat4::IDENTITY.to_cols_array_2d(),
+                transform: [1.0, 0.0, 0.0, 0.0],
             };
             materials.push(Material {
                 textures,
@@ -511,58 +661,233 @@ impl GltfGpu {
                 double_sided,
             });
         }
+        let mut geometry = Vec::with_capacity(asset.primitives.len());
+        let mut stats = self.counters.get();
+        for (primitive, p) in asset.primitives.iter().enumerate() {
+            if !asset.nodes.iter().any(|n| {
+                n.mesh
+                    .is_some_and(|m| asset.meshes[m].primitives.contains(&primitive))
+            }) {
+                geometry.push(None);
+                continue;
+            }
+            let (indices, topology) = indices(p);
+            let has_rigid_node = p.morph_targets.is_empty()
+                && asset.nodes.iter().any(|n| {
+                    n.skin.is_none()
+                        && n.mesh
+                            .is_some_and(|m| asset.meshes[m].primitives.contains(&primitive))
+                });
+            let slots = material_slots(asset, p);
+            let mut center = Vec3::ZERO;
+            let vertex = if has_rigid_node {
+                let vertices: Vec<_> = asset.vertices[p.vertices.clone()]
+                    .iter()
+                    .map(|v| {
+                        center += Vec3::from(v.position);
+                        // Match deformed_vertices normalization and Gram-Schmidt.
+                        let n = Vec3::from(v.normal).try_normalize().unwrap_or(Vec3::Y);
+                        let t = Vec3::from_slice(&v.tangent[..3]);
+                        let t = (t - n * n.dot(t)).try_normalize().unwrap_or(Vec3::ZERO);
+                        packed_vertex(v, Vec3::from(v.position), n, t, 1.0, &slots)
+                    })
+                    .collect();
+                center /= vertices.len().max(1) as f32;
+                stats.rigid_upload_bytes += (vertices.len() * 96 + indices.len() * 4) as u64;
+                Some(
+                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("glTF shared rigid vertices"),
+                        contents: as_bytes(&vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }),
+                )
+            } else {
+                None
+            };
+            let index = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("glTF shared indices"),
+                contents: as_bytes(&indices),
+                usage: wgpu::BufferUsages::INDEX,
+            });
+            let has_skin_node = self.skin_material.is_some()
+                && p.morph_targets.is_empty()
+                && asset.nodes.iter().any(|n| {
+                    n.mesh
+                        .is_some_and(|m| asset.meshes[m].primitives.contains(&primitive))
+                        && n.skin
+                            .and_then(|i| asset.skins.get(i))
+                            .is_some_and(|skin| skin.joints.len() <= MAX_GPU_JOINTS)
+                });
+            let skin = if has_skin_node {
+                prepare_skin(asset, p, &slots).map(|prepared| {
+                    let PreparedSkin {
+                        vertices,
+                        influences,
+                        mean_terms,
+                        identity_mean,
+                    } = prepared;
+                    stats.skin_upload_bytes += (vertices.len() * 96
+                        + influences.len() * std::mem::size_of::<SkinInfluences>())
+                        as u64;
+                    if vertex.is_none() {
+                        stats.skin_upload_bytes += (indices.len() * 4) as u64;
+                    }
+                    Rc::new(SharedSkin {
+                        vertex: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("glTF shared skin source vertices"),
+                            contents: as_bytes(&vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        }),
+                        influences: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("glTF shared eight influences"),
+                            contents: as_bytes(&influences),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        }),
+                        mean_terms,
+                        identity_mean,
+                    })
+                })
+            } else {
+                None
+            };
+            geometry.push(Some(Geometry {
+                vertex,
+                skin,
+                index,
+                count: indices.len() as u32,
+                topology,
+                center,
+            }));
+        }
+        self.counters.set(stats);
+        let shared = Rc::new(SharedAsset {
+            asset: asset.clone(),
+            materials: Rc::new(materials),
+            geometry,
+        });
+        self.assets
+            .borrow_mut()
+            .insert(identity, Rc::downgrade(&shared));
+        Ok(self.create_model(device, shared))
+    }
+    /// Snapshot counters without retaining any asset or GPU resource.
+    pub fn stats(&self) -> GltfGpuStats {
+        let mut stats = self.counters.get();
+        for shared in self.assets.borrow().values().filter_map(Weak::upgrade) {
+            stats.cached_assets += 1;
+            stats.geometry_resources += shared.geometry.iter().flatten().count();
+            stats.material_resources += shared.materials.len();
+        }
+        stats
+    }
+    fn create_model(&self, device: &wgpu::Device, shared: Rc<SharedAsset>) -> GpuModel {
+        let asset = &shared.asset;
+        let materials = shared.materials.clone();
+        let mut palettes: HashMap<usize, SkinPalette> = HashMap::new();
         let mut draws = Vec::new();
         for (node, n) in asset.nodes.iter().enumerate() {
             let Some(mesh) = n.mesh else { continue };
             for &primitive in &asset.meshes[mesh].primitives {
                 let p = &asset.primitives[primitive];
-                let (indices, topology) = indices(p);
+                let geometry = shared.geometry[primitive]
+                    .as_ref()
+                    .expect("referenced primitive geometry");
+                let rigid = n.skin.is_none() && p.morph_targets.is_empty();
+                let skin = n
+                    .skin
+                    .and_then(|i| asset.skins.get(i))
+                    .filter(|skin| skin.joints.len() <= MAX_GPU_JOINTS)
+                    .and_then(|_| geometry.skin.clone());
+                if skin.is_some() && !palettes.contains_key(&node) {
+                    let initial = vec![Mat4::IDENTITY.to_cols_array_2d(); MAX_GPU_JOINTS];
+                    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("glTF node skin palette"),
+                        contents: as_bytes(&initial),
+                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    });
+                    palettes.insert(
+                        node,
+                        SkinPalette {
+                            buffer,
+                            last: Vec::with_capacity(MAX_GPU_JOINTS),
+                        },
+                    );
+                }
                 let material = p.material.unwrap_or(asset.materials.len());
-                let vertex = device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("glTF posed vertices"),
-                    size: p.vertices.len() as u64 * 96,
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                let index = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("glTF indices"),
-                    contents: as_bytes(&indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
+                let vertex = if let Some(skin) = &skin {
+                    skin.vertex.clone()
+                } else if rigid {
+                    geometry
+                        .vertex
+                        .as_ref()
+                        .expect("rigid primitive buffer")
+                        .clone()
+                } else {
+                    device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("glTF CPU deformed vertices"),
+                        size: p.vertices.len() as u64 * 96,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    })
+                };
+                let initial = materials[material].uniform;
                 let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("glTF material options"),
-                    contents: as_bytes(&[materials[material].uniform]),
+                    label: Some("glTF material and transform"),
+                    contents: as_bytes(&[initial]),
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 });
+                let mut entries = vec![wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: uniform.as_entire_binding(),
+                }];
+                if let Some(palette) = palettes.get(&node).filter(|_| skin.is_some()) {
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: palette.buffer.as_entire_binding(),
+                    });
+                }
                 let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("glTF model material"),
-                    layout: &self.material,
-                    entries: &[wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniform.as_entire_binding(),
-                    }],
+                    layout: if skin.is_some() {
+                        self.skin_material.as_ref().expect("supported skin layout")
+                    } else {
+                        &self.material
+                    },
+                    entries: &entries,
                 });
                 draws.push(Draw {
                     node,
                     primitive,
                     material,
                     vertex,
-                    index,
-                    count: indices.len() as u32,
-                    topology,
+                    index: geometry.index.clone(),
+                    count: geometry.count,
+                    topology: geometry.topology,
                     uniform,
                     bind,
                     center: Vec3::ZERO,
                     negative: false,
+                    rigid,
+                    skin,
+                    local_center: geometry.center,
+                    last_uniform: initial,
+                    scratch: Vec::new(),
                 });
             }
         }
-        Ok(GpuModel {
+        let mut stats = self.counters.get();
+        stats.uniform_upload_bytes += (draws.len() * std::mem::size_of::<Uniform>()) as u64
+            + palettes.len() as u64 * PALETTE_BYTES;
+        stats.skin_palette_upload_bytes += palettes.len() as u64 * PALETTE_BYTES;
+        self.counters.set(stats);
+        GpuModel {
             draws,
             materials,
+            _shared: shared,
+            palettes,
             last_pose: None,
             active: HashSet::new(),
-        })
+        }
     }
     #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
     pub fn update(
@@ -575,12 +900,46 @@ impl GltfGpu {
         root: Mat4,
         options: [f32; 4],
     ) -> Result<usize, String> {
+        let _scope = super::profiler::cpu_scope("gltf.update");
         let stamp = (revision, root, options);
         if model.last_pose.as_ref() == Some(&stamp) {
             return Ok(0);
         }
-        model.active = pose.active_nodes.iter().copied().collect();
+        model.active.clear();
+        model.active.extend(pose.active_nodes.iter().copied());
+        let mut stats = self.counters.get();
         let mut bytes = 0;
+        for (&node, palette) in &mut model.palettes {
+            if !model.active.contains(&node) {
+                continue;
+            }
+            let matrices = pose
+                .skin_matrices
+                .get(node)
+                .ok_or("Pose skin node out of range")?;
+            if matrices.len() > MAX_GPU_JOINTS {
+                return Err("GPU skin palette exceeds supported size".into());
+            }
+            if palette.last.len() != matrices.len()
+                || !palette
+                    .last
+                    .iter()
+                    .zip(matrices)
+                    .all(|(a, b)| *a == b.to_cols_array_2d())
+            {
+                palette.last.clear();
+                palette
+                    .last
+                    .extend(matrices.iter().map(|matrix| matrix.to_cols_array_2d()));
+                if !palette.last.is_empty() {
+                    queue.write_buffer(&palette.buffer, 0, as_bytes(&palette.last));
+                    let uploaded = palette.last.len() * 64;
+                    bytes += uploaded;
+                    stats.uniform_upload_bytes += uploaded as u64;
+                    stats.skin_palette_upload_bytes += uploaded as u64;
+                }
+            }
+        }
         for draw in &mut model.draws {
             if !model.active.contains(&draw.node) {
                 continue;
@@ -590,52 +949,58 @@ impl GltfGpu {
             let inverse = matrix.inverse().transpose();
             let normal = if inverse.is_finite() { inverse } else { matrix };
             draw.negative = matrix.determinant() < 0.0;
-            let source = primitive.material.and_then(|m| asset.materials.get(m));
-            let slots = source
-                .map(|m| {
-                    [
-                        m.base_color_texture,
-                        m.metallic_roughness_texture,
-                        m.normal_texture,
-                        m.occlusion_texture,
-                        m.emissive_texture,
-                    ]
-                })
-                .unwrap_or([None; 5]);
-            let mut vertices = Vec::with_capacity(primitive.vertices.len());
-            let mut center = Vec3::ZERO;
-            for v in
-                crate::gltf_animation::deformed_vertices(asset, pose, draw.node, draw.primitive)?
-            {
-                let mut pos = Vec3::from(v.position);
-                let mut n = Vec3::from(v.normal);
-                let mut t = Vec3::from_slice(&v.tangent[..3]);
-                pos = matrix.transform_point3(pos);
-                n = normal.transform_vector3(n).normalize_or_zero();
-                t = matrix.transform_vector3(t).normalize_or_zero();
-                center += pos;
-                vertices.push(Vertex {
-                    position: pos.into(),
-                    normal: n.into(),
-                    tangent: [
-                        t.x,
-                        t.y,
-                        t.z,
-                        v.tangent[3] * if draw.negative { -1.0 } else { 1.0 },
-                    ],
-                    uvs: std::array::from_fn(|i| {
-                        v.tex_coords
-                            .get(slots[i].map(|s| s.tex_coord as usize).unwrap_or(0))
-                            .copied()
-                            .unwrap_or([0.0; 2])
-                    }),
-                    color: v.color,
-                });
+            if draw.rigid {
+                // Exact affine vertex mean, rather than the bounds center.
+                draw.center = matrix.transform_point3(draw.local_center);
+            } else if let Some(skin) = &draw.skin {
+                let matrices = &pose.skin_matrices[draw.node];
+                let mut mean = skin.identity_mean;
+                for &(joint, term) in &skin.mean_terms {
+                    mean += *matrices
+                        .get(joint)
+                        .ok_or("Vertex joint index out of skin range")?
+                        * term;
+                }
+                draw.center = matrix.transform_point3(mean.truncate());
+            } else {
+                let _deform_scope = super::profiler::cpu_scope("gltf.deform");
+                let slots = material_slots(asset, primitive);
+                draw.scratch.clear();
+                let mut center = Vec3::ZERO;
+                for v in crate::gltf_animation::deformed_vertices(
+                    asset,
+                    pose,
+                    draw.node,
+                    draw.primitive,
+                )? {
+                    let pos = matrix.transform_point3(Vec3::from(v.position));
+                    let n = normal
+                        .transform_vector3(Vec3::from(v.normal))
+                        .normalize_or_zero();
+                    let t = matrix
+                        .transform_vector3(Vec3::from_slice(&v.tangent[..3]))
+                        .normalize_or_zero();
+                    center += pos;
+                    draw.scratch.push(packed_vertex(
+                        &v,
+                        pos,
+                        n,
+                        t,
+                        if draw.negative { -1.0 } else { 1.0 },
+                        &slots,
+                    ));
+                }
+                draw.center = center / draw.scratch.len().max(1) as f32;
+                queue.write_buffer(&draw.vertex, 0, as_bytes(&draw.scratch));
+                bytes += draw.scratch.len() * 96;
+                stats.cpu_deformed_vertices += draw.scratch.len() as u64;
             }
-            draw.center = center / vertices.len().max(1) as f32;
-            queue.write_buffer(&draw.vertex, 0, as_bytes(&vertices));
-            bytes += vertices.len() * 96;
             let mut uniform = model.materials[draw.material].uniform;
+            if draw.rigid || draw.skin.is_some() {
+                uniform.model = matrix.to_cols_array_2d();
+                uniform.normal = normal.to_cols_array_2d();
+                uniform.transform = [if draw.negative { -1.0 } else { 1.0 }, 1.0, 0.0, 0.0];
+            }
             uniform.options = options;
             uniform.options[3] = if primitive.flat_normals { 1.0 } else { 0.0 };
             uniform.extra[3] = if matches!(
@@ -648,9 +1013,14 @@ impl GltfGpu {
             } else {
                 0.0
             };
-            queue.write_buffer(&draw.uniform, 0, as_bytes(&[uniform]));
-            bytes += 96;
+            if uniform != draw.last_uniform {
+                queue.write_buffer(&draw.uniform, 0, as_bytes(&[uniform]));
+                draw.last_uniform = uniform;
+                bytes += std::mem::size_of::<Uniform>();
+                stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
+            }
         }
+        self.counters.set(stats);
         model.last_pose = Some(stamp);
         Ok(bytes)
     }
@@ -677,6 +1047,7 @@ impl GltfGpu {
                     blend,
                     double_sided,
                     negative,
+                    skinned: draw.skin.is_some(),
                 };
                 if self.pipelines.contains_key(&variant) {
                     continue;
@@ -691,13 +1062,22 @@ impl GltfGpu {
                             &self.effects
                         }),
                         Some(&self.textures),
-                        Some(&self.material),
+                        Some(if variant.skinned {
+                            self.skin_material.as_ref().expect("supported skin layout")
+                        } else {
+                            &self.material
+                        }),
                     ],
                     immediate_size: 0,
                 });
                 let shader = self
                     .shaders
-                    .entry((material.texture_mask, key.shadow, variant.opaque_unclipped))
+                    .entry((
+                        material.texture_mask,
+                        key.shadow,
+                        variant.opaque_unclipped,
+                        variant.skinned,
+                    ))
                     .or_insert_with(|| {
                         device.create_shader_module(wgpu::ShaderModuleDescriptor {
                             label: Some("glTF material-class shader"),
@@ -706,6 +1086,7 @@ impl GltfGpu {
                                     material.texture_mask,
                                     key.shadow,
                                     variant.opaque_unclipped,
+                                    variant.skinned,
                                 )
                                 .into(),
                             ),
@@ -730,6 +1111,7 @@ impl GltfGpu {
                         }));
                     }
                 }
+                let vertex_buffers = [Some(Vertex::layout()), Some(SkinInfluences::layout())];
                 let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     label: Some("glTF PBR variant"),
                     layout: Some(&layout),
@@ -737,7 +1119,11 @@ impl GltfGpu {
                         module: shader,
                         entry_point: Some("vs_main"),
                         compilation_options: Default::default(),
-                        buffers: &[Some(Vertex::layout())],
+                        buffers: if variant.skinned {
+                            &vertex_buffers
+                        } else {
+                            &vertex_buffers[..1]
+                        },
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: shader,
@@ -806,9 +1192,6 @@ impl GltfGpu {
         blend: bool,
         camera_pos: Vec3,
     ) -> usize {
-        if key.shadow {
-            pass.set_bind_group(1, &self.empty_bind, &[]);
-        }
         self.draw_many(pass, std::iter::once(model), key, blend, camera_pos)
     }
     /// Sort transparent primitives across all visible model roots.
@@ -820,8 +1203,10 @@ impl GltfGpu {
         blend: bool,
         camera_pos: Vec3,
     ) -> usize {
+        let mut stats = self.counters.get();
         if key.shadow {
             pass.set_bind_group(1, &self.empty_bind, &[]);
+            stats.bind_group_changes += 1;
         }
         let mut draws: Vec<_> = models
             .flat_map(|model| {
@@ -846,6 +1231,8 @@ impl GltfGpu {
             });
         }
         let mut submitted = 0;
+        let mut last_variant = None;
+        let mut last_material = None;
         for (model, draw) in draws {
             let material = &model.materials[draw.material];
             let variant = Variant {
@@ -858,30 +1245,61 @@ impl GltfGpu {
                 blend,
                 double_sided: material.double_sided,
                 negative: draw.negative,
+                skinned: draw.skin.is_some(),
             };
             let Some(pipeline) = self.pipelines.get(&variant) else {
                 continue;
             };
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(2, &material.textures, &[]);
+            if last_variant != Some(variant) {
+                pass.set_pipeline(pipeline);
+                stats.pipeline_changes += 1;
+                last_variant = Some(variant);
+            }
+            let material_identity = material as *const Material;
+            if last_material != Some(material_identity) {
+                pass.set_bind_group(2, &material.textures, &[]);
+                stats.bind_group_changes += 1;
+                last_material = Some(material_identity);
+            }
             pass.set_bind_group(3, &draw.bind, &[]);
+            stats.bind_group_changes += 1;
             pass.set_vertex_buffer(0, draw.vertex.slice(..));
+            if let Some(skin) = &draw.skin {
+                pass.set_vertex_buffer(1, skin.influences.slice(..));
+            }
             pass.set_index_buffer(draw.index.slice(..), wgpu::IndexFormat::Uint32);
             pass.draw_indexed(0..draw.count, 0, 0..1);
             submitted += 1;
+            stats.draw_calls += 1;
         }
+        self.counters.set(stats);
         submitted
     }
 }
 // Replace sample expressions before compilation so absent maps incur no texture
 // operation on either backend. Raw fallback texels preserve the original decoder.
-fn material_shader_source(texture_mask: u8, shadow: bool, opaque_unclipped: bool) -> String {
+fn material_shader_source(
+    texture_mask: u8,
+    shadow: bool,
+    opaque_unclipped: bool,
+    skinned: bool,
+) -> String {
     let mut source = concat!(
         include_str!("gltf_pbr.wgsl"),
         "\n",
         include_str!("appearance.wgsl")
     )
     .to_owned();
+    if skinned {
+        source = source.replacen("@location(8) color:vec4<f32> };", "@location(8) color:vec4<f32>, @location(9) joints0:vec4<u32>, @location(10) joints1:vec4<u32>, @location(11) weights0:vec4<f32>, @location(12) weights1:vec4<f32> };", 1);
+        source = source.replace("    // GPU_SKIN_VERTEX", "    let deformed=skin_vertex(v); local_position=deformed.position; local_normal=deformed.normal; local_tangent=deformed.tangent;");
+    } else {
+        // Exclude the entire palette/helper declarations from rigid variants.
+        let start = source.find("// GPU_SKIN_BEGIN").expect("skin helper start");
+        let end =
+            source.find("// GPU_SKIN_END").expect("skin helper end") + "// GPU_SKIN_END".len();
+        source.replace_range(start..end, "");
+    }
     for (i, (sample, fallback)) in [
         ("textureSample(base_map,base_sampler,uv)", "vec4<f32>(1.0)"),
         ("textureSample(mr_map,mr_sampler,uv)", "vec4<f32>(1.0)"),
@@ -981,4 +1399,114 @@ fn indices(p: &ModelPrimitive) -> (Vec<u32>, wgpu::PrimitiveTopology) {
             (out, wgpu::PrimitiveTopology::TriangleList)
         }
     }
+}
+
+fn material_slots(asset: &ModelAsset, primitive: &ModelPrimitive) -> [Option<TextureSlot>; 5] {
+    primitive
+        .material
+        .and_then(|m| asset.materials.get(m))
+        .map(|m| {
+            [
+                m.base_color_texture,
+                m.metallic_roughness_texture,
+                m.normal_texture,
+                m.occlusion_texture,
+                m.emissive_texture,
+            ]
+        })
+        .unwrap_or([None; 5])
+}
+fn packed_vertex(
+    v: &ModelVertex,
+    pos: Vec3,
+    n: Vec3,
+    t: Vec3,
+    sign: f32,
+    slots: &[Option<TextureSlot>; 5],
+) -> Vertex {
+    Vertex {
+        position: pos.into(),
+        normal: n.into(),
+        tangent: [t.x, t.y, t.z, v.tangent[3] * sign],
+        uvs: std::array::from_fn(|i| {
+            v.tex_coords
+                .get(slots[i].map(|s| s.tex_coord as usize).unwrap_or(0))
+                .copied()
+                .unwrap_or([0.0; 2])
+        }),
+        color: v.color,
+    }
+}
+
+// Preparation is one-off per immutable primitive. Keep nonzero influence order:
+// merging duplicates or renormalizing would change the authoritative CPU math.
+fn prepare_skin(
+    asset: &ModelAsset,
+    primitive: &ModelPrimitive,
+    slots: &[Option<TextureSlot>; 5],
+) -> Option<PreparedSkin> {
+    let source = &asset.vertices[primitive.vertices.clone()];
+    let mut vertices = Vec::with_capacity(source.len());
+    let mut influences = Vec::with_capacity(source.len());
+    let mut terms = vec![Vec4::ZERO; MAX_GPU_JOINTS];
+    let mut identity = Vec4::ZERO;
+    for v in source {
+        let mut packed = SkinInfluences {
+            joints0: [0; 4],
+            joints1: [0; 4],
+            weights0: [0.0; 4],
+            weights1: [0.0; 4],
+        };
+        let mut count = 0;
+        let mut mass = 0.0;
+        if v.influences.is_empty() {
+            identity += Vec3::from(v.position).extend(1.0);
+        }
+        for &(joint, weight) in &v.influences {
+            if !weight.is_finite() || weight < 0.0 {
+                return None;
+            }
+            if weight == 0.0 {
+                continue;
+            }
+            if count >= 8 || joint as usize >= MAX_GPU_JOINTS {
+                return None;
+            }
+            if count < 4 {
+                packed.joints0[count] = joint;
+                packed.weights0[count] = weight;
+            } else {
+                packed.joints1[count - 4] = joint;
+                packed.weights1[count - 4] = weight;
+            }
+            terms[joint as usize] += Vec3::from(v.position).extend(1.0) * weight;
+            mass += weight;
+            count += 1;
+        }
+        if !v.influences.is_empty() && (!mass.is_finite() || mass <= 0.0) {
+            return None;
+        }
+        vertices.push(packed_vertex(
+            v,
+            Vec3::from(v.position),
+            Vec3::from(v.normal),
+            Vec3::from_slice(&v.tangent[..3]),
+            1.0,
+            slots,
+        ));
+        influences.push(packed);
+    }
+    let divisor = source.len().max(1) as f32;
+    let terms = terms
+        .into_iter()
+        .enumerate()
+        .filter(|(_, q)| *q != Vec4::ZERO)
+        .map(|(j, q)| (j, q / divisor))
+        .collect();
+    Some(PreparedSkin {
+        vertices,
+        influences,
+        mean_terms: terms,
+        identity_mean: identity / divisor,
+    })
 }

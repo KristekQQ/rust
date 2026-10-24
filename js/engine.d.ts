@@ -166,6 +166,8 @@ export interface ModelInfo {
 }
 export class ModelObject extends SceneObject {
     private constructor();
+    /** New default pose/root sharing immutable asset/GPU resources; independent animation/physics. */
+    createInstance(): ModelObject;
     readonly info: ModelInfo;
     playAnimation(clip?: number | string, options?: {loop?: boolean; speed?: number}): this;
     pauseAnimation(paused?: boolean): this;
@@ -248,6 +250,8 @@ export interface EffectStats {
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
 export interface DebugStats {
+    /** Cumulative glTF work and currently live shared asset resources. */
+    gltf: {cpuDeformedVertices:number;rigidUploadBytes:number;skinUploadBytes:number;uniformUploadBytes:number;skinPaletteUploadBytes:number;geometryCacheHits:number;materialCacheHits:number;geometryResources:number;materialResources:number;cachedAssets:number;drawCalls:number;pipelineChanges:number;bindGroupChanges:number};
     font3d: {
         runtime:{fonts:number;texts:number;cachedGlyphs:number;liveGlyphs:number;layoutRebuilds:number;syncUpdates:number};
         geometryBytes:number;instanceGeometryBytes:number;
@@ -277,7 +281,7 @@ export type PostEffectName = "ssr" | "godRays" | "bloom" | "fxaa";
 export interface FrameProfile {
     enabled: boolean;
     frame: number|null;
-    cpu: Record<string,{lastMs:number;meanMs:number;p95Ms:number;samples:number}>;
+    cpu: Record<string,{lastMs:number;meanMs:number;p95Ms:number;p99Ms:number;maxMs:number;samples:number}>;
     gpu: {supported:boolean;available:boolean;sampleEveryFrames?:number;skippedSamples?:number;sampleFrame:number|null;ageFrames:number|null;passesMs:Record<string,number>|null;error?:string|null};
 }
 export interface FrameGraphStats {

@@ -42,12 +42,13 @@ export async function createGameplay(engine,content){
   const source=content.characters.find(c=>c.spec.slug===kind);if(!source)throw Error('Chybí původní model '+kind);
   const count=kind==='drone-orbiter'?8:3;
   for(let i=0;i<count;i++){
-   const model=i===0?source.model:await scene.loadModel(new URL(source.spec.file,base));
+   const model=i===0?source.model:source.model.createInstance();
    model.setRenderOptions({castsShadow:false,receivesShadow:true});
    enemies.push({model,kind,height:source.spec.height,offset:source.spec.root.position,scale:source.spec.root.scale});
   }
  }
- const swords=/** @type {[import('../../js/engine.js').ModelObject,import('../../js/engine.js').ModelObject]} */([await scene.loadModel(new URL('gladius.glb',base)),await scene.loadModel(new URL('gladius.glb',base))]);
+ const swordAsset=await scene.loadModel(new URL('gladius.glb',base));
+ const swords=/** @type {[import('../../js/engine.js').ModelObject,import('../../js/engine.js').ModelObject]} */([swordAsset,swordAsset.createInstance()]);
  for(const sword of swords)sword.setCutter({base:[0,0,-.14],tip:[0,0,-1.02]}).setBladeTrail(true).setRenderOptions({castsShadow:false,receivesShadow:false});
  const bolts=Array.from({length:32},()=>scene.createSphere([0,-10000,0]).setScale([.055,.055,.055]).setEmission(1.5).setRenderOptions({castsShadow:false,receivesShadow:false}));
  const beams=Array.from({length:14},()=>scene.createCube([0,-10000,0]).setEmission(3).setRenderOptions({castsShadow:false,receivesShadow:false}));

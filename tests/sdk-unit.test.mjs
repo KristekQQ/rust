@@ -701,3 +701,12 @@ test('numeric text forwards static digits and transforms to Rust shared glyph in
     assert.deepEqual(calls[2], ['numeric','6789',1.2,.72]);
     assert.deepEqual(calls[3], ['position',81,0,0,0]);
 });
+
+
+test('model instances delegate asset sharing to Rust without transport', async () => {
+    const calls=[];
+    const {ModelObject}=await sdk();
+    const source=new ModelObject(wasmMock({instantiate_model(id){calls.push(id);return 42;}}),17);
+    const copy=source.createInstance();
+    assert.equal(copy.id,42);assert.notEqual(copy,source);assert.deepEqual(calls,[17]);
+});
