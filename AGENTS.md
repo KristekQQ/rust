@@ -6,6 +6,12 @@ Project-owned skills live in versioned `.agents/skills/`, not personal `~/.codex
 
 At Honza's request, [honza-intent](.agents/skills/honza-intent/SKILL.md) is also project-owned so other instances share his intent-clarification workflow. Use it for unresolved ambiguity or corrections after misunderstanding, not typos alone.
 
+## Concurrent agents and releases
+
+When multiple chats or agents work on this repository, use [parallel-work](.agents/skills/parallel-work/SKILL.md) before edits, integration or push. Record the task, owned paths, base commit and checkout in the shared local registry described there. One writer owns each file in a checkout. Independent substantial changes use separate worktrees and `codex/` branches; small disjoint docs edits may stay in the current checkout. Preserve existing dirty work rather than moving, stashing or committing it for another agent.
+
+One recorded integrator owns each shared remote release target (such as `origin/main`) and its final verification, push and Quest production package. Workers hand off owned commits and evidence; a worker's push request does not authorize publishing another task. Do not run concurrent builds or regenerate `pkg/`, `all_sources.txt` or `output/production/` in the same checkout. At milestone checks, compare relevant input/build identities, not just dirty-file names; report unexpected changes without guessing their author. Distinguish local changes, commit, push, CI and headset acceptance. These notes coordinate cooperating agents; they are not an automatic lock or authorization to message other chats.
+
 For scene placement, rotations, scale and attached world-space labels, use [scene-object-layout](.agents/skills/scene-object-layout/SKILL.md); verify requested sides in XR coordinates, not only the desktop preview.
 
 For gameplay feel, player skill, wave rhythm and varied VR scenes use [zabavnost](.agents/skills/zabavnost/SKILL.md). Its article notes support design choices; actual enjoyment needs player feedback.

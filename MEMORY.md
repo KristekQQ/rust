@@ -15,6 +15,8 @@ Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current co
 | Local build/server and verification | `scripts/run-local.sh [port]`, `scripts/serve-local.py`; `docs/DEVELOPMENT.md` |
 
 ## Decisions and useful boundaries
+
+- Concurrent work (2026-10-22): use [parallel-work](.agents/skills/parallel-work/SKILL.md). Keep substantial tasks in separate worktrees, record file ownership in the shared Git-common-directory registry, and assign one integrator per shared remote release target. Compare relevant input identities at milestones; changed bytes do not identify their author. Runtime ownership/status belongs in that local registry, not this versioned map. Never combine another task's dirty changes or replace its build/package as part of a push.
 - Stable object/light IDs are never reused. Transforms use radians; scheduled rotation deltas use degrees, timing seconds. Four lights; Rust host layouts must match WGSL.
 - Model handles own Rust hierarchy/pose. Import never activates a camera; embedded cameras require explicit SDK commands. Current skin/morph deformation is CPU-cached by changed pose; shader PBR supports core maps/alpha modes. Extension/IBL limits are documented in `docs/GLTF.md`.
 - Approved cathedral view `[6,2.5,2]` toward `[-12,8,0]`, first light `[-19,12,0.2]`. Keep this placement unless asked to change it. 72,513 triangles; glass faces omitted to expose window apertures. Stone metallic=0/roughness=.95; asset CC BY-NC. Light is point/perspective, not directional sun.
