@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neon District · Cyberpunk VR aréna</title>
+<style>
+:root{color-scheme:dark;font:14px/1.5 system-ui;background:#050b14;color:#dbeafa}*{box-sizing:border-box}body{margin:0}canvas{display:block;width:100vw;height:100vh}header{position:absolute;left:28px;top:24px;padding:14px 20px;background:#071321c9;border-left:3px solid #54eff7;border-radius:0 12px 12px 0;pointer-events:none}small{color:#65e9ed;letter-spacing:.18em}h1{font-size:27px;letter-spacing:.02em;margin:2px 0}header p{margin:2px 0;color:#a9bccd}aside{position:absolute;left:28px;bottom:24px;width:min(340px,calc(100vw - 48px));padding:17px 20px;background:#071321e8;border:1px solid #294657;border-radius:12px;backdrop-filter:blur(12px)}button,a{font:inherit}button{padding:9px 13px;border-radius:6px;border:1px solid #4dbfce;background:#103442;color:#e7ffff;cursor:pointer}button:disabled{opacity:.4;cursor:default}.views{display:flex;gap:8px;margin:10px 0}.views button{background:transparent;border-color:#365263;padding:5px 11px}a{color:#6addf2}p{margin:8px 0;color:#adbed0}ul{padding-left:18px}details{margin-top:10px}summary{cursor:pointer;color:#b9d7e9}#result{white-space:pre-wrap;font-size:11px}#status{font-size:12px}body.xr aside,body.xr header{display:none}@media(max-width:600px){header{left:12px;top:12px;padding:10px 13px}h1{font-size:21px}aside{left:12px;bottom:12px;padding:13px;width:300px}}
+/* OrbitCamera uses a left-handed preview; XR eye views are already right-handed. */
+body:not(.xr) #gpu-canvas{transform:scaleX(-1)}
+</style>
+<canvas id="gpu-canvas" width="960" height="720" aria-label="Venkovní cyberpunková ulice s neonovými fasádami, bočními cestami a bojovým náměstím"></canvas>
+<header><small>SEKTOR 09 / NOČNÍ ČTVRŤ</small><h1>Neon District</h1><p>Dva meče. Jeden protivník. Další až po jeho smrti.</p></header>
+<aside><button id="enter" disabled>Vstoupit do VR</button> <button id="exit" hidden>Ukončit VR</button>
+<p><label><input id="show-fps" type="checkbox" checked> FPS panel vpravo u nohy ve VR</label></p>
+<div class="views"><button id="street">Ulice</button><button id="overview">Celá aréna</button></div>
+<p id="status" role="status">Načítám městský blok…</p>
+<details><summary>Souboj, pohyb a teleport</summary><ul><li><strong>Meče v obou rukou</strong> — švihni čepelí do těla monstra</li><li>Protivníci přicházejí po jednom. Po smrtící ráně se rozpadnou a nastoupí další.</li><li><strong>Levý analog</strong> — chůze</li><li><strong>Pravý analog</strong> — otočení o 30°</li><li><strong>Držet A</strong> — zpomalit čas a zamířit</li><li><strong>Pustit A</strong> — teleport až 10 m</li><li><strong>B</strong> — zrušit teleport</li></ul><p>Svítící kruhy pomáhají s orientací. Teleportovat lze i na ostatní volnou podlahu. Lávky a střechy zatím tvoří kulisu.</p></details>
+<details id="verification"><summary>Model a ověření</summary><p>Originální prostorový GLB. Tři druhy monster se střídají v nekonečné řadě. Každého porazíš jedním skutečným švihem.</p><p><a href="../../assets/models/cyberpunk-alley/cyberpunk-alley.glb" download>Stáhnout arénu GLB</a> · <a href="?backend=webgl">WebGL</a></p><button id="verify">Ověřit scénu</button><pre id="result" role="status"></pre></details></aside>
+<script type="module" src="./main.js"></script></html>

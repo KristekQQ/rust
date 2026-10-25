@@ -1,4 +1,4 @@
-import { initEngine } from '../../js/engine.js';
+import { initEngine } from '../shared/runtime-info.js';
 import { createScene } from './scene.js';
 import { createGameInput } from './input.js';
 

@@ -1,0 +1,453 @@
+{
+  "version": 1,
+  "units": "meters",
+  "upAxis": "Y",
+  "forwardAxis": "-Z",
+  "walkableBounds": [
+    -7,
+    7,
+    -31,
+    2
+  ],
+  "spawn": [
+    0,
+    0,
+    0
+  ],
+  "obstacles": [
+    {
+      "id": "boulder--1-0",
+      "center": [
+        -6.35,
+        0.9,
+        -3
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder--1-1",
+      "center": [
+        -6.35,
+        0.9,
+        -11
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder--1-2",
+      "center": [
+        -6.35,
+        0.9,
+        -19
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder--1-3",
+      "center": [
+        -6.35,
+        0.9,
+        -27
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder-1-0",
+      "center": [
+        6.35,
+        0.9,
+        -3
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder-1-1",
+      "center": [
+        6.35,
+        0.9,
+        -11
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder-1-2",
+      "center": [
+        6.35,
+        0.9,
+        -19
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "boulder-1-3",
+      "center": [
+        6.35,
+        0.9,
+        -27
+      ],
+      "halfExtents": [
+        1.15,
+        0.9,
+        1.35
+      ]
+    },
+    {
+      "id": "crystal-shelf-0",
+      "center": [
+        -5.1,
+        1.2,
+        -5
+      ],
+      "halfExtents": [
+        1.5,
+        1.2,
+        1.5
+      ]
+    },
+    {
+      "id": "crystal-shelf-1",
+      "center": [
+        5.25,
+        1.2,
+        -8
+      ],
+      "halfExtents": [
+        1.5,
+        1.2,
+        1.5
+      ]
+    },
+    {
+      "id": "crystal-shelf-2",
+      "center": [
+        -5.15,
+        1.2,
+        -14
+      ],
+      "halfExtents": [
+        1.5,
+        1.2,
+        1.5
+      ]
+    },
+    {
+      "id": "crystal-shelf-3",
+      "center": [
+        5.2,
+        1.2,
+        -19
+      ],
+      "halfExtents": [
+        1.5,
+        1.2,
+        1.5
+      ]
+    },
+    {
+      "id": "crystal-shelf-4",
+      "center": [
+        -5.1,
+        1.2,
+        -25
+      ],
+      "halfExtents": [
+        1.5,
+        1.2,
+        1.5
+      ]
+    },
+    {
+      "id": "crystal-shelf-5",
+      "center": [
+        4.8,
+        1.2,
+        -27
+      ],
+      "halfExtents": [
+        1.5,
+        1.2,
+        1.5
+      ]
+    },
+    {
+      "id": "heart-formation",
+      "center": [
+        4.6,
+        2.6,
+        -31
+      ],
+      "halfExtents": [
+        2.0,
+        2.6,
+        2
+      ]
+    },
+    {
+      "id": "stalagmite-left-6",
+      "center": [
+        -7.05,
+        1.45,
+        -6
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-left-16",
+      "center": [
+        -7.05,
+        1.45,
+        -16
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-left-24",
+      "center": [
+        -7.05,
+        1.45,
+        -24
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-left-30",
+      "center": [
+        -7.05,
+        1.45,
+        -30
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-right-6",
+      "center": [
+        7.1499999999999995,
+        1.45,
+        -6
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-right-16",
+      "center": [
+        7.1499999999999995,
+        1.45,
+        -16
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-right-24",
+      "center": [
+        7.1499999999999995,
+        1.45,
+        -24
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "stalagmite-right-30",
+      "center": [
+        7.1499999999999995,
+        1.45,
+        -30
+      ],
+      "halfExtents": [
+        0.55,
+        1.45,
+        0.5
+      ]
+    },
+    {
+      "id": "lantern-0",
+      "center": [
+        -5,
+        1.5,
+        1
+      ],
+      "halfExtents": [
+        0.3,
+        1.5,
+        0.3
+      ]
+    },
+    {
+      "id": "lantern-1",
+      "center": [
+        5,
+        1.5,
+        1
+      ],
+      "halfExtents": [
+        0.3,
+        1.5,
+        0.3
+      ]
+    },
+    {
+      "id": "lantern-2",
+      "center": [
+        -6,
+        1.5,
+        -17
+      ],
+      "halfExtents": [
+        0.3,
+        1.5,
+        0.3
+      ]
+    },
+    {
+      "id": "lantern-3",
+      "center": [
+        6,
+        1.5,
+        -24
+      ],
+      "halfExtents": [
+        0.3,
+        1.5,
+        0.3
+      ]
+    }
+  ],
+  "landingPads": [
+    {
+      "id": "landing-0",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-1",
+      "position": [
+        0,
+        0,
+        -6
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-2",
+      "position": [
+        0,
+        0,
+        -12
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-3",
+      "position": [
+        0,
+        0,
+        -18
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-4",
+      "position": [
+        0,
+        0,
+        -24
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-5",
+      "position": [
+        0,
+        0,
+        -30
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-6",
+      "position": [
+        -3.2,
+        0,
+        -9
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-7",
+      "position": [
+        3.1,
+        0,
+        -14
+      ],
+      "radius": 0.6
+    },
+    {
+      "id": "landing-8",
+      "position": [
+        -3.1,
+        0,
+        -21
+      ],
+      "radius": 0.6
+    }
+  ]
+}

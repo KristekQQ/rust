@@ -1,7 +1,7 @@
 // Decision 2026-10-16: local tests found CPU cutting faster than hybrid/resident
 // WebGPU compute for this workload. Keep auto=CPU; GPU modes are experiments.
 // Future instances: read ./README.md before revisiting this; Quest 3 is unmeasured.
-import {initEngine} from '../../js/engine.js';
+import {initEngine} from '../shared/runtime-info.js';
 import {createScene,createSword,BOARD_Y} from './scene.js';
 
 const canvas=document.querySelector('#gpu-canvas');

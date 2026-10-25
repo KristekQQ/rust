@@ -6,7 +6,7 @@ use crate::{
 use glam::{Mat4, Quat, Vec2, Vec3};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 const HIDDEN: Vec3 = Vec3::new(0., -10000., 0.);
 #[derive(Deserialize)]
 pub struct EnemySpec {
@@ -51,6 +51,7 @@ struct Enemy {
     yaw: f32,
     phase: u8,
     age: f32,
+    cut_idle: f32,
     shot: f32,
     salvos: u32,
     beam_age: f32,
@@ -84,6 +85,7 @@ struct CutTask {
     model: crate::gltf_model::ModelInstance,
     root: Mat4,
     parts: Vec<(usize, usize)>,
+    triangle_offset: usize,
     normal: Vec3,
     point: Vec3,
     owner: usize,
@@ -94,6 +96,24 @@ struct Pending {
     owner: usize,
     serial: u32,
     normal: Vec3,
+}
+const PREPARE_TRIANGLES: usize = 3500;
+const INSTALL_VERTICES: usize = 9000;
+struct CompletedCut {
+    pending: Pending,
+    bytes: Vec<u8>,
+    counts: [usize; 2],
+    side: usize,
+    offset: usize,
+}
+struct PieceMotion {
+    direction: Vec3,
+    age: f32,
+}
+struct StagedCut {
+    pending: Pending,
+    ids: Vec<(u32, usize)>,
+    uploaded: BTreeSet<u32>,
 }
 type ConfigIds = ([u32; 2], Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, u32);
 
@@ -132,10 +152,23 @@ pub struct Game {
     death_mode: String,
     tasks: VecDeque<CutTask>,
     pending: BTreeMap<u32, Pending>,
-    completed: Vec<(Pending, Vec<u8>)>,
+    completed: VecDeque<CompletedCut>,
+    staged: Vec<StagedCut>,
+    abandoned: Vec<u32>,
+    prepared_triangles: usize,
+    staged_vertices: usize,
+    commits: u32,
+    stage_ms: f64,
+    stage_max_ms: f64,
     token: u32,
     pieces: Vec<u32>,
+    piece_motion: BTreeMap<u32, PieceMotion>,
     cut_errors: u32,
+    blade_contacts: u64,
+    blade_hits: u64,
+    blade_slow: u64,
+    blade_breaks: u64,
+    blade_speed: f32,
     xr: bool,
     pub xr_origin: Mat4,
     xr_aim: bool,
@@ -246,6 +279,7 @@ impl Game {
                 yaw: 0.,
                 phase: 0,
                 age: 0.,
+                cut_idle: 0.,
                 shot: 0.,
                 salvos: 0,
                 beam_age: -1.,
@@ -298,10 +332,23 @@ impl Game {
             death_mode: "cut".into(),
             tasks: VecDeque::new(),
             pending: BTreeMap::new(),
-            completed: Vec::new(),
+            completed: VecDeque::new(),
+            staged: Vec::new(),
+            abandoned: Vec::new(),
+            prepared_triangles: 0,
+            staged_vertices: 0,
+            commits: 0,
+            stage_ms: 0.,
+            stage_max_ms: 0.,
             token: 0,
             pieces: Vec::new(),
+            piece_motion: BTreeMap::new(),
             cut_errors: 0,
+            blade_contacts: 0,
+            blade_hits: 0,
+            blade_slow: 0,
+            blade_breaks: 0,
+            blade_speed: 0.,
             xr: false,
             xr_origin: Mat4::IDENTITY,
             xr_aim: false,
@@ -324,6 +371,8 @@ impl Game {
         self.tasks.clear();
         self.pending.clear();
         self.completed.clear();
+        self.clear_staged(scene);
+        self.piece_motion.clear();
         for id in self.pieces.drain(..) {
             scene.remove_object(id);
         }
@@ -551,6 +600,13 @@ impl Game {
         head: Option<Mat4>,
         hands: [Option<Mat4>; 2],
     ) -> f32 {
+        let stage_start = cut_clock();
+        if self.advance_cuts(scene).is_err() {
+            self.cut_failed();
+            self.clear_staged(scene);
+        }
+        self.stage_ms = cut_clock() - stage_start;
+        self.stage_max_ms = self.stage_max_ms.max(self.stage_ms);
         let dt = real_dt.clamp(0., 0.05);
         if !dt.is_finite() || dt <= 0. {
             self.blades = [None; 2];
@@ -580,6 +636,7 @@ impl Game {
             self.blades = [None; 2];
             return 0.;
         }
+        self.advance_piece_motion(scene, sim);
         self.frame += 1;
         self.age += sim;
         let head = head.unwrap_or_else(|| {
@@ -601,6 +658,7 @@ impl Game {
             return sim;
         }
         let samples = self.sample_blades(scene, head, hands, dt);
+        self.blade_speed = 0.;
         let mut sword_hits = Vec::new();
         let mut shots = Vec::new();
         let mut damage = 0.;
@@ -609,9 +667,21 @@ impl Game {
                 continue;
             }
             if self.enemies[i].phase == 3 {
+                self.enemies[i].age += sim;
+                self.enemies[i].cut_idle += dt;
+                let mut cutting = self.tasks.iter().any(|t| t.owner == i)
+                    || self.pending.values().any(|p| p.owner == i)
+                    || self.completed.iter().any(|c| c.pending.owner == i)
+                    || self.staged.iter().any(|s| s.pending.owner == i);
+                // Lost worker replies or GPU readiness must not hold a wave forever.
+                // This measures active real time, independently of bullet time.
+                let expired = cutting && self.enemies[i].cut_idle > 10.;
+                if expired {
+                    self.expire_cut(scene, i);
+                    cutting = false;
+                }
                 let e = &mut self.enemies[i];
-                e.age += sim;
-                if e.age > 3.2 {
+                if expired || (e.age > 3.2 && !cutting) {
                     e.phase = 0;
                     hide_enemy(scene, e.spec.id);
                 }
@@ -696,7 +766,18 @@ impl Game {
                 };
                 let contact = swept_enemy(*old, *new, e);
                 let travel = old.a.distance(new.a).max(old.b.distance(new.b));
-                let eligible = *can_cut && travel > 0.018 && travel / real_dt > 0.3;
+                // Physical speed, not a per-frame distance: identical swings must
+                // remain eligible at 72/90/120 Hz. Contact state and cooldown
+                // suppress repeats while resting inside an opponent.
+                let speed = travel / real_dt;
+                self.blade_speed = self.blade_speed.max(speed);
+                let eligible = *can_cut && speed > 0.3;
+                if contact {
+                    self.blade_contacts += 1;
+                    if !eligible {
+                        self.blade_slow += 1;
+                    }
+                }
                 if blade_damage_allowed(
                     e,
                     hand,
@@ -704,6 +785,7 @@ impl Game {
                     eligible,
                     (!self.xr).then_some(self.strikes[hand]),
                 ) {
+                    self.blade_hits += 1;
                     let edge = new.b - new.a;
                     let movement = (new.a + new.b - old.a - old.b) * 0.5;
                     let normal = edge.cross(movement).try_normalize().unwrap_or(Vec3::Y);
@@ -750,6 +832,8 @@ impl Game {
         self.tasks.clear();
         self.pending.clear();
         self.completed.clear();
+        self.clear_staged(scene);
+        self.piece_motion.clear();
         for id in self.pieces.drain(..) {
             scene.remove_object(id);
         }
@@ -941,6 +1025,7 @@ impl Game {
             if real_continuity(old, new, dt) {
                 Some((old, new, self.xr || self.swing[h] >= 0.))
             } else {
+                self.blade_breaks += 1;
                 None
             }
         })
@@ -1080,19 +1165,14 @@ impl Game {
         e.hp = 0.;
         e.phase = 3;
         e.age = 0.;
+        e.cut_idle = 0.;
         e.beam_age = -1.;
         self.kills += 1;
-        play(scene, e, "Explode", false);
+        // Freeze the exact impact pose while the bounded worker transaction runs.
+        // Explode moves individual nodes apart before slicing and destroys the silhouette.
+        let _ = scene.pause_model_animation(e.spec.id, true);
         if let Some(model) = scene.model(e.spec.id) {
-            let mut model = model.clone();
-            if let Some(clip) = model.asset.animations.iter().position(|a| {
-                a.name
-                    .as_deref()
-                    .is_some_and(|s| s.eq_ignore_ascii_case("Explode"))
-            }) {
-                let _ = model.play(clip, false);
-                let _ = model.seek(0.1);
-            }
+            let model = model.clone();
             let parts = model
                 .pose
                 .active_nodes
@@ -1114,6 +1194,7 @@ impl Game {
                 model,
                 root: scene.objects()[&e.spec.id].transform.model(),
                 parts,
+                triangle_offset: 0,
                 normal,
                 point: e.position + Vec3::Y * e.spec.height * 0.5,
                 owner: i,
@@ -1127,43 +1208,53 @@ impl Game {
         };
         let mut data = Vec::new();
         let mut triangles = 0;
-        while let Some((node, primitive)) = task.parts.pop() {
+        while triangles < PREPARE_TRIANGLES {
+            let Some(&(node, primitive)) = task.parts.last() else {
+                break;
+            };
             let p = &task.model.asset.primitives[primitive];
             if p.mode != crate::gltf_model::PrimitiveMode::Triangles {
+                task.parts.pop();
+                task.triangle_offset = 0;
                 continue;
             }
-            let vertices = crate::gltf_animation::deformed_vertices(
+            let start = task.triangle_offset * 3;
+            let end = (start + (PREPARE_TRIANGLES - triangles) * 3).min(p.indices.len() / 3 * 3);
+            let vertices = crate::gltf_animation::deformed_cut_vertex_subset(
                 &task.model.asset,
                 &task.model.pose,
                 node,
                 primitive,
+                p.indices[start..end].iter().copied(),
             )?;
             let matrix =
                 task.root * crate::gltf_animation::node_render_matrix(&task.model.pose, node);
             let nm = matrix.inverse().transpose();
             let material = p.material.map(|m| &task.model.asset.materials[m]);
-            for tri in p.indices.as_chunks::<3>().0.iter() {
-                for &index in tri {
-                    let v = &vertices[index as usize];
-                    let position = matrix.transform_point3(Vec3::from_array(v.position));
-                    let normal = nm
-                        .transform_vector3(Vec3::from_array(v.normal))
-                        .normalize_or_zero();
-                    let color = Vec3::from_slice(&v.color)
-                        * material.map_or(Vec3::ONE, |m| Vec3::from_slice(&m.base_color_factor));
-                    data.extend_from_slice(&[
-                        position.x, position.y, position.z, normal.x, normal.y, normal.z, color.x,
-                        color.y, color.z,
-                    ]);
-                }
-                triangles += 1;
+            for v in &vertices {
+                let position = matrix.transform_point3(Vec3::from_array(v.position));
+                let normal = nm
+                    .transform_vector3(Vec3::from_array(v.normal))
+                    .normalize_or_zero();
+                let color = Vec3::from_slice(&v.color)
+                    * material.map_or(Vec3::ONE, |m| Vec3::from_slice(&m.base_color_factor));
+                data.extend_from_slice(&[
+                    position.x, position.y, position.z, normal.x, normal.y, normal.z, color.x,
+                    color.y, color.z,
+                ]);
             }
-            if triangles >= 3500 {
-                break;
+            triangles += (end - start) / 3;
+            if end == p.indices.len() / 3 * 3 {
+                task.parts.pop();
+                task.triangle_offset = 0;
+            } else {
+                task.triangle_offset = end / 3;
             }
         }
+        self.prepared_triangles = triangles;
         self.token = self.token.wrapping_add(1);
         let token = self.token;
+        self.enemies[task.owner].cut_idle = 0.;
         let normal = if self.death_mode == "cut" {
             task.normal
         } else {
@@ -1196,8 +1287,10 @@ impl Game {
         }
         Ok(output)
     }
-    pub fn accept_cut(&mut self, scene: &mut SceneManager, bytes: &[u8]) -> Result<(), String> {
+    /// Worker callbacks only validate framing and enqueue; geometry work runs in tick.
+    pub fn accept_cut(&mut self, _scene: &mut SceneManager, bytes: &[u8]) -> Result<(), String> {
         if bytes.len() < 12 || bytes.len() > 16 * 1024 * 1024 || !bytes.len().is_multiple_of(4) {
+            self.cut_failed();
             return Err("Invalid cut result".into());
         }
         let token = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
@@ -1208,96 +1301,252 @@ impl Game {
         if e.serial != pending.serial || e.phase != 3 {
             return Ok(());
         }
-        let enemy_id = e.spec.id;
-        self.completed.push((pending, bytes.to_vec()));
-        if self.pending.values().any(|p| p.owner == pending.owner)
-            || self.tasks.iter().any(|t| t.owner == pending.owner)
-        {
-            return Ok(());
-        }
-        let mut ready = Vec::new();
-        let mut retained = Vec::new();
-        for item in self.completed.drain(..) {
-            if item.0.owner == pending.owner {
-                ready.push(item);
-            } else {
-                retained.push(item);
-            }
-        }
-        self.completed = retained;
-        for (metadata, bytes) in ready {
-            self.install_cut(scene, &bytes, metadata)?;
-        }
-        hide_enemy(scene, enemy_id);
-        Ok(())
-    }
-    fn install_cut(
-        &mut self,
-        scene: &mut SceneManager,
-        bytes: &[u8],
-        pending: Pending,
-    ) -> Result<(), String> {
         let counts = [
             u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize,
             u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize,
         ];
-        if counts.iter().any(|n| !n.is_multiple_of(3))
+        if counts
+            .iter()
+            .any(|n| !n.is_multiple_of(3) || *n > (bytes.len() - 12) / 36)
             || bytes.len() != 12 + (counts[0] + counts[1]) * 36
         {
+            self.cut_failed();
             return Err("Invalid cut result length".into());
         }
-        let mut offset = 12;
-        for (side, count) in counts.into_iter().enumerate() {
-            for chunk_count in (0..count)
-                .step_by(60000)
-                .map(|start| (count - start).min(60000))
-            {
-                let mut vertices = Vec::with_capacity(chunk_count);
-                let mut min = Vec3::splat(f32::INFINITY);
-                let mut max = Vec3::splat(f32::NEG_INFINITY);
-                for bytes in bytes[offset..offset + chunk_count * 36]
-                    .as_chunks::<36>()
-                    .0
-                    .iter()
-                {
-                    let floats: Vec<_> = bytes
-                        .as_chunks::<4>()
-                        .0
-                        .iter()
-                        .map(|b| f32::from_le_bytes(*b))
-                        .collect();
-                    if floats.iter().any(|v| !v.is_finite()) {
-                        return Err("Nonfinite cut result".into());
-                    }
-                    let p = Vec3::from_slice(&floats);
-                    min = min.min(p);
-                    max = max.max(p);
-                    vertices.push(crate::gltf_loader::ImportedVertex {
-                        position: p.to_array(),
-                        normal: [floats[3], floats[4], floats[5]],
-                        color: [floats[6], floats[7], floats[8]],
-                    });
+        if !self
+            .staged
+            .iter()
+            .any(|s| s.pending.owner == pending.owner && s.pending.serial == pending.serial)
+        {
+            self.staged.push(StagedCut {
+                pending,
+                ids: Vec::new(),
+                uploaded: BTreeSet::new(),
+            });
+        }
+        self.enemies[pending.owner].cut_idle = 0.;
+        self.completed.push_back(CompletedCut {
+            pending,
+            bytes: bytes.to_vec(),
+            counts,
+            side: 0,
+            offset: 0,
+        });
+        Ok(())
+    }
+    /// Prepared hidden meshes can be uploaded before their atomic publication.
+    pub fn staged_cut_ids(&self) -> impl Iterator<Item = u32> + '_ {
+        self.staged
+            .iter()
+            .flat_map(|s| s.ids.iter().map(|&(id, _)| id))
+    }
+    /// Called after renderer synchronization, only for meshes whose GPU upload succeeded.
+    pub fn ack_cut_uploads(&mut self, ids: &[u32]) {
+        for stage in &mut self.staged {
+            for &id in ids {
+                if stage.ids.iter().any(|&(staged, _)| staged == id) && stage.uploaded.insert(id) {
+                    self.enemies[stage.pending.owner].cut_idle = 0.;
                 }
-                offset += chunk_count * 36;
-                let mesh = crate::gltf_loader::ImportedMesh {
-                    indices: (0..vertices.len() as u32).collect(),
-                    vertices,
-                    bounds_min: min.to_array(),
-                    bounds_max: max.to_array(),
-                    warnings: Vec::new(),
-                };
-                let mesh = crate::cutting::CutMesh::from_render_mesh(&mesh);
-                let id = scene.add_triangle_mesh(mesh)?;
+            }
+        }
+    }
+    fn clear_staged(&mut self, scene: &mut SceneManager) {
+        for s in self.staged.drain(..) {
+            for (id, _) in s.ids {
+                scene.remove_object(id);
+            }
+        }
+        for id in self.abandoned.drain(..) {
+            scene.remove_object(id);
+        }
+    }
+    fn advance_cuts(&mut self, scene: &mut SceneManager) -> Result<(), String> {
+        self.staged_vertices = 0;
+        if self
+            .staged
+            .iter()
+            .flat_map(|s| &s.ids)
+            .any(|&(id, _)| !scene.object_exists(id))
+        {
+            return Err("Staged cut object removed before publication".into());
+        }
+        for id in self.abandoned.drain(..) {
+            scene.remove_object(id);
+        }
+        // Commit only stages completed on a previous tick: renderer gets a warmup frame.
+        let mut i = 0;
+        while i < self.staged.len() {
+            let p = self.staged[i].pending;
+            let valid =
+                self.enemies[p.owner].serial == p.serial && self.enemies[p.owner].phase == 3;
+            let busy = self
+                .tasks
+                .iter()
+                .any(|t| t.owner == p.owner && t.serial == p.serial)
+                || self
+                    .pending
+                    .values()
+                    .any(|t| t.owner == p.owner && t.serial == p.serial)
+                || self
+                    .completed
+                    .iter()
+                    .any(|t| t.pending.owner == p.owner && t.pending.serial == p.serial);
+            let uploaded = self.staged[i]
+                .ids
+                .iter()
+                .all(|&(id, _)| self.staged[i].uploaded.contains(&id));
+            if valid && (busy || !uploaded) {
+                i += 1;
+                continue;
+            }
+            let stage = self.staged.remove(i);
+            if !valid {
+                for (id, _) in stage.ids {
+                    scene.remove_object(id);
+                }
+                continue;
+            }
+            // All fallible geometry creation has succeeded. Publish all halves together.
+            for &(id, side) in &stage.ids {
+                scene.set_object_position(id, Vec3::ZERO);
                 let sign = if side == 0 { 1. } else { -1. };
-                scene.set_projectile(id, pending.normal * sign * 0.65 + Vec3::Y * 0.75, 1.5, 0.);
-                scene.dissolve_cut_pieces(&[id], 0.3, 2.5)?;
+                // Generic fading pieces deliberately skip projectile physics. Own this
+                // visual motion here so both halves actually separate during dissolve.
+                self.piece_motion.insert(
+                    id,
+                    PieceMotion {
+                        direction: if self.death_mode == "cut" {
+                            p.normal * sign
+                        } else {
+                            Vec3::ZERO
+                        },
+                        age: 0.,
+                    },
+                );
+                scene.dissolve_cut_pieces(&[id], 1.26, 1.74)?;
                 self.pieces.push(id);
             }
+            hide_enemy(scene, self.enemies[p.owner].spec.id);
+            // Worker latency must not consume the visible death effect lifetime.
+            self.enemies[p.owner].age = 0.;
+            self.commits += 1;
+        }
+        let mut budget = INSTALL_VERTICES;
+        while budget > 0 {
+            let Some(result) = self.completed.front_mut() else {
+                break;
+            };
+            if self.enemies[result.pending.owner].serial != result.pending.serial
+                || self.enemies[result.pending.owner].phase != 3
+            {
+                self.completed.pop_front();
+                continue;
+            }
+            if result.side == 2 {
+                self.completed.pop_front();
+                continue;
+            }
+            let count = (result.counts[result.side] - result.offset).min(budget);
+            if count == 0 {
+                result.side += 1;
+                result.offset = 0;
+                continue;
+            }
+            let start = 12
+                + (if result.side == 1 {
+                    result.counts[0]
+                } else {
+                    0
+                } + result.offset)
+                    * 36;
+            let mut vertices = Vec::with_capacity(count);
+            let mut min = Vec3::splat(f32::INFINITY);
+            let mut max = Vec3::splat(f32::NEG_INFINITY);
+            for bytes in result.bytes[start..start + count * 36].as_chunks::<36>().0 {
+                let floats: [f32; 9] = std::array::from_fn(|i| {
+                    f32::from_le_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap())
+                });
+                if floats.iter().any(|v| !v.is_finite()) {
+                    return Err("Nonfinite cut result".into());
+                }
+                let p = Vec3::from_slice(&floats);
+                min = min.min(p);
+                max = max.max(p);
+                vertices.push(crate::gltf_loader::ImportedVertex {
+                    position: p.to_array(),
+                    normal: [floats[3], floats[4], floats[5]],
+                    color: [floats[6], floats[7], floats[8]],
+                });
+            }
+            let mesh = crate::gltf_loader::ImportedMesh {
+                indices: (0..count as u32).collect(),
+                vertices,
+                bounds_min: min.to_array(),
+                bounds_max: max.to_array(),
+                warnings: Vec::new(),
+            };
+            let id =
+                scene.add_visual_triangle_mesh(crate::cutting::CutMesh::from_render_mesh(&mesh))?;
+            scene.set_object_position(id, HIDDEN);
+            self.staged
+                .iter_mut()
+                .find(|s| {
+                    s.pending.owner == result.pending.owner
+                        && s.pending.serial == result.pending.serial
+                })
+                .expect("accepted cut has stage")
+                .ids
+                .push((id, result.side));
+            self.enemies[result.pending.owner].cut_idle = 0.;
+            result.offset += count;
+            budget -= count;
+            self.staged_vertices += count;
         }
         Ok(())
     }
+    fn advance_piece_motion(&mut self, scene: &mut SceneManager, dt: f32) {
+        self.pieces.retain(|id| scene.object_exists(*id));
+        self.piece_motion.retain(|id, motion| {
+            if !scene.object_exists(*id) {
+                return false;
+            }
+            motion.age += dt;
+            let distance = (motion.age * 0.52).min(0.65);
+            let falling = (motion.age - 0.45).max(0.);
+            let drop = if motion.direction == Vec3::ZERO {
+                0.
+            } else {
+                (falling * falling * 0.1).min(0.38)
+            };
+            scene.set_object_position(*id, motion.direction * distance - Vec3::Y * drop);
+            true
+        });
+    }
+    fn expire_cut(&mut self, scene: &mut SceneManager, owner: usize) {
+        let serial = self.enemies[owner].serial;
+        let matches = |p: &Pending| p.owner == owner && p.serial == serial;
+        self.tasks
+            .retain(|t| t.owner != owner || t.serial != serial);
+        self.pending.retain(|_, p| !matches(p));
+        self.completed.retain(|c| !matches(&c.pending));
+        let mut i = 0;
+        while i < self.staged.len() {
+            if matches(&self.staged[i].pending) {
+                for (id, _) in self.staged.remove(i).ids {
+                    scene.remove_object(id);
+                }
+            } else {
+                i += 1;
+            }
+        }
+        self.cut_errors += 1;
+    }
     pub fn cut_failed(&mut self) {
         self.cut_errors += 1;
+        for stage in self.staged.drain(..) {
+            self.abandoned
+                .extend(stage.ids.into_iter().map(|(id, _)| id));
+        }
         self.tasks.clear();
         self.pending.clear();
         self.completed.clear();
@@ -1423,7 +1672,7 @@ impl Game {
         );
     }
     pub fn state(&self) -> Value {
-        json!({"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"errors":self.cut_errors},"xr":self.xr})
+        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
     }
 }
 fn max_hp(kind: &str) -> f32 {
@@ -1628,3 +1877,19 @@ fn blade_time(from: Vec3, to: Vec3, a: Blade, b: Blade) -> Option<f32> {
 #[cfg(test)]
 #[path = "rim_game_tests.rs"]
 mod tests;
+
+#[cfg(target_arch = "wasm32")]
+fn cut_clock() -> f64 {
+    web_sys::window()
+        .and_then(|w| w.performance())
+        .map_or(0., |p| p.now())
+}
+#[cfg(not(target_arch = "wasm32"))]
+fn cut_clock() -> f64 {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_secs_f64()
+        * 1000.
+}

@@ -144,6 +144,7 @@ fn original_models_normalize_and_wave_waits_for_every_orbiter() {
     assert_eq!(game.enemies[5].phase, 1);
     game.defeat(&mut scene, 5, Vec3::Y);
     game.enemies[5].age = 3.21;
+    game.cut_failed(); // This test retires deaths without a worker.
     game.tick(&mut scene, 0.01, None, [None; 2]);
     assert_eq!(game.wave, 1);
     assert_eq!(game.kills, 6);
@@ -276,7 +277,9 @@ fn worker_batches_cover_full_original_mesh_and_ignore_late_serials() {
         if bytes.is_empty() {
             break;
         }
-        triangle_count += u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+        let count = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+        assert!(count <= PREPARE_TRIANGLES);
+        triangle_count += count;
         results.push(crate::rim_cut::split(&bytes).unwrap());
     }
     assert_eq!(triangle_count, expected);
@@ -287,7 +290,10 @@ fn worker_batches_cover_full_original_mesh_and_ignore_late_serials() {
         assert!(game.pieces.is_empty());
     }
     game.accept_cut(&mut scene, &last).unwrap();
-    assert!(game.pending.is_empty() && game.completed.is_empty());
+    assert!(game.pending.is_empty());
+    assert!(game.pieces.is_empty());
+    finish_cut_staging(&mut game, &mut scene);
+    assert!(game.completed.is_empty());
     assert!(!game.pieces.is_empty());
     assert_eq!(
         scene.objects()[&game.enemies[owner].spec.id]
@@ -435,23 +441,17 @@ fn pooled_animations_freeze_and_spawn_restarts_each_kind() {
 }
 
 #[test]
-fn death_playback_survives_pending_cut_then_freezes_with_hidden_root() {
+fn death_impact_pose_stays_intact_until_atomic_cut_publication() {
     for mode in ["cut", "dissolve"] {
         let (mut game, mut scene) = fixture_with_playing_pool(true);
         start(&mut game, &mut scene);
         game.death_mode = mode.into();
         let id = game.enemies[0].spec.id;
+        let impact_pose = scene.model(id).unwrap().revision;
         game.defeat(&mut scene, 0, Vec3::X);
-        let playback = scene.model(id).unwrap().playback.as_ref().unwrap();
-        assert!(!playback.looping && playback.playing);
-        assert_eq!(
-            scene.model(id).unwrap().asset.animations[playback.clip]
-                .name
-                .as_deref(),
-            Some("Explode")
-        );
+        assert!(!scene.model(id).unwrap().playback.as_ref().unwrap().playing);
         scene.update(0.03);
-        assert!(scene.model(id).unwrap().playback.as_ref().unwrap().time > 0.);
+        assert_eq!(scene.model(id).unwrap().revision, impact_pose);
         let mut results = Vec::new();
         loop {
             let bytes = game.take_cut_job().unwrap();
@@ -464,9 +464,11 @@ fn death_playback_survives_pending_cut_then_freezes_with_hidden_root() {
         for bytes in results {
             game.accept_cut(&mut scene, &bytes).unwrap();
         }
-        assert!(scene.model(id).unwrap().playback.as_ref().unwrap().playing);
+        assert!(!scene.model(id).unwrap().playback.as_ref().unwrap().playing);
         assert_ne!(scene.objects()[&id].transform.position, HIDDEN);
         game.accept_cut(&mut scene, &last).unwrap();
+        assert!(game.pieces.is_empty());
+        finish_cut_staging(&mut game, &mut scene);
         assert_eq!(game.enemies[0].phase, 3);
         assert!(!scene.model(id).unwrap().playback.as_ref().unwrap().playing);
         let frozen = scene.model(id).unwrap().revision;
@@ -487,6 +489,7 @@ fn death_timeout_and_teardown_pause_pool_and_reject_late_cut_results() {
     start(&mut game, &mut scene);
     game.defeat(&mut scene, 0, Vec3::Y);
     game.enemies[0].age = 3.21;
+    game.cut_failed(); // Explicit failure releases a stalled cut; timeout then retires the enemy.
     game.tick(&mut scene, 0.01, None, [None; 2]);
     assert_eq!(game.enemies[0].phase, 0);
     assert_pool_frozen(&game, &mut scene);
@@ -761,4 +764,378 @@ fn xr_aim_cancel_and_tracking_loss_do_not_launch_but_trigger_release_does() {
     assert_eq!(game.player.jump_count, 1);
     assert_eq!(game.player.stamina, 3.);
     assert_eq!(game.state()["player"]["stamina"]["spent"], 1);
+}
+
+fn finish_cut_staging(game: &mut Game, scene: &mut SceneManager) {
+    let initial_commits = game.commits;
+    for _ in 0..200 {
+        let ids: Vec<_> = game.staged_cut_ids().collect();
+        game.ack_cut_uploads(&ids);
+        game.tick(scene, 0.001, None, [None; 2]);
+        assert!(game.staged_vertices <= INSTALL_VERTICES);
+        if game.commits != initial_commits {
+            assert!(game
+                .pieces
+                .iter()
+                .all(|id| game.piece_motion.contains_key(id)));
+            assert!(
+                game.pieces.iter().all(|id| {
+                    !scene.is_cuttable(*id)
+                        && scene.triangle_meshes()[id].mesh.contact_shape().is_none()
+                }),
+                "dead fragments never bake collision proxies"
+            );
+            return;
+        }
+        assert!(game.pieces.is_empty(), "no partial publication");
+        for id in game.staged_cut_ids() {
+            assert_eq!(scene.objects()[&id].transform.position, HIDDEN);
+        }
+    }
+    panic!("cut staging did not finish");
+}
+
+#[test]
+fn cut_staging_waits_for_gpu_ack_and_cleans_up_on_failure() {
+    let (mut game, mut scene) = fixture();
+    start(&mut game, &mut scene);
+    game.defeat(&mut scene, 0, Vec3::Y);
+    loop {
+        let bytes = game.take_cut_job().unwrap();
+        if bytes.is_empty() {
+            break;
+        }
+        game.accept_cut(&mut scene, &crate::rim_cut::split(&bytes).unwrap())
+            .unwrap();
+    }
+    assert!(
+        game.staged_cut_ids().next().is_none(),
+        "onmessage does no scene installation"
+    );
+    for _ in 0..30 {
+        game.tick(&mut scene, 0.001, None, [None; 2]);
+    }
+    assert!(game.completed.is_empty());
+    assert!(game.pieces.is_empty());
+    assert_ne!(
+        scene.objects()[&game.enemies[0].spec.id].transform.position,
+        HIDDEN
+    );
+    let ids: Vec<_> = game.staged_cut_ids().collect();
+    assert!(!ids.is_empty());
+    game.cut_failed();
+    game.tick(&mut scene, 0.001, None, [None; 2]);
+    assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+    assert!(game.staged.is_empty());
+}
+
+#[test]
+fn single_huge_primitive_prepares_only_requested_triangles() {
+    let (mut game, mut scene) = fixture();
+    start(&mut game, &mut scene);
+    game.defeat(&mut scene, 0, Vec3::X);
+    let task = game.tasks.front_mut().unwrap();
+    let (node, primitive) = *task
+        .parts
+        .iter()
+        .find(|&&(_, p)| {
+            let p = &task.model.asset.primitives[p];
+            p.mode == crate::gltf_model::PrimitiveMode::Triangles && p.vertices.len() > 6
+        })
+        .unwrap();
+    let p = &task.model.asset.primitives[primitive];
+    let triangle = p.indices[..3].to_vec();
+    let full = crate::gltf_animation::deformed_vertices(
+        &task.model.asset,
+        &task.model.pose,
+        node,
+        primitive,
+    )
+    .unwrap();
+    let subset = crate::gltf_animation::deformed_vertex_subset(
+        &task.model.asset,
+        &task.model.pose,
+        node,
+        primitive,
+        triangle.iter().copied(),
+    )
+    .unwrap();
+    for (v, &index) in subset.iter().zip(&triangle) {
+        assert_eq!(v.position, full[index as usize].position);
+        assert_eq!(v.normal, full[index as usize].normal);
+        assert_eq!(v.tangent, full[index as usize].tangent);
+    }
+    let unused = (0..p.vertices.len())
+        .find(|i| !triangle.contains(&(*i as u32)))
+        .unwrap();
+    let first_vertex = p.vertices.start;
+    let asset = Arc::make_mut(&mut task.model.asset);
+    asset.primitives[primitive].indices = triangle.repeat(10_001);
+    // Whole-primitive deformation now fails: bounded subset must never touch this vertex.
+    asset.vertices[first_vertex + unused].position = [f32::NAN; 3];
+    task.parts = vec![(node, primitive)];
+    let mut counts = Vec::new();
+    let mut first_triangle = Vec::new();
+    loop {
+        let bytes = game.take_cut_job().unwrap();
+        if bytes.is_empty() {
+            break;
+        }
+        counts.push(u32::from_le_bytes(bytes[4..8].try_into().unwrap()));
+        if first_triangle.is_empty() {
+            first_triangle = bytes[32..140].to_vec();
+        }
+        for tri in bytes[32..].as_chunks::<108>().0 {
+            assert_eq!(tri.as_slice(), first_triangle);
+        }
+    }
+    assert_eq!(counts, [3500, 3500, 3001]);
+}
+
+#[test]
+fn staged_reset_and_nonfinite_result_leave_no_partial_pieces() {
+    let (mut game, mut scene) = fixture();
+    start(&mut game, &mut scene);
+    for fail in [false, true] {
+        game.defeat(&mut scene, 0, Vec3::Y);
+        let mut results = Vec::new();
+        loop {
+            let bytes = game.take_cut_job().unwrap();
+            if bytes.is_empty() {
+                break;
+            }
+            results.push(crate::rim_cut::split(&bytes).unwrap());
+        }
+        for result in &results {
+            game.accept_cut(&mut scene, result).unwrap();
+        }
+        game.tick(&mut scene, 0.001, None, [None; 2]);
+        let ids: Vec<_> = game.staged_cut_ids().collect();
+        assert!(!ids.is_empty());
+        assert!(game.pieces.is_empty());
+        assert!(ids
+            .iter()
+            .all(|id| scene.projectile_velocity(*id).is_none()));
+        if fail {
+            let result = game.completed.front_mut().unwrap();
+            // Poison a remaining vertex, after the first bounded chunk was staged.
+            let start = 12
+                + (if result.side == 1 {
+                    result.counts[0]
+                } else {
+                    0
+                } + result.offset)
+                    * 36;
+            result.bytes[start..start + 4].copy_from_slice(&f32::NAN.to_le_bytes());
+            game.tick(&mut scene, 0.001, None, [None; 2]);
+            assert!(game.staged.is_empty());
+            assert_eq!(game.cut_errors, 1);
+        } else {
+            game.spawn(&mut scene);
+        }
+        assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+        assert!(game.pieces.is_empty());
+    }
+}
+
+#[test]
+fn published_halves_separate_before_dissolve_then_evaporate() {
+    let (mut game, mut scene) = fixture_with_playing_pool(true);
+    start(&mut game, &mut scene);
+    game.defeat(&mut scene, 0, Vec3::X);
+    loop {
+        let job = game.take_cut_job().unwrap();
+        if job.is_empty() {
+            break;
+        }
+        game.accept_cut(&mut scene, &crate::rim_cut::split(&job).unwrap())
+            .unwrap();
+    }
+    finish_cut_staging(&mut game, &mut scene);
+    let ids = game.pieces.clone();
+    assert!(ids.iter().any(|id| game.piece_motion[id].direction.x > 0.));
+    assert!(ids.iter().any(|id| game.piece_motion[id].direction.x < 0.));
+    for _ in 0..20 {
+        game.tick(&mut scene, 0.05, None, [None; 2]);
+        scene.update(0.05);
+    }
+    for id in &ids {
+        let object = &scene.objects()[id];
+        let direction = game.piece_motion[id].direction.x;
+        assert!(
+            object.transform.position.x * direction > 0.5,
+            "half must visibly separate despite being a fading piece"
+        );
+        assert_eq!(
+            object.visual_fade, 1.,
+            "full silhouette must survive the first second"
+        );
+        assert!(object.visual_dissolve);
+    }
+    for _ in 0..20 {
+        game.tick(&mut scene, 0.05, None, [None; 2]);
+        scene.update(0.05);
+    }
+    for id in &ids {
+        let object = &scene.objects()[id];
+        assert!((object.transform.position.x.abs() - 0.65).abs() < 1e-5);
+        assert!(object.visual_fade > 0. && object.visual_fade < 1.);
+    }
+    for _ in 0..21 {
+        game.tick(&mut scene, 0.05, None, [None; 2]);
+        scene.update(0.05);
+    }
+    assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+    // Scene removes dissolved meshes after gameplay; prune its IDs next frame.
+    game.tick(&mut scene, 0.05, None, [None; 2]);
+    assert!(game.pieces.is_empty());
+}
+
+#[test]
+fn lost_worker_and_upload_ack_expire_only_the_stalled_enemy_in_real_time() {
+    let (mut game, mut scene) = fixture();
+    start(&mut game, &mut scene);
+    game.defeat(&mut scene, 0, Vec3::X);
+    let stale = crate::rim_cut::split(&game.take_cut_job().unwrap()).unwrap();
+    game.defeat(&mut scene, 1, Vec3::Y);
+    let other_serial = game.enemies[1].serial;
+    // A stale transaction must not cancel its neighbour or require aim-time progress.
+    game.enemies[0].cut_idle = 10.01;
+    game.enemies[0].age = 3.21;
+    game.tick(&mut scene, 0.01, None, [None; 2]);
+    assert_eq!(game.enemies[0].phase, 0);
+    assert_eq!(game.cut_errors, 1);
+    assert!(game
+        .tasks
+        .iter()
+        .any(|t| t.owner == 1 && t.serial == other_serial));
+    game.accept_cut(&mut scene, &stale).unwrap();
+    assert!(
+        game.completed.is_empty(),
+        "expired reply cannot resurrect a death"
+    );
+    while !game.tasks.is_empty() {
+        let result = crate::rim_cut::split(&game.take_cut_job().unwrap()).unwrap();
+        game.accept_cut(&mut scene, &result).unwrap();
+    }
+    for _ in 0..100 {
+        game.tick(&mut scene, 0.001, None, [None; 2]);
+        if game.completed.is_empty() {
+            break;
+        }
+    }
+    let hidden: Vec<_> = game.staged_cut_ids().collect();
+    assert!(!hidden.is_empty());
+    assert!(game.pieces.is_empty());
+    game.enemies[1].cut_idle = 10.01;
+    game.enemies[1].age = 3.21;
+    game.tick(&mut scene, 0.01, None, [None; 2]);
+    assert_eq!(game.enemies[1].phase, 0);
+    assert_eq!(game.cut_errors, 2);
+    assert!(hidden.iter().all(|id| !scene.object_exists(*id)));
+    assert!(game.staged.is_empty());
+}
+
+#[test]
+fn every_kill_finishes_real_slicing_then_advances_the_wave() {
+    let (mut game, mut scene) = fixture();
+    start(&mut game, &mut scene);
+    for i in 0..6 {
+        game.defeat(&mut scene, i, Vec3::X);
+    }
+    while !game.tasks.is_empty() {
+        let result = crate::rim_cut::split(&game.take_cut_job().unwrap()).unwrap();
+        game.accept_cut(&mut scene, &result).unwrap();
+    }
+    for _ in 0..200 {
+        let ids: Vec<_> = game.staged_cut_ids().collect();
+        game.ack_cut_uploads(&ids);
+        game.tick(&mut scene, 0.001, None, [None; 2]);
+        if game.commits == 6 {
+            break;
+        }
+    }
+    assert_eq!(game.commits, 6);
+    assert!(!game.pieces.is_empty());
+    assert_eq!(game.wave, 0);
+    for e in game.enemies.iter_mut().filter(|e| e.phase == 3) {
+        e.age = 3.21;
+    }
+    game.tick(&mut scene, 0.01, None, [None; 2]);
+    assert_eq!(game.kills, 6);
+    assert_eq!(game.wave, 1);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 2);
+    assert!(game
+        .enemies
+        .iter()
+        .filter(|e| e.phase == 1)
+        .all(|e| e.spec.kind == "core-tank"));
+}
+
+#[test]
+fn failed_cuts_cannot_block_wave_during_continuous_bullet_time() {
+    let (mut game, mut scene) = fixture();
+    start(&mut game, &mut scene);
+    for i in 0..6 {
+        game.defeat(&mut scene, i, Vec3::Y);
+    }
+    game.set_xr(true);
+    game.sim_dt = 0.0001;
+    let head = Mat4::from_translation(Vec3::new(0., 1.7, 42.));
+    for _ in 0..202 {
+        game.tick(&mut scene, 0.05, Some(head), [None; 2]);
+    }
+    assert_eq!(
+        game.wave, 1,
+        "real-time inactivity retires deaths even when sim time barely advances"
+    );
+    assert_eq!(game.cut_errors, 6);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 2);
+}
+
+#[test]
+fn same_physical_vr_swings_hit_at_72_90_and_120_hz() {
+    for hz in [72., 90., 120.] {
+        let (mut game, mut scene) = fixture();
+        start(&mut game, &mut scene);
+        game.set_xr(true);
+        game.sim_dt = 0.; // Hold the target still; hand motion uses real tracking dt.
+        game.enemies[0].position = Vec3::new(0., 1.04, 40.95);
+        let head = Some(Mat4::from_translation(Vec3::new(0., 1.7, 42.)));
+        let dt = 1. / hz;
+        let sweep = |game: &mut Game, scene: &mut SceneManager, start: f32, sign: f32| {
+            for frame in 0..=(0.8_f32 * hz).ceil() as usize {
+                let x = start + sign * 1.5 * (frame as f32 * dt).min(0.8);
+                game.tick(
+                    scene,
+                    dt,
+                    head,
+                    [None, Some(Mat4::from_translation(Vec3::new(x, 1.4, 41.6)))],
+                );
+            }
+        };
+        sweep(&mut game, &mut scene, 0.6, -1.);
+        assert_eq!(
+            game.enemies[0].hp, 50.,
+            "same 1.5m/s swing must hit at {hz} Hz"
+        );
+        for _ in 0..(hz * 0.35) as usize {
+            game.tick(
+                &mut scene,
+                dt,
+                head,
+                [
+                    None,
+                    Some(Mat4::from_translation(Vec3::new(-0.6, 1.4, 41.6))),
+                ],
+            );
+        }
+        sweep(&mut game, &mut scene, -0.6, 1.);
+        assert_eq!(game.enemies[0].hp, 0., "return swing kills at {hz} Hz");
+        assert_eq!(game.enemies[0].phase, 3);
+        assert!(
+            !game.tasks.is_empty(),
+            "HP zero queues actual worker geometry at {hz} Hz"
+        );
+    }
 }

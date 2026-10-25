@@ -1,5 +1,5 @@
 // 1. Renderer/SDK, definice scény a volitelné vývojové UI jsou oddělené moduly.
-import { initEngine } from "../../js/engine.js";
+import { initEngine } from "../shared/runtime-info.js";
 import { createScene } from "./scene.js";
 import { createTools } from "../shared/tools.js";
 
@@ -7,7 +7,7 @@ import { createTools } from "../shared/tools.js";
 const canvas = document.getElementById("gpu-canvas");
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error("Canvas nebyl nalezen");
 const backend = new URLSearchParams(location.search).get("backend") === "webgl" ? "webgl" : "auto";
-const engine = await initEngine(canvas, { backend });
+export const engine = await initEngine(canvas, { backend });
 
 // 3. Nastavíme pohled a výstupy. Tato konfigurace patří aplikaci, ne debug UI.
 engine.set_camera_mode("orbit");

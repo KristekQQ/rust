@@ -38,10 +38,12 @@ pub struct TrackedPoseState {
 
 #[derive(Default)]
 pub struct XrPlayer {
+    pub locomotion: crate::xr_locomotion::XrLocomotion,
     pub controllers: [TrackedController; 2],
     head: Option<TrackedPoseState>,
     hands: [Option<TrackedPoseState>; 2],
-    head_binding: Option<(u32, Vec3)>,
+    head_binding: Option<(u32, Vec3, Vec3, bool)>,
+    reference: Mat4,
     hand_speeds: [GripSpeed; 2],
     inventory: BTreeSet<u32>,
 }
@@ -56,7 +58,7 @@ impl XrPlayer {
     }
 
     pub fn head_object(&self) -> Option<u32> {
-        self.head_binding.map(|(id, _)| id)
+        self.head_binding.map(|(id, _, _, _)| id)
     }
 
     /// Registered scene objects, independent of their optional hand equipment slots.
@@ -128,6 +130,25 @@ impl XrPlayer {
     }
 
     pub fn bind_head(&mut self, scene: &mut SceneManager, id: Option<u32>) -> Result<(), String> {
+        self.bind_head_offset(scene, id, Vec3::ZERO, false)
+    }
+
+    pub fn set_reference(&mut self, reference: Mat4) {
+        if valid_pose(reference) {
+            self.reference = reference;
+        }
+    }
+
+    pub fn bind_head_offset(
+        &mut self,
+        scene: &mut SceneManager,
+        id: Option<u32>,
+        offset: Vec3,
+        feet: bool,
+    ) -> Result<(), String> {
+        if !offset.is_finite() || offset.abs().max_element() > 10. {
+            return Err("Tracked attachment offset must be finite within 10m".into());
+        }
         if id.is_some_and(|id| self.controllers.iter().any(|c| c.object_id() == Some(id))) {
             return Err("Tracked object is already equipped in a hand".into());
         }
@@ -136,15 +157,15 @@ impl XrPlayer {
                 scene
                     .objects()
                     .get(&id)
-                    .map(|object| (id, object.transform.scale))
+                    .map(|object| (id, object.transform.scale, offset, feet))
                     .ok_or_else(|| "Tracked head object does not exist".to_string())
             })
             .transpose()?;
-        if let Some((old, _)) = self.head_binding {
+        if let Some((old, _, _, _)) = self.head_binding {
             scene.set_object_position(old, HIDDEN);
         }
         self.head_binding = binding;
-        if let Some((id, _)) = binding {
+        if let Some((id, _, _, _)) = binding {
             scene.set_object_position(id, HIDDEN);
         }
         Ok(())
@@ -166,17 +187,28 @@ impl XrPlayer {
         self.head = pose
             .filter(|_| !invalid)
             .map(|matrix| TrackedPoseState { matrix, speed: 0. });
-        if let Some((id, scale)) = self.head_binding {
+        if let Some((id, scale, offset, feet)) = self.head_binding {
             if let Some(state) = self.head {
                 let (y, x, z) = Quat::from_mat4(&state.matrix)
                     .normalize()
                     .to_euler(EulerRot::YXZ);
-                scene.set_object_transform(
-                    id,
-                    state.matrix.w_axis.truncate(),
-                    Vec3::new(x, y, z),
-                    scale,
-                );
+                let head = state.matrix.w_axis.truncate();
+                let (position, rotation) = if feet {
+                    let floor = Vec3::new(head.x, self.reference.w_axis.y, head.z);
+                    let position = floor + self.reference.transform_vector3(offset);
+                    let toward = head - position;
+                    (
+                        position,
+                        Vec3::new(
+                            -toward.y.atan2(toward.x.hypot(toward.z)),
+                            toward.x.atan2(toward.z),
+                            0.,
+                        ),
+                    )
+                } else {
+                    (state.matrix.transform_point3(offset), Vec3::new(x, y, z))
+                };
+                scene.set_object_transform(id, position, rotation, scale);
             } else {
                 scene.set_object_position(id, HIDDEN);
             }
@@ -242,7 +274,7 @@ impl XrPlayer {
         self.head = None;
         self.hands = [None; 2];
         self.hand_speeds = Default::default();
-        if let Some((id, _)) = self.head_binding {
+        if let Some((id, _, _, _)) = self.head_binding {
             scene.set_object_position(id, HIDDEN);
         }
         for controller in &mut self.controllers {
@@ -272,6 +304,52 @@ mod tests {
         assert!(player.hand(2).is_none());
         assert!(player
             .update_hand(&mut scene, 2, Some(pose), false, 0.01)
+            .is_err());
+    }
+
+    #[test]
+    fn feet_attachment_ignores_gaze_but_follows_reference_and_floor() {
+        let mut scene = SceneManager::default();
+        let mut player = XrPlayer::default();
+        let panel = scene.add_cube(Vec3::ZERO);
+        let offset = Vec3::new(0.9, 0.35, -1.);
+        player
+            .bind_head_offset(&mut scene, Some(panel), offset, true)
+            .unwrap();
+        let head = Vec3::new(2., 1.7, 3.);
+        player
+            .update_head(&mut scene, Some(Mat4::from_translation(head)))
+            .unwrap();
+        let position = scene.objects()[&panel].transform.position;
+        for yaw in [0.5, 1.5, -1.] {
+            player
+                .update_head(
+                    &mut scene,
+                    Some(Mat4::from_rotation_translation(
+                        Quat::from_rotation_y(yaw),
+                        head,
+                    )),
+                )
+                .unwrap();
+            assert!(scene.objects()[&panel]
+                .transform
+                .position
+                .abs_diff_eq(position, 1e-6));
+        }
+        let reference =
+            Mat4::from_rotation_translation(Quat::from_rotation_y(1.), Vec3::new(0., 0.4, 0.));
+        player.set_reference(reference);
+        player
+            .update_head(&mut scene, Some(Mat4::from_translation(head)))
+            .unwrap();
+        assert!(scene.objects()[&panel].transform.position.abs_diff_eq(
+            Vec3::new(head.x, 0.4, head.z) + reference.transform_vector3(offset),
+            1e-6
+        ));
+        player.update_head(&mut scene, None).unwrap();
+        assert_eq!(scene.objects()[&panel].transform.position, HIDDEN);
+        assert!(player
+            .bind_head_offset(&mut scene, Some(panel), Vec3::splat(f32::NAN), true)
             .is_err());
     }
 

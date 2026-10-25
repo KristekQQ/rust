@@ -1,0 +1,365 @@
+{
+  "date": "2026-10-24T20:12:04.124272+00:00",
+  "releaseId": "bdd7929e03",
+  "wasm": "43c94a078d074a1a359f3c75a208d5febfb6f11f798f6001a22345a3c8c5cdc5",
+  "scenes": [
+    "basic",
+    "crystal-cave",
+    "culling",
+    "cutting",
+    "cynatar",
+    "forest-arena",
+    "fox-control",
+    "gltf",
+    "lights",
+    "mirror",
+    "monkey",
+    "monster-room",
+    "neon-arena",
+    "neon-enemies",
+    "neon-font-preview",
+    "neon-robot",
+    "postprocessing",
+    "projectiles",
+    "rim",
+    "shadows",
+    "table-tennis",
+    "webxr"
+  ],
+  "browserResults": [
+    {
+      "suite": "basic",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "shadows",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "mirror",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "lights",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "gltf",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "forest-arena",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "crystal-cave",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "monster-room",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "table-tennis",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "rim",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "neon-enemies",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "neon-robot",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "cynatar",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "monkey",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "neon-font-preview",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "neon-arena",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "webxr-webgpu",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "projectiles",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "cutting",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "scene-sdk",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "lifecycle",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "postprocessing",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "fox-control",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "culling",
+      "backend": "webgpu",
+      "status": "PASS",
+      "actualBackend": "BrowserWebGpu"
+    },
+    {
+      "suite": "basic",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "shadows",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "mirror",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "lights",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "gltf",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "forest-arena",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "forest-arena-xr",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "crystal-cave",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "crystal-cave-xr",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "monster-room",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "monster-room-xr",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "table-tennis",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "table-tennis-xr",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "monster-combat",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "rim-gameplay",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "rim",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "neon-enemies",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "neon-robot",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "cynatar",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "monkey",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "neon-font-preview",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "neon-arena",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "webxr-contract",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "webxr-preview",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "projectiles",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "cutting",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "scene-sdk",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "lifecycle",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "postprocessing",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "fox-control",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    },
+    {
+      "suite": "culling",
+      "backend": "webgl",
+      "status": "PASS",
+      "actualBackend": "Gl"
+    }
+  ],
+  "servedFileMatches": 218,
+  "sceneRouteMatches": 22,
+  "physicalQuestVerified": false,
+  "commitOrPush": false
+}

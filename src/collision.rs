@@ -46,6 +46,15 @@ pub struct Collider {
     pub bounds: Aabb,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct SurfaceHit {
+    pub position: Vec3,
+    /// Outward face normal; zero when the segment starts inside a solid.
+    pub normal: Vec3,
+    pub fraction: f32,
+    pub id: u32,
+}
+
 #[derive(Debug)]
 enum NodeKind {
     Leaf { start: usize, end: usize },
@@ -122,6 +131,77 @@ impl CollisionWorld {
         let mut hits = Vec::new();
         self.visit_query(bounds, ignore_id, |c| hits.push(c));
         hits
+    }
+
+    /// Finds the nearest solid along a segment, including its endpoints.
+    pub fn cast_segment(&self, start: Vec3, end: Vec3) -> Option<SurfaceHit> {
+        let delta = end - start;
+        if !start.is_finite() || !end.is_finite() || !delta.is_finite() {
+            return None;
+        }
+        // A segment may have zero extent on an axis, unlike a solid AABB.
+        let bounds = Aabb {
+            min: start.min(end),
+            max: start.max(end),
+        };
+        let mut nearest: Option<SurfaceHit> = None;
+        self.visit_query(bounds, None, |collider| {
+            let Some((fraction, normal)) = segment_hit(start, delta, collider.bounds) else {
+                return;
+            };
+            let replace = nearest.is_none_or(|previous| {
+                fraction < previous.fraction
+                    || (fraction == previous.fraction
+                        && ((normal == Vec3::ZERO && previous.normal != Vec3::ZERO)
+                            || ((normal == Vec3::ZERO) == (previous.normal == Vec3::ZERO)
+                                && collider.id < previous.id)))
+            });
+            if replace {
+                let mut position = start + delta * fraction;
+                // Interpolation may round into the solid. Keep the hit face
+                // exact so a character placed on it passes strict clearance.
+                for axis in 0..3 {
+                    if normal[axis] != 0.0 {
+                        position[axis] = if normal[axis] > 0.0 {
+                            collider.bounds.max[axis]
+                        } else {
+                            collider.bounds.min[axis]
+                        };
+                    }
+                }
+                nearest = Some(SurfaceHit {
+                    position,
+                    normal,
+                    fraction,
+                    id: collider.id,
+                });
+            }
+        });
+        nearest
+    }
+
+    /// Checks an upright box whose bottom is `feet.y`. Touching faces are clear.
+    /// Invalid coordinates or non-positive half extents are never clear.
+    pub fn character_clear(&self, feet: Vec3, half_extents: Vec3) -> bool {
+        if !feet.is_finite() || !half_extents.is_finite() || !half_extents.cmpgt(Vec3::ZERO).all() {
+            return false;
+        }
+        let horizontal = Vec3::new(half_extents.x, 0.0, half_extents.z);
+        let Some(body) = Aabb::new(
+            feet - horizontal,
+            feet + horizontal + Vec3::Y * (half_extents.y * 2.0),
+        ) else {
+            return false;
+        };
+        let mut clear = true;
+        self.visit_query(body, None, |collider| {
+            if body.min.cmplt(collider.bounds.max).all()
+                && body.max.cmpgt(collider.bounds.min).all()
+            {
+                clear = false;
+            }
+        });
+        clear
     }
 
     // Returns leaf collider checks so native tests can verify actual BVH pruning.
@@ -266,6 +346,44 @@ impl CollisionWorld {
     }
 }
 
+fn segment_hit(start: Vec3, delta: Vec3, bounds: Aabb) -> Option<(f32, Vec3)> {
+    if start.cmpgt(bounds.min).all() && start.cmplt(bounds.max).all() {
+        return Some((0.0, Vec3::ZERO));
+    }
+    let mut enter = f32::NEG_INFINITY;
+    let mut exit = 1.0_f32;
+    let mut normal = Vec3::ZERO;
+    for axis in 0..3 {
+        if delta[axis] == 0.0 {
+            if start[axis] < bounds.min[axis] || start[axis] > bounds.max[axis] {
+                return None;
+            }
+            continue;
+        }
+        let a = (bounds.min[axis] - start[axis]) / delta[axis];
+        let b = (bounds.max[axis] - start[axis]) / delta[axis];
+        let near = a.min(b);
+        exit = exit.min(a.max(b));
+        if near > enter {
+            enter = near;
+            normal = Vec3::ZERO;
+            normal[axis] = if delta[axis] > 0.0 { -1.0 } else { 1.0 };
+        }
+        if enter > exit {
+            return None;
+        }
+    }
+    if exit < 0.0 || enter > 1.0 {
+        return None;
+    }
+    // A boundary origin moving away (or a stationary boundary point) still
+    // blocks, but must not advertise a distant exit face as a landing surface.
+    Some((
+        enter.max(0.0),
+        if enter < 0.0 { Vec3::ZERO } else { normal },
+    ))
+}
+
 fn overlaps_other_axes(a: Aabb, b: Aabb, movement_axis: usize) -> bool {
     (0..3).filter(|axis| *axis != movement_axis).all(|axis| {
         // Strict overlap lets the character slide along an already touching face.
@@ -309,6 +427,91 @@ mod tests {
             assert!(Aabb::new(Vec3::new(value, 0.0, 0.0), Vec3::ONE).is_none());
             assert!(Aabb::new(Vec3::ZERO, Vec3::new(1.0, value, 1.0)).is_none());
         }
+    }
+
+    #[test]
+    fn segment_reports_top_side_and_underside_outward_normals() {
+        let world = world(vec![collider(7, [-1.0, 0.0, -1.0], [1.0, 1.0, 1.0])]);
+        for (start, end, position, normal) in [
+            (Vec3::Y * 3.0, Vec3::NEG_Y, Vec3::Y, Vec3::Y),
+            (
+                Vec3::new(-3.0, 0.5, 0.0),
+                Vec3::new(1.0, 0.5, 0.0),
+                Vec3::new(-1.0, 0.5, 0.0),
+                Vec3::NEG_X,
+            ),
+            (Vec3::NEG_Y, Vec3::Y * 3.0, Vec3::ZERO, Vec3::NEG_Y),
+        ] {
+            let hit = world.cast_segment(start, end).unwrap();
+            assert_position(hit.position, position);
+            assert_eq!(hit.normal, normal);
+            assert_eq!(hit.id, 7);
+            assert!((hit.fraction - start.distance(position) / start.distance(end)).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn segment_nearest_hit_is_independent_of_insertion_order() {
+        let near = collider(9, [-1.0, 2.0, -1.0], [1.0, 3.0, 1.0]);
+        let far = collider(1, [-1.0, 0.0, -1.0], [1.0, 1.0, 1.0]);
+        for colliders in [vec![far, near], vec![near, far]] {
+            let hit = world(colliders)
+                .cast_segment(Vec3::Y * 5.0, Vec3::NEG_Y)
+                .unwrap();
+            assert_eq!(hit.id, 9);
+            assert_position(hit.position, Vec3::Y * 3.0);
+        }
+    }
+
+    #[test]
+    fn segment_face_position_is_exact_and_boundary_entry_keeps_normal() {
+        for top in [0.1, 0.1337, 2.3333, 100.123] {
+            let world = world(vec![collider(1, [-2.0, top - 1.0, -2.0], [2.0, top, 2.0])]);
+            let hit = world
+                .cast_segment(Vec3::Y * (top + 3.731), Vec3::Y * (top - 2.111))
+                .unwrap();
+            assert_eq!(hit.position.y, top);
+            assert!(world.character_clear(hit.position, HALF));
+            let entry = world
+                .cast_segment(hit.position, hit.position - Vec3::Y)
+                .unwrap();
+            assert_eq!(entry.normal, Vec3::Y);
+            assert_eq!(entry.fraction, 0.0);
+            let departure = world
+                .cast_segment(hit.position, hit.position + Vec3::Y)
+                .unwrap();
+            assert_eq!(departure.normal, Vec3::ZERO);
+            assert_eq!(departure.fraction, 0.0);
+        }
+    }
+
+    #[test]
+    fn segment_parallel_miss_and_inside_origin_are_safe() {
+        let world = world(vec![collider(1, [0.0; 3], [1.0; 3])]);
+        assert!(world
+            .cast_segment(Vec3::new(2.0, 3.0, 0.5), Vec3::new(2.0, -1.0, 0.5))
+            .is_none());
+        for end in [Vec3::Y * 4.0, Vec3::splat(0.5)] {
+            let hit = world.cast_segment(Vec3::splat(0.5), end).unwrap();
+            assert_eq!(hit.fraction, 0.0);
+            assert_eq!(hit.normal, Vec3::ZERO);
+            assert_position(hit.position, Vec3::splat(0.5));
+        }
+        assert!(world
+            .cast_segment(Vec3::splat(2.0), Vec3::splat(2.0))
+            .is_none());
+    }
+
+    #[test]
+    fn character_clear_allows_roof_contact_but_blocks_headroom_and_walls() {
+        let roof = collider(1, [-5.0, 0.0, -5.0], [5.0, 1.0, 5.0]);
+        assert!(world(vec![roof]).character_clear(Vec3::Y, HALF));
+        assert!(!world(vec![roof]).character_clear(Vec3::Y * 0.99, HALF));
+        let ceiling = collider(2, [-5.0, 2.9, -5.0], [5.0, 3.1, 5.0]);
+        assert!(!world(vec![roof, ceiling]).character_clear(Vec3::Y, HALF));
+        let wall = collider(3, [0.4, 1.0, -5.0], [0.6, 5.0, 5.0]);
+        assert!(!world(vec![roof, wall]).character_clear(Vec3::Y, HALF));
+        assert!(!CollisionWorld::default().character_clear(Vec3::ZERO, Vec3::ZERO));
     }
 
     #[test]

@@ -91,6 +91,16 @@ impl SplitRecipe {
 }
 impl From<CutMesh> for MeshData {
     fn from(mesh: CutMesh) -> Self {
+        Self::from_cpu(mesh, true)
+    }
+}
+impl MeshData {
+    /// Noninteractive death fragments retain their exact render geometry, without
+    /// baking a convex collision proxy that will never be queried.
+    pub(crate) fn visual_only(mesh: CutMesh) -> Self {
+        Self::from_cpu(mesh, false)
+    }
+    fn from_cpu(mesh: CutMesh, contact: bool) -> Self {
         let (min, max) = mesh.bounds();
         let stats = MeshStats {
             min,
@@ -100,11 +110,13 @@ impl From<CutMesh> for MeshData {
             volume: mesh.volume(),
         };
         Self(Rc::new(MeshNode {
-            contact: Some(Rc::new(crate::contact_shape::ContactShape::new(
-                &mesh.positions,
-                (min, max),
-                mesh.centroid(),
-            ))),
+            contact: contact.then(|| {
+                Rc::new(crate::contact_shape::ContactShape::new(
+                    &mesh.positions,
+                    (min, max),
+                    mesh.centroid(),
+                ))
+            }),
             stats,
             source: MeshSource::Cpu(mesh),
             support: None,
@@ -248,6 +260,25 @@ mod tests {
         )
         .unwrap()
     }
+    #[test]
+    fn visual_fragment_keeps_exact_geometry_and_metadata_without_contact_bake() {
+        let physical = MeshData::from(tetrahedron());
+        let visual = MeshData::visual_only(tetrahedron());
+        assert!(physical.contact_shape().is_some());
+        assert!(visual.contact_shape().is_none());
+        assert_eq!(physical.bounds(), visual.bounds());
+        assert_eq!(physical.volume(), visual.volume());
+        assert_eq!(physical.triangle_count(), visual.triangle_count());
+        let a = physical.ready_cpu().unwrap().render_mesh();
+        let b = visual.ready_cpu().unwrap().render_mesh();
+        assert_eq!(a.indices, b.indices);
+        for (a, b) in a.vertices.iter().zip(&b.vertices) {
+            assert_eq!(a.position, b.position);
+            assert_eq!(a.normal, b.normal);
+            assert_eq!(a.color, b.color);
+        }
+    }
+
     #[test]
     fn contact_shape_is_eager_and_shared_without_materializing_variant_colors() {
         let base = MeshData::from(tetrahedron());

@@ -1,0 +1,115 @@
+import {initEngine} from '../js/engine.js';
+import {createScene,PERFORMANCE_PANEL_OFFSET} from '../examples/crystal-cave/scene.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+import {assertForeground} from './pixels.js';
+const sim=installXRSimulator({profile:{id:'crystal-cave-72',hz:72,eyeWidth:320,eyeHeight:320},clockTimers:false});
+const run=new XRTestRun('crystal-cave-xr',sim,publishXRReport);
+const near=(a,b,t=.003)=>a.length===b.length&&a.every((v,i)=>Math.abs(v-b[i])<t);
+const buttons=(a=0,b=0)=>[0,0,0,0,a,b];
+let engine;
+await run.execute(async test=>{
+    engine=await initEngine(document.querySelector('#gpu-canvas'),{backend:'webgl'});
+    document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+    engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+    const world=await createScene(engine.scene);
+    engine.xr.player.configureLocomotion({...world.locomotion,marker:world.marker});
+    for(const hand of ['left','right'])engine.xr.player.equip(hand,engine.scene.createCube([0,-10000,0]).setScale([.045,.07,.1]));
+    const frame=(input={})=>{sim.frame(input);test.assert(!engine.xr.lastError,'XR frames have no rendering errors',String(engine.xr.lastError));};
+    const reset=async()=>{
+        if(engine.xr.isPresenting)await engine.xr.exit();await engine.xr.enter({resolutionScale:1});
+        frame({head:{position:[0,1.6,0],orientation:[0,0,0,1]},controllers:{left:{tracked:true,position:[-.3,1.1,-.2],axes:[0,0,0,0]},right:{tracked:true,position:[.3,1.1,-.2],orientation:[0,0,0,1],buttons:buttons(),axes:[0,0,0,0]}}});frame();
+    };
+    await reset();
+    assertForeground(sim.pixels('left'),'cave left eye',3000);assertForeground(sim.pixels('right'),'cave right eye',3000);
+    test.assert(pixelDifference(sim.pixels('left'),sim.pixels('right'))>100,'real geometry produces stereo disparity');
+    test.assert(engine.xr.player.state.leftHand.tracked&&engine.xr.player.state.rightHand.tracked,'both controllers track in cave');
+    const before=sim.pixels('left');
+    for(let i=0;i<35;i++)frame({controllers:{left:{axes:[0,0,0,-1]}}});
+    frame({controllers:{left:{axes:[0,0,0,0]}}});
+    const walked=engine.xr.player.state;
+    test.assert(walked.head.position[2]<-.8,'left analog moves through cave');
+    test.assert(near(walked.rightHand.position,[.3,1.1,walked.head.position[2]-.2]),'hands move with native rig');
+    test.assert(pixelDifference(before,sim.pixels('left'))>100,'walking changes rendered cave perspective');
+    frame({head:{position:[.4,1.6,.2]}});const head=engine.xr.player.state.head.position;
+    frame({controllers:{right:{axes:[0,0,1,0]}}});
+    test.assert(near(engine.xr.player.state.head.position,head),'snap turn preserves physical head position');
+    const origin=engine.xr.player.state.locomotion.origin;frame();
+    test.assert(near(engine.xr.player.state.locomotion.origin,origin),'held stick does not repeat snap');
+    await reset();
+    frame({controllers:{right:{buttons:buttons(1)}}});
+    const target=engine.xr.player.state.locomotion.target;
+    test.assert(target!==null&&engine.xr.player.state.locomotion.aiming,'A aims at clear cave floor');
+    test.assert(world.marker.meshInfo.position[1]>-1,'landing marker is placed on floor');
+    frame({controllers:{right:{buttons:buttons(1,1)}}});
+    test.assert(!engine.xr.player.state.locomotion.aiming,'B cancels teleport');
+    frame({controllers:{right:{buttons:buttons()}}});
+    frame({controllers:{right:{buttons:buttons(1)}}});
+    frame({controllers:{right:{tracked:false}}});
+    frame({controllers:{right:{tracked:true,buttons:buttons()}}});
+    test.assert(near(engine.xr.player.state.head.position,[0,1.6,0]),'tracking loss cancels pending teleport');
+    // Traverse every authored pad, returning via the clear central lane before each branch.
+    const route=[];let previous=[0,0,0];
+    for(const pad of world.layout.landingPads){
+        for(const destination of [[0,0,previous[2]],[0,0,pad.position[2]],pad.position]){
+            const distance=Math.hypot(destination[0]-previous[0],destination[2]-previous[2]);
+            if(distance<.6)continue;
+            const steps=Math.ceil(distance/5);
+            for(let i=1;i<=steps;i++)route.push(previous.map((v,k)=>v+(destination[k]-v)*i/steps));
+            previous=destination;
+        }
+    }
+    const aimAt=target=>{
+        const head=engine.xr.player.state.head.position;
+        const dx=target[0]-head[0]-.3,dz=target[2]-head[2]+.2,d=Math.hypot(dx,dz),v=9,g=9.8,h=1.1;
+        const disc=v**4-g*(g*d*d-2*h*v*v),pitch=Math.atan((v*v-Math.sqrt(disc))/(g*d)),yaw=Math.atan2(-dx,-dz);
+        const sp=Math.sin(pitch/2),cp=Math.cos(pitch/2),sy=Math.sin(yaw/2),cy=Math.cos(yaw/2);
+        frame({controllers:{right:{orientation:[cy*sp,sy*cp,-sy*sp,cy*cp],buttons:buttons()}}});
+        frame({controllers:{right:{buttons:buttons(1)}}});
+    };
+    route.push([0,0,-21],[0,0,-16]);
+    for(const target of route){
+        aimAt(target);
+        const aim=engine.xr.player.state.locomotion.target;
+        test.assert(aim!==null&&near(aim,target,.05),'authored cave route has valid teleport landings',{aim,target});
+        frame({controllers:{right:{buttons:buttons()}}});
+        test.assert(near([engine.xr.player.state.head.position[0],engine.xr.player.state.head.position[2]],[target[0],target[2]],.05),'teleport reaches authored cave pads');
+        test.assert(Math.abs(engine.xr.player.state.head.position[1]-1.6)<.003,'teleport keeps physical eye height');
+    }
+    aimAt([6.9,0,-16]);
+    test.assert(engine.xr.player.state.locomotion.target===null,'side stalagmite blocks teleport into real rock');
+    frame({controllers:{right:{buttons:buttons()}}});
+    for(let i=0;i<80;i++)frame({dt:50,controllers:{left:{axes:[0,0,1,0]}}});
+    const side=engine.xr.player.state.head.position;
+    test.assert(side[0]>5&&side[0]<6.3,'side stalagmite stops analog walk before rock',side);
+    await reset();
+    for(let i=0;i<350;i++)frame({dt:50,controllers:{left:{axes:[0,0,0,-1]}}});
+    const stopped=engine.xr.player.state.head.position;
+    test.assert(stopped[2]>=world.layout.walkableBounds[2]-.001&&stopped[2]<world.layout.walkableBounds[2]+.15,'rear wall stops analog movement',stopped);
+    frame({controllers:{left:{axes:[0,0,0,0]},right:{buttons:buttons(1)}}});
+    test.assert(engine.xr.player.state.locomotion.target===null,'teleport cannot leave rear wall');
+    await reset();engine.xr.player.bindHead(world.performancePanel,{offset:PERFORMANCE_PANEL_OFFSET,anchor:'feet'});
+    frame({head:{position:[.3,1.7,.4],orientation:[0,Math.sin(.3),0,Math.cos(.3)]}});
+    const state=engine.xr.player.state,m=state.head.matrix,[x,y,z]=PERFORMANCE_PANEL_OFFSET;
+    const panelOrigin=state.locomotion.origin;
+    test.assert(near(world.performancePanel.meshInfo.position,[m[12]+panelOrigin[0]*x+panelOrigin[8]*z,panelOrigin[13]+y,m[14]+panelOrigin[2]*x+panelOrigin[10]*z]),'optional debug panel follows beside right foot');
+    const anchored=world.performancePanel.meshInfo.position;
+    frame({head:{orientation:[-Math.sin(.5)*Math.cos(.3),Math.sin(.3)*Math.cos(.5),Math.sin(.3)*Math.sin(.5),Math.cos(.3)*Math.cos(.5)]}});
+    test.assert(near(world.performancePanel.meshInfo.position,anchored),'looking down does not displace floor debug panel');
+    frame({head:{orientation:[0,-Math.sin(.6),0,Math.cos(.6)]}});
+    test.assert(near(world.performancePanel.meshInfo.position,anchored),'sideways glance does not rotate debug panel around player');
+    engine.xr.player.bindHead(null);frame();
+    const stereo=sim.pixels(),preview=document.querySelector('#stereo');preview.width=stereo.width;preview.height=stereo.height;preview.getContext('2d').putImageData(stereo,0,0);
+    const effects=engine.effects_stats();test.assert(effects.shadowLightCount===0,'cave has no dynamic shadow-map passes');
+    await engine.xr.exit();await reset();test.assert(near(engine.xr.player.state.head.position,[0,1.6,0]),'exit and reentry reset navigation');
+    for(let i=0;i<20;i++)frame({controllers:{left:{axes:[0,0,0,-1]}}});
+    test.assert(engine.xr.player.state.locomotion.origin[14]<-.3,'clear regression starts with a displaced rig');
+    engine.scene.clear();
+    const replacement=engine.scene.createCube([0,1,-3]);
+    frame({controllers:{left:{axes:[0,0,0,0]},right:{buttons:buttons()}}});
+    const cleared=engine.xr.player.state;
+    test.assert(!cleared.locomotion.enabled&&near(cleared.locomotion.origin,[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]),'scene clear removes old navigation and origin during XR');
+    test.assert(near(cleared.head.position,[0,1.6,0])&&replacement.exists,'replacement scene uses current physical pose without stale marker or origin');
+    await engine.xr.exit();
+});
+engine?.dispose();sim.dispose();

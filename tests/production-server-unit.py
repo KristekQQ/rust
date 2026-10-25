@@ -57,6 +57,45 @@ class ProductionDelivery(unittest.TestCase):
                     server.shutdown()
                     worker.join()
 
+    def test_plain_refresh_canonical_url_and_conditional_requests(self):
+        for handler_type in [module.DevelopmentHandler, module.ProductionHandler]:
+            with self.subTest(handler=handler_type.__name__), tempfile.TemporaryDirectory() as directory:
+                page = Path(directory) / 'examples/rim'
+                page.mkdir(parents=True)
+                target = page / 'index.html'
+                target.write_bytes(b'first application')
+                with ThreadingHTTPServer(('127.0.0.1', 0), partial(handler_type, directory=directory)) as server:
+                    worker = threading.Thread(target=server.serve_forever, daemon=True)
+                    worker.start()
+                    try:
+                        def request(path, headers=None):
+                            connection = http.client.HTTPConnection(*server.server_address)
+                            connection.request('GET', path, headers=headers or {})
+                            response = connection.getresponse()
+                            result = response.status, dict(response.getheaders()), response.read()
+                            connection.close()
+                            return result
+                        status, headers, _ = request('/examples/rim/?backend=webgpu&v=7c37709d6c&profile=0&view=gate')
+                        self.assertEqual(status, 302)
+                        self.assertEqual(headers['Location'], '/examples/rim/?backend=webgpu&profile=0&view=gate')
+                        self.assertIn('no-store', headers['Cache-Control'])
+                        path = '/examples/rim/?backend=webgpu'
+                        status, headers, body = request(path)
+                        self.assertEqual((status, body), (200, b'first application'))
+                        target.write_bytes(b'current application')
+                        status, headers, body = request(path, {
+                            'If-Modified-Since': 'Thu, 01 Jan 2099 00:00:00 GMT',
+                            'If-None-Match': 'old-version', 'Cache-Control': 'max-age=0',
+                        })
+                        self.assertEqual((status, body), (200, b'current application'))
+                        self.assertIn('no-store', headers['Cache-Control'])
+                        self.assertEqual(headers['Pragma'], 'no-cache')
+                        self.assertEqual(headers['Expires'], '0')
+                        self.assertNotIn('Clear-Site-Data', headers)
+                    finally:
+                        server.shutdown()
+                        worker.join()
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,5 @@
 import { initEngine } from '../../js/engine.js';
+import {installRuntimeInfo} from '../shared/runtime-info.js';
 import { createScene, launchApple } from './scene.js';
 
 const canvas = document.getElementById('gpu-canvas');
@@ -8,13 +9,15 @@ const exit = document.getElementById('exit');
 if (!(canvas instanceof HTMLCanvasElement) || !status || !(enter instanceof HTMLButtonElement) || !(exit instanceof HTMLButtonElement)) throw new Error('Chybí UI.');
 
 // WebXR compositor uses WebGL; no desktop/WebGPU fallback is counted as VR.
-export const engine = await initEngine(canvas, { backend: 'webgl' });
+const query=new URLSearchParams(location.search);
+export const engine = await initEngine(canvas, { backend:'webgl',profiling:query.get('profile')==='1'&&query.get('info')!=='0' });
 engine.set_render_effects(false, false);
 engine.set_grid_visible(true);
 engine.set_light_helpers_visible(false);
 engine.setDebugOverlay(false);
 engine.setCameraView([0, 1.8, 1.5], [0, 0.8, -1]);
 export const world = createScene(engine.scene);
+installRuntimeInfo(engine,{panel:world.infoPanel});
 engine.xr.bindController('right', world.sword, {cutting: true, requireTrigger: false});
 engine.xr.bindController('left', world.leftSword, {cutting: true, requireTrigger: false});
 engine.xr.bindButton(world.restartButton);

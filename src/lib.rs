@@ -16,6 +16,7 @@ pub mod gltf_loader;
 pub mod gltf_model;
 pub mod info_panel;
 pub mod input;
+pub mod melee_encounter;
 pub mod postprocess_plan;
 mod projectile;
 #[cfg(target_arch = "wasm32")]
@@ -27,6 +28,8 @@ pub mod rim_game;
 pub mod rim_movement;
 pub mod scene;
 mod spatial;
+pub mod table_tennis;
+pub mod table_tennis_contact;
 #[cfg(any(test, target_arch = "wasm32"))]
 mod translucency;
 pub mod visibility;
@@ -34,6 +37,7 @@ pub mod visibility;
 pub mod web;
 pub mod xr_buttons;
 pub mod xr_input;
+pub mod xr_locomotion;
 pub mod xr_player;
 pub mod xr_round;
 

@@ -29,7 +29,8 @@ const second = model.createInstance();
 second.setPosition([2, 0, 0]).playAnimation('Run');
 ```
 
-Rigid primitives keep immutable local-space GPU vertices and upload only changed
+Rigid primitives keep immutable local-space GPU vertices. Compatible repeated
+rigid draws use a shared per-view instance page; other draws upload only changed
 model/normal uniforms. Skinned primitives use a GPU palette on both backends when
 there are at most 128 joints, at most 8 nonzero ordered influences per vertex,
 no morph targets, and the actual device supports the required 13 attributes and
@@ -40,13 +41,28 @@ retain the CPU contract. Exact affine vertex means preserve transparency sorting
 
 Material/geometry sharing is keyed by live `Arc<ModelAsset>` identity. The weak
 cache owns no orphaned assets; the last model releases shared resources. Each
-instance keeps its own pose, palette and draw uniforms. This is resource sharing,
-not glTF draw instancing; compatible built-in/triangle instances continue to use
-the engine's existing instancing paths.
+instance keeps its own pose, palette and draw state. Compatible opaque rigid
+primitives now also use real `draw_indexed(..., 0..instance_count)` instancing on
+both backends. Consecutive roots must share their asset and have pairwise disjoint
+conservative bounds; batching preserves each model's primitive order. Overlapping
+roots, BLEND and skin/morph paths retain independent draws. This conservative
+eligibility avoids changing coplanar depth winners or transparency ordering.
+
+Instance data uses 112 bytes and seven vertex attributes (locations 9–15), gated
+on actual device limits. Each view/pipeline has separate cached transform and
+material buffers; unchanged material data is not reuploaded with transforms.
+Removing models invalidates cached pages, including views not rendered again.
+`debugStats().gltf` reports actual instanced draws, instances, primitive culling,
+write calls and cached batch bytes. Legacy `renderer_stats().drawCalls` retains
+its object-batch estimate; actual commands are `debugStats().mainDrawCalls` and
+`debugStats().drawCalls`.
 
 Animated render bounds use cached conservative per-joint/rigid bounds with
 outward rounding. Morphs and unsafe/unsupported weights/transforms fall back to
-exact deformation. Public CPU `model_bounds` and cutting geometry remain exact.
+exact deformation. Each draw also uses the cached conservative primitive bounds
+against its current eye/shadow/reflection frustum. Unsupported primitive bounds
+fail open, without adding exact CPU deformation merely to cull. Public CPU
+`model_bounds` and cutting geometry remain exact.
 `debugStats().gltf` exposes cumulative uploads/deformed vertices/state changes and
 live resource counts; `frameProfile()` adds `gltf.animation`, `gltf.bounds`,
 `gltf.update` and fallback `gltf.deform` CPU scopes. Scopes can nest; do not sum
@@ -68,7 +84,10 @@ texelům; normálová mapa zachovává přesně hodnotu 128/255, ne aproximaci 0
 OPAQUE hlavní průchod bez clip roviny neobsahuje dosažitelný `discard`. MASK,
 BLEND, stíny a průchody s clip rovinou zachovávají původní testy. `clipped` je
 samostatný klíč, nezaměňovat s obráceným windingem (`reflected`). Shader moduly
-vznikají líně a sdílejí se mezi pipeline (nejvýše 32 × 3 × 2 tříd včetně rigidní/skinning varianty); nemění se každý frame.
+vznikají líně a sdílejí se mezi pipeline včetně rigidní, skinning a instancované varianty; nemění se každý frame.
+Unused per-map UV inputs/varyings are omitted by material class; normal UVs and
+the full non-neutral fallback TBN path remain present. CPU vertex storage keeps
+the shared 96-byte format; this does not claim a packed-geometry bandwidth gain.
 Ověření zahrnuje `gltf-full`, `gltf-sdk`, `gltf-material-cache` a `render-mirrored` na obou
 backendech. Změna kompilace může mírně změnit zaokrouhlení odlesků; pixelová
 shoda není zaručena. Desktop čas neprokazuje zrychlení na Questu.
@@ -151,3 +170,7 @@ Velikosti obrázků a bufferů se kontrolují proti limitům zařízení. Soubor
 Licenční údaje stažených modelů jsou v jejich asset README. Fox má části CC0 a CC BY 4.0. DamagedHelmet a Šibenik jsou nekomerční demonstrační assety; licence enginu se tím nemění.
 
 Specifikace: [Khronos glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html).
+
+### Reusable render preparation storage
+
+The glTF queue retains flat index/value scratch across views and frames. `debugStats().gltf.queueScratchGrowths` is the cumulative count of tracked vectors whose capacity grew during a preparation call, not the total number of allocator calls. `queueScratchBytes` reports live retained capacity for those seven vectors; model-dependent cache clearing after removals releases it. Prepared GPU handle lists, diagnostic records and stable blend sorting can still allocate. See [the scoped Astra audit](ASTRA_RENDER_AUDIT_2026-10-24.md) for measurements and remaining scaling limits.

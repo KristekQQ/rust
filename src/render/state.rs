@@ -319,13 +319,16 @@ impl State {
         true
     }
     pub fn update(&mut self, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
+        self.update_timed(dt, dt, camera_matrix, camera_pos);
+    }
+    pub fn update_timed(&mut self, elapsed: f32, dt: f32, camera_matrix: Mat4, camera_pos: Vec3) {
         super::profiler::begin_frame();
         self.frame_dt = dt;
         if let Some(display) = &mut self.combo_display {
             display.advance(&mut self.renderer.scene, dt);
         }
-        self.renderer.advance_scene(dt);
-        self.refresh_info_panels(dt);
+        self.renderer.advance_scene_with_elapsed(elapsed, dt);
+        self.refresh_info_panels(elapsed);
         self.view = RenderView {
             view_projection: camera_matrix,
             camera_position: camera_pos,
@@ -455,7 +458,8 @@ impl State {
             self.renderer
                 .scene
                 .update_info_panels(PanelKind::Scene, &rows);
-            let diagnostics = self.renderer.info_diagnostic_rows();
+            let mut diagnostics = self.renderer.info_diagnostic_rows();
+            diagnostics.insert(0, ("RENDER", format!("RUST {}", self.backend)));
             self.renderer
                 .scene
                 .update_info_panels(PanelKind::Diagnostics, &diagnostics);

@@ -136,6 +136,7 @@ export class SceneObject {
     setScale(scale: Vector3): this;
     /** Local-space solid box. Defaults match a unit cube, then follow its root transform. */
     setCollider(options?: {halfExtents?: Vector3; offset?: Vector3}): this;
+    setColliders(boxes: readonly {halfExtents: Vector3; offset?: Vector3}[]): this;
     removeCollider(): this;
     /** Delta rotation in degrees; timing in seconds. Calculated by Rust. */
     rotate(degrees: Vector3, options?: RotationOptions): this;
@@ -188,6 +189,12 @@ export class SceneLight {
     removeAfter(seconds: number): this;
     remove(): void;
 }
+export interface TableTennisState {score:[number,number];server:number;winner:number|null;phase:'ready'|'rally'|'point'|'finished';event:string;rallyHits:number;practice:boolean;ballSpin:Vector3;ballRadius:number;paddleFacePosition:Vector3;paddleNormal:Vector3;paddleVelocity:Vector3;ballPosition:Vector3;ballVelocity:Vector3;}
+export interface MeleeOptions {
+    enemies: ModelObject[]; swords: [SceneObject,SceneObject]; spawns: Vector3[];
+    bounds: [number,number,number,number]; obstacles?: [number,number,number,number][];
+}
+export interface MeleeState {active:number; id:number; phase:string; kills:number; position:Vector3; hp:number}
 /** Commands to the Rust SceneManager. Contains no JS scene or animation state. */
 export class Scene {
     configureRim(options:RimOptions|null):void;
@@ -197,6 +204,11 @@ export class Scene {
     rimAcceptCut(bytes:Uint8Array):void;
     rimCutFailed():void;
 
+    configureMelee(options:MeleeOptions|null):void;
+    configureTableTennis(options:{ball:SceneObject;player:SceneObject;opponent:SceneObject;scorePanel:SceneObject}|null):void;
+    tableTennisCommand(command:'move'|'serve'|'reset'|'practice'|'match',x?:number,y?:number):void;
+    readonly tableTennisState:TableTennisState|null;
+    readonly meleeState:MeleeState|null;
     private constructor();
     readonly objectCount: number;
     readonly lightCount: number;
@@ -234,7 +246,7 @@ export type RawEngine = Pick<typeof wasm,
     "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused"> & {screenToPlane(point:readonly [number,number],height?:number):Vector3;worldToScreen(point:Vector3):readonly[number,number]|null;setOrbitView(position:Vector3,target:Vector3):void;adjustOrbit(dx:number,dy:number,zoom?:number):void;cameraViewState():CameraViewState};
 export interface RenderStats {
     total: number; visible: number; culled: number;
-    /** Object batches only, excludes optional debug lines. */
+    /** Legacy object-batch estimate after object culling; excludes helpers and does not account for glTF primitive culling/instancing. Use debugStats().mainDrawCalls for actual main-view commands. */
     drawCalls: number;
     uploadBytes: number;
     /** Rust simulation and preparation/encoding/submission of all passes; excludes GPU execution. */
@@ -251,7 +263,8 @@ export interface EffectStats {
 }
 export interface DebugStats {
     /** Cumulative glTF work and currently live shared asset resources. */
-    gltf: {cpuDeformedVertices:number;rigidUploadBytes:number;skinUploadBytes:number;uniformUploadBytes:number;skinPaletteUploadBytes:number;geometryCacheHits:number;materialCacheHits:number;geometryResources:number;materialResources:number;cachedAssets:number;drawCalls:number;pipelineChanges:number;bindGroupChanges:number};
+    gltfDraws: {enabled:boolean;limit:number;draws:{object:number;node:number;primitive:number;indices:number;instances:number;objects:number[];viewSlot:number;shadow:boolean;reflected:boolean;blend:boolean;materialMask:boolean}[]};
+    gltf: {primitiveTests:number;primitiveCulled:number;instancedDrawCalls:number;instancesDrawn:number;instanceUploadBytes:number;instanceBufferBytes:number;queueScratchGrowths:number;queueScratchBytes:number;cpuDeformedVertices:number;rigidUploadBytes:number;skinUploadBytes:number;uniformUploadBytes:number;bufferUploadCalls:number;skinPaletteUploadBytes:number;geometryCacheHits:number;materialCacheHits:number;geometryResources:number;materialResources:number;cachedAssets:number;drawCalls:number;pipelineChanges:number;bindGroupChanges:number};
     font3d: {
         runtime:{fonts:number;texts:number;cachedGlyphs:number;liveGlyphs:number;layoutRebuilds:number;syncUpdates:number};
         geometryBytes:number;instanceGeometryBytes:number;
@@ -263,7 +276,7 @@ export interface DebugStats {
     /** Alpha index subsets; index counts cover the same frame span as drawCalls. */
     translucency: {cachedMeshes:number;indexBufferBytes:number;submittedIndices:number;fullIndices:number;draws:number};
     neonGlow: {enabled:boolean;draws:number;segments:number;cachedMeshes:number;bufferBytes:number};
-    enabled: boolean; fps: number; frameMs: number; cpuMs: number;
+    enabled: boolean; fps: number; frameMs: number; frameP95Ms: number; cpuMs: number;
     /** Main-view extraction only, not GPU execution. Cached frames do not run culling. */
     cullMs: number; cullCached: boolean;
     total: number; visible: number; culled: number;
@@ -286,7 +299,7 @@ export interface FrameProfile {
 }
 export interface FrameGraphStats {
     active:boolean; passes:string[]; transientTextures:number; transientBuffers:number; transientBytesEstimate?:number;
-    prunedPassCount?:number; slots?:string[];
+    prunedPassCount?:number; slots?:string[]; packedDepth?:boolean; sceneColorAttachments?:number;
     resources?:Array<{name:string;lifetime:string;slot:number|null;firstUse:number|null;lastUse:number|null}>;
 }
 export interface PostProcessing {
@@ -322,7 +335,21 @@ export interface XRTrackedPose {
     readonly speed: number;
     readonly object: SceneObject|null;
 }
-export interface XRPlayerState {head:XRTrackedPose;leftHand:XRTrackedPose;rightHand:XRTrackedPose;inventory:SceneObject[]}
+export interface XRLocomotionOptions {
+    /** Walkable head-centre limits [minX,maxX,minZ,maxZ]. Legacy mode uses floor y=0. */
+    bounds: readonly [number,number,number,number];
+    /** Solid footprints; Rust adds 0.4m player clearance. */
+    obstacles?: readonly (readonly [number,number,number,number])[];
+    /** Use the shared static scene collider BVH for elevated surfaces and gravity. */
+    sceneCollisions?: boolean;
+    /** Arc launch speed in m/s, 1..30 (default 9). */
+    teleportSpeed?: number;
+    speed?: number; teleportRange?: number; slowScale?: number;
+    marker: SceneObject;
+}
+export interface XRLocomotionState {enabled:boolean;origin:readonly number[];aiming:boolean;target:Vector3|null;timeScale:number}
+export interface XRPlayerState {head:XRTrackedPose;leftHand:XRTrackedPose;rightHand:XRTrackedPose;inventory:SceneObject[];locomotion:XRLocomotionState}
+
 /** Engine-owned person with generic equipment. No avatar geometry or weapons are spawned. */
 export class XRPlayer {
     protected constructor();
@@ -331,7 +358,8 @@ export class XRPlayer {
     readonly leftHand: XRTrackedPose;
     readonly rightHand: XRTrackedPose;
     readonly inventory: SceneObject[];
-    bindHead(object: SceneObject|null): this;
+    configureLocomotion(options: XRLocomotionOptions|null): this;
+    bindHead(object: SceneObject|null, options?: {offset?:[number,number,number],anchor?:'head'|'feet'}): this;
     addItem(object: SceneObject): this;
     /** Unregister/unequip without deleting the scene object. */
     removeItem(object: SceneObject): this;
@@ -360,6 +388,7 @@ export interface ComboDisplayState {
     current: ComboDisplayRow|null;
     history: (ComboDisplayRow & {success:boolean;points:number;age:number;opacity:number;label:number})[];
 }
+/** Emits frame after the native stereo frame completes, including when document RAF is suspended. */
 export interface WebXRHost extends EventTarget {
     readonly player: XRPlayer;
     /** Select a scene button with target ray + trigger or a bound blade strike. Emits buttonhover, select.detail.target and buttonpress. */
@@ -398,4 +427,4 @@ export interface RimOptions {
  obstacles:[number,number,number,number][];
 }
 export interface RimInput{start?:boolean;pause?:boolean;reset?:boolean;movement?:[number,number];sprint?:boolean;aim?:boolean;dash?:boolean;slash?:number;look?:[number,number];teleport?:Vector3;death_mode?:'cut'|'dissolve'}
-export interface RimState{active:boolean;paused:boolean;health:number;dead:boolean;wave:number;kills:number;deaths:number;player:{position:{x:number;y:number;z:number};yaw:number;pitch:number;aiming:boolean;target:Vector3|null;jump:{active:boolean;count:number};dash:{active:boolean;count:number};stamina:{value:number;max:number}};frame:{simulation:number;visual:number};enemies:{id:number;slug:string;position:Vector3;height:number;hp:number;maxHp:number;phase:number;shotTimer:number;plasma:number}[];projectiles:{active:number;fired:number;reflected:number;hitEnemies:number;blockedWorld:number;bolts:{position:Vector3;velocity:Vector3;friendly:boolean}[]};cuts:{queued:number;pending:number;pieces:number;errors:number};xr:boolean}
+export interface RimState{blade:{contactSamples:number;hits:number;slowSamples:number;discontinuities:number;maxSpeedForFrame:number};active:boolean;paused:boolean;health:number;dead:boolean;wave:number;kills:number;deaths:number;player:{position:{x:number;y:number;z:number};yaw:number;pitch:number;aiming:boolean;target:Vector3|null;jump:{active:boolean;count:number};dash:{active:boolean;count:number};stamina:{value:number;max:number}};frame:{simulation:number;visual:number};enemies:{id:number;slug:string;position:Vector3;height:number;hp:number;maxHp:number;phase:number;shotTimer:number;plasma:number}[];projectiles:{active:number;fired:number;reflected:number;hitEnemies:number;blockedWorld:number;bolts:{position:Vector3;velocity:Vector3;friendly:boolean}[]};cuts:{motion:{id:number;age:number;direction:Vector3;distance:number}[];queued:number;pending:number;pieces:number;errors:number;preparedTriangles:number;stagedVertices:number;staging:number;stagedMeshes:number;commits:number;stageMs:number;stageMaxMs:number};xr:boolean}

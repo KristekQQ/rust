@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 import ssl
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -39,6 +40,19 @@ class DevelopmentHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        # Old chat/bookmark links used v=<release> as a manual cache workaround.
+        # Canonical page URLs retain gameplay/backend options, without that marker.
+        parts = urlsplit(self.path)
+        query = parse_qsl(parts.query, keep_blank_values=True)
+        target = Path(self.translate_path(self.path))
+        page = target.is_file() and target.suffix.lower() == '.html'
+        page = page or (target.is_dir() and (target / 'index.html').is_file())
+        if page and any(key == 'v' for key, _ in query):
+            clean = urlencode([(key, value) for key, value in query if key != 'v'])
+            self.send_response(302)
+            self.send_header('Location', urlunsplit(('', '', parts.path, clean, '')))
+            self.end_headers()
+            return
         if self.path.split('?', 1)[0] == '/favicon.ico':
             self.send_response(204)
             self.end_headers()

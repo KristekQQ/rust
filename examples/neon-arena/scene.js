@@ -1,3 +1,4 @@
+import {VR_DEBUG_PANEL_WIDTH,VR_DEBUG_PANEL_HEIGHT} from '../shared/vr-debug-panel.js';
 export const ARENA_REVISION='cynatar-arena-47';
 import { swordGeometry, neonFrameGeometry, fruitGeometries, createFruitPatternCatalog, FRUIT_PATTERN_COUNT } from './geometry.js';
 export const NEON_GLOW=Object.freeze({strength:.4,radius:.045});
@@ -140,22 +141,9 @@ export async function createScene(scene) {
         .setCutter({base:[0,0,-0.1],tip:[0,0,-0.95]}).setBladePhysics({edge:[0,-1,0]}).setCutAssist(.35).setBladeContactResponse(true).setBladeTrail(true);
     scene.createLight({ position: [2, 5, 1], color: [1, 0.95, 0.9] });
     scene.createLight({ position: [-3, 3, -2], color: [0.25, 0.4, 0.7] });
-    const [monument, scoreDisplay] = await Promise.all([
-        scene.loadModel(new URL('./assets/codex-monument.gltf', import.meta.url)),
-        scene.loadModel(new URL('./assets/score-display.gltf', import.meta.url)),
-    ]);
-    const monumentOrigin = /** @type {import('../../js/engine.d.ts').Vector3} */ ([3.0,0,-2.8]);
-    const monumentScale = /** @type {import('../../js/engine.d.ts').Vector3} */ ([1.05,.6,1.05]);
-    const monumentYaw = Math.atan2(-monumentOrigin[0],-monumentOrigin[2]);
-    monument.setPosition(monumentOrigin).setRotation([0,monumentYaw,0]).setScale(monumentScale).setRenderOptions({isStatic:true,castsShadow:false});
+    const scoreDisplay=await scene.loadModel(new URL('./assets/score-display.gltf', import.meta.url));
     scoreDisplay.setPosition(onBoard(0,2.65,-.25)).setRotation([boardTilt,PAYTABLE_YAW,0]).setRenderOptions({isStatic:true,castsShadow:false});
-    /** Keep the plaque and inscription on the stone's front surface, in metres.
-     * @param {number} y @param {number} z @returns {import('../../js/engine.d.ts').Vector3} */
-    const onStone=(y,z)=>[monumentOrigin[0]+Math.sin(monumentYaw)*z*monumentScale[2],y*monumentScale[1],monumentOrigin[2]+Math.cos(monumentYaw)*z*monumentScale[2]];
-    const infoPanel = scene.createInfoPanel('diagnostics', {position:onStone(1.105,.248),width:1.08*monumentScale[0],height:.88*monumentScale[1]})
-        .setRotation([0,monumentYaw,0]);
-    const credits = scene.createTextPanel({title:'CODEX',lines:['POSTAVENO SPOLECNE','S HONZOU'],position:onStone(2.01,.228),width:1.08*monumentScale[0],height:.48*monumentScale[1]})
-        .setRotation([0,monumentYaw,0]);
+    const infoPanel=scene.createInfoPanel('diagnostics',{position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT});
     const timerPanel=scene.createInfoPanel('countdown',{position:[0,2.36,-2.15],width:1.18,height:.50})
         .setEmission(8).setRenderOptions({castsShadow:false,receivesShadow:false});
     const scorePanel=scene.createInfoPanel('score',{position:[0,1.90,-2.15],width:1.55,height:.25})
@@ -202,7 +190,7 @@ export async function createScene(scene) {
         },
     };
     arenaFont.set('cynatar');
-    return {arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, monument, scoreDisplay, logo, credits, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
+    return {arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, scoreDisplay, logo, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
 }
 
 // Points per completed triple; adapted ranking, not the slot's cash payouts.

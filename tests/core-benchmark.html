@@ -4,13 +4,26 @@ const q=new URLSearchParams(location.search), kind=q.get('kind');
 const engine=await initEngine(document.querySelector('canvas'),{backend:q.get('backend')==='webgl'?'webgl':'auto',profiling:q.get('profile')!=='0'});
 engine.resize(960,640);engine.set_camera_mode('free');engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.setCameraView([0,2,9],[0,0,0]);
 engine.scene.createLight({position:[-3,6,5],color:[15,15,15]});
-const paths={rigid:'/assets/models/damaged-helmet/DamagedHelmet.glb',skin:'/assets/models/fox/Fox.glb',morph:'/tests/fixtures/gltf/full/full.gltf'};
-const models=[];for(let i=0;i<(kind==='morph'?1:6);i++){
-const m=await engine.scene.loadModel(paths[kind]);m.setPosition([(i%3-1)*2.7,Math.floor(i/3)*2-1,0]);
+const paths={instances:'/assets/models/damaged-helmet/DamagedHelmet.glb',rigid:'/assets/models/damaged-helmet/DamagedHelmet.glb',skin:'/assets/models/fox/Fox.glb',morph:'/tests/fixtures/gltf/full/full.gltf'};
+if(kind==='fxaa') {
+ engine.scene.clear();engine.set_simulation_paused(true);engine.set_render_effects(false,false);
+ engine.setCameraView([3,2,6],[0,0,0]);engine.scene.createLight({position:[-3,6,5],color:[3,3,3]});
+ engine.scene.createCube([0,0,0]).setRotation([.2,.35,.1]);
+ engine.scene.createSphere([0,0,-1]).setScale([1.2,1.2,1.2]);
+ engine.postprocessing.enable('fxaa',{strength:1});
+}
+if(kind==='sparse') {
+ const data=new Uint8Array(108);new Float32Array(data.buffer,0,12).set([-.3,-.3,0,.3,-.3,0,.3,.3,0,-.3,.3,0]);new Float32Array(data.buffer,48,12).set([0,0,1,0,0,1,0,0,1,0,0,1]);new Uint16Array(data.buffer,96,6).set([0,1,2,0,2,3]);
+ const model={asset:{version:'2.0'},buffers:[{uri:'data:application/octet-stream;base64,'+btoa(String.fromCharCode(...data)),byteLength:data.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:48},{buffer:0,byteOffset:48,byteLength:48},{buffer:0,byteOffset:96,byteLength:12}],accessors:[{bufferView:0,componentType:5126,count:4,type:'VEC3',min:[-.3,-.3,0],max:[.3,.3,0]},{bufferView:1,componentType:5126,count:4,type:'VEC3'},{bufferView:2,componentType:5123,count:6,type:'SCALAR'}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2}]}],nodes:Array.from({length:128},(_,i)=>({mesh:0,translation:[0,i*100,0]})),scenes:[{nodes:Array.from({length:128},(_,i)=>i)}],scene:0};
+ paths.sparse=URL.createObjectURL(new Blob([JSON.stringify(model)],{type:'model/gltf+json'}));
+}
+const models=[];for(let i=0;i<(kind==='fxaa'?0:kind==='morph'?1:6);i++){
+const m=(kind==='instances'||kind==='sparse')&&i?models[0].createInstance():await engine.scene.loadModel(paths[kind]);m.setPosition([(i%3-1)*2.7,Math.floor(i/3)*2-1,0]);
 if(kind==='skin')m.setScale([.017,.017,.017]).playAnimation('Walk').pauseAnimation();models.push(m);
 }
+if(kind==='sparse')URL.revokeObjectURL(paths.sparse);
 let moving=false,frame=0;
-function pose(t){for(let i=0;i<models.length;i++){const m=models[i];if(kind==='rigid')m.setRotation([.12*Math.sin(t),t+i*.12,0]);if(kind==='skin')m.seekAnimation(t%.7);if(kind==='morph')for(let j=0;j<3;j++)m.setMorphWeights(j,[(Math.sin(t)+1)*.5]);}}
+function pose(t){for(let i=0;i<models.length;i++){const m=models[i];if(kind==='rigid'||kind==='instances')m.setRotation([.12*Math.sin(t),t+i*.12,0]);if(kind==='skin')m.seekAnimation(t%.7);if(kind==='morph')for(let j=0;j<3;j++)m.setMorphWeights(j,[(Math.sin(t)+1)*.5]);}}
 function tick(){if(moving)pose((frame++%240)/120);requestAnimationFrame(tick)}requestAnimationFrame(tick);
 window.bench={engine,models,kind,start(){frame=0;moving=true;},stop(){moving=false;pose(.3);}};bench.stop();
 </script></html>

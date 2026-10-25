@@ -13,7 +13,19 @@ const extraFiles = ['index.html', 'tests/pixels.js',
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
 /** Transform each module in place: relative imports and import.meta.url keep their original base URL. */
-export async function minifyRuntimeFile(relativePath, bytes) {
+export async function minifyRuntimeFile(relativePath, bytes, build, releaseId) {
+    if (relativePath === 'examples/rim/index.html' && build) {
+        if (!/^[a-f0-9]{64}$/.test(build.wasm || '')) throw new Error('Rome build marker requires verified WASM SHA-256.');
+        const marker = '<meta name="engine-build" content="working">';
+        if (!bytes.includes(Buffer.from(marker))) throw new Error('Missing Rome build marker.');
+        let html = bytes.toString('utf8').replace(marker, `<meta name="engine-build" content="${build.wasm.slice(0, 8)}">`);
+        if (!html.includes('<meta name="app-build" content="working">')) throw new Error('Missing Rome application marker.');
+        if (releaseId !== undefined) {
+            if (!/^[a-f0-9]{10}$/.test(releaseId)) throw new Error('Invalid application version.');
+            html = html.replace('<meta name="app-build" content="working">', `<meta name="app-build" content="${releaseId}">`);
+        }
+        return Buffer.from(html);
+    }
     if (relativePath === 'examples/neon-arena/index.html') {
         return Buffer.from(bytes.toString('utf8').replace('<meta charset=', '<meta name="build-profile" content="release"><meta charset='));
     }
@@ -64,10 +76,9 @@ export async function writeProduction({ sourceRoot = root, destination = path.jo
     const backup = `${staging}-previous`;
     const manifest = { version: 1, profile: 'release', build, files: [], totals: { files: 0, bytes: 0, sourceBytes: 0, gzipBytes: 0, brotliBytes: 0 } };
     try {
-        for (const file of files) {
-            if (!(await lstat(path.join(sourceRoot, file))).isFile()) throw new Error(`Production input must be a regular file: ${file}`);
-            const source = await readFile(path.join(sourceRoot, file));
-            const bytes = await minifyRuntimeFile(file, source);
+        const version = createHash('sha256');
+        let pendingRome = null;
+        const stageFile = async (file, source, bytes) => {
             const target = path.join(staging, file);
             await mkdir(path.dirname(target), { recursive: true });
             await writeFile(target, bytes);
@@ -83,7 +94,21 @@ export async function writeProduction({ sourceRoot = root, destination = path.jo
                 }
             }
             manifest.files.push(record);
+        };
+        for (const file of files) {
+            if (!(await lstat(path.join(sourceRoot, file))).isFile()) throw new Error(`Production input must be a regular file: ${file}`);
+            const source = await readFile(path.join(sourceRoot, file));
+            const bytes = await minifyRuntimeFile(file, source, build);
+            // Hash canonical payload bytes; only the app-version literal stays a
+            // placeholder, avoiding a self-reference. No second asset read/copy.
+            version.update(file).update('\0').update(sha256(bytes)).update('\0');
+            if (file === 'examples/rim/index.html') pendingRome = {file, source};
+            else await stageFile(file, source, bytes);
         }
+        manifest.releaseId = version.digest('hex').slice(0, 10);
+        if (pendingRome) await stageFile(pendingRome.file, pendingRome.source,
+            await minifyRuntimeFile(pendingRome.file, pendingRome.source, build, manifest.releaseId));
+        manifest.files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
         manifest.totals.files = manifest.files.length;
         // Manifest describes payload files only, avoiding a self-referential checksum.
         const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
@@ -118,6 +143,7 @@ export async function assertProductionBuild(directory, { checkCurrentSource = fa
         throw new Error('Invalid release production manifest. Run npm run build:production.');
     }
     const seen = new Set();
+    const version = createHash('sha256');
     for (const record of manifest.files) {
         if (typeof record.path !== 'string' || record.path.includes('\\') || path.posix.normalize(record.path) !== record.path || record.path.startsWith('/') || record.path.startsWith('../') || seen.has(record.path)) {
             throw new Error('Invalid production manifest path.');
@@ -127,8 +153,18 @@ export async function assertProductionBuild(directory, { checkCurrentSource = fa
             if (!expected) continue;
             const bytes = await readFile(path.join(directory, record.path + suffix));
             if (bytes.length !== expected.bytes || sha256(bytes) !== expected.sha256) throw new Error(`Production payload changed: ${record.path}${suffix}`);
+            if (suffix === '' && manifest.releaseId) {
+                let canonical = bytes;
+                if (record.path === 'examples/rim/index.html') {
+                    const marker = `<meta name="app-build" content="${manifest.releaseId}">`;
+                    if (!bytes.includes(Buffer.from(marker))) throw new Error('Rome application marker does not match manifest.');
+                    canonical = Buffer.from(bytes.toString('utf8').replace(marker, '<meta name="app-build" content="working">'));
+                }
+                version.update(record.path).update('\0').update(sha256(canonical)).update('\0');
+            }
         }
     }
+    if (manifest.releaseId && version.digest('hex').slice(0, 10) !== manifest.releaseId) throw new Error('Application version mismatch.');
     for (const required of ['index.html', 'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm']) {
         if (!seen.has(required)) throw new Error(`Production manifest is missing ${required}`);
     }

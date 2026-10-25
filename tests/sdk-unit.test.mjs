@@ -596,6 +596,7 @@ test('XRPlayer exposes native tracking and generic inventory without weapon assu
     const wasm={
         xr_player_state:()=>JSON.stringify(state),
         xr_bind_head:id=>calls.push(['head',id]),
+        xr_bind_head_offset:(...args)=>calls.push(['headOffset',...args]),
         xr_add_item:id=>calls.push(['add',id]),
         xr_remove_item:id=>calls.push(['remove',id]),
     };
@@ -607,6 +608,10 @@ test('XRPlayer exposes native tracking and generic inventory without weapon assu
     assert.deepEqual(player.inventory.map(object=>object.id),[12]);
     player.addItem(tool).bindHead(head).equip('right',tool).unequip('left').removeItem(tool);
     assert.deepEqual(calls,[['add',12],['head',13],['equip','right',12,{}],['equip','left',null,{}],['equip','right',null,{}],['remove',12]]);
+    player.bindHead(head,{offset:[.9,.35,-1],anchor:'feet'});
+    assert.deepEqual(calls.at(-1),['headOffset',13,.9,.35,-1,true]);
+    assert.throws(()=>player.bindHead(head,{offset:[NaN,0,0]}),/ukotvení/);
+    assert.throws(()=>player.bindHead(head,{anchor:'other'}),/ukotvení/);
     assert.throws(()=>player.equip('left',new SceneObject({},12)),/patřit/);
     assert.throws(()=>player.bindHead(new SceneObject({},13)),/patřit/);
     alive=false;
@@ -709,4 +714,17 @@ test('model instances delegate asset sharing to Rust without transport', async (
     const source=new ModelObject(wasmMock({instantiate_model(id){calls.push(id);return 42;}}),17);
     const copy=source.createInstance();
     assert.equal(copy.id,42);assert.notEqual(copy,source);assert.deepEqual(calls,[17]);
+});
+
+test('XR locomotion forwards authored bounds and owned marker; foreign/disposed handles fail', async()=>{
+    const {XRPlayer,SceneObject}=await sdk();let alive=true;const calls=[];
+    const wasm={xr_configure_locomotion:json=>calls.push(JSON.parse(json))};
+    const marker=new SceneObject(wasm,42);
+    const player=new XRPlayer(wasm,{},o=>o===marker,id=>id,()=>alive);
+    player.configureLocomotion({bounds:[-10,10,-20,8],marker,slowScale:.15});
+    assert.deepEqual(calls,[{bounds:[-10,10,-20,8],marker:42,slowScale:.15}]);
+    assert.throws(()=>player.configureLocomotion({bounds:[-1,1,-1,1],marker:new SceneObject({},42)}),/patřit/);
+    assert.throws(()=>player.configureLocomotion({bounds:[-1,1,-1,1]}),/marker/);
+    player.configureLocomotion(null);assert.equal(calls[1],null);alive=false;
+    assert.throws(()=>player.configureLocomotion(null),/ukončen/);
 });

@@ -201,6 +201,8 @@ impl SceneManager {
                     transform.rotation,
                     transform.scale * Vec3::new(unit, unit, depth),
                 );
+                self.shadow_revisions.changed(child.render_options);
+                self.shadow_revisions.changed(key.options);
                 child.render_options = key.options;
                 [
                     child.emission,

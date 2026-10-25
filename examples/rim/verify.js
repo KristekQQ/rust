@@ -8,6 +8,13 @@ export async function verify(){
  const canvas=/** @type {HTMLCanvasElement} */(document.getElementById('gpu-canvas'));
  try{
   assert(['BrowserWebGpu','Gl'].includes(engine.renderer_backend()),'Actual native renderer');
+  const query=new URLSearchParams(location.search),build=document.querySelector('meta[name="engine-build"]')?.getAttribute('content');
+  assert(engine.frameProfile().enabled===(query.get('profile')==='1'&&query.get('info')!=='0'),'Detailed profiling is opt-in; basic FPS remains available');
+  assert(build==='working'||/^[a-f0-9]{8}$/.test(build||''),'Explicit working or release build identity');
+  const release=document.querySelector('meta[name="app-build"]')?.getAttribute('content');
+  assert(release==='working'||/^[a-f0-9]{10}$/.test(release||''),'Explicit complete application version');
+  assert(document.getElementById('backend')?.textContent?.includes(release==='working'?'pracovní sestava':'sestava '+release),'Visible build identity matches packaged metadata');
+
   assert(content.environment.info.primitives===19,'Original city geometry');assert(game.collision.shapes.length===1065,'Original convex roofs/arches/columns');
   view('gate');const city=await capturePixels(canvas);assertForeground(city,'Actual Roman city',40000);
   view('forum');assertChanged(city,await capturePixels(canvas),'Original camera landmarks',20000);
@@ -31,6 +38,17 @@ export async function verify(){
   assert(state().kills>=1&&state().enemies.find(e=>e.id===enemy.id)?.hp===0,'Second separate gladius swing defeats original GLB opponent');
   for(let i=0;i<180&&state().cuts.pieces===0;i++)await frames(1);
   assert(state().cuts.pieces>0&&state().cuts.errors===0,'Rust/WASM worker returns real split GLB geometry');
+  /** @type {{label:string,pixels:ImageData,png:string,age:number|undefined}[]} */
+  const stages=[];
+  const snapshot=async (/** @type {string} */ label)=>{const pixels=await capturePixels(canvas);assertForeground(pixels,label,1000);const copy=document.createElement('canvas');copy.width=pixels.width;copy.height=pixels.height;copy.getContext('2d')?.putImageData(pixels,0,0);stages.push({label,pixels,png:copy.toDataURL('image/png'),age:state().cuts.motion[0]?.age});};
+  const ageTo=async (/** @type {number} */ age)=>{for(let i=0;i<300&&(state().cuts.motion[0]?.age??Infinity)<age;i++)await frames(1);};
+  await snapshot('impact');await ageTo(.85);
+  assert(state().cuts.motion.some(p=>p.distance>.4&&p.direction.some(v=>Math.abs(v)>.1)),'Actual opposite half offsets are visible before dissolve');
+  await snapshot('separated');await ageTo(2.05);await snapshot('evaporating');
+  assertChanged(stages[0].pixels,stages[1].pixels,'Actual separated render',40);
+  assertChanged(stages[1].pixels,stages[2].pixels,'Actual dissolution render',40);
+  Reflect.set(window,'rimVisualEvidence',stages.map(({label,png,age})=>({label,png,age})));
+  await ageTo(3.1);await frames(2);assert(state().cuts.motion.length===0&&state().cuts.pieces===0,'Dissolved half meshes are released');
   assert(state().frame.simulation===state().frame.visual,'Simulation and visuals share the presented frame');
   assertChanged(beforeHit,await capturePixels(canvas),'Actual cut/death geometry',40);
   assert(!performance.getEntriesByType('resource').some(r=>r.name.includes('three.module')),'No Three runtime');

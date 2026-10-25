@@ -13,6 +13,8 @@ const localOption = (key) => {
   }
 };
 const profiling = process.env.PROFILING !== "0";
+const warmupMs = Number(process.env.WARMUP_MS || 2000), sampleMs = Number(process.env.SAMPLE_MS || 5000);
+if (![warmupMs, sampleMs].every(v => Number.isFinite(v) && v >= 1000)) throw Error("Warmup/sample duration must be at least1000ms");
 const threeRoot = process.env.THREE_ROOT ? path.resolve(process.env.THREE_ROOT) : null;
 const sourceOverlay = path.join(path.dirname(pkg), "source");
 const { default: puppeteer } = await import(path.join(repo, "node_modules/puppeteer/lib/puppeteer/puppeteer.js"));
@@ -62,7 +64,7 @@ try {
   gpuDevice = info.gpu.devices.map(({vendorString,deviceString,driverVendor,driverVersion}) => ({vendorString,deviceString,driverVendor,driverVersion}));
   await session.detach();
 } catch { /* Hardware detail is optional; backend acceptance remains mandatory. */ }
-const report = { gpuDevice, sourceOverlay, profiling, threeRoot, comparison: !!threeRoot, label, date: (/* @__PURE__ */ new Date()).toISOString(), browser: await browser.version(), pkg, wasmHash: createHash("sha256").update(await fs.readFile(path.join(pkg, "webgpu_wasm_bg.wasm"))).digest("hex"), results: [] };
+const report = { gpuDevice, sourceOverlay, profiling, warmupMs, sampleMs, threeRoot, comparison: !!threeRoot, label, date: (/* @__PURE__ */ new Date()).toISOString(), browser: await browser.version(), pkg, wasmHash: createHash("sha256").update(await fs.readFile(path.join(pkg, "webgpu_wasm_bg.wasm"))).digest("hex"), results: [] };
 try {
   for (const backend of (process.env.BACKENDS || "webgpu,webgl").split(",")) for (const kind of (process.env.SCENES || "rigid,skin,morph,rim").split(",")) {
     console.log("RUN", label, backend, kind);
@@ -95,7 +97,7 @@ try {
         }
       });
     });
-    await page.goto(url + (kind === "three" ? "/three/" : kind === "rim" ? "/examples/rim/?backend=" + backend + (profiling ? "&profile=1" : "") : "/core-benchmark.html?kind=" + kind + "&backend=" + backend + "&profile=" + Number(profiling)), { waitUntil: "networkidle0" });
+    await page.goto(url + (kind === "three" ? "/three/" : kind === "rim" ? "/examples/rim/?backend=" + backend + "&profile=" + Number(profiling) : "/core-benchmark.html?kind=" + kind + "&backend=" + backend + "&profile=" + Number(profiling)), { waitUntil: "networkidle0" });
     await page.waitForFunction(kind === "three" ? "!!window.cityDebug" : kind === "rim" ? "!!window.rimDemo" : "!!window.bench", { timeout: 12e4 });
     if (kind === "rim") await page.evaluate(() => {
       window.bench = { engine: rimDemo.engine, start() {
@@ -122,14 +124,18 @@ try {
       rimDemo.engine.set_render_effects(false, false);
       rimDemo.engine.postprocessing.disable("fxaa");
     });
+    if (kind !== "three") {
+      const actualProfiling = await page.evaluate(() => bench.engine.frameProfile().enabled);
+      if (actualProfiling !== profiling) throw Error("Requested/actual profiling mismatch: " + profiling + "/" + actualProfiling);
+    }
     await page.evaluate(() => bench.start());
-    await new Promise((r) => setTimeout(r, 2e3));
-    const data = await page.evaluate(async () => {
+    await new Promise((r) => setTimeout(r, warmupMs));
+    const data = await page.evaluate(async (measureMs) => {
       measure.rows = [];
       measure.active = true;
       const samples = [], gpu = [], start = performance.now();
       let lastGpu = -1;
-      while (performance.now() - start < 5e3) {
+      while (performance.now() - start < measureMs) {
         await new Promise((r) => setTimeout(r, 100));
         const e = bench.engine, p = e.frameProfile();
         samples.push({ stats: e.renderer_stats(), debug: e.debugStats(), cpu: p.cpu });
@@ -141,7 +147,7 @@ try {
       measure.active = false;
       bench.stop();
       return { rows: measure.rows, samples, gpu, backend: bench.engine.renderer_backend(), profile: bench.engine.frameProfile() };
-    });
+    }, sampleMs);
     await new Promise((r) => setTimeout(r, 150));
     const png = await page.evaluate(async () => {
       const { capturePixels } = await import("/tests/pixels.js");
@@ -154,7 +160,13 @@ try {
     });
     await fs.writeFile(path.join(out, backend + "-" + kind + ".png"), Buffer.from(png, "base64"));
     const intervals = data.rows.slice(1).map((r, i) => r.stamp - data.rows[i].stamp), cpu = data.rows.map((r) => r.cpu);
-    const result = { kind, requestedBackend: backend, ...data, errors, cpu: summary(cpu), interval: summary(intervals), fps: 1e3 / summary(intervals).mean };
+    // Optional expensive breakdown is collected after timing and pixel capture.
+    const diagnostics = process.env.DRAW_DIAGNOSTICS === '1' && kind !== 'three' ? await page.evaluate(async () => {
+      bench.engine.setDebugOverlay(true);
+      await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
+      const value=bench.engine.debugStats();bench.engine.setDebugOverlay(false);return value;
+    }) : undefined;
+    const result = { diagnostics, kind, requestedBackend: backend, ...data, errors, cpu: summary(cpu), interval: summary(intervals), fps: 1e3 / summary(intervals).mean };
     report.results.push(result);
     await fs.writeFile(path.join(out, "report.json"), JSON.stringify(report, null, 2));
     console.log(JSON.stringify({ kind, backend, cpu: result.cpu, fps: result.fps, uploads: summary(data.samples.map((s) => s.stats.uploadBytes)), gpu: data.gpu.at(-1), errors }));

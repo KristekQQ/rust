@@ -2,6 +2,8 @@
 #[derive(Default)]
 pub struct FrameMetrics {
     elapsed: f64,
+    samples: std::collections::VecDeque<f64>,
+    pub frame_p95_ms: f64,
     frames: u32,
     pub fps: f64,
     pub frame_ms: f64,
@@ -16,9 +18,16 @@ impl FrameMetrics {
             *self = Self::default();
             return;
         }
+        if self.samples.len() == 120 {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(dt as f64 * 1000.);
         self.elapsed += dt as f64;
         self.frames += 1;
         if self.elapsed >= 0.5 {
+            let mut sorted: Vec<_> = self.samples.iter().copied().collect();
+            sorted.sort_by(f64::total_cmp);
+            self.frame_p95_ms = sorted[(sorted.len() as f64 * 0.95).ceil() as usize - 1];
             self.fps = self.frames as f64 / self.elapsed;
             self.frame_ms = self.elapsed * 1000.0 / self.frames as f64;
             self.elapsed = 0.0;
@@ -37,6 +46,7 @@ mod tests {
         }
         assert!((metrics.fps - 60.0).abs() < 0.001);
         assert!((metrics.frame_ms - 1000.0 / 60.0).abs() < 0.001);
+        assert!((metrics.frame_p95_ms - 1000.0 / 60.0).abs() < 0.001);
         metrics.record(f32::NAN);
         assert!(metrics.fps.is_finite());
         metrics.record(2.0);

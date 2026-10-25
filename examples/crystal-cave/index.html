@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Krystalová jeskyně · VR</title>
+<style>
+:root{color-scheme:dark;font:14px/1.5 system-ui;background:#070f16;color:#e3f4f6}*{box-sizing:border-box}body{margin:0}canvas{display:block;width:100vw;height:100vh}header{position:absolute;left:32px;top:30px;pointer-events:none;text-shadow:0 2px 14px #000}small{font-size:10px;color:#9ae3df;letter-spacing:.3em}h1{font:400 clamp(27px,4vw,46px)/1.2 Georgia,serif;margin:8px 0}header p{color:#bbcdce;margin:0}aside{position:absolute;bottom:28px;left:32px;width:min(350px,calc(100vw - 40px));padding:20px;background:#071319e8;border:1px solid #52727577;border-radius:14px;backdrop-filter:blur(15px)}button,a{font:inherit}button{padding:10px 16px;border:1px solid #79c7c7;border-radius:7px;color:#e6ffff;background:#16474c;cursor:pointer}button:disabled{opacity:.5;cursor:default}button:focus-visible,a:focus-visible{outline:2px solid #d3fff2;outline-offset:4px}#enter{width:100%;background:#a4e5df;color:#092e32;font-weight:700}.views{display:flex;gap:9px;margin:12px 0}.views button{flex:1;background:transparent;padding:7px}p{margin:10px 0;color:#adc5c8}label,#status{font-size:12px}details{margin-top:12px;font-size:12px}summary{cursor:pointer;color:#c4e4e5}ul{padding-left:17px}a{color:#9aeee3}#result{white-space:pre-wrap}body.xr header,body.xr aside{display:none}body:not(.xr) #gpu-canvas{transform:scaleX(-1)}@media(max-width:600px){header{left:20px;top:20px}header p{font-size:12px}aside{left:20px;bottom:20px;padding:15px}}
+</style>
+<canvas id="gpu-canvas" width="960" height="720" aria-label="Prostorová jeskyně se skalním stropem, krápníky a svítícími krystaly"></canvas>
+<header><small>PODZEMNÍ EXPEDICE / VR</small><h1>Krystalová jeskyně</h1><p>Od teplého světla vstupu do modrého ticha hlubin.</p></header>
+<aside><button id="enter" disabled>Vstoupit do VR</button><button id="exit" hidden>Ukončit VR</button>
+<div class="views"><button id="entrance">U vstupu</button><button id="heart">Srdce jeskyně</button></div>
+<p id="status" role="status">Načítám podzemní svět…</p>
+<label><input id="show-fps" type="checkbox"> FPS panel ve VR</label>
+<details><summary>Jak se pohybovat</summary><ul><li>Levý analog: chůze.</li><li>Pravý analog: otočení o 30°.</li><li>Drž A, zaměř volnou podlahu a pusť: teleport.</li><li>B: zrušit teleport.</li></ul><p>Prohlédni si krápníky nad hlavou a projdi ke krystalům na konci jeskyně.</p></details>
+<details id="verification"><summary>Model a ověření</summary><a href="../../assets/models/crystal-cave/crystal-cave.glb" download>Stáhnout jeskyni GLB</a> · <a href="?backend=webgl">WebGL</a><p><button id="verify">Ověřit scénu</button></p><pre id="result" role="status"></pre></details>
+</aside><script type="module" src="./main.js"></script></html>

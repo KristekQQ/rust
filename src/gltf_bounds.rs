@@ -225,6 +225,83 @@ impl RenderBoundsCache {
         Self { primitives }
     }
 
+    fn local_bounds(
+        &self,
+        asset: &ModelAsset,
+        pose: &ModelPose,
+        node_index: usize,
+        primitive_index: usize,
+    ) -> Option<Bounds> {
+        let primitive = self.primitives.get(primitive_index)?.as_ref()?;
+        let all = primitive.all?;
+        let local = if asset.nodes.get(node_index)?.skin.is_none() {
+            all
+        } else {
+            let matrices = pose.skin_matrices.get(node_index)?;
+            let mut local = primitive.rigid;
+            let mut skinned = None;
+            let mut magnitude = [0_f64; 3];
+            for &(joint, bounds) in &primitive.joints {
+                let matrix = *matrices.get(joint as usize)?;
+                // Degenerate/ill-conditioned palettes preserve exact error handling.
+                let inverse = matrix.inverse();
+                if !inverse.is_finite()
+                    || matrix
+                        .to_cols_array()
+                        .iter()
+                        .chain(inverse.to_cols_array().iter())
+                        .any(|v| v.abs() > 1e12)
+                {
+                    return None;
+                }
+                let transformed = bounds.transform(matrix)?;
+                include(&mut skinned, transformed);
+                let p = all.magnitude();
+                let columns = matrix.to_cols_array_2d();
+                for (axis, magnitude) in magnitude.iter_mut().enumerate() {
+                    let absolute = (0..3)
+                        .map(|col| (columns[col][axis] as f64).abs() * p[col])
+                        .sum::<f64>()
+                        + (columns[3][axis] as f64).abs();
+                    *magnitude = magnitude.max(absolute);
+                }
+            }
+            if let Some(mut skinned) = skinned {
+                // Convex enclosure plus error from non-unit float sums and
+                // the CPU's weighted-matrix accumulation before transformation.
+                let padding =
+                    primitive.sum_error + primitive.max_sum * gamma(2 * primitive.max_terms + 16)?;
+                skinned.expand(magnitude.map(|value| value * padding));
+                include(&mut local, skinned);
+            }
+            local?
+        };
+        Some(local)
+    }
+
+    /// Conservative bounds in draw coordinates. Unknown inputs disable culling.
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn primitive_bounds(
+        &self,
+        asset: &ModelAsset,
+        pose: &ModelPose,
+        node: usize,
+        primitive: usize,
+        root: Mat4,
+    ) -> Option<(Vec3, Vec3)> {
+        let mesh = asset.nodes.get(node)?.mesh?;
+        if !asset.meshes.get(mesh)?.primitives.contains(&primitive) {
+            return None;
+        }
+        // node_render_matrix uses direct indexing; malformed poses must fail open.
+        pose.skin_world_space.get(node)?;
+        pose.world_matrices.get(node)?;
+        let render = root * node_render_matrix(pose, node);
+        self.local_bounds(asset, pose, node, primitive)?
+            .transform(render)?
+            .finish()
+    }
+
     /// Returns None when exact deformation is required, never a narrower guess.
     fn cached_bounds(&self, asset: &ModelAsset, pose: &ModelPose) -> Option<(Vec3, Vec3)> {
         let mut result = None;
@@ -236,51 +313,10 @@ impl RenderBoundsCache {
             let render = node_render_matrix(pose, node_index);
             for &primitive_index in &asset.meshes.get(mesh)?.primitives {
                 let primitive = self.primitives.get(primitive_index)?.as_ref()?;
-                let Some(all) = primitive.all else {
+                if primitive.all.is_none() {
                     continue;
-                };
-                let local = if node.skin.is_none() {
-                    all
-                } else {
-                    let matrices = pose.skin_matrices.get(node_index)?;
-                    let mut local = primitive.rigid;
-                    let mut skinned = None;
-                    let mut magnitude = [0_f64; 3];
-                    for &(joint, bounds) in &primitive.joints {
-                        let matrix = *matrices.get(joint as usize)?;
-                        // Degenerate/ill-conditioned palettes preserve exact error handling.
-                        let inverse = matrix.inverse();
-                        if !inverse.is_finite()
-                            || matrix
-                                .to_cols_array()
-                                .iter()
-                                .chain(inverse.to_cols_array().iter())
-                                .any(|v| v.abs() > 1e12)
-                        {
-                            return None;
-                        }
-                        let transformed = bounds.transform(matrix)?;
-                        include(&mut skinned, transformed);
-                        let p = all.magnitude();
-                        let columns = matrix.to_cols_array_2d();
-                        for (axis, magnitude) in magnitude.iter_mut().enumerate() {
-                            let absolute = (0..3)
-                                .map(|col| (columns[col][axis] as f64).abs() * p[col])
-                                .sum::<f64>()
-                                + (columns[3][axis] as f64).abs();
-                            *magnitude = magnitude.max(absolute);
-                        }
-                    }
-                    if let Some(mut skinned) = skinned {
-                        // Convex enclosure plus error from non-unit float sums and
-                        // the CPU's weighted-matrix accumulation before transformation.
-                        let padding = primitive.sum_error
-                            + primitive.max_sum * gamma(2 * primitive.max_terms + 16)?;
-                        skinned.expand(magnitude.map(|value| value * padding));
-                        include(&mut local, skinned);
-                    }
-                    local?
-                };
+                }
+                let local = self.local_bounds(asset, pose, node_index, primitive_index)?;
                 include(&mut result, local.transform(render)?);
             }
         }
@@ -516,5 +552,103 @@ mod tests {
         asset.vertices[0].influences = (0..100).map(|i| (i % 2, 0.01)).collect();
         let model = ModelInstance::new(Arc::new(asset), None).unwrap();
         assert_contains(&model);
+    }
+
+    fn assert_primitive_contains(model: &ModelInstance, primitive: usize, root: Mat4) {
+        let bounds = model
+            .render_bounds_cache
+            .primitive_bounds(&model.asset, &model.pose, 0, primitive, root)
+            .expect("supported primitive bounds");
+        let render = root * node_render_matrix(&model.pose, 0);
+        for vertex in
+            crate::gltf_animation::deformed_vertices(&model.asset, &model.pose, 0, primitive)
+                .unwrap()
+        {
+            let point = render.transform_point3(Vec3::from_array(vertex.position));
+            assert!(
+                bounds.0.cmple(point).all() && bounds.1.cmpge(point).all(),
+                "primitive {primitive}: {:?} outside {:?}",
+                point,
+                bounds
+            );
+        }
+    }
+
+    #[test]
+    fn primitive_bounds_contain_animated_vertices_in_combined_draw_coordinates() {
+        for skin in [false, true] {
+            let mut asset = fixture();
+            if !skin {
+                asset.nodes[0].skin = None;
+            }
+            // Separate primitive ranges must keep independent spatial bounds.
+            asset.primitives[0].vertices = 0..2;
+            asset.primitives[0].indices = vec![0, 1];
+            let mut second = asset.primitives[0].clone();
+            second.vertices = 2..3;
+            second.indices = vec![0];
+            asset.primitives.push(second);
+            asset.meshes[0].primitives.push(1);
+            let mut model = ModelInstance::new(Arc::new(asset), None).unwrap();
+            for step in 0..20 {
+                let t = step as f32 * 0.17;
+                model.pose.local_trs[0].scale = Vec3::new(-2., 0.3, 3.);
+                // Keep skin palette strictly affine (existing cache contract);
+                // rigid nodes also exercise animated mesh rotation.
+                model.pose.local_trs[0].rotation = if skin {
+                    Quat::IDENTITY
+                } else {
+                    Quat::from_rotation_y(t)
+                };
+                model.pose.local_trs[0].translation = Vec3::new(5., -3., 4.);
+                model.pose.local_trs[1].translation = Vec3::new(t, 2., -1.);
+                model.pose.local_trs[1].rotation = Quat::from_rotation_z(-t);
+                model.pose.local_trs[2].scale = Vec3::new(-1., 3., 0.1);
+                model.pose.local_trs[2].rotation = Quat::from_rotation_x(t);
+                recompute_world(&model.asset, &mut model.pose).unwrap();
+                let root = Mat4::from_scale_rotation_translation(
+                    Vec3::new(0.2, -4., 1.7),
+                    Quat::from_rotation_z(t),
+                    Vec3::new(100., -200., 30.),
+                );
+                assert_primitive_contains(&model, 0, root);
+                assert_primitive_contains(&model, 1, root);
+            }
+        }
+    }
+
+    #[test]
+    fn primitive_bounds_unknown_morph_budget_and_bad_transforms_fail_open() {
+        let mut model = ModelInstance::new(Arc::new(fixture()), None).unwrap();
+        let query = |model: &ModelInstance, node, primitive, root| {
+            model.render_bounds_cache.primitive_bounds(
+                &model.asset,
+                &model.pose,
+                node,
+                primitive,
+                root,
+            )
+        };
+        assert!(query(&model, usize::MAX, 0, Mat4::IDENTITY).is_none());
+        assert!(query(&model, 0, usize::MAX, Mat4::IDENTITY).is_none());
+        assert!(query(&model, 1, 0, Mat4::IDENTITY).is_none());
+        assert!(query(&model, 0, 0, Mat4::ZERO).is_none());
+        model.pose.skin_matrices[0][0] = Mat4::from_scale(Vec3::new(1e-20, 1., 1.));
+        assert!(query(&model, 0, 0, Mat4::IDENTITY).is_none());
+        model.pose.world_matrices.clear();
+        assert!(query(&model, 0, 0, Mat4::IDENTITY).is_none());
+
+        let mut asset = fixture();
+        asset.primitives[0].morph_targets.push(MorphTarget {
+            positions: vec![[1., 0., 0.]; 3],
+            normals: vec![],
+            tangents: vec![],
+        });
+        let model = ModelInstance::new(Arc::new(asset), None).unwrap();
+        assert!(query(&model, 0, 0, Mat4::IDENTITY).is_none());
+        let cache = RenderBoundsCache::with_budget(&model.asset, 0);
+        assert!(cache
+            .primitive_bounds(&model.asset, &model.pose, 0, 0, Mat4::IDENTITY)
+            .is_none());
     }
 }

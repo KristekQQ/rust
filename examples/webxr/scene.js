@@ -1,3 +1,4 @@
+import {VR_DEBUG_PANEL_WIDTH,VR_DEBUG_PANEL_HEIGHT} from '../shared/vr-debug-panel.js';
 import { appleGeometry, swordGeometry } from './geometry.js';
 
 /** Vlastní scéna v metrech. Žádná runtime závislost na jiném příkladu.
@@ -18,7 +19,7 @@ export function createScene(scene, {practice = false} = {}) {
         .setCutter({base:[0,0,-0.1],tip:[0,0,-0.95]}).setBladePhysics({edge:[0,-1,0]});
     scene.createLight({ position: [2, 5, 1], color: [1, 0.95, 0.9] });
     scene.createLight({ position: [-3, 3, -2], color: [0.25, 0.4, 0.7] });
-    const infoPanel = scene.createInfoPanel('scene', {position:[-.68,2.05,-2.3],width:1.2,height:.72});
+    const infoPanel = scene.createInfoPanel('diagnostics', {position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT});
     const scorePanel = scene.createInfoPanel('round', {position:[.68,2.05,-2.3],width:1.2,height:.72});
     const restartButton = scene.createInfoPanel('restart', {position:[0,1.05,-1.65],width:.75,height:.22});
     /** @type {import("../../js/engine.d.ts").TriangleMeshOptions} */

@@ -6,6 +6,7 @@
 <script type="module">
 import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+// Count the game director separately from the optional 250ms diagnostics sampler.
 const sim=installXRSimulator({profile:{eyeWidth:400,eyeHeight:400}});
 const run=new XRTestRun('arena-minute',sim,publishXRReport);
 import {planCue} from '../examples/neon-arena/round-plan.js';
@@ -23,7 +24,7 @@ await run.execute(async test=>{
     test.assert(engine.xr.roundState.duration===60&&engine.xr.roundState.remaining===60,'real Rust clock starts at sixty seconds');
     test.assert(app.gameState().liveApples.length===6,'opening offers two differently valued triples');
     test.assert(app.gameState().liveApples.every(fruit=>Math.abs(fruit.meshInfo.scale[0]-.09)<1e-6),'real opening fruit uses the larger comfortable physical scale');
-    test.assert(sim.timerCount===1,'whole choreography owns exactly one timer');
+    test.assert(sim.timerCountForDelay(100)===1,'whole choreography owns exactly one timer');
     const initial=app.gameState().liveApples.map(fruit=>fruit.meshInfo.position);
     test.assert(initial.every(p=>p[1]<.9),'fruit launches below the strike zone instead of appearing at hand height');
     test.assert(app.gameState().launchGlints.length===12&&app.gameState().launchGlints.every(g=>!g.meshInfo.cuttable),'opening launch glints are bounded decorative geometry');
@@ -62,7 +63,7 @@ await run.execute(async test=>{
     test.assert(captured.size===6,'all six different phases ran in the real minute');
     test.assert(history.length===minutePlan.cues.length&&history.every(cue=>cue.spawned===minutePlan.cues[cue.index].targets.length),'every authored cue fired once without skipped fruit');
     test.assert(history.at(-1).spawned===10&&maximum===10,'finale really launches ten original fruit');
-    test.assert(engine.xr.roundState.finished&&sim.timerCount===0&&!app.gameState().launching,'round ends at sixty seconds and releases director timer');
+    test.assert(engine.xr.roundState.finished&&sim.timerCountForDelay(100)===0&&!app.gameState().launching,'round ends at sixty seconds and releases director timer');
     test.assert(app.gameState().liveApples.length===0,'finale has time to settle before the round ends');
     test.assert(app.world.phasePanels.every(panel=>panel.object.meshInfo.position[0]>10),'phase heading hidden after round end');
     await engine.xr.exit();
@@ -72,7 +73,7 @@ await run.execute(async test=>{
     test.assert(programState().cues.length===1&&app.gameState().shots===6&&engine.xr.roundState.remaining===60,'restart resets minute program without replaying stale cues');
     arenaTools.call('arena_stop');
     const stopped=app.gameState().shots;for(let i=0;i<40;i++)sim.frame({...pose,dt:100});
-    test.assert(sim.timerCount===0&&app.gameState().shots===stopped&&app.gameState().launchGlints.length===0,'manual stop prevents future cues and clears launch show');
+    test.assert(sim.timerCountForDelay(100)===0&&app.gameState().shots===stopped&&app.gameState().launchGlints.length===0,'manual stop prevents future cues and clears launch show');
     // Keep score probes isolated from decorative fragment/effect accumulation.
     const probePieces=[];
     let lastCut=null;

@@ -24,6 +24,16 @@ test('module minification preserves imports, URL bases and public exports', asyn
     assert.equal((await minifyRuntimeFile('index.html', index)).toString(), '<script type="module" src="js/app.js"></script>');
 });
 
+test('Rome release label is bound to the verified WASM identity', async () => {
+    const html = Buffer.from('<meta name="engine-build" content="working"><meta name="app-build" content="working"><title>Rome</title>');
+    const output = await minifyRuntimeFile('examples/rim/index.html', html, {wasm: '1234abcd'.repeat(8)}, 'abcd012345');
+    assert.match(output.toString(), /name="engine-build" content="1234abcd"/);
+    assert.match(output.toString(), /name="app-build" content="abcd012345"/);
+    assert.deepEqual(await minifyRuntimeFile('examples/rim/index.html', html), html);
+    await assert.rejects(minifyRuntimeFile('examples/rim/index.html', html, {wasm:'invalid'}), /verified WASM/);
+    await assert.rejects(minifyRuntimeFile('examples/rim/index.html', Buffer.from('<title>Rome</title>'), {wasm:'a'.repeat(64)}), /Missing Rome/);
+});
+
 test('offline compression round-trips exact bytes', () => {
     const bytes = Buffer.from('module data \0 with UTF-8: čeština\n'.repeat(40));
     const { gzip, brotli } = precompress(bytes);
@@ -34,11 +44,12 @@ test('offline compression round-trips exact bytes', () => {
 test('isolated release package has manifest checksums and replaces previous output only on success', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'production-bundle-'));
     const destination = path.join(directory, 'output/production');
-    const build = { configuration: { profile: 'release' }, wasm: 'fixture' };
+    const build = { configuration: { profile: 'release' }, wasm: 'a'.repeat(64) };
     const fixture = {
         'index.html': '<!doctype html><script type="module" src="js/app.js"></script>',
         'js/app.js': 'export const value = 1 + 2;',
         'examples/demo/main.js': 'import "../../js/app.js";',
+        'examples/rim/index.html': '<meta name="engine-build" content="working"><meta name="app-build" content="working">',
         'examples/demo/build-private.mjs': 'private build helper',
         'assets/license.txt': 'Asset license',
         'tests/pixels.js': 'export const pixels = true;',
@@ -58,7 +69,7 @@ test('isolated release package has manifest checksums and replaces previous outp
         await writeFile(path.join(destination, 'obsolete.txt'), 'previous');
         const manifest = await writeProduction({ sourceRoot: directory, destination, build });
         assert.equal(manifest.profile, 'release');
-        assert.equal(manifest.files.length, 9);
+        assert.equal(manifest.files.length, 10);
         assert.deepEqual(await assertProductionBuild(destination), manifest);
         assert.deepEqual(JSON.parse(await readFile(path.join(destination, 'production-manifest.json'))), manifest);
         for (const excluded of ['obsolete.txt', '.private-token', 'pkg/verification-build.json', 'examples/demo/build-private.mjs']) {
@@ -72,6 +83,13 @@ test('isolated release package has manifest checksums and replaces previous outp
             if (record.brotli) assert.deepEqual(brotliDecompressSync(await readFile(path.join(destination, `${record.path}.br`))), bytes);
         }
         assert.equal(await readFile(path.join(directory, 'pkg/webgpu_wasm.js'), 'utf8'), fixture['pkg/webgpu_wasm.js']);
+        assert.match(await readFile(path.join(destination,'examples/rim/index.html'),'utf8'), new RegExp(`app-build" content="${manifest.releaseId}"`));
+        assert.equal((await writeProduction({sourceRoot:directory,destination,build})).releaseId,manifest.releaseId);
+        await writeFile(path.join(directory,'js/app.js'),'export const value = 4;');
+        assert.notEqual((await writeProduction({sourceRoot:directory,destination,build})).releaseId,manifest.releaseId);
+        await writeFile(path.join(directory,'js/app.js'),fixture['js/app.js']);
+        assert.deepEqual(await writeProduction({sourceRoot:directory,destination,build}),manifest);
+
         await writeFile(path.join(directory, 'js/app.js'), 'export broken syntax');
         await assert.rejects(writeProduction({ sourceRoot: directory, destination, build }));
         assert.deepEqual(JSON.parse(await readFile(path.join(destination, 'production-manifest.json'))), manifest);

@@ -1,0 +1,17 @@
+<!doctype html><html><meta charset="utf-8"><canvas id="gpu-canvas" width="960" height="640"></canvas><pre id="result">RUNNING…</pre><script type="module">
+import {initEngine} from '/js/engine.js';
+const p=new URLSearchParams(location.search),engine=await initEngine(document.querySelector('canvas'),{backend:p.get('backend')==='webgl'?'webgl':'auto'});
+engine.resize(960,640);engine.set_camera_mode('free');engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_simulation_paused(true);
+if(p.get('scene')==='arena'){
+ const {createScene,NEON_GLOW,FLOOR_SSR,FLOOR_SSR_BOUNDS}=await import('/examples/neon-arena/scene.js');
+ engine.set_render_effects(false,false);engine.setBackgroundColor([0,0,0]);engine.setNeonGlow(NEON_GLOW);engine.postprocessing.configureSSR({resolutionScale:.5,receiverBounds:FLOOR_SSR_BOUNDS});engine.postprocessing.enable('ssr',FLOOR_SSR);
+ const world=await createScene(engine.scene);world.infoPanel.setPosition([0,-10000,0]);engine.setCameraView([.3,1.7,1.4],[0,1.2,-1.8]);
+}else{
+ const {configureAppearance}=await import('/examples/rim/appearance.js'),{createScene,createGameplay}=await import('/examples/rim/scene.js');
+ configureAppearance(engine);const content=await createScene(engine.scene),game=await createGameplay(engine,content);engine.scene.configureRim(null);
+ for(const {model} of content.characters)model.stopAnimation();
+ game.enemies.slice(0,6).forEach(({model},i)=>model.setPosition([(i-2.5)*1.3,1.2,34-(i%2)*.7]).setScale([.35,.35,.35]).setRotation([0,i*.3,0]).playAnimation('Idle').pauseAnimation().seekAnimation(.3));
+ engine.setCameraView([0,1.7,42],[0,1.2,34]);
+}
+window.pixelFixture={engine};document.documentElement.dataset.rendererBackend=engine.renderer_backend();document.querySelector('#result').textContent='PASS: frozen '+p.get('scene');
+</script></html>

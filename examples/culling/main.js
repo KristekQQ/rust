@@ -1,5 +1,5 @@
 // 1. Renderer/SDK, definice scény a volitelné vývojové UI jsou oddělené moduly.
-import { initEngine } from "../../js/engine.js";
+import { initEngine } from "../shared/runtime-info.js";
 import { createScene } from "./scene.js";
 import { createTools } from "../shared/tools.js";
 

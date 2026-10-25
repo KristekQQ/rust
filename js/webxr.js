@@ -16,11 +16,23 @@ export class XRPlayer {
         for(const key of ['head','leftHand','rightHand'])state[key]={...state[key],object:state[key].object===null?null:this.#object(state[key].object)};
         return {...state,inventory:state.inventory.map(this.#object)};
     }
+    configureLocomotion(options){
+        this.#check(options?.marker);
+        if(options && !options.marker)throw new Error('Teleport vyžaduje marker cíle.');
+        this.#engine.xr_configure_locomotion(JSON.stringify(options?{...options,marker:options.marker.id}:null));return this;
+    }
     get head(){return this.state.head;}
     get leftHand(){return this.state.leftHand;}
     get rightHand(){return this.state.rightHand;}
     get inventory(){return this.state.inventory;}
-    bindHead(object){this.#check(object);this.#engine.xr_bind_head(object?.id??0xffffffff);return this;}
+    bindHead(object,options={}){
+        this.#check(object);
+        const {offset=[0,0,0],anchor='head'}=options;
+        if(!['head','feet'].includes(anchor)||offset.length!==3||!offset.every(v=>Number.isFinite(v)&&Math.abs(v)<=10))throw new Error('Neplatné ukotvení panelu.');
+        if(options.offset||anchor==='feet')this.#engine.xr_bind_head_offset(object?.id??0xffffffff,...offset,anchor==='feet');
+        else this.#engine.xr_bind_head(object?.id??0xffffffff);
+        return this;
+    }
     addItem(object){this.#check(object);if(!object)throw new Error('Chybí objekt.');this.#engine.xr_add_item(object.id);return this;}
     removeItem(object){
         this.#check(object);if(!object)throw new Error('Chybí objekt.');
@@ -53,6 +65,7 @@ export class WebXRHost extends EventTarget {
     #haptics = [false, false];
     #contactActive = [false, false];
     #resetInputs = () => {
+        this.#engine.xr_cancel_locomotion?.();
         this.#pressed = [null, null];
         this.#bladePoses = [null, null];
         this.#buttonTouch = [false, false];
@@ -90,22 +103,22 @@ export class WebXRHost extends EventTarget {
         this.#buttonTouch = [false, false];
         this.#buttonPoints = [undefined, undefined];
     }
-    #rimSource=null;
-    #updateRim(session, frame, space, pose, tracked, dt) {
-        if(!this.#engine.rim_update_xr)return;
+    #locomotionSource=null;
+    #updateLocomotion(session, frame, space, pose, tracked, dt) {
+        if(!this.#engine.xr_update_locomotion)return;
         const sources=[...(session.inputSources??[])];
         const left=sources.find(s=>s.handedness==='left'&&s.gamepad?.mapping==='xr-standard');
         const right=sources.find(s=>s.handedness==='right'&&s.gamepad?.mapping==='xr-standard');
-        const changed=right!==this.#rimSource;this.#rimSource=right;
+        const changed=right!==this.#locomotionSource;this.#locomotionSource=right;
         const leftPose=tracked&&left?.gripSpace?frame.getPose(left.gripSpace,space):null;
         const ray=tracked&&right?.targetRaySpace?frame.getPose(right.targetRaySpace,space):null;
         this.#engine.rim_xr_buttons?.(!!ray&&!!right?.gamepad?.buttons[0]?.pressed,!!ray&&!!right?.gamepad?.buttons[4]?.pressed);
         const axes=source=>source?.gamepad?.axes??[];
         const l=leftPose?axes(left):[],r=ray?axes(right):[];
         // xr-standard thumbstick uses axes 2/3; two-axis generic sticks use 0/1.
-        this.#engine.rim_update_xr(tracked?pose.transform.matrix:new Float32Array(),ray?ray.transform.matrix:new Float32Array(),
+        this.#engine.xr_update_locomotion(tracked?pose.transform.matrix:new Float32Array(),ray?ray.transform.matrix:new Float32Array(),
             [l[l.length>=4?2:0]??0,l[l.length>=4?3:1]??0,r[r.length>=4?2:0]??0],
-            changed||!!right?.gamepad?.buttons[5]?.pressed,dt);
+            !!ray&&!!right.gamepad.buttons[4]?.pressed,changed||!!right?.gamepad?.buttons[5]?.pressed,dt);
     }
     #updateControllers(session, frame, space, tracking) {
         const sources = [...(session.inputSources ?? [])];
@@ -295,7 +308,7 @@ export class WebXRHost extends EventTarget {
                     const pose = xrFrame.getViewerPose(space);
                     const firstGpuEyes=firstFrame&&gpu?[]:null;
                     const tracked = !!pose && (!session.visibilityState || session.visibilityState === 'visible');
-                    this.#updateRim(session, xrFrame, space, pose, tracked, Math.max(0, elapsed / 1000));
+                    this.#updateLocomotion(session, xrFrame, space, pose, tracked, this.#previous === null ? 0 : Math.max(0, (time - this.#previous) / 1000));
                     this.#engine.xr_begin_frame(this.#previous === null ? 0 : Math.max(0, (time - this.#previous) / 1000));
                     this.#previous = time;
                     const round = this.roundState;
@@ -348,6 +361,9 @@ export class WebXRHost extends EventTarget {
                         }
                     }
                     this.#engine.xr_finish_frame();
+                    // Platform clients may transfer bounded jobs after both eyes.
+                    // Document RAF can be suspended throughout immersive sessions.
+                    this.dispatchEvent(new Event('frame'));
                     if (firstFrame && pose?.views.length) {
                         firstFrame = false;
                         this.dispatchEvent(new CustomEvent('firstframe',{detail:{...runtimeSettings(),enabledFeatures:Array.from(session.enabledFeatures??[]),

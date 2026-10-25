@@ -18,6 +18,9 @@ thread_local! {
     static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
     static GENERATION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static RIM: RefCell<Option<crate::rim_game::Game>> = const { RefCell::new(None) };
+    static MELEE: RefCell<Option<crate::melee_encounter::Encounter>> = const { RefCell::new(None) };
+    static MELEE_TRACKING_DT: std::cell::Cell<f32> = const { std::cell::Cell::new(0.) };
+    static MELEE_DT: std::cell::Cell<f32> = const { std::cell::Cell::new(0.) };
     static RIM_REAL_DT: std::cell::Cell<f32> = const { std::cell::Cell::new(0.) };
     static XR_PLAYER: RefCell<crate::xr_player::XrPlayer> = RefCell::new(Default::default());
     static RESET_FRAME_CLOCK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -44,6 +47,7 @@ impl Drop for Runtime {
 #[wasm_bindgen]
 pub fn dispose() {
     RIM.with(|slot| slot.borrow_mut().take());
+    MELEE.with(|slot| slot.borrow_mut().take());
     crate::render::profiler::reset();
     XR_ACTIVE.with(|active| active.set(false));
     XR_PLAYER.with(|player| *player.borrow_mut() = Default::default());
@@ -404,7 +408,11 @@ pub fn set_render_effects(shadows: bool, reflections: bool) {
 pub fn set_simulation_paused(paused: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {
-            state.borrow_mut().scene.paused = paused;
+            let mut state = state.borrow_mut();
+            state.scene.paused = paused;
+            if let Some(game) = state.scene.table_tennis.as_mut() {
+                game.reset_tracking();
+            }
         }
     });
 }
@@ -675,11 +683,26 @@ pub fn renderer_backend() -> String {
     })
 }
 
+// Reset scene-specific gameplay before either clear entry point removes objects.
+// The XR session and equipment bindings retain their established lifecycle.
+fn reset_scene_gameplay(scene: &mut crate::scene::SceneManager) {
+    RIM.with(|slot| slot.borrow_mut().take());
+    MELEE.with(|slot| slot.borrow_mut().take());
+    XR_PLAYER.with(|player| {
+        let mut player = player.borrow_mut();
+        player.locomotion = Default::default();
+        player.set_reference(glam::Mat4::IDENTITY);
+        player.reset_tracking(scene);
+    });
+}
+
 #[wasm_bindgen]
 pub fn clear_all() {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {
-            state.borrow_mut().scene.clear();
+            let mut state = state.borrow_mut();
+            reset_scene_gameplay(&mut state.scene);
+            state.scene.clear();
         }
     });
 }
@@ -964,6 +987,30 @@ pub fn set_box_collider(id: u32, hx: f32, hy: f32, hz: f32, ox: f32, oy: f32, oz
 }
 
 #[wasm_bindgen]
+pub fn set_box_colliders(id: u32, packed: &[f32]) -> bool {
+    if packed.is_empty() || !packed.len().is_multiple_of(6) || packed.len() > 2048 * 6 {
+        return false;
+    }
+    let boxes: Vec<_> = packed
+        .as_chunks::<6>()
+        .0
+        .iter()
+        .map(|b| {
+            (
+                glam::Vec3::from_slice(&b[..3]),
+                glam::Vec3::from_slice(&b[3..]),
+            )
+        })
+        .collect();
+    STATE.with(|state| {
+        state
+            .borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.set_box_colliders(id, &boxes))
+    })
+}
+
+#[wasm_bindgen]
 pub fn remove_collider(id: u32) -> bool {
     STATE.with(|state| {
         state
@@ -1017,10 +1064,10 @@ pub fn resize(width: u32, height: u32) {
 
 #[wasm_bindgen]
 pub fn clear_scene() {
-    RIM.with(|slot| slot.borrow_mut().take());
     STATE.with(|s| {
         if let Some(st) = &*s.borrow() {
             let mut state = st.borrow_mut();
+            reset_scene_gameplay(&mut state.scene);
             state.clear_combo_display();
             state.scene.clear_scene();
             state.combo_score = Default::default();
@@ -1942,11 +1989,10 @@ pub fn set_light(id: u32, x: f32, y: f32, z: f32, r: f32, g: f32, b: f32) -> boo
 
 // Apply the same rig origin to platform eyes, head, hands and interaction rays.
 fn xr_world(matrix: glam::Mat4) -> glam::Mat4 {
-    RIM.with(|slot| {
-        slot.borrow()
-            .as_ref()
-            .map_or(matrix, |game| game.xr_origin * matrix)
-    })
+    if let Some(origin) = RIM.with(|slot| slot.borrow().as_ref().map(|game| game.xr_origin)) {
+        return origin * matrix;
+    }
+    XR_PLAYER.with(|player| player.borrow().locomotion.world(matrix))
 }
 fn xr_world_array(matrix: &[f32]) -> Result<[f32; 16], JsValue> {
     let values: &[f32; 16] = matrix
@@ -1957,6 +2003,19 @@ fn xr_world_array(matrix: &[f32]) -> Result<[f32; 16], JsValue> {
         return Err(JsValue::from_str("Invalid XR pose"));
     }
     Ok(xr_world(pose).to_cols_array())
+}
+// Acknowledgement changes readiness only; the next game tick publishes all
+// pieces atomically before simulation and either eye use their new transforms.
+fn ack_rim_cut_uploads(state: &State) {
+    RIM.with(|slot| {
+        if let Some(game) = slot.borrow_mut().as_mut() {
+            let ready: Vec<_> = game
+                .staged_cut_ids()
+                .filter(|id| state.triangle_mesh_uploaded(*id))
+                .collect();
+            game.ack_cut_uploads(&ready);
+        }
+    });
 }
 /// Raw platform input; Aurelia owns movement and simulation time.
 #[wasm_bindgen]
@@ -1986,6 +2045,165 @@ pub fn rim_update_xr(
     Ok(())
 }
 
+fn xr_sync_marker(scene: &mut crate::scene::SceneManager, player: &crate::xr_player::XrPlayer) {
+    if let Some(config) = &player.locomotion.config {
+        scene.set_object_position(
+            config.marker,
+            player
+                .locomotion
+                .target
+                .unwrap_or(glam::Vec3::new(0., -10000., 0.)),
+        );
+    }
+}
+#[wasm_bindgen]
+pub fn xr_configure_locomotion(input: &str) -> Result<(), JsValue> {
+    let value: serde_json::Value =
+        serde_json::from_str(input).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let config = if value.is_null() {
+        None
+    } else {
+        let rect = |value: &serde_json::Value| -> Result<[f32; 4], JsValue> {
+            let a = value
+                .as_array()
+                .filter(|a| a.len() == 4)
+                .ok_or_else(|| JsValue::from_str("Bounds require four numbers"))?;
+            let mut r = [0.; 4];
+            for (i, v) in a.iter().enumerate() {
+                r[i] = v
+                    .as_f64()
+                    .ok_or_else(|| JsValue::from_str("Invalid bounds"))?
+                    as f32;
+            }
+            Ok(r)
+        };
+        let number = |key: &str, default: f32| -> Result<f32, JsValue> {
+            match value.get(key) {
+                None => Ok(default),
+                Some(v) => v
+                    .as_f64()
+                    .map(|n| n as f32)
+                    .ok_or_else(|| JsValue::from_str("Invalid locomotion number")),
+            }
+        };
+        let obstacles = value
+            .get("obstacles")
+            .map(|v| {
+                v.as_array()
+                    .ok_or_else(|| JsValue::from_str("Invalid obstacles"))
+            })
+            .transpose()?;
+        Some(crate::xr_locomotion::LocomotionConfig {
+            bounds: rect(&value["bounds"])?,
+            obstacles: obstacles
+                .map(|a| a.iter().map(rect).collect::<Result<Vec<_>, _>>())
+                .transpose()?
+                .unwrap_or_default(),
+            scene_collisions: match value.get("sceneCollisions") {
+                None => false,
+                Some(v) => v
+                    .as_bool()
+                    .ok_or_else(|| JsValue::from_str("Invalid sceneCollisions"))?,
+            },
+            teleport_speed: number("teleportSpeed", 9.)?,
+            speed: number("speed", 2.5)?,
+            teleport_range: number("teleportRange", 10.)?,
+            slow_scale: number("slowScale", 0.15)?,
+            marker: value["marker"]
+                .as_u64()
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or_else(|| JsValue::from_str("Invalid teleport marker"))?,
+        })
+    };
+    if let Some(c) = &config {
+        c.validate().map_err(|e| JsValue::from_str(&e))?;
+    }
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            let mut player = player.borrow_mut();
+            if config
+                .as_ref()
+                .is_some_and(|c| !scene.object_exists(c.marker))
+            {
+                return Err("Teleport marker does not exist".into());
+            }
+            if let Some(old) = &player.locomotion.config {
+                scene.set_object_position(old.marker, glam::Vec3::new(0., -10000., 0.));
+            }
+            player.locomotion.configure(config)?;
+            player.reset_tracking(scene);
+            xr_sync_marker(scene, &player);
+            Ok(())
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn xr_cancel_locomotion() -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            let mut player = player.borrow_mut();
+            player.locomotion.cancel();
+            xr_sync_marker(scene, &player);
+            Ok(())
+        })
+    })
+}
+/// Raw device values only. Rust owns navigation, collision, landing and simulation time.
+#[wasm_bindgen]
+pub fn xr_update_locomotion(
+    head: &[f32],
+    ray: &[f32],
+    axes: &[f32],
+    held: bool,
+    cancel: bool,
+    dt: f32,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|a| a.get()) {
+        return Err(JsValue::from_str("XR is not presenting"));
+    }
+    let pose = |m: &[f32]| {
+        <&[f32; 16]>::try_from(m)
+            .ok()
+            .map(glam::Mat4::from_cols_array)
+    };
+    let axes: [f32; 3] = axes
+        .try_into()
+        .map_err(|_| JsValue::from_str("Three locomotion axes required"))?;
+    if RIM.with(|slot| {
+        if let Some(game) = slot.borrow_mut().as_mut() {
+            game.xr_move(pose(head), pose(ray), axes, cancel, dt);
+            true
+        } else {
+            false
+        }
+    }) {
+        return Ok(());
+    }
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            let mut player = player.borrow_mut();
+            if player.locomotion.step_with_world(
+                pose(head),
+                pose(ray),
+                axes,
+                held,
+                cancel,
+                dt,
+                Some(scene.collision_world()),
+            ) {
+                player.reset_tracking(scene);
+                MELEE.with(|slot| {
+                    if let Some(encounter) = slot.borrow_mut().as_mut() {
+                        encounter.reset_tracking();
+                    }
+                });
+            }
+            xr_sync_marker(scene, &player);
+            Ok(())
+        })
+    })
+}
+
 fn xr_pose_state(
     pose: Option<crate::xr_player::TrackedPoseState>,
     object: Option<u32>,
@@ -2007,6 +2225,7 @@ pub fn xr_player_state() -> Result<String, JsValue> {
             "head":xr_pose_state(player.head(),player.head_object().filter(|id|live(*id))),
             "leftHand":xr_pose_state(player.hand(0),player.controllers[0].object_id().filter(|id|live(*id))),
             "rightHand":xr_pose_state(player.hand(1),player.controllers[1].object_id().filter(|id|live(*id))),
+            "locomotion":{"enabled":player.locomotion.config.is_some(),"origin":player.locomotion.origin().to_cols_array(),"aiming":player.locomotion.aiming,"target":player.locomotion.target.map(|v|v.to_array()),"timeScale":player.locomotion.time_scale()},
             "inventory":player.inventory().into_iter().filter(|id|live(*id)).collect::<Vec<_>>()
         }).to_string())
     })
@@ -2019,6 +2238,19 @@ pub fn xr_bind_head(id: u32) -> Result<(), JsValue> {
             player
                 .borrow_mut()
                 .bind_head(scene, (id != u32::MAX).then_some(id))
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn xr_bind_head_offset(id: u32, x: f32, y: f32, z: f32, feet: bool) -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            player.borrow_mut().bind_head_offset(
+                scene,
+                (id != u32::MAX).then_some(id),
+                glam::Vec3::new(x, y, z),
+                feet,
+            )
         })
     })
 }
@@ -2043,7 +2275,14 @@ pub fn xr_update_head(matrix: &[f32]) -> Result<(), JsValue> {
             .map_err(|_| JsValue::from_str("Invalid head matrix"))?;
         Some(xr_world(glam::Mat4::from_cols_array(matrix)))
     };
-    cutting_command(|scene| XR_PLAYER.with(|player| player.borrow_mut().update_head(scene, pose)))
+    let reference = xr_world(glam::Mat4::IDENTITY);
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            let mut player = player.borrow_mut();
+            player.set_reference(reference);
+            player.update_head(scene, pose)
+        })
+    })
 }
 
 /// Bind an authored object to a grip pose. UINT32_MAX unbinds it.
@@ -2295,6 +2534,11 @@ pub fn xr_round_state() -> String {
 /// WebXR host owns session scheduling; Rust retains scene and view calculations.
 #[wasm_bindgen]
 pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
+    MELEE.with(|slot| {
+        if let Some(encounter) = slot.borrow_mut().as_mut() {
+            encounter.reset_tracking();
+        }
+    });
     STATE.with(|slot| {
         let state = slot.borrow();
         let state = state
@@ -2302,7 +2546,12 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
         if !active {
             let mut state = state.borrow_mut();
-            XR_PLAYER.with(|player| player.borrow_mut().reset_tracking(&mut state.scene));
+            XR_PLAYER.with(|player| {
+                let mut player = player.borrow_mut();
+                player.reset_tracking(&mut state.scene);
+                player.locomotion.reset();
+                xr_sync_marker(&mut state.scene, &player);
+            });
         }
         RIM.with(|slot| {
             if let Some(game) = slot.borrow_mut().as_mut() {
@@ -2363,7 +2612,9 @@ pub fn xr_render_gpu_eye(
             .as_ref()
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
             .borrow_mut();
-        state.render_xr_gpu_image(matrix, position, &sub_image)
+        let result = state.render_xr_gpu_image(matrix, position, &sub_image);
+        ack_rim_cut_uploads(&state);
+        result
     })
 }
 
@@ -2405,11 +2656,14 @@ pub fn xr_begin_frame(dt: f32) -> Result<(), JsValue> {
             .as_ref()
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
         let scale = RIM.with(|slot| {
-            slot.borrow()
-                .as_ref()
-                .map_or(1.0, |game| if dt > 0.0 { game.sim_dt / dt } else { 1.0 })
+            slot.borrow().as_ref().map_or_else(
+                || XR_PLAYER.with(|p| p.borrow().locomotion.time_scale()),
+                |game| if dt > 0.0 { game.sim_dt / dt } else { 1.0 },
+            )
         });
         RIM_REAL_DT.with(|value| value.set(dt));
+        MELEE_DT.with(|value| value.set(dt * scale));
+        MELEE_TRACKING_DT.with(|value| value.set(dt));
         state.borrow_mut().advance_xr(dt, scale);
         Ok(())
     })
@@ -2435,7 +2689,9 @@ pub fn xr_render_eye(
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
         let mut state = state.borrow_mut();
         state.resize(width, height);
-        state.render_xr_eye(matrix, position)
+        let result = state.render_xr_eye(matrix, position);
+        ack_rim_cut_uploads(&state);
+        result
     })
 }
 
@@ -2552,11 +2808,12 @@ async fn start_runtime(generation: u64) -> Result<(), JsValue> {
             });
             if let Some((sim, matrix, pos)) = game_view {
                 st.clear_model_camera();
-                st.update(sim, matrix, pos);
+                st.update_timed(dt, sim, matrix, pos);
             } else {
                 st.update(dt, cam_matrix, cam_pos);
             }
 
+            ack_rim_cut_uploads(&st);
             if let Err(error) = st.render() {
                 web_sys::console::error_1(&error);
                 if let Some(status) = web_sys::window()
@@ -2593,6 +2850,102 @@ async fn start_runtime(generation: u64) -> Result<(), JsValue> {
         })
     });
     Ok(())
+}
+
+/// Explicit scene-authored melee encounter; simulation remains in Rust.
+#[wasm_bindgen]
+pub fn configure_melee(input: &str) -> Result<(), JsValue> {
+    let config: Option<crate::melee_encounter::Config> =
+        serde_json::from_str(input).map_err(|error| JsValue::from_str(&error.to_string()))?;
+    cutting_command(|scene| {
+        MELEE.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            if let Some(config) = config {
+                config.validate(scene)?;
+                if let Some(mut old) = slot.take() {
+                    old.stop(scene);
+                }
+                *slot = Some(crate::melee_encounter::Encounter::new(config, scene)?);
+            } else if let Some(mut encounter) = slot.take() {
+                encounter.stop(scene);
+            }
+            Ok(())
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn melee_state() -> String {
+    MELEE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map_or_else(|| "null".into(), |encounter| encounter.state().to_string())
+    })
+}
+
+/// Configure an explicit table-tennis scene; no automatic object creation.
+#[wasm_bindgen]
+pub fn configure_table_tennis(
+    ball: u32,
+    player: u32,
+    opponent: u32,
+    panel: u32,
+) -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        if ball == player
+            || ball == opponent
+            || player == opponent
+            || ![ball, player, opponent]
+                .into_iter()
+                .all(|id| scene.object_exists(id))
+        {
+            return Err("Table tennis requires three distinct live objects".into());
+        }
+        let mut game = crate::table_tennis::Game::new(ball, player, opponent);
+        if !scene.info_panels.contains_key(&panel) {
+            return Err("Score panel must be a live text panel".into());
+        }
+        game.score_panel = Some(panel);
+        scene.table_tennis = Some(game);
+        Ok(())
+    })
+}
+#[wasm_bindgen]
+pub fn table_tennis_command(command: &str, x: f32, y: f32) -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        if command == "stop" {
+            scene.table_tennis = None;
+            return Ok(());
+        }
+        let game = scene
+            .table_tennis
+            .as_mut()
+            .ok_or("Table tennis is not configured")?;
+        match command {
+            "move" if x.is_finite() && y.is_finite() => game.move_player(x, y),
+            "serve" => game.serve(),
+            "reset" => game.reset(),
+            "practice" => game.set_practice(true),
+            "match" => game.set_practice(false),
+            _ => return Err("Invalid table tennis command".into()),
+        }
+        Ok(())
+    })
+}
+#[wasm_bindgen]
+pub fn table_tennis_state() -> String {
+    STATE.with(|slot| {
+        slot.borrow().as_ref().map_or_else(
+            || "null".into(),
+            |state| {
+                state
+                    .borrow()
+                    .scene
+                    .table_tennis
+                    .as_ref()
+                    .map_or_else(|| "null".into(), |game| game.state().to_string())
+            },
+        )
+    })
 }
 
 // Explicit Aurelia scene configuration and input; never spawns a runtime scene.
@@ -2679,6 +3032,29 @@ pub fn xr_prepare_gameplay() {
     STATE.with(|slot| {
         if let Some(state) = slot.borrow().as_ref() {
             let mut state = state.borrow_mut();
+            if !state.scene.paused {
+                if let Some(mut game) = state.scene.table_tennis.take() {
+                    game.tick(&mut state.scene, MELEE_DT.with(|dt| dt.get()));
+                    state.scene.table_tennis = Some(game);
+                }
+            }
+            MELEE.with(|slot| {
+                if let Some(encounter) = slot.borrow_mut().as_mut() {
+                    XR_PLAYER.with(|player| {
+                        let player = player.borrow();
+                        encounter.tick_timed(
+                            &mut state.scene,
+                            MELEE_DT.with(|dt| dt.get()),
+                            MELEE_TRACKING_DT.with(|dt| dt.get()),
+                            player.head().map(|pose| pose.matrix),
+                            [
+                                player.hand(0).map(|pose| pose.matrix),
+                                player.hand(1).map(|pose| pose.matrix),
+                            ],
+                        );
+                    });
+                }
+            });
             RIM.with(|slot| {
                 if let Some(g) = slot.borrow_mut().as_mut() {
                     XR_PLAYER.with(|player| {

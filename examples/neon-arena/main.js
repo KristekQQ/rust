@@ -1,5 +1,7 @@
 import {reportDiagnostic,probeWebGpuXR} from '../shared/diagnostics.js';
 import { initEngine } from '../../js/engine.js';
+import {installRuntimeInfo} from '../shared/runtime-info.js';
+import {VR_DEBUG_PANEL_OFFSET,VR_DEBUG_PANEL_WIDTH,VR_DEBUG_PANEL_HEIGHT} from '../shared/vr-debug-panel.js';
 import { ARENA_REVISION, createScene, createFruitMesh, launchApple, previewSlice, FRUIT_SCALE, RESTART_POSITION, FRUIT_OPACITY, FRUIT_OPACITY_VARIATION, CUT_EFFECT_SIZE, NEON_GLOW, FLOOR_SSR, FLOOR_SSR_BOUNDS } from './scene.js';
 import {PerformanceTest,PERFORMANCE_PHASES} from './performance-test.js';
 import {planWave} from './wave-plan.js';
@@ -19,11 +21,12 @@ let enableSSR=parameters.get('ssr')!=='0';
 let enableGlow=parameters.get('glow')!=='0';
 const revision=ARENA_REVISION;
 let solidFruit=true;
-export const engine = await initEngine(canvas, {backend,profiling:parameters.get('profile')==='1'});
+export const engine = await initEngine(canvas, {backend,profiling:parameters.get('info')!=='0'&&parameters.get('profile')==='1'});
+engine.setDebugOverlay(false);
 /** @type {PerformanceTest|null} */
 let performanceTest=null;
 document.documentElement.dataset.rendererBackend = engine.renderer_backend();
-reportDiagnostic('engine-ready',undefined,{ssr:enableSSR,glow:enableGlow,revision,profiling:parameters.get('profile')==='1'});
+reportDiagnostic('engine-ready',undefined,{ssr:enableSSR,glow:enableGlow,revision,profiling:engine.frameProfile().enabled});
 engine.xr.addEventListener('gpuerror',event=>{const detail=/** @type {CustomEvent} */(event).detail;reportDiagnostic('gpu-validation',new Error(detail.message),detail);});
 engine.xr.addEventListener('gpulost',event=>{performanceTest?.cancel('GPU ztraceno');const detail=/** @type {CustomEvent} */(event).detail;reportDiagnostic('gpu-lost',new Error(detail.message),detail);});
 engine.xr.addEventListener('performance',event=>{
@@ -96,7 +99,7 @@ if(fruitStyle instanceof HTMLInputElement){
 // Desktop orbit and immersive eye views use opposite horizontal handedness.
 // Keep this preview correction local to the example's world-space text.
 const setPanelFacing = (/** @type {boolean} */ immersive) => {
-    for (const panel of [...world.phasePanels.map(item=>item.object),world.infoPanel,...world.stockScorePanels,world.timerPanel,world.scoreLabel,world.scorePanel,world.currentLabel,...world.awardPanels,world.comboRules,...world.galleryLabels,world.restartButton,world.credits,world.logo])
+    for (const panel of [...world.phasePanels.map(item=>item.object),...world.stockScorePanels,world.timerPanel,world.scoreLabel,world.scorePanel,world.currentLabel,...world.awardPanels,world.comboRules,...world.galleryLabels,world.restartButton,world.logo])
         panel.setScale([immersive ? 1 : -1,1,1]);
 
 };
@@ -114,6 +117,10 @@ if(verify instanceof HTMLButtonElement)verify.onclick=async()=>{
     }catch(error){if(result)result.textContent=`FAIL: ${error instanceof Error?error.stack:error}`;}
 };
 export const player = engine.xr.player;
+const vrInfoToggle=document.getElementById('vr-info');
+const runtimeInfo=installRuntimeInfo(engine,{panel:world.infoPanel,toggle:vrInfoToggle instanceof HTMLInputElement?vrInfoToggle:null});
+const syncVrInfo=()=>runtimeInfo.setVisible(vrInfoToggle instanceof HTMLInputElement?vrInfoToggle.checked:runtimeInfo.visible);
+
 player.equip('right', world.sword, {cutting: true, requireTrigger: false, haptics:true});
 player.equip('left', world.leftSword, {cutting: true, requireTrigger: false, haptics:true});
 engine.xr.bindButton(world.restartButton);
@@ -270,7 +277,8 @@ let benchmarkTimeout=0;
 export const benchmarkState=()=>performanceTest?.snapshot()??null;
 function benchmarkLabel(/** @type {string} */ title,/** @type {string[]} */ lines) {
     if(benchmarkPanel?.exists)benchmarkPanel.remove();
-    benchmarkPanel=engine.scene.createTextPanel({title,lines,position:[0,.72,-1.75],width:1.4,height:.22}).setEmission(.7);
+    benchmarkPanel=engine.scene.createTextPanel({title,lines,position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT}).setEmission(.7);
+    if(engine.xr.isPresenting)player.bindHead(benchmarkPanel,{anchor:'feet',offset:VR_DEBUG_PANEL_OFFSET});
 }
 function startBenchmark(){
     const original={ssr:enableSSR,glow:enableGlow};
@@ -316,8 +324,8 @@ function startBenchmark(){
             showBuild();engine.set_simulation_paused(false);
             for(const object of benchmarkObjects)if(object.exists)object.remove();
             benchmarkObjects=[];
-            if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;
-            const report={...snapshot,revision,production:releaseBuild,renderer:engine.renderer_backend(),profiling:parameters.get('profile')==='1',created:new Date().toISOString(),
+            if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;syncVrInfo();
+            const report={...snapshot,revision,production:releaseBuild,renderer:engine.renderer_backend(),profiling:engine.frameProfile().enabled,created:new Date().toISOString(),
                 note:'FPS a medián/minimum oken po 180 snímcích; nejde o 1% low ani GPU čas. Pohled a pohyb hlavy nejsou uzamčené.'};
             benchmarkReport=JSON.stringify(report,null,2);
             reportDiagnostic('xr-benchmark-result',undefined,report);
@@ -404,23 +412,25 @@ const ready = async () => {
             ? (!isSecureContext ? 'Pro VR je potřeba důvěryhodné HTTPS nebo localhost přes USB/ADB.'
                 : missingGpuBinding ? 'WebGPU náhled běží, ale prohlížeč neposkytuje WebGPU pro VR (XRGPUBinding). V chrome://flags zkontroluj WebXR Experiments a potom restartuj prohlížeč. Pokud volba není dostupná, použij WebGL / WebXR.'
                 : 'VR není pro tuto konfiguraci dostupné. Použij odkaz WebGL / WebXR.')
-            : 'Připraveno. Sekej katanami v obou rukou. Neonové ovoce vystřeluje samo, informace o scéně vidíš i ve VR.';
+            : 'Připraveno. Sekej katanami v obou rukou. Neonové ovoce vystřeluje samo.'+(runtimeInfo.visible?' Statistiky jsou uvnitř VR vpravo u nohou.':' Statistiky ve VR jsou vypnuté.');
     } catch (error) { status.textContent = String(error); }
+    reportDiagnostic('xr-ready',undefined,{available:!enter.disabled,hint:status.textContent});
 };
 enter.onclick = () => {
     enter.disabled = true;
+    reportDiagnostic('xr-enter-click');
     void engine.xr.enter().catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
 };
 exit.onclick = () => { void engine.xr.exit().catch(error => { status.textContent = String(error); }); };
 engine.xr.addEventListener('firstframe', event => reportDiagnostic('xr-first-frame',undefined,{.../** @type {CustomEvent} */(event).detail,postprocessing:engine.postprocessing.stats(),profile:engine.frameProfile(),graph:engine.postprocessing.graph()}));
-engine.xr.addEventListener('start', () => { reportDiagnostic('xr-start'); if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=true; if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=true; setPanelFacing(true); exit.hidden = false; if(benchmarkToggle instanceof HTMLInputElement&&benchmarkToggle.checked)startBenchmark();else startRound(); });
+engine.xr.addEventListener('start', () => { document.body.classList.add('xr');syncVrInfo();reportDiagnostic('xr-start'); if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=true; if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=true; setPanelFacing(true); exit.hidden = false; if(benchmarkToggle instanceof HTMLInputElement&&benchmarkToggle.checked)startBenchmark();else startRound(); });
 engine.xr.addEventListener('roundend', () => {
     stopLaunches();showPhase('');showStartButton();
     const count=document.getElementById('cuts');if(count)count.textContent=String(engine.xr.roundState?.score??0);
     world.apples.forEach((fruit,i)=>fruit.setPosition(world.previewPositions[i]));
     status.textContent = `Konec kola — skóre ${engine.xr.roundState?.score ?? 0}, trojic ${engine.xr.roundState?.triples ?? 0}. Před tebou je START — klepni mečem nebo namiř a stiskni trigger.`;
 });
-engine.xr.addEventListener('end', () => { performanceTest?.cancel('VR ukončeno');if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=false;if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=false; parkStartButton();setPanelFacing(false); stopLaunches();showPhase(''); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
+engine.xr.addEventListener('end', () => { document.body.classList.remove('xr');syncVrInfo();performanceTest?.cancel('VR ukončeno');if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=false;if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=false; parkStartButton();setPanelFacing(false); stopLaunches();showPhase(''); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
 engine.xr.addEventListener('error', () => { performanceTest?.cancel('Chyba XR');stopLaunches();showPhase('');status.textContent = `VR se zastavilo: ${engine.xr.lastError}`; reportDiagnostic('xr-frame',engine.xr.lastError); });
 window.addEventListener('pagehide', () => { performanceTest?.cancel('Stránka zavřena');disconnectArenaBridge();stopLaunches(); window.removeEventListener('resize', fit); engine.dispose(); }, { once: true });
 await ready();

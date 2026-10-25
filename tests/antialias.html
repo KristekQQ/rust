@@ -58,12 +58,21 @@ try {
         }
         assert(flat > 500, 'Flat-color preservation covers image interior and background');
         const graph = engine.postprocessing.graph();
+        assert(graph.packedDepth===false && graph.sceneColorAttachments===1, 'FXAA-only has one color attachment and no packed depth');
         assert(graph.passes.at(-1) === 'fxaa.compose', 'FXAA is the final color effect');
         engine.postprocessing.enable('bloom', {strength: .1});
         await capturePixels(canvas);
+        assert(engine.postprocessing.graph().packedDepth===false,'Bloom + FXAA does not need packed depth');
         const chain = engine.postprocessing.graph().passes;
         assert(chain.indexOf('bloom.compose') < chain.indexOf('fxaa.compose'), 'FXAA follows bloom');
         engine.postprocessing.disable('bloom');
+        engine.postprocessing.enable('ssr',{strength:.3});
+        await capturePixels(canvas);
+        assert(engine.postprocessing.graph().packedDepth===(engine.renderer_backend()==='Gl'),'SSR creates required packed depth on WebGL only');
+        engine.postprocessing.disable('ssr');
+        const restoredFXAA=await capturePixels(canvas);
+        assert(engine.postprocessing.graph().packedDepth===false,'Disabling depth effects releases packed depth');
+        assert(changedPixels(smooth,restoredFXAA)===0,'Depth effect toggle restores identical FXAA pixels');
         engine.postprocessing.disable('fxaa');
         const disabled = await capturePixels(canvas);
         assert(changedPixels(raw, disabled) === 0, 'Disabling FXAA restores baseline pixels');

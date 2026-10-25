@@ -178,6 +178,28 @@ impl Transform {
     }
 }
 
+#[derive(Default)]
+struct ShadowRevisions {
+    static_casters: u64,
+    dynamic_casters: u64,
+}
+impl ShadowRevisions {
+    fn changed(&mut self, options: RenderOptions) {
+        if options.casts_shadow {
+            let revision = if options.is_static {
+                &mut self.static_casters
+            } else {
+                &mut self.dynamic_casters
+            };
+            *revision = revision.wrapping_add(1);
+        }
+    }
+    fn clear(&mut self) {
+        self.static_casters = self.static_casters.wrapping_add(1);
+        self.dynamic_casters = self.dynamic_casters.wrapping_add(1);
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderOptions {
     pub is_static: bool,
@@ -269,6 +291,7 @@ struct BoxCollider {
 
 #[derive(Default)]
 pub struct SceneManager {
+    pub table_tennis: Option<crate::table_tennis::Game>,
     feedback: cut_feedback::Feedback,
     numeric_font: numeric_font::NumericFont,
     font3d: font3d::Font3D,
@@ -292,6 +315,7 @@ pub struct SceneManager {
     next_id: u32,
     render_revision: u64,
     static_revision: u64,
+    shadow_revisions: ShadowRevisions,
     spins: BTreeMap<u32, Vec3>,
     projectiles: BTreeMap<u32, (Vec3, f32, f32)>,
     projectile_scratch: Vec<crate::projectile::Body>,
@@ -306,7 +330,7 @@ pub struct SceneManager {
     time: f32,
     rotations: Vec<RotationAction>,
     removals: Vec<ScheduledRemoval>,
-    colliders: BTreeMap<u32, BoxCollider>,
+    colliders: BTreeMap<u32, Vec<BoxCollider>>,
     collision_world: crate::collision::CollisionWorld,
     collision_dirty: bool,
     visibility_index: std::cell::RefCell<crate::visibility::VisibilityIndex>,
@@ -353,7 +377,17 @@ impl SceneManager {
     pub fn static_revision(&self) -> u64 {
         self.static_revision
     }
+    pub fn shadow_revision(&self, is_static: bool) -> u64 {
+        if is_static {
+            self.shadow_revisions.static_casters
+        } else {
+            self.shadow_revisions.dynamic_casters
+        }
+    }
     fn changed(&mut self, id: u32) {
+        if let Some(object) = self.objects.get(&id) {
+            self.shadow_revisions.changed(object.render_options);
+        }
         if self.colliders.contains_key(&id) {
             self.collision_dirty = true;
         }
@@ -427,7 +461,11 @@ impl SceneManager {
         let Some(object) = self.objects.get_mut(&id) else {
             return false;
         };
+        if object.render_options == options {
+            return true;
+        }
         let was_static = object.render_options.is_static;
+        self.shadow_revisions.changed(object.render_options);
         object.render_options = options;
         self.changed(id);
         if was_static && !options.is_static {
@@ -438,19 +476,29 @@ impl SceneManager {
 
     /// Explicit local-space box, independent of render geometry or animation bounds.
     pub fn set_box_collider(&mut self, id: u32, half_extents: Vec3, offset: Vec3) -> bool {
+        self.set_box_colliders(id, &[(half_extents, offset)])
+    }
+
+    /// Compound authored boxes share the owner's transform and lifetime, without render nodes.
+    pub fn set_box_colliders(&mut self, id: u32, boxes: &[(Vec3, Vec3)]) -> bool {
         if !self.object_exists(id)
-            || !half_extents.is_finite()
-            || half_extents.min_element() <= 0.0
-            || !offset.is_finite()
+            || boxes.is_empty()
+            || boxes.len() > 2048
+            || boxes.iter().any(|(half, offset)| {
+                !half.is_finite() || half.min_element() <= 0. || !offset.is_finite()
+            })
         {
             return false;
         }
         self.colliders.insert(
             id,
-            BoxCollider {
-                half_extents,
-                offset,
-            },
+            boxes
+                .iter()
+                .map(|(half_extents, offset)| BoxCollider {
+                    half_extents: *half_extents,
+                    offset: *offset,
+                })
+                .collect(),
         );
         self.collision_dirty = true;
         true
@@ -467,21 +515,24 @@ impl SceneManager {
     /// Cached BVH; movement of a non-solid character never rebuilds the world.
     pub fn collision_world(&mut self) -> &crate::collision::CollisionWorld {
         if self.collision_dirty {
-            let colliders = self
-                .colliders
-                .iter()
-                .filter_map(|(id, collider)| {
-                    let transform = self.objects.get(id)?.transform;
-                    let model = transform.model();
+            let mut colliders = Vec::new();
+            for (id, boxes) in &self.colliders {
+                let Some(object) = self.objects.get(id) else {
+                    continue;
+                };
+                let model = object.transform.model();
+                for collider in boxes {
                     let center = model.transform_point3(collider.offset);
-                    // Rotated authored boxes use conservative world-aligned bounds.
+                    // Authored axis-aligned proxies; rotated boxes remain conservative AABBs.
                     let half = model.x_axis.truncate().abs() * collider.half_extents.x
                         + model.y_axis.truncate().abs() * collider.half_extents.y
                         + model.z_axis.truncate().abs() * collider.half_extents.z;
-                    crate::collision::Aabb::new(center - half, center + half)
-                        .map(|bounds| crate::collision::Collider { id: *id, bounds })
-                })
-                .collect();
+                    if let Some(bounds) = crate::collision::Aabb::new(center - half, center + half)
+                    {
+                        colliders.push(crate::collision::Collider { id: *id, bounds });
+                    }
+                }
+            }
             self.collision_world.rebuild(colliders);
             self.collision_dirty = false;
         }
@@ -568,6 +619,7 @@ impl SceneManager {
             object.transform.position = body.position;
             object.refresh_render_data();
             self.collision_dirty |= self.colliders.contains_key(&body.id);
+            self.shadow_revisions.changed(object.render_options);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -586,6 +638,7 @@ impl SceneManager {
                 *velocity * duration - Vec3::Y * (*gravity * duration * duration * 0.5);
             velocity.y -= *gravity * duration;
             object.refresh_render_data();
+            self.shadow_revisions.changed(object.render_options);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -663,6 +716,7 @@ impl SceneManager {
                 let value = fade.start * (1. - t * t * (3. - 2. * t));
                 if value != object.visual_fade {
                     object.visual_fade = value;
+                    self.shadow_revisions.changed(object.render_options);
                     self.render_revision = self.render_revision.wrapping_add(1);
                     if object.render_options.is_static {
                         self.static_revision = self.static_revision.wrapping_add(1);
@@ -822,6 +876,7 @@ impl SceneManager {
                 render_data: crate::visibility::ObjectRenderData::new(mesh, transform),
             },
         );
+        self.shadow_revisions.changed(RenderOptions::default());
         self.render_revision = self.render_revision.wrapping_add(1);
         id
     }
@@ -1017,6 +1072,13 @@ impl SceneManager {
     }
     pub fn add_triangle_mesh(&mut self, mesh: crate::cutting::CutMesh) -> Result<u32, String> {
         self.add_mesh_data(mesh.into())
+    }
+    /// Internal visual fragments: no blade contacts, projectile motion or re-cutting.
+    pub(crate) fn add_visual_triangle_mesh(
+        &mut self,
+        mesh: crate::cutting::CutMesh,
+    ) -> Result<u32, String> {
+        self.add_mesh_data(crate::cutting_mesh::MeshData::visual_only(mesh))
     }
     fn add_mesh_data(&mut self, mesh: crate::cutting_mesh::MeshData) -> Result<u32, String> {
         let total: usize = self
@@ -2405,6 +2467,7 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.table_tennis = None;
         self.feedback = cut_feedback::Feedback::default();
         self.projectiles.clear();
         self.projectile_scratch.clear();
@@ -2429,6 +2492,7 @@ impl SceneManager {
         self.cutting_index = crate::spatial::Bvh::default();
         self.colliders.clear();
         self.collision_dirty = true;
+        self.shadow_revisions.clear();
         self.objects.clear();
         self.models.clear();
         self.mirror_object = None;
@@ -2446,6 +2510,7 @@ impl SceneManager {
             .retain(|r| matches!(r.kind, RemovalKind::Object));
     }
     pub fn clear(&mut self) {
+        self.table_tennis = None;
         self.clear_scene();
         self.clear_lights();
         self.projectiles.clear();
@@ -2464,9 +2529,10 @@ impl SceneManager {
             .objects
             .get(&id)
             .is_some_and(|o| o.render_options.is_static);
-        if self.objects.remove(&id).is_none() {
+        let Some(removed) = self.objects.remove(&id) else {
             return false;
-        }
+        };
+        self.shadow_revisions.changed(removed.render_options);
         self.collision_dirty |= self.colliders.remove(&id).is_some();
         self.models.remove(&id);
         self.triangle_meshes.remove(&id);
@@ -2781,6 +2847,7 @@ impl SceneManager {
             object.transform.position = start.lerp(*end, t * t * (3.0 - 2.0 * t));
             object.refresh_render_data();
             self.collision_dirty |= self.colliders.contains_key(id);
+            self.shadow_revisions.changed(object.render_options);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -2816,6 +2883,7 @@ impl SceneManager {
                 action.floor_y - bottom + (std::f32::consts::PI * t).sin() * 0.18 * (1.0 - t);
             object.transform = transform;
             object.refresh_render_data();
+            self.shadow_revisions.changed(object.render_options);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -2835,6 +2903,7 @@ impl SceneManager {
                 rotation.delta * ((elapsed - rotation.elapsed) / rotation.duration);
             rotation.elapsed = elapsed;
             object.refresh_render_data();
+            self.shadow_revisions.changed(object.render_options);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -2869,6 +2938,7 @@ impl SceneManager {
                     continue;
                 }
                 object.refresh_render_data();
+                self.shadow_revisions.changed(object.render_options);
                 self.render_revision = self.render_revision.wrapping_add(1);
                 if object.render_options.is_static {
                     self.static_revision = self.static_revision.wrapping_add(1);
@@ -2876,6 +2946,11 @@ impl SceneManager {
             }
         }
         self.update_projectiles(dt);
+        if let Some(mut game) = self.table_tennis.take() {
+            game.tick(self, dt);
+            self.table_tennis = Some(game);
+        }
+
         for (id, orbit) in &self.light_orbits {
             if let Some(light) = self.lights.get_mut(id) {
                 let angle = now * orbit.speed + orbit.phase;
@@ -2894,6 +2969,27 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn compound_colliders_follow_owner_without_extra_render_nodes() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        let count = scene.objects.len();
+        assert!(scene.set_box_colliders(
+            id,
+            &[
+                (Vec3::ONE, Vec3::new(-3., 0., 0.)),
+                (Vec3::ONE, Vec3::new(3., 0., 0.))
+            ]
+        ));
+        let region = crate::collision::Aabb::new(Vec3::splat(-20.), Vec3::splat(20.)).unwrap();
+        assert_eq!(scene.collision_world().query(region, None).len(), 2);
+        assert_eq!(scene.objects.len(), count);
+        assert!(!scene.set_box_colliders(id, &[(Vec3::ZERO, Vec3::ZERO)]));
+        assert_eq!(scene.collision_world().query(region, None).len(), 2);
+        scene.remove_object(id);
+        assert!(scene.collision_world().query(region, None).is_empty());
+    }
+
     fn apple() -> crate::cutting::CutMesh {
         let (segments, rings) = (20, 12);
         let mut positions = vec![Vec3::new(0., 0.2, 0.), Vec3::new(0., 2.12, 0.)];
@@ -3416,6 +3512,49 @@ mod tests {
             assert!(scene.collision_dirty);
         }
     }
+    #[test]
+    fn shadow_revisions_follow_casters_and_category_transitions() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_object(
+            MeshKind::Cube,
+            Transform::new(Vec3::ZERO, Vec3::ZERO, Vec3::ONE),
+        );
+        let dynamic = scene.shadow_revision(false);
+        assert!(dynamic > 0);
+        scene.set_object_position(id, Vec3::X);
+        assert!(scene.shadow_revision(false) > dynamic);
+        scene.set_render_options(
+            id,
+            RenderOptions {
+                casts_shadow: false,
+                ..Default::default()
+            },
+        );
+        let revisions = (scene.shadow_revision(true), scene.shadow_revision(false));
+        scene.set_object_position(id, Vec3::Y);
+        scene.set_emission(id, 1.0);
+        scene.set_color_cutout(id, 0.3);
+        assert_eq!(
+            revisions,
+            (scene.shadow_revision(true), scene.shadow_revision(false))
+        );
+        scene.set_render_options(
+            id,
+            RenderOptions {
+                is_static: true,
+                ..Default::default()
+            },
+        );
+        assert!(scene.shadow_revision(true) > revisions.0);
+        let revisions = (scene.shadow_revision(true), scene.shadow_revision(false));
+        scene.set_render_options(id, RenderOptions::default());
+        assert!(scene.shadow_revision(true) > revisions.0);
+        assert!(scene.shadow_revision(false) > revisions.1);
+        let revision = scene.shadow_revision(false);
+        scene.remove_object(id);
+        assert!(scene.shadow_revision(false) > revision);
+    }
+
     #[test]
     fn static_revision_invalidates_only_when_static_geometry_changes() {
         use super::*;

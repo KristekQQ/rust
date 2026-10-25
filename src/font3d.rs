@@ -752,6 +752,8 @@ impl SceneManager {
                     transform.rotation,
                     transform.scale * text.unit,
                 );
+                self.shadow_revisions.changed(object.render_options);
+                self.shadow_revisions.changed(key.options);
                 object.render_options = key.options;
                 [
                     object.emission,

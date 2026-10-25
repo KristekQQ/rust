@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hvozd obrů · Lesní VR aréna</title>
+<style>
+:root{color-scheme:dark;font:14px/1.5 system-ui;background:#050b14;color:#dbeafa}*{box-sizing:border-box}body{margin:0}canvas{display:block;width:100vw;height:100vh}header{position:absolute;left:28px;top:24px;padding:14px 20px;background:#14241cc9;border-left:3px solid #c2d78a;border-radius:0 12px 12px 0;pointer-events:none}small{color:#c2d78a;letter-spacing:.18em}h1{font-size:27px;letter-spacing:.02em;margin:2px 0}header p{margin:2px 0;color:#a9bccd}aside{position:absolute;left:28px;bottom:24px;width:min(340px,calc(100vw - 48px));padding:17px 20px;background:#14241ce8;border:1px solid #294657;border-radius:12px;backdrop-filter:blur(12px)}button,a{font:inherit}button{padding:9px 13px;border-radius:6px;border:1px solid #8ca66b;background:#344d32;color:#e7ffff;cursor:pointer}button:disabled{opacity:.4;cursor:default}.views{display:flex;gap:8px;margin:10px 0}.views button{background:transparent;border-color:#365263;padding:5px 11px}a{color:#c2d78a}p{margin:8px 0;color:#adbed0}ul{padding-left:18px}details{margin-top:10px}summary{cursor:pointer;color:#b9d7e9}#result{white-space:pre-wrap;font-size:11px}#status{font-size:12px}body.xr aside,body.xr header{display:none}@media(max-width:600px){header{left:12px;top:12px;padding:10px 13px}h1{font-size:21px}aside{left:12px;bottom:12px;padding:13px;width:300px}}
+/* OrbitCamera uses a left-handed preview; XR eye views are already right-handed. */
+body:not(.xr) #gpu-canvas{transform:scaleX(-1)}
+</style>
+<canvas id="gpu-canvas" width="960" height="720" aria-label="Rozlehlé lesní údolí s mýtinami, kamennými ruinami a lesními tvory"></canvas>
+<header><small>LESNÍ ÚDOLÍ / 100 × 120 M</small><h1>Hvozd obrů</h1><p>Rozlehlý hvozd, zapomenuté ruiny a lesní tvorové.</p></header>
+<aside><button id="enter" disabled>Vstoupit do VR</button> <button id="exit" hidden>Ukončit VR</button>
+<div class="views"><button id="street">Mýtina</button><button id="overview">Celá aréna</button><button id="ruins">Ruiny</button></div>
+<label><input id="show-fps" type="checkbox" checked> Prostorový FPS panel vpravo u nohy</label><p id="last-fps" role="status">VR FPS se změří po vstupu do headsetu.</p>
+<p id="status" role="status">Načítám lesní údolí…</p>
+<details><summary>Pohyb a teleport</summary><ul><li><strong>Levý analog</strong> — chůze</li><li><strong>Pravý analog</strong> — otočení o 30°</li><li><strong>Držet A</strong> — zpomalit čas a zamířit</li><li><strong>Pustit A</strong> — teleport až 10 m</li><li><strong>B</strong> — zrušit teleport</li></ul><p>Prozkoumej mýtinu, boční stezky a ruiny. Teleport míří na volnou zem; stromy a kameny blokují průchod.</p></details>
+<details id="verification"><summary>Model a ověření</summary><p>Originální prostorový GLB. Noví lesní tvorové mají klidové animace. Tato verze obsahuje prostředí a pohyb; boj a AI zatím nejsou zapnuté.</p><p><a href="../../assets/models/forest-arena/forest-arena.glb" download>Stáhnout arénu GLB</a> · <a href="?backend=webgl">WebGL</a></p><button id="verify">Ověřit scénu</button><pre id="result" role="status"></pre></details></aside>
+<script type="module" src="./main.js"></script></html>

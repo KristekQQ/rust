@@ -26,7 +26,7 @@ export async function runAppleScenario({simulator,test,slow=false,onSnapshot=()=
             records.set(apple.id,{volume:apple.meshInfo.volume,shot:'extra'});
     };
     await engine.xr.enter();
-    assert(app.gameState().shots===1 && simulator.timerCount===1,'XR start automatically fires and owns one timer');
+    assert(app.gameState().shots===1 && simulator.timerCountForDelay(2000)===1,'XR start automatically fires and owns one timer');
     const first=app.gameState().liveApples[0];
     const startY=first.meshInfo.position[1];
     records.set(first.id,{volume:first.meshInfo.volume,shot:0});
@@ -77,7 +77,7 @@ export async function runAppleScenario({simulator,test,slow=false,onSnapshot=()=
         }
         if(slow)await simulator.wait(1000/72);
     }
-    assert(seenShots>=4 && simulator.timerCount===1,'automatic firing continues without controller buttons');
+    assert(seenShots>=4 && simulator.timerCountForDelay(2000)===1,'automatic firing continues without controller buttons');
     assert(reports.some(report=>report.removed.some(id=>records.get(id)?.shot===3)),'subsequent rotational swing also cuts a newly launched apple');
     assert(savedBefore && savedAfter && missVerified && lossVerified,'all visual simulation milestones');
     // Reports hold real production SDK handles. Their geometry was checked at the hit, before expiry.
@@ -269,7 +269,7 @@ export async function runAppleScenario({simulator,test,slow=false,onSnapshot=()=
     const finalScore=engine.xr.roundState.cuts;
     assert(engine.xr.roundState.finished && engine.xr.roundState.remaining===0 && ended===1,'round ends once at zero');
     onSnapshot('score',simulator.pixels());
-    assert(simulator.timerCount===0 && !app.gameState().launching,'round end stops automatic firing');
+    assert(simulator.timerCountForDelay(2000)===0 && !app.gameState().launching,'round end stops automatic firing');
     const endedShots=app.gameState().shots;
     for(let i=0;i<30;i++)simulator.frame({...still,dt:100});
     assert(engine.xr.roundState.cuts===finalScore && app.gameState().shots===endedShots && ended===1,'finished round keeps score and stays stopped');
@@ -278,11 +278,11 @@ export async function runAppleScenario({simulator,test,slow=false,onSnapshot=()=
     const aim=(ray,pressed)=>({...still,dt:1000/72,controllers:{...still.controllers,
         left:{...still.controllers.left,targetRayMatrix:ray,pressed}}});
     simulator.frame(aim(missRay,false));simulator.frame(aim(missRay,true));
-    assert(engine.xr.roundState.finished && simulator.timerCount===0,'trigger outside the 3D restart button does not start a round');
+    assert(engine.xr.roundState.finished && simulator.timerCountForDelay(2000)===0,'trigger outside the 3D restart button does not start a round');
     simulator.frame(aim(buttonRay,false));
     assert(Math.abs(app.world.pointers[0].meshInfo.position[2]+1.65)<.02,'target ray shows a cursor on the real restart button');
     simulator.frame(aim(buttonRay,true));
-    assert(engine.xr.roundState.remaining===30 && engine.xr.roundState.cuts===0 && app.gameState().cuts===0 && simulator.timerCount===1,
+    assert(engine.xr.roundState.remaining===30 && engine.xr.roundState.cuts===0 && app.gameState().cuts===0 && simulator.timerCountForDelay(2000)===1,
         '3D button plus trigger starts a fresh 30 second round with zero score and one launch timer');
     simulator.frame(aim(buttonRay,true));
     assert(app.gameState().shots===1,'holding the button trigger does not repeatedly restart');
@@ -297,25 +297,25 @@ export async function runAppleScenario({simulator,test,slow=false,onSnapshot=()=
     const rightAim=pressed=>({...still,dt:1000/72,controllers:{...still.controllers,
         right:{...still.controllers.right,targetRayMatrix:buttonRay,pressed}}});
     simulator.frame(rightAim(false));simulator.frame(rightAim(true));
-    assert(engine.xr.roundState.remaining===30 && app.gameState().shots===1 && simulator.timerCount===1,
+    assert(engine.xr.roundState.remaining===30 && app.gameState().shots===1 && simulator.timerCountForDelay(2000)===1,
         'right controller can use the same 3D button to restart an active round');
     const bladeFrame=(hand,y,x=0)=>({dt:1000/30,controllers:{left:null,right:null,
         [hand]:{position:[x,y,-.95],orientation:[0,0,0,1],tracked:true,pressed:false}}});
     engine.xr.startRound(1);
     for(let i=0;i<35;i++)simulator.frame({...still,dt:1000/30,controllers:{left:null,right:null}});
-    assert(engine.xr.roundState.finished && simulator.timerCount===0,'finished round remains ready for physical sword restart');
+    assert(engine.xr.roundState.finished && simulator.timerCountForDelay(2000)===0,'finished round remains ready for physical sword restart');
     for(const hand of ['left','right']) {
         simulator.frame({dt:1000/30,controllers:{left:null,right:null}});
         simulator.frame(bladeFrame(hand,1.25,.6));simulator.frame(bladeFrame(hand,.85,.6));
         assert(engine.xr.roundState.remaining<30,`${hand} sword misses outside restart box`);
         simulator.frame({dt:1000/30,controllers:{left:null,right:null}});
         simulator.frame(bladeFrame(hand,1.25));simulator.frame(bladeFrame(hand,.85));
-        assert(engine.xr.roundState.remaining===30 && app.gameState().shots===1 && simulator.timerCount===1,
+        assert(engine.xr.roundState.remaining===30 && app.gameState().shots===1 && simulator.timerCountForDelay(2000)===1,
             `${hand} fast sword sweep through restart box starts one fresh round without trigger`);
         // Enter the box, then leave the blade resting inside it.
         simulator.frame(bladeFrame(hand,1.05));
         for(let i=0;i<8;i++)simulator.frame(bladeFrame(hand,1.05));
-        assert(engine.xr.roundState.remaining<29.8 && app.gameState().shots===1 && simulator.timerCount===1,
+        assert(engine.xr.roundState.remaining<29.8 && app.gameState().shots===1 && simulator.timerCountForDelay(2000)===1,
             `${hand} blade resting in restart box does not repeatedly reset the round`);
         const beforeGap=engine.xr.roundState.remaining;
         simulator.frame({dt:1000/30,controllers:{left:null,right:null}});
@@ -323,9 +323,9 @@ export async function runAppleScenario({simulator,test,slow=false,onSnapshot=()=
         assert(engine.xr.roundState.remaining<beforeGap,'tracking reacquisition inside restart box never synthesizes a strike');
     }
     await engine.xr.exit();
-    assert(simulator.timerCount===0 && !app.gameState().launching,'VR end stops automatic firing');
+    assert(simulator.timerCountForDelay(2000)===0 && !app.gameState().launching,'VR end stops automatic firing');
     await engine.xr.enter();
-    assert(simulator.timerCount===1,'VR reentry owns exactly one launch timer');
+    assert(simulator.timerCountForDelay(2000)===1,'VR reentry owns exactly one launch timer');
     await engine.xr.exit();
     return {shots:seenShots,hits:reports.length,fastHits,missVerified,lossVerified};
     } finally {

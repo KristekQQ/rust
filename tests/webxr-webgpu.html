@@ -7,6 +7,7 @@ import {installXRSimulator} from './xr/simulator.js';
 import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
 import {assertForeground,capturePixels} from './pixels.js';
 import {verifyMainViewCaches} from './xr/view-cache-checks.js';
+import {verifyGltfInstanceViews} from './xr/gltf-instance-checks.js';
 
 const profiling=new URLSearchParams(location.search).has('profile');
 const width=profiling?1024:192,height=profiling?1024:208,sim=installXRSimulator({clockTimers:false,profile:{eyeWidth:width,eyeHeight:height}});
@@ -332,6 +333,10 @@ const report=await run.execute(async test=>{
         test.assert(performanceReports.length===1&&performanceReports[0].frames===180&&performanceReports[0].fps>0&&performanceReports[0].cpuSubmitMs>=0&&performanceReports[0].eyeViewports.length===2,'bounded XR telemetry reports delivered frame cadence, CPU submission and both eye viewports',performanceReports);
         await second.checkValidation(test);
     }
+    if(!profiling)await verifyGltfInstanceViews(engine,sim,test,{
+        pixels:index=>second.pixels(index),
+        shiftLeft:amount=>{second.leftProjectionShift=amount;}
+    });
     const active=sim.session;engine.dispose();
     test.assert(!engine.xr.isPresenting&&active.pendingFrameCount===0,'dispose cancels active GPU XR');
     denyXR=true;

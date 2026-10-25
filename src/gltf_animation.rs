@@ -428,20 +428,95 @@ pub fn deformed_vertices(
         .primitives
         .get(primitive)
         .ok_or("Primitive index out of range")?;
+    deformed_vertex_subset(asset, pose, node, primitive, 0..p.vertices.len() as u32)
+}
+
+/// Deform only the requested local indices, preserving order and duplicate indices.
+/// Cutting uses this to bound preparation even for a single enormous primitive.
+pub fn deformed_vertex_subset(
+    asset: &ModelAsset,
+    pose: &ModelPose,
+    node: usize,
+    primitive: usize,
+    indices: impl IntoIterator<Item = u32>,
+) -> Result<Vec<ModelVertex>, String> {
+    deformed_subset(
+        asset,
+        pose,
+        node,
+        primitive,
+        indices,
+        |vertex, position, normal, tangent| {
+            let mut out = vertex.clone();
+            out.position = position.to_array();
+            out.normal = normal.to_array();
+            out.tangent = tangent;
+            out
+        },
+        true,
+    )
+}
+
+/// Compact cut payload: borrow skin/UV arrays and skip unused tangent work.
+/// Morph positions, skinning and inverse-transpose normals share the full path.
+pub(crate) fn deformed_cut_vertex_subset(
+    asset: &ModelAsset,
+    pose: &ModelPose,
+    node: usize,
+    primitive: usize,
+    indices: impl IntoIterator<Item = u32>,
+) -> Result<Vec<crate::gltf_loader::ImportedVertex>, String> {
+    deformed_subset(
+        asset,
+        pose,
+        node,
+        primitive,
+        indices,
+        |vertex, position, normal, _| crate::gltf_loader::ImportedVertex {
+            position: position.to_array(),
+            normal: normal.to_array(),
+            color: [vertex.color[0], vertex.color[1], vertex.color[2]],
+        },
+        false,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn deformed_subset<T>(
+    asset: &ModelAsset,
+    pose: &ModelPose,
+    node: usize,
+    primitive: usize,
+    indices: impl IntoIterator<Item = u32>,
+    mut project: impl FnMut(&ModelVertex, Vec3, Vec3, [f32; 4]) -> T,
+    tangents: bool,
+) -> Result<Vec<T>, String> {
+    let p = asset
+        .primitives
+        .get(primitive)
+        .ok_or("Primitive index out of range")?;
     let model_node = asset.nodes.get(node).ok_or("Model node out of range")?;
     let weights = pose
         .node_weights
         .get(node)
         .ok_or("Pose node out of range")?;
-    let mut vertices = asset
+    let source = asset
         .vertices
         .get(p.vertices.clone())
-        .ok_or("Invalid primitive vertex range")?
-        .to_vec();
-    for (i, vertex) in vertices.iter_mut().enumerate() {
+        .ok_or("Invalid primitive vertex range")?;
+    let indices = indices.into_iter();
+    let mut vertices = Vec::with_capacity(indices.size_hint().0);
+    for index in indices {
+        let i = index as usize;
+        let vertex = source.get(i).ok_or("Primitive vertex index out of range")?;
         let mut position = Vec3::from_array(vertex.position);
         let mut normal = Vec3::from_array(vertex.normal);
-        let mut tangent = Vec3::from_slice(&vertex.tangent);
+        let mut tangent = if tangents {
+            Vec3::from_slice(&vertex.tangent)
+        } else {
+            Vec3::ZERO
+        };
+        let mut handedness = vertex.tangent[3];
         for (j, target) in p.morph_targets.iter().enumerate() {
             let weight = weights.get(j).copied().unwrap_or(0.);
             if weight == 0. {
@@ -453,8 +528,10 @@ pub fn deformed_vertices(
             if let Some(delta) = target.normals.get(i) {
                 normal += Vec3::from_array(*delta) * weight;
             }
-            if let Some(delta) = target.tangents.get(i) {
-                tangent += Vec3::from_array(*delta) * weight;
+            if tangents {
+                if let Some(delta) = target.tangents.get(i) {
+                    tangent += Vec3::from_array(*delta) * weight;
+                }
             }
         }
         if model_node.skin.is_some() && !vertex.influences.is_empty() {
@@ -477,21 +554,28 @@ pub fn deformed_vertices(
             } else {
                 linear * normal
             };
-            tangent = linear * tangent;
-            if linear.determinant() < 0. {
-                vertex.tangent[3] = -vertex.tangent[3];
+            if tangents {
+                tangent = linear * tangent;
+                if linear.determinant() < 0. {
+                    handedness = -handedness;
+                }
             }
         }
         if !position.is_finite() || !normal.is_finite() || !tangent.is_finite() {
             return Err("Model deformation overflow".into());
         }
         normal = normal.try_normalize().unwrap_or(Vec3::Y);
-        tangent = (tangent - normal * normal.dot(tangent))
-            .try_normalize()
-            .unwrap_or(Vec3::ZERO);
-        vertex.position = position.to_array();
-        vertex.normal = normal.to_array();
-        vertex.tangent = [tangent.x, tangent.y, tangent.z, vertex.tangent[3]];
+        if tangents {
+            tangent = (tangent - normal * normal.dot(tangent))
+                .try_normalize()
+                .unwrap_or(Vec3::ZERO);
+        }
+        vertices.push(project(
+            vertex,
+            position,
+            normal,
+            [tangent.x, tangent.y, tangent.z, handedness],
+        ));
     }
     Ok(vertices)
 }
@@ -547,6 +631,72 @@ mod tests {
             components,
         }
     }
+    #[test]
+    fn compact_cut_vertices_match_full_deformation_with_skin_morph_and_duplicate_indices() {
+        for bytes in [
+            include_bytes!("../assets/models/rim/drone-orbiter.glb").as_slice(),
+            include_bytes!("../assets/models/rim/core-tank.glb").as_slice(),
+            include_bytes!("../assets/models/rim/blade-wraith.glb").as_slice(),
+            include_bytes!("../assets/models/fox/Fox.glb").as_slice(),
+        ] {
+            let asset = Arc::new(crate::gltf_loader::parse_model(bytes, &[], &[]).unwrap());
+            let mut model = ModelInstance::new(asset, None).unwrap();
+            if !model.asset.animations.is_empty() {
+                model.play(0, true).unwrap();
+                model.seek(0.37).unwrap();
+            }
+            for &node in &model.pose.active_nodes.clone() {
+                let Some(mesh) = model.asset.nodes[node].mesh else {
+                    continue;
+                };
+                for primitive in model.asset.meshes[mesh].primitives.clone() {
+                    let mut asset = (*model.asset).clone();
+                    let mut pose = model.pose.clone();
+                    let p = &mut asset.primitives[primitive];
+                    let indices: Vec<_> = p
+                        .indices
+                        .iter()
+                        .take(21)
+                        .copied()
+                        .chain(p.indices.iter().take(3).copied())
+                        .collect();
+                    p.morph_targets = vec![MorphTarget {
+                        positions: vec![[0.01, -0.02, 0.03]; p.vertices.len()],
+                        normals: vec![[0.03, 0.01, -0.02]; p.vertices.len()],
+                        tangents: vec![[0.02, 0., 0.01]; p.vertices.len()],
+                    }];
+                    pose.node_weights[node] = vec![0.6];
+                    for matrix in &mut pose.skin_matrices[node] {
+                        *matrix = Mat4::from_scale(Vec3::new(-1.1, 0.7, 1.4)) * *matrix;
+                    }
+                    let full = deformed_vertex_subset(
+                        &asset,
+                        &pose,
+                        node,
+                        primitive,
+                        indices.iter().copied(),
+                    )
+                    .unwrap();
+                    let compact = deformed_cut_vertex_subset(
+                        &asset,
+                        &pose,
+                        node,
+                        primitive,
+                        indices.iter().copied(),
+                    )
+                    .unwrap();
+                    assert_eq!(full.len(), indices.len());
+                    assert_eq!(compact.len(), full.len());
+                    for (a, b) in full.iter().zip(&compact) {
+                        assert_eq!(a.position, b.position);
+                        assert_eq!(a.normal, b.normal);
+                        assert_eq!(&a.color[..3], b.color);
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn step_linear_and_cubic_tangents_scale_by_key_duration() {
         let linear = channel(

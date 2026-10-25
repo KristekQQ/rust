@@ -1,6 +1,5 @@
-// Revision avoids an older SDK from the browser cache after a WASM API change.
-/** @type {typeof import('../../js/engine.js')} */
-const { initEngine } = await import(new URL('../../js/engine.js?v=window-rays', import.meta.url).href);
+// Shared diagnostics use one canonical module identity across examples and tools.
+import {initEngine} from '../shared/runtime-info.js';
 import { createScene } from './scene.js';
 /** @type {typeof import('./ui.js')} */
 const { createUI } = await import(new URL('./ui.js?v=window-rays', import.meta.url).href);
@@ -9,7 +8,7 @@ import { loadPuddleMask } from './texture.js';
 const canvas = document.getElementById('gpu-canvas');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Chybí canvas');
 const backend = new URLSearchParams(location.search).get('backend') === 'webgl' ? 'webgl' : 'auto';
-const engine = await initEngine(canvas, { backend });
+export const engine = await initEngine(canvas, { backend });
 const showRays = () => engine.setCameraView([6, 2.5, 2], [-12, 8, 0]);
 showRays();
 engine.set_grid_visible(false);

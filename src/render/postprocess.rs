@@ -1076,9 +1076,8 @@ impl PostProcessor {
         )?;
         let resources = GraphResources::new(device, &plan.compiled)?;
         let scene = ColorTarget::new(device, "postprocess scene", width, height, self.format);
-        let depth_color = device
-            .as_webgpu()
-            .is_none()
+        let reads_depth = specs.iter().any(|effect| effect.reads_depth);
+        let depth_color = (device.as_webgpu().is_none() && reads_depth)
             .then(|| Intermediate::new(device, width, height, wgpu::TextureFormat::Rgba8Unorm));
         let mut bind_groups = Vec::with_capacity(plan.steps.len());
         let mut ssr_target = None;
@@ -1108,7 +1107,11 @@ impl PostProcessor {
                                 if device.as_webgpu().is_some() {
                                     &scene.depth
                                 } else {
-                                    &depth_color.as_ref().expect("WebGL packed depth").view
+                                    // Color-only effects never sample depth. Bind an existing
+                                    // non-attachment D2 texture to keep the shared layout valid.
+                                    depth_color
+                                        .as_ref()
+                                        .map_or(&self.reflection_mask.view, |depth| &depth.view)
                                 },
                             ),
                         },
@@ -1176,6 +1179,8 @@ impl PostProcessor {
         self.targets.as_ref().map_or_else(|| serde_json::json!({"active":false,"passes":[],"transientTextures":0,"transientBuffers":0}), |targets| {
             let mut summary = targets.plan.graph.debug_summary(&targets.plan.compiled);
             summary["active"] = true.into();
+            summary["packedDepth"] = targets.depth_color.is_some().into();
+            summary["sceneColorAttachments"] = (1 + usize::from(targets.depth_color.is_some())).into();
             summary["transientTextures"] = targets.resources.texture_count().into();
             summary["transientBuffers"] = targets.resources.buffer_count().into();
             summary["transientBytesEstimate"] = targets.resources.allocated_bytes_estimate().into();

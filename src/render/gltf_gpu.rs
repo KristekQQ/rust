@@ -19,15 +19,161 @@ struct Vertex {
     color: [f32; 4],
 }
 impl Vertex {
-    fn layout() -> wgpu::VertexBufferLayout<'static> {
+    fn attributes(texture_mask: u8) -> Vec<wgpu::VertexAttribute> {
         const A: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![0=>Float32x3,1=>Float32x3,2=>Float32x4,3=>Float32x2,4=>Float32x2,5=>Float32x2,6=>Float32x2,7=>Float32x2,8=>Float32x4];
+        A.into_iter()
+            .filter(|a| {
+                a.shader_location < 3
+                    || a.shader_location == 8
+                    || a.shader_location == 5
+                    || texture_mask & (1 << (a.shader_location - 3)) != 0
+            })
+            .collect()
+    }
+    fn layout(attributes: &[wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'_> {
         wgpu::VertexBufferLayout {
             array_stride: 96,
             step_mode: wgpu::VertexStepMode::Vertex,
+            attributes,
+        }
+    }
+}
+/// Seven instance attributes keep the common path within WebGL2's 16-attribute budget.
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+struct RigidInstance {
+    model: [[f32; 4]; 4],
+    normal: [[f32; 4]; 3],
+}
+impl RigidInstance {
+    fn from_uniform(u: &Uniform) -> Self {
+        let mut normal = [u.normal[0], u.normal[1], u.normal[2]];
+        normal[0][3] = u.transform[0];
+        Self {
+            model: u.model,
+            normal,
+        }
+    }
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        const A: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![9=>Float32x4,10=>Float32x4,11=>Float32x4,12=>Float32x4,13=>Float32x4,14=>Float32x4,15=>Float32x4];
+        wgpu::VertexBufferLayout {
+            array_stride: 112,
+            step_mode: wgpu::VertexStepMode::Instance,
             attributes: &A,
         }
     }
 }
+struct InstancePage {
+    buffer: wgpu::Buffer,
+    material_buffer: wgpu::Buffer,
+    bind: wgpu::BindGroup,
+    material: Option<Uniform>,
+    capacity: usize,
+    last: Vec<RigidInstance>,
+}
+struct PreparedDraw {
+    variant: Variant,
+    material_identity: usize,
+    textures: wgpu::BindGroup,
+    bind: wgpu::BindGroup,
+    vertex: wgpu::Buffer,
+    index: wgpu::Buffer,
+    skin: Option<wgpu::Buffer>,
+    instance: Option<wgpu::Buffer>,
+    count: u32,
+    instances: u32,
+    records: Vec<(u32, usize, usize)>,
+}
+#[derive(Default)]
+pub struct PreparedDraws {
+    draws: Vec<PreparedDraw>,
+    pub upload_bytes: usize,
+}
+
+/// Frame-local indices only: no references or GPU resources survive a preparation call.
+#[derive(Clone, Copy)]
+struct QueueItem {
+    model: usize,
+    draw: usize,
+}
+#[derive(Default)]
+struct QueueScratch {
+    eligible: Vec<QueueItem>,
+    model_ranges: Vec<std::ops::Range<usize>>,
+    cursors: Vec<usize>,
+    ordered: Vec<QueueItem>,
+    groups: Vec<std::ops::Range<usize>>,
+    occupied: Vec<(Vec3, Vec3)>,
+    payload: Vec<RigidInstance>,
+}
+impl QueueScratch {
+    fn clear(&mut self) {
+        self.eligible.clear();
+        self.model_ranges.clear();
+        self.cursors.clear();
+        self.ordered.clear();
+        self.groups.clear();
+        self.occupied.clear();
+        self.payload.clear();
+    }
+    fn capacities(&self) -> [usize; 7] {
+        [
+            self.eligible.capacity(),
+            self.model_ranges.capacity(),
+            self.cursors.capacity(),
+            self.ordered.capacity(),
+            self.groups.capacity(),
+            self.occupied.capacity(),
+            self.payload.capacity(),
+        ]
+    }
+    fn bytes(&self) -> usize {
+        let sizes = [
+            std::mem::size_of::<QueueItem>(),
+            std::mem::size_of::<std::ops::Range<usize>>(),
+            std::mem::size_of::<usize>(),
+            std::mem::size_of::<QueueItem>(),
+            std::mem::size_of::<std::ops::Range<usize>>(),
+            std::mem::size_of::<(Vec3, Vec3)>(),
+            std::mem::size_of::<RigidInstance>(),
+        ];
+        self.capacities()
+            .into_iter()
+            .zip(sizes)
+            .map(|(n, size)| n * size)
+            .sum()
+    }
+    fn singleton(&mut self, item: QueueItem) {
+        let start = self.ordered.len();
+        self.ordered.push(item);
+        self.groups.push(start..start + 1);
+    }
+    fn append_compatible(&mut self, item: QueueItem, models: &[(u32, &GpuModel)]) {
+        let model = models[item.model].1;
+        let draw = &model.draws[item.draw];
+        let compatible = self.groups.last().is_some_and(|range| {
+            let previous = self.ordered[range.start];
+            let other_model = models[previous.model].1;
+            let other = &other_model.draws[previous.draw];
+            range.len() < 1024
+                && previous.draw == item.draw
+                && Rc::ptr_eq(&other_model._shared, &model._shared)
+                && draw.rigid
+                && other.rigid
+                && draw.negative == other.negative
+                && draw.material == other.material
+                && draw.primitive == other.primitive
+                && draw.last_uniform.options == other.last_uniform.options
+        });
+        if compatible {
+            self.ordered.push(item);
+            self.groups.last_mut().unwrap().end += 1;
+        } else {
+            self.singleton(item);
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniform {
@@ -111,11 +257,20 @@ pub struct GltfGpuStats {
     pub pipeline_changes: u64,
     pub bind_group_changes: u64,
     pub uniform_upload_bytes: u64,
+    pub buffer_upload_calls: u64,
     pub geometry_cache_hits: u64,
     pub material_cache_hits: u64,
     pub geometry_resources: usize,
     pub material_resources: usize,
     pub cached_assets: usize,
+    pub primitive_tests: u64,
+    pub primitive_culled: u64,
+    pub instanced_draw_calls: u64,
+    pub instances_drawn: u64,
+    pub instance_upload_bytes: u64,
+    pub instance_buffer_bytes: usize,
+    pub queue_scratch_growths: u64,
+    pub queue_scratch_bytes: usize,
 }
 struct Draw {
     node: usize,
@@ -133,6 +288,8 @@ struct Draw {
     skin: Option<Rc<SharedSkin>>,
     local_center: Vec3,
     last_uniform: Uniform,
+    uploaded_uniform: Cell<Uniform>,
+    bounds: Option<(Vec3, Vec3)>,
     scratch: Vec<Vertex>,
 }
 pub struct GpuModel {
@@ -164,6 +321,22 @@ struct Variant {
     double_sided: bool,
     negative: bool,
     skinned: bool,
+    instanced: bool,
+}
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DrawRecord {
+    object: u32,
+    node: usize,
+    primitive: usize,
+    indices: u32,
+    instances: u32,
+    objects: Vec<u32>,
+    view_slot: usize,
+    shadow: bool,
+    reflected: bool,
+    blend: bool,
+    material_mask: bool,
 }
 pub struct GltfGpu {
     global: wgpu::BindGroupLayout,
@@ -172,12 +345,17 @@ pub struct GltfGpu {
     material: wgpu::BindGroupLayout,
     skin_material: Option<wgpu::BindGroupLayout>,
     // 32 map classes x (generic color, opaque unclipped color, shadow).
-    shaders: HashMap<(u8, bool, bool, bool), wgpu::ShaderModule>,
+    shaders: HashMap<(u8, bool, bool, bool, bool), wgpu::ShaderModule>,
     empty_layout: wgpu::BindGroupLayout,
     empty_bind: wgpu::BindGroup,
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
     assets: RefCell<HashMap<usize, Weak<SharedAsset>>>,
     counters: Cell<GltfGpuStats>,
+    diagnostics: Cell<bool>,
+    draw_records: RefCell<Vec<DrawRecord>>,
+    instance_pages: HashMap<(PipelineKey, usize), Vec<InstancePage>>,
+    instancing_supported: bool,
+    queue_scratch: QueueScratch,
 }
 impl GltfGpu {
     pub fn new(
@@ -275,6 +453,12 @@ impl GltfGpu {
             pipelines: HashMap::new(),
             assets: RefCell::new(HashMap::new()),
             counters: Cell::new(GltfGpuStats::default()),
+            diagnostics: Cell::new(false),
+            draw_records: RefCell::new(Vec::new()),
+            instance_pages: HashMap::new(),
+            queue_scratch: QueueScratch::default(),
+            instancing_supported: limits.max_vertex_attributes >= 16
+                && limits.max_vertex_buffers >= 2,
         }
     }
     pub fn upload(
@@ -778,6 +962,13 @@ impl GltfGpu {
             stats.geometry_resources += shared.geometry.iter().flatten().count();
             stats.material_resources += shared.materials.len();
         }
+        stats.queue_scratch_bytes = self.queue_scratch.bytes();
+        stats.instance_buffer_bytes = self
+            .instance_pages
+            .values()
+            .flatten()
+            .map(|p| p.capacity * 112 + std::mem::size_of::<Uniform>())
+            .sum();
         stats
     }
     fn create_model(&self, device: &wgpu::Device, shared: Rc<SharedAsset>) -> GpuModel {
@@ -871,6 +1062,8 @@ impl GltfGpu {
                     skin,
                     local_center: geometry.center,
                     last_uniform: initial,
+                    uploaded_uniform: Cell::new(initial),
+                    bounds: None,
                     scratch: Vec::new(),
                 });
             }
@@ -890,11 +1083,12 @@ impl GltfGpu {
         }
     }
     #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
-    pub fn update(
+    pub(crate) fn update(
         &self,
         queue: &wgpu::Queue,
         model: &mut GpuModel,
         asset: &ModelAsset,
+        bounds_cache: &crate::gltf_bounds::RenderBoundsCache,
         pose: &ModelPose,
         revision: u64,
         root: Mat4,
@@ -933,6 +1127,7 @@ impl GltfGpu {
                     .extend(matrices.iter().map(|matrix| matrix.to_cols_array_2d()));
                 if !palette.last.is_empty() {
                     queue.write_buffer(&palette.buffer, 0, as_bytes(&palette.last));
+                    stats.buffer_upload_calls += 1;
                     let uploaded = palette.last.len() * 64;
                     bytes += uploaded;
                     stats.uniform_upload_bytes += uploaded as u64;
@@ -949,6 +1144,8 @@ impl GltfGpu {
             let inverse = matrix.inverse().transpose();
             let normal = if inverse.is_finite() { inverse } else { matrix };
             draw.negative = matrix.determinant() < 0.0;
+            draw.bounds =
+                bounds_cache.primitive_bounds(asset, pose, draw.node, draw.primitive, root);
             if draw.rigid {
                 // Exact affine vertex mean, rather than the bounds center.
                 draw.center = matrix.transform_point3(draw.local_center);
@@ -992,6 +1189,7 @@ impl GltfGpu {
                 }
                 draw.center = center / draw.scratch.len().max(1) as f32;
                 queue.write_buffer(&draw.vertex, 0, as_bytes(&draw.scratch));
+                stats.buffer_upload_calls += 1;
                 bytes += draw.scratch.len() * 96;
                 stats.cpu_deformed_vertices += draw.scratch.len() as u64;
             }
@@ -1014,266 +1212,520 @@ impl GltfGpu {
                 0.0
             };
             if uniform != draw.last_uniform {
-                queue.write_buffer(&draw.uniform, 0, as_bytes(&[uniform]));
                 draw.last_uniform = uniform;
-                bytes += std::mem::size_of::<Uniform>();
-                stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
             }
         }
         self.counters.set(stats);
         model.last_pose = Some(stamp);
         Ok(bytes)
     }
-    pub fn prepare_pipeline(&mut self, device: &wgpu::Device, key: PipelineKey, model: &GpuModel) {
-        for draw in &model.draws {
-            let topology = draw.topology;
-            let material = &model.materials[draw.material];
-            let blend = material.alpha == AlphaMode::Blend;
-            // Transparent glTF is drawn into the final single-color overlay.
-            // Do not create an unused MRT alpha pipeline: baseline WebGL2 has
-            // no independent blending between color and packed-depth targets.
-            if blend && (key.material_mask || key.packed_depth) {
-                continue;
+    fn ensure_pipeline(&mut self, device: &wgpu::Device, variant: Variant) {
+        if self.pipelines.contains_key(&variant) {
+            return;
+        }
+        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("glTF pipeline layout"),
+            bind_group_layouts: &[
+                Some(&self.global),
+                Some(if variant.key.shadow {
+                    &self.empty_layout
+                } else {
+                    &self.effects
+                }),
+                Some(&self.textures),
+                Some(if variant.skinned {
+                    self.skin_material.as_ref().expect("supported skin layout")
+                } else {
+                    &self.material
+                }),
+            ],
+            immediate_size: 0,
+        });
+        let shader = self
+            .shaders
+            .entry((
+                variant.texture_mask,
+                variant.key.shadow,
+                variant.opaque_unclipped,
+                variant.skinned,
+                variant.instanced,
+            ))
+            .or_insert_with(|| {
+                device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("glTF material-class shader"),
+                    source: wgpu::ShaderSource::Wgsl(
+                        material_shader_source(
+                            variant.texture_mask,
+                            variant.key.shadow,
+                            variant.opaque_unclipped,
+                            variant.skinned,
+                            variant.instanced,
+                        )
+                        .into(),
+                    ),
+                })
+            });
+        let mut targets = Vec::new();
+        if !variant.key.shadow {
+            targets.push(Some(wgpu::ColorTargetState {
+                format: variant.key.format,
+                blend: Some(if variant.blend {
+                    wgpu::BlendState::ALPHA_BLENDING
+                } else {
+                    wgpu::BlendState::REPLACE
+                }),
+                write_mask: wgpu::ColorWrites::ALL,
+            }));
+            if variant.key.packed_depth {
+                targets.push(Some(wgpu::ColorTargetState {
+                    format: wgpu::TextureFormat::Rgba8Unorm,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }));
             }
-            let double_sided = material.double_sided;
-            for negative in [false, true] {
-                let variant = Variant {
-                    key,
-                    texture_mask: material.texture_mask,
-                    opaque_unclipped: material.alpha == AlphaMode::Opaque
-                        && !key.clipped
-                        && !key.shadow,
-                    topology,
-                    blend,
-                    double_sided,
-                    negative,
-                    skinned: draw.skin.is_some(),
-                };
-                if self.pipelines.contains_key(&variant) {
+        }
+        let attributes = Vertex::attributes(variant.texture_mask);
+        let vertex_buffers = [
+            Some(Vertex::layout(&attributes)),
+            Some(if variant.instanced {
+                RigidInstance::layout()
+            } else {
+                SkinInfluences::layout()
+            }),
+        ];
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("glTF PBR variant"),
+            layout: Some(&layout),
+            vertex: wgpu::VertexState {
+                module: shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: if variant.skinned || variant.instanced {
+                    &vertex_buffers
+                } else {
+                    &vertex_buffers[..1]
+                },
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: shader,
+                entry_point: Some(if variant.key.shadow {
+                    "fs_shadow"
+                } else if variant.key.packed_depth {
+                    "fs_postprocess"
+                } else if variant.key.material_mask {
+                    "fs_material_mask"
+                } else {
+                    "fs_main"
+                }),
+                compilation_options: Default::default(),
+                targets: &targets,
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: variant.topology,
+                strip_index_format: if matches!(
+                    variant.topology,
+                    wgpu::PrimitiveTopology::LineStrip | wgpu::PrimitiveTopology::TriangleStrip
+                ) {
+                    Some(wgpu::IndexFormat::Uint32)
+                } else {
+                    None
+                },
+                cull_mode: if variant.double_sided || variant.key.shadow {
+                    None
+                } else {
+                    Some(if variant.key.reflected ^ variant.negative {
+                        wgpu::Face::Back
+                    } else {
+                        wgpu::Face::Front
+                    })
+                },
+                ..Default::default()
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: variant.key.depth_format,
+                depth_write_enabled: Some(variant.key.shadow || !variant.blend),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                stencil: Default::default(),
+                bias: if variant.key.shadow {
+                    wgpu::DepthBiasState {
+                        constant: 2,
+                        slope_scale: 2.0,
+                        clamp: 0.0,
+                    }
+                } else {
+                    Default::default()
+                },
+            }),
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+        self.pipelines.insert(variant, pipeline);
+    }
+    pub fn begin_frame(&self) {
+        self.draw_records.borrow_mut().clear();
+    }
+    pub fn set_diagnostics(&self, enabled: bool) {
+        self.diagnostics.set(enabled);
+        if !enabled {
+            self.draw_records.borrow_mut().clear();
+        }
+    }
+    pub fn draw_diagnostics(&self) -> serde_json::Value {
+        serde_json::json!({"enabled":self.diagnostics.get(),"draws":*self.draw_records.borrow(),"limit":20000})
+    }
+    /// Pages contain transforms only. Drop cached pages as soon as all models disappear.
+    pub fn clear_instance_pages(&mut self) {
+        self.instance_pages.clear();
+        self.queue_scratch = QueueScratch::default();
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_draws<'a>(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        models: impl Iterator<Item = (u32, &'a GpuModel)>,
+        key: PipelineKey,
+        blend: bool,
+        camera: Vec3,
+        view_slot: usize,
+        view_projection: Mat4,
+        culling: bool,
+    ) -> PreparedDraws {
+        let _scope = super::profiler::cpu_scope("gltf.queue");
+        let upload_before = self.counters.get().uniform_upload_bytes;
+        let models: Vec<_> = models.collect();
+        let frustum = crate::visibility::Frustum::from_view_projection(view_projection);
+        let mut stats = self.counters.get();
+        let mut scratch = std::mem::take(&mut self.queue_scratch);
+        let capacities_before = scratch.capacities();
+        scratch.clear();
+        for (model_index, &(_, model)) in models.iter().enumerate() {
+            let start = scratch.eligible.len();
+            for (ordinal, d) in model.draws.iter().enumerate() {
+                if model.last_pose.is_none()
+                    || !model.active.contains(&d.node)
+                    || (model.materials[d.material].alpha == AlphaMode::Blend) != blend
+                {
                     continue;
                 }
-                let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("glTF pipeline layout"),
-                    bind_group_layouts: &[
-                        Some(&self.global),
-                        Some(if key.shadow {
-                            &self.empty_layout
-                        } else {
-                            &self.effects
-                        }),
-                        Some(&self.textures),
-                        Some(if variant.skinned {
-                            self.skin_material.as_ref().expect("supported skin layout")
-                        } else {
-                            &self.material
-                        }),
-                    ],
-                    immediate_size: 0,
-                });
-                let shader = self
-                    .shaders
-                    .entry((
-                        material.texture_mask,
-                        key.shadow,
-                        variant.opaque_unclipped,
-                        variant.skinned,
-                    ))
-                    .or_insert_with(|| {
-                        device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                            label: Some("glTF material-class shader"),
-                            source: wgpu::ShaderSource::Wgsl(
-                                material_shader_source(
-                                    material.texture_mask,
-                                    key.shadow,
-                                    variant.opaque_unclipped,
-                                    variant.skinned,
-                                )
-                                .into(),
-                            ),
-                        })
-                    });
-                let mut targets = Vec::new();
-                if !key.shadow {
-                    targets.push(Some(wgpu::ColorTargetState {
-                        format: key.format,
-                        blend: Some(if blend {
-                            wgpu::BlendState::ALPHA_BLENDING
-                        } else {
-                            wgpu::BlendState::REPLACE
-                        }),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    }));
-                    if key.packed_depth {
-                        targets.push(Some(wgpu::ColorTargetState {
-                            format: wgpu::TextureFormat::Rgba8Unorm,
-                            blend: Some(wgpu::BlendState::REPLACE),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        }));
+                if culling {
+                    if let Some((min, max)) = d.bounds {
+                        stats.primitive_tests += 1;
+                        if !frustum.intersects_aabb((min + max) * 0.5, (max - min) * 0.5) {
+                            stats.primitive_culled += 1;
+                            continue;
+                        }
                     }
                 }
-                let vertex_buffers = [Some(Vertex::layout()), Some(SkinInfluences::layout())];
-                let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("glTF PBR variant"),
-                    layout: Some(&layout),
-                    vertex: wgpu::VertexState {
-                        module: shader,
-                        entry_point: Some("vs_main"),
-                        compilation_options: Default::default(),
-                        buffers: if variant.skinned {
-                            &vertex_buffers
-                        } else {
-                            &vertex_buffers[..1]
-                        },
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: shader,
-                        entry_point: Some(if key.shadow {
-                            "fs_shadow"
-                        } else if key.packed_depth {
-                            "fs_postprocess"
-                        } else if key.material_mask {
-                            "fs_material_mask"
-                        } else {
-                            "fs_main"
-                        }),
-                        compilation_options: Default::default(),
-                        targets: &targets,
-                    }),
-                    primitive: wgpu::PrimitiveState {
-                        topology,
-                        strip_index_format: if matches!(
-                            topology,
-                            wgpu::PrimitiveTopology::LineStrip
-                                | wgpu::PrimitiveTopology::TriangleStrip
-                        ) {
-                            Some(wgpu::IndexFormat::Uint32)
-                        } else {
-                            None
-                        },
-                        cull_mode: if double_sided || key.shadow {
-                            None
-                        } else {
-                            Some(if key.reflected ^ negative {
-                                wgpu::Face::Back
-                            } else {
-                                wgpu::Face::Front
-                            })
-                        },
-                        ..Default::default()
-                    },
-                    depth_stencil: Some(wgpu::DepthStencilState {
-                        format: key.depth_format,
-                        depth_write_enabled: Some(key.shadow || !blend),
-                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                        stencil: Default::default(),
-                        bias: if key.shadow {
-                            wgpu::DepthBiasState {
-                                constant: 2,
-                                slope_scale: 2.0,
-                                clamp: 0.0,
-                            }
-                        } else {
-                            Default::default()
-                        },
-                    }),
-                    multisample: Default::default(),
-                    multiview_mask: None,
-                    cache: None,
+                scratch.eligible.push(QueueItem {
+                    model: model_index,
+                    draw: ordinal,
                 });
-                self.pipelines.insert(variant, pipeline);
             }
+            scratch.model_ranges.push(start..scratch.eligible.len());
+            scratch.cursors.push(start);
         }
-    }
-    pub fn draw(
-        &self,
-        pass: &mut wgpu::RenderPass<'_>,
-        model: &GpuModel,
-        key: PipelineKey,
-        blend: bool,
-        camera_pos: Vec3,
-    ) -> usize {
-        self.draw_many(pass, std::iter::once(model), key, blend, camera_pos)
-    }
-    /// Sort transparent primitives across all visible model roots.
-    pub fn draw_many<'a>(
-        &self,
-        pass: &mut wgpu::RenderPass<'_>,
-        models: impl Iterator<Item = &'a GpuModel>,
-        key: PipelineKey,
-        blend: bool,
-        camera_pos: Vec3,
-    ) -> usize {
-        let mut stats = self.counters.get();
-        if key.shadow {
-            pass.set_bind_group(1, &self.empty_bind, &[]);
-            stats.bind_group_changes += 1;
+        self.counters.set(stats);
+        let model_bounds = |m: &GpuModel| -> Option<(Vec3, Vec3)> {
+            let mut min = Vec3::splat(f32::INFINITY);
+            let mut max = Vec3::splat(f32::NEG_INFINITY);
+            let mut any = false;
+            for d in &m.draws {
+                if !m.active.contains(&d.node) {
+                    continue;
+                }
+                let (a, b) = d.bounds?;
+                min = min.min(a);
+                max = max.max(b);
+                any = true;
+            }
+            any.then_some((min, max))
+        };
+        let disjoint = |a: (Vec3, Vec3), b: (Vec3, Vec3)| (a.1.cmplt(b.0) | b.1.cmplt(a.0)).any();
+        let mut start = 0;
+        while start < models.len() {
+            let mut end = start + 1;
+            let bounds = model_bounds(models[start].1);
+            scratch.occupied.clear();
+            if let Some(b) = bounds {
+                scratch.occupied.push(b);
+            }
+            if !blend && self.instancing_supported && bounds.is_some() {
+                while end < models.len()
+                    && Rc::ptr_eq(&models[start].1._shared, &models[end].1._shared)
+                {
+                    let Some(b) = model_bounds(models[end].1) else {
+                        break;
+                    };
+                    if !scratch.occupied.iter().all(|&a| disjoint(a, b)) {
+                        break;
+                    }
+                    scratch.occupied.push(b);
+                    end += 1;
+                }
+            }
+            if end - start > 1 {
+                // Shared assets create identical draw ordinals. Merge the already
+                // ordered per-model lists by ordinal, then model, without a tree
+                // or an allocation per column/group. Gaps from culling stay gaps.
+                let mut ordinal = 0;
+                loop {
+                    let mut next = usize::MAX;
+                    for model in start..end {
+                        let cursor = scratch.cursors[model];
+                        if cursor < scratch.model_ranges[model].end {
+                            let item = scratch.eligible[cursor];
+                            if item.draw == ordinal {
+                                scratch.append_compatible(item, &models);
+                                scratch.cursors[model] += 1;
+                            }
+                            let cursor = scratch.cursors[model];
+                            if cursor < scratch.model_ranges[model].end {
+                                next = next.min(scratch.eligible[cursor].draw);
+                            }
+                        }
+                    }
+                    if next == usize::MAX {
+                        break;
+                    }
+                    ordinal = next;
+                }
+            } else {
+                for index in scratch.model_ranges[start].clone() {
+                    scratch.singleton(scratch.eligible[index]);
+                }
+            }
+            start = end;
         }
-        let mut draws: Vec<_> = models
-            .flat_map(|model| {
-                model
-                    .draws
-                    .iter()
-                    .filter(move |d| {
-                        model
-                            .last_pose
-                            .as_ref()
-                            .is_some_and(|_| model.active.contains(&d.node))
-                            && (model.materials[d.material].alpha == AlphaMode::Blend) == blend
-                    })
-                    .map(move |d| (model, d))
-            })
-            .collect();
         if blend {
-            draws.sort_by(|(_, a), (_, b)| {
-                b.center
-                    .distance_squared(camera_pos)
-                    .total_cmp(&a.center.distance_squared(camera_pos))
+            scratch.groups.sort_by(|a, b| {
+                let item_a = scratch.ordered[a.start];
+                let item_b = scratch.ordered[b.start];
+                models[item_b.model].1.draws[item_b.draw]
+                    .center
+                    .distance_squared(camera)
+                    .total_cmp(
+                        &models[item_a.model].1.draws[item_a.draw]
+                            .center
+                            .distance_squared(camera),
+                    )
             });
         }
-        let mut submitted = 0;
-        let mut last_variant = None;
-        let mut last_material = None;
-        for (model, draw) in draws {
-            let material = &model.materials[draw.material];
+        let mut prepared = PreparedDraws {
+            draws: Vec::with_capacity(scratch.groups.len()),
+            upload_bytes: 0,
+        };
+        let mut page_index = 0;
+        for group in &scratch.groups {
+            let first = scratch.ordered[group.start];
+            let model = models[first.model].1;
+            let d = &model.draws[first.draw];
+            let material = &model.materials[d.material];
+            let instanced = group.len() > 1;
             let variant = Variant {
                 key,
                 texture_mask: material.texture_mask,
                 opaque_unclipped: material.alpha == AlphaMode::Opaque
                     && !key.clipped
                     && !key.shadow,
-                topology: draw.topology,
+                topology: d.topology,
                 blend,
                 double_sided: material.double_sided,
-                negative: draw.negative,
-                skinned: draw.skin.is_some(),
+                negative: d.negative,
+                skinned: d.skin.is_some(),
+                instanced,
             };
-            let Some(pipeline) = self.pipelines.get(&variant) else {
+            self.ensure_pipeline(device, variant);
+            self.ensure_pipeline(
+                device,
+                Variant {
+                    negative: !variant.negative,
+                    ..variant
+                },
+            );
+            let mut stats = self.counters.get();
+            if !instanced && d.uploaded_uniform.get() != d.last_uniform {
+                queue.write_buffer(&d.uniform, 0, as_bytes(&[d.last_uniform]));
+                d.uploaded_uniform.set(d.last_uniform);
+                stats.buffer_upload_calls += 1;
+                stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
+            }
+            let mut draw_bind = d.bind.clone();
+            let instance = if instanced {
+                scratch.payload.clear();
+                scratch
+                    .payload
+                    .extend(scratch.ordered[group.clone()].iter().map(|item| {
+                        RigidInstance::from_uniform(
+                            &models[item.model].1.draws[item.draw].last_uniform,
+                        )
+                    }));
+                let payload = &scratch.payload;
+                let pages = self.instance_pages.entry((key, view_slot)).or_default();
+                let capacity = payload.len().next_power_of_two();
+                if pages.len() <= page_index || pages[page_index].capacity < capacity {
+                    let material_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("glTF instanced material"),
+                        size: std::mem::size_of::<Uniform>() as u64,
+                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    });
+                    let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("glTF instanced material"),
+                        layout: &self.material,
+                        entries: &[wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: material_buffer.as_entire_binding(),
+                        }],
+                    });
+                    let page = InstancePage {
+                        material_buffer,
+                        bind,
+                        material: None,
+                        buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                            label: Some("glTF rigid instances"),
+                            size: (capacity * 112) as u64,
+                            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                            mapped_at_creation: false,
+                        }),
+                        capacity,
+                        last: Vec::new(),
+                    };
+                    if pages.len() <= page_index {
+                        pages.push(page);
+                    } else {
+                        pages[page_index] = page;
+                    }
+                }
+                let page = &mut pages[page_index];
+                let mut material = d.last_uniform;
+                material.model = Mat4::IDENTITY.to_cols_array_2d();
+                material.normal = Mat4::IDENTITY.to_cols_array_2d();
+                material.transform = [1., 1., 0., 0.];
+                if page.material != Some(material) {
+                    queue.write_buffer(&page.material_buffer, 0, as_bytes(&[material]));
+                    page.material = Some(material);
+                    stats.buffer_upload_calls += 1;
+                    stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
+                }
+                draw_bind = page.bind.clone();
+                if page.last != *payload {
+                    queue.write_buffer(&page.buffer, 0, as_bytes(payload));
+                    stats.buffer_upload_calls += 1;
+                    stats.uniform_upload_bytes += (payload.len() * 112) as u64;
+                    stats.instance_upload_bytes += (payload.len() * 112) as u64;
+                    page.last.clone_from(payload);
+                }
+                page_index += 1;
+                Some(page.buffer.clone())
+            } else {
+                None
+            };
+            self.counters.set(stats);
+            prepared.draws.push(PreparedDraw {
+                variant,
+                material_identity: material as *const Material as usize,
+                textures: material.textures.clone(),
+                bind: draw_bind,
+                vertex: d.vertex.clone(),
+                index: d.index.clone(),
+                skin: d.skin.as_ref().map(|s| s.influences.clone()),
+                instance,
+                count: d.count,
+                instances: group.len() as u32,
+                records: if self.diagnostics.get() {
+                    scratch.ordered[group.clone()]
+                        .iter()
+                        .map(|item| {
+                            let (id, model) = models[item.model];
+                            let draw = &model.draws[item.draw];
+                            (id, draw.node, draw.primitive)
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                },
+            });
+        }
+        if !blend {
+            if let Some(pages) = self.instance_pages.get_mut(&(key, view_slot)) {
+                pages.truncate(page_index);
+            }
+        }
+        let mut stats = self.counters.get();
+        stats.queue_scratch_growths += capacities_before
+            .into_iter()
+            .zip(scratch.capacities())
+            .filter(|(before, after)| before < after)
+            .count() as u64;
+        self.counters.set(stats);
+        self.queue_scratch = scratch;
+        prepared.upload_bytes = (self.counters.get().uniform_upload_bytes - upload_before) as usize;
+        prepared
+    }
+    pub fn draw_prepared(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        prepared: &PreparedDraws,
+        key: PipelineKey,
+        view_slot: usize,
+    ) -> usize {
+        let mut stats = self.counters.get();
+        if key.shadow {
+            pass.set_bind_group(1, &self.empty_bind, &[]);
+            stats.bind_group_changes += 1;
+        }
+        let mut last_variant = None;
+        let mut last_material = None;
+        for d in &prepared.draws {
+            let Some(pipeline) = self.pipelines.get(&d.variant) else {
                 continue;
             };
-            if last_variant != Some(variant) {
+            if last_variant != Some(d.variant) {
                 pass.set_pipeline(pipeline);
                 stats.pipeline_changes += 1;
-                last_variant = Some(variant);
+                last_variant = Some(d.variant);
             }
-            let material_identity = material as *const Material;
-            if last_material != Some(material_identity) {
-                pass.set_bind_group(2, &material.textures, &[]);
+            if last_material != Some(d.material_identity) {
+                pass.set_bind_group(2, &d.textures, &[]);
                 stats.bind_group_changes += 1;
-                last_material = Some(material_identity);
+                last_material = Some(d.material_identity);
             }
-            pass.set_bind_group(3, &draw.bind, &[]);
+            pass.set_bind_group(3, &d.bind, &[]);
             stats.bind_group_changes += 1;
-            pass.set_vertex_buffer(0, draw.vertex.slice(..));
-            if let Some(skin) = &draw.skin {
-                pass.set_vertex_buffer(1, skin.influences.slice(..));
+            pass.set_vertex_buffer(0, d.vertex.slice(..));
+            if let Some(buffer) = d.instance.as_ref().or(d.skin.as_ref()) {
+                pass.set_vertex_buffer(1, buffer.slice(..));
             }
-            pass.set_index_buffer(draw.index.slice(..), wgpu::IndexFormat::Uint32);
-            pass.draw_indexed(0..draw.count, 0, 0..1);
-            submitted += 1;
+            pass.set_index_buffer(d.index.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..d.count, 0, 0..d.instances);
             stats.draw_calls += 1;
+            stats.instances_drawn += d.instances as u64;
+            if d.instances > 1 {
+                stats.instanced_draw_calls += 1;
+            }
+            if self.diagnostics.get() {
+                let mut r = self.draw_records.borrow_mut();
+                if r.len() < 20000 {
+                    r.push(DrawRecord {
+                        object: d.records[0].0,
+                        node: d.records[0].1,
+                        primitive: d.records[0].2,
+                        indices: d.count,
+                        instances: d.instances,
+                        objects: d.records.iter().map(|r| r.0).collect(),
+                        view_slot,
+                        shadow: key.shadow,
+                        reflected: key.reflected,
+                        blend: d.variant.blend,
+                        material_mask: key.material_mask,
+                    });
+                }
+            }
         }
         self.counters.set(stats);
-        submitted
+        prepared.draws.len()
     }
 }
 // Replace sample expressions before compilation so absent maps incur no texture
@@ -1283,6 +1735,7 @@ fn material_shader_source(
     shadow: bool,
     opaque_unclipped: bool,
     skinned: bool,
+    instanced: bool,
 ) -> String {
     let mut source = concat!(
         include_str!("gltf_pbr.wgsl"),
@@ -1319,6 +1772,30 @@ fn material_shader_source(
         if texture_mask & (1 << i) == 0 {
             source = source.replace(sample, fallback);
         }
+    }
+    // Keep normal-map UV derivatives even for the non-neutral fallback normal.
+    source = source.replace(
+        "fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }",
+        "",
+    );
+    for (i, name) in ["base", "mr", "normal", "ao", "emissive"]
+        .iter()
+        .enumerate()
+    {
+        if i == 2 || texture_mask & (1 << i) != 0 {
+            continue;
+        }
+        source = source.replace(&format!("sample_{name}(v.uv{i})"), "vec4<f32>(1.0)");
+        source = source.replace(&format!("@location({}) uv{i}:vec2<f32>, ", i + 3), "");
+        source = source.replace(&format!("o.uv{i}=v.uv{i}; "), "");
+    }
+    if instanced {
+        source=source.replacen("@location(8) color:vec4<f32> };", "@location(8) color:vec4<f32>, @location(9) model0:vec4<f32>, @location(10) model1:vec4<f32>, @location(11) model2:vec4<f32>, @location(12) model3:vec4<f32>, @location(13) normal0:vec4<f32>, @location(14) normal1:vec4<f32>, @location(15) normal2:vec4<f32> };",1);
+        let a = source
+            .find("    if(material.transform.y>0.5) {")
+            .expect("rigid transform");
+        let b = a + source[a..].find("    o.pos=").expect("vertex projection");
+        source.replace_range(a..b,"    let model=mat4x4<f32>(v.model0,v.model1,v.model2,v.model3);\n    let normal=mat3x3<f32>(v.normal0.xyz,v.normal1.xyz,v.normal2.xyz);\n    o.world=(model*vec4(local_position,1.0)).xyz;\n    o.normal=transform_unit(normal*local_normal);\n    o.tangent=vec4(transform_unit((model*vec4(local_tangent.xyz,0.0)).xyz),local_tangent.w*v.normal0.w);\n");
     }
     if opaque_unclipped && !shadow {
         // Remove only the color entrypoints' discard call. fs_shadow continues

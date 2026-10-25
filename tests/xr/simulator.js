@@ -128,6 +128,7 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
     }
     const api={
         get profile(){return {...profile};},get session(){return session;},get time(){return now;},get timerCount(){return timers.size;},
+        timerCountForDelay(delay){return [...timers.values()].filter(timer=>timer.repeat&&timer.delay===Number(delay)).length;},
         gripX(angle,position){return matrixFromPose({position,orientation:[Math.sin(angle/2),0,0,Math.cos(angle/2)]});},
         frame(input={}) {
             alive();const dt=input.dt??1000/profile.hz;if(!Number.isFinite(dt)||dt<0||dt>10000)throw new TypeError('XR frame dt must be between 0 and 10000 ms');

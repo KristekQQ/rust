@@ -141,6 +141,9 @@ test('deterministic timer order, cancellation, hidden RAF and input identities',
     const sim=await start();
     try {
         const calls=[];const interval=setInterval(()=>calls.push(sim.time),5);
+        const diagnostics=setInterval(()=>{},250);
+        assert.equal(sim.timerCount,2);assert.equal(sim.timerCountForDelay(5),1);assert.equal(sim.timerCountForDelay(250),1);
+        clearInterval(diagnostics);assert.equal(sim.timerCountForDelay(250),0);
         const canceled=setTimeout(()=>assert.fail('Canceled timer fired'),1);clearTimeout(canceled);clearTimeout(canceled);
         setTimeout(()=>calls.push('once'),7);
         let rendered=0,changes=0;sim.session.addEventListener('inputsourceschange',()=>changes++);

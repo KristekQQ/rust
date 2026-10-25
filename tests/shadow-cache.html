@@ -57,8 +57,19 @@ try {
     const dynamic=engine.scene.createCube([-1,0,0]).setRenderOptions({isStatic:false,castsShadow:true});
     await frame();const occupied=engine.effects_stats();
     if(occupied.dynamicUpdates-emptyDynamic!==3)throw Error('New dynamic caster must redraw every light');
+    const occupiedPixels=snapshot();
+    for(let i=0;i<8;i++){marker.setPosition([i,-10000,0]);await frame();}
+    const unchanged=engine.effects_stats();
+    if(unchanged.dynamicUpdates!==occupied.dynamicUpdates||unchanged.staticUpdates!==occupied.staticUpdates)throw Error('Non-caster movement invalidates occupied maps');
+    dynamic.setPosition([-1.5,0,0]);await frame();const dynamicMoved=engine.effects_stats();
+    if(dynamicMoved.dynamicUpdates-unchanged.dynamicUpdates!==3)throw Error('Dynamic caster movement must invalidate maps');
+    assertChanged(occupiedPixels,snapshot(),'Dynamic caster movement');
+    dynamic.setRenderOptions({isStatic:true,castsShadow:true});await frame();const migrated=engine.effects_stats();
+    if(migrated.staticUpdates-dynamicMoved.staticUpdates!==3||migrated.dynamicUpdates-dynamicMoved.dynamicUpdates!==3)throw Error('Static/dynamic migration must invalidate both layers');
+    dynamic.setRenderOptions({isStatic:false,castsShadow:true});await frame();const restored=engine.effects_stats();
+    if(restored.staticUpdates-migrated.staticUpdates!==3||restored.dynamicUpdates-migrated.dynamicUpdates!==3)throw Error('Reverse migration must invalidate both layers');
     dynamic.remove();await frame();const cleared=engine.effects_stats();
-    if(cleared.dynamicUpdates-occupied.dynamicUpdates!==3)throw Error('Last caster removal must clear stale shadows');
+    if(cleared.dynamicUpdates-restored.dynamicUpdates!==3)throw Error('Last caster removal must clear stale shadows');
     for(let i=0;i<5;i++){marker.setPosition([-i,-10000,0]);await frame();}
     if(engine.effects_stats().dynamicUpdates!==cleared.dynamicUpdates)throw Error('Cleared shadow maps were resubmitted');
     window.shadowCacheEvidence = {before, after, moved, noopStaticUpdates, movedStaticUpdates: moved.staticUpdates - after.staticUpdates};

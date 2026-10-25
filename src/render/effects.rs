@@ -345,9 +345,9 @@ impl Effects {
                 let key = (
                     shadow_matrices[i],
                     if pass == RenderPassKind::ShadowStatic {
-                        renderer.scene.static_revision()
+                        renderer.scene.shadow_revision(true)
                     } else {
-                        renderer.scene.render_revision()
+                        renderer.scene.shadow_revision(false)
                     },
                     renderer.frustum_culling,
                 );

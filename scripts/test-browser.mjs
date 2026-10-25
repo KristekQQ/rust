@@ -21,11 +21,33 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    ...['basic','culling','cutting','cynatar','fox-control','gltf','lights','mirror','monkey','neon-arena','neon-enemies','neon-font-preview','neon-robot','postprocessing','projectiles','rim','shadows','webxr','forest-arena','crystal-cave','monster-room','table-tennis'].map(scene=>({name:'info-'+scene,path:'tests/runtime-info-example.html?scene='+scene,status:'#result',backends:['webgl'],xrReport:true})),
+    {name:"runtime-info-xr",path:"tests/runtime-info-xr.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"neon-arena-entry",path:"tests/neon-arena-entry.html",interaction:"arena-entry",backends:["webgl"]},
+    {name:"basic",path:"examples/basic/",interaction:"example-smoke"},
+    {name:"shadows",path:"examples/shadows/",interaction:"example-smoke"},
+    {name:"mirror",path:"examples/mirror/",interaction:"example-smoke"},
+    {name:"lights",path:"examples/lights/",interaction:"example-smoke"},
+    {name:"gltf",path:"examples/gltf/",interaction:"example-smoke"},
+    {name:"forest-arena",path:"examples/forest-arena/?verify=1",status:"#result",button:"#verify"},
+    {name:"forest-arena-xr",path:"tests/forest-arena-xr.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"crystal-cave",path:"examples/crystal-cave/?verify=1",status:"#result",button:"#verify"},
+    {name:"crystal-cave-xr",path:"tests/crystal-cave-xr.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"monster-room",path:"examples/monster-room/?verify=1",status:"#result",button:"#verify"},
+    {name:"monster-room-xr",path:"tests/monster-room-xr.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"table-tennis",path:"examples/table-tennis/?verify=1",status:"#result",button:"#verify"},
+    {name:"table-tennis-xr",path:"tests/table-tennis-xr.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"monster-combat",path:"tests/monster-combat.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"gltf-batching",path:"tests/gltf-batching.html",status:"#result"},
     {name:"gltf-gpu-transforms",path:"tests/gltf-gpu-transforms.html",status:"#result"},
     {name:"gltf-visibility",path:"tests/gltf-visibility.html",status:"#result"},
     {name:"scene-appearance",path:"tests/scene-appearance.html",status:"#result"},
     {name:"antialias",path:"tests/antialias.html",status:"#result"},
-    {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"rim-refresh",path:"examples/rim/",interaction:"rim-refresh"},
+    {name:"rim-device-logs",path:"tests/rim-device-logs.html",status:"#device-result",xrReport:true},
+    {name:"rim-gameplay-120",path:"tests/rim-gameplay.html?hz=120",status:"#result",xrReport:true},
+    {name:"rim-cut-scheduler-control",path:"tests/rim-gameplay.html?omitXRHook=1",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true},
     {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
     { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
     { name: 'gltf-material-cache', path: 'tests/gltf-material-cache.html', status: '#result' },
@@ -458,7 +480,74 @@ try {
                 const failure = await page.$eval(suite.status, node => /FAIL/.test(node.textContent || ''));
                 if (!failure) await page.click(suite.button);
             }
-            if (suite.interaction === 'webxr-preview') {
+            if (suite.interaction === 'arena-entry') {
+                await page.waitForFunction(() => window.arenaEntryTest?.ready);
+                for (const viewport of [{width:390,height:740,deviceScaleFactor:1},{width:960,height:640,deviceScaleFactor:1}]) {
+                    await page.setViewport(viewport);
+                    await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);window.arenaEntryTest.before();});
+                }
+                await page.screenshot({path:path.join(output,'neon-arena-entry-before-vr.png')});
+                await page.click('#enter');
+                await page.waitForFunction(() => window.arenaEntryTest.presenting);
+                await page.evaluate(()=>window.arenaEntryTest.inside());
+                const stereo=await page.evaluate(()=>window.arenaEntryTest.stereoPng.split(',')[1]);
+                await writeFile(path.join(output,'neon-arena-entry-spatial.png'),Buffer.from(stereo,'base64'));
+                await page.evaluate(()=>window.arenaEntryTest.leave());
+                await page.waitForFunction(()=>!document.querySelector('#enter').disabled);
+                await page.click('#enter');
+                await page.waitForFunction(() => window.arenaEntryTest.presenting);
+                result.text=await page.evaluate(()=>window.arenaEntryTest.finish());
+                result.entryChecks=await page.evaluate(()=>window.arenaEntryTest.checks);
+            }
+            else if (suite.interaction === 'rim-refresh') {
+                await page.setCacheEnabled(true);
+                const ready=()=>page.waitForFunction(()=>window.rimDemo&&window.rimCutTransportDiagnostics?.status==='ready');
+                await ready();
+                const before=await page.evaluate(()=>({build:document.documentElement.dataset.buildId,backend:window.rimDemo.engine.renderer_backend()}));
+                const storageKey='verification-refresh-preference';
+                await page.evaluate(key=>localStorage.setItem(key,'preserve'),storageKey);
+                const responses=[];
+                const observe=response=>{
+                    const url=new URL(response.url());
+                    if(url.origin===new URL(baseUrl).origin&&(/\.(?:js|wasm|glb|gltf|json)$/.test(url.pathname)||url.pathname==='/examples/rim/'))responses.push({path:url.pathname,cache:response.fromCache(),serviceWorker:response.fromServiceWorker(),status:response.status(),policy:response.headers()['cache-control']});
+                };
+                page.on('response',observe);
+                const clean=new URL(page.url());clean.searchParams.delete('v');
+                await page.goto(clean.href+'&v=old-link',{waitUntil:'load'});
+                await ready();
+                if(new URL(page.url()).searchParams.has('v'))throw Error('Legacy page version remains in address bar');
+                responses.length=0;
+                await page.reload({waitUntil:'load'});
+                await ready();
+                page.off('response',observe);
+                const after=await page.evaluate(key=>({build:document.documentElement.dataset.buildId,backend:window.rimDemo.engine.renderer_backend(),preference:localStorage.getItem(key)}),storageKey);
+                await page.evaluate(key=>localStorage.removeItem(key),storageKey);
+                if(after.build!==before.build||after.backend!==before.backend||after.preference!=='preserve')throw Error('Refresh changed build/backend or erased preferences');
+                if(responses.some(r=>r.cache||r.serviceWorker||r.status!==200||!r.policy?.includes('no-store')))throw Error('Refresh reused cached or invalid runtime resources: '+JSON.stringify(responses));
+                for(const suffix of ['/examples/rim/','/examples/rim/main.js','/examples/rim/cut-worker.js','/pkg/webgpu_wasm_bg.wasm'])if(!responses.some(r=>r.path===suffix))throw Error('Missing fresh runtime request '+suffix);
+                result.refreshEvidence={before,after,resources:responses};
+                result.text='PASS: plain page reload with cache enabled fetched current modules, worker and WASM; canonical URL and preferences preserved';
+            }
+            else if (suite.interaction === 'example-smoke') {
+                result.text = await page.evaluate(async () => {
+                    // Await the authored scene bootstrap, then reuse its existing SDK owner.
+                    await import('./main.js');
+                    const {initEngine} = await import('../../js/engine.js');
+                    const canvas = document.querySelector('#gpu-canvas');
+                    if (!(canvas instanceof HTMLCanvasElement)) throw Error('Missing scene canvas');
+                    const engine = await initEngine(canvas, {
+                        backend: canvas.dataset.backend === 'webgl' ? 'webgl' : 'auto',
+                        profiling: canvas.dataset.frameProfile === 'true',
+                    });
+                    for (let i=0; i<6; i++) await new Promise(requestAnimationFrame);
+                    const {capturePixels,assertForeground} = await import('../../tests/pixels.js');
+                    assertForeground(await capturePixels(canvas), 'Authored example geometry', 1000);
+                    if (engine.scene.objectCount < 1) throw Error('Empty scene');
+                    document.documentElement.dataset.rendererBackend = engine.renderer_backend();
+                    return 'PASS: authored example boots with real Rust geometry and pixels';
+                });
+            }
+            else if (suite.interaction === 'webxr-preview') {
                 result.text = await page.evaluate(async () => {
                     const {engine} = await import('./main.js');
                     const {capturePixels, assertForeground} = await import('../../tests/pixels.js');
@@ -482,7 +571,7 @@ try {
             else if (suite.interaction === 'fox') result.text = await verifyFox(page);
             else if (suite.interaction === 'culling') result.text = await verifyCulling(page);
             else {
-                await page.waitForFunction(selector => /^(PASS|FAIL):/.test(document.querySelector(selector)?.textContent?.trim() || ''), { polling: suite.xrReport ? 'raf' : 100 }, suite.status);
+                await page.waitForFunction(selector => /^(PASS|FAIL):/.test(document.querySelector(selector)?.textContent?.trim() || ''), { polling: suite.name.startsWith('rim-') ? 100 : suite.xrReport ? 'raf' : 100 }, suite.status);
                 result.text = await page.$eval(suite.status, node => node.textContent.trim());
             }
             if (suite.xrReport) {
@@ -501,12 +590,19 @@ try {
             const expected = backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
             if (result.actualBackend !== expected) throw new Error(`Requested ${backend}, observed ${result.actualBackend || 'unknown'}; fallback is not a pass`);
             if (errors.length) throw new Error(errors.join('\n'));
+            if (suite.name === 'rim-gameplay' || suite.name === 'rim-gameplay-120') result.rimCutEvidence = await page.evaluate(() => ({halfVisibility:window.rimCutEvidence.halfVisibility,transport:window.rimCutEvidence.transport,completionMs:window.rimCutEvidence.completionMs}));
+            if (suite.name === 'rim-device-logs') result.rimDeviceLogEvidence = await page.evaluate(() => window.rimDeviceLogEvidence);
             if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);
             if (suite.name === 'gltf-material-cache') result.materialCacheEvidence = await page.evaluate(() => window.materialCacheEvidence);
             if (suite.name === 'postprocess-fusion') {
                 result.pixelEvidence = await page.evaluate(() => window.fusionEvidence.map(({png,...item})=>item));
                 if (capture) for (const item of await page.evaluate(() => window.fusionEvidence)) {
                     await writeFile(path.join(output,`fusion-${backend}-${item.name}.png`),Buffer.from(item.png,'base64'));
+                }
+            }
+            if (capture && suite.name === 'rim') {
+                for (const stage of await page.evaluate(() => window.rimVisualEvidence??[])) {
+                    await writeFile(path.join(output, `rim-${backend}-${stage.label}.png`), Buffer.from(stage.png.split(',')[1], 'base64'));
                 }
             }
             if (capture && suite.xrReport) {

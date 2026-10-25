@@ -72,6 +72,12 @@ export class SceneObject {
     setCollider({ halfExtents = [0.5, 0.5, 0.5], offset = [0, 0, 0] } = {}) {
         accepted(this.#wasm.set_box_collider(this.id, ...halfExtents, ...offset)); return this;
     }
+    /** Compound local-space collision proxies; no additional rendered objects.
+     * @param {readonly {halfExtents: Vector3, offset?: Vector3}[]} boxes */
+    setColliders(boxes) {
+        accepted(this.#wasm.set_box_colliders(this.id, new Float32Array(boxes.flatMap(
+            ({halfExtents, offset = [0,0,0]}) => [...halfExtents, ...offset])))); return this;
+    }
     removeCollider() { accepted(this.#wasm.remove_collider(this.id)); return this; }
     /** @param {Vector3} degrees @param {import("./engine.d.ts").RotationOptions} [options] */
     rotate(degrees, { delay = 0, duration = 1 } = {}) {
@@ -228,6 +234,26 @@ export class Scene {
     /** @param {Uint8Array} bytes */
     rimAcceptCut(bytes){this.#wasm.rim_accept_cut(bytes);}
     rimCutFailed(){this.#wasm.rim_cut_failed();}
+    /** @param {import('./engine.d.ts').MeleeOptions|null} options */
+    configureMelee(options) {
+        if(options===null){this.#wasm.configure_melee('null');return;}
+        const {enemies,swords,spawns,bounds,obstacles=[]}=options;
+        if([...enemies,...swords].some(object=>handleBindings.get(object)!==this.#wasm))throw new Error('Soubojové objekty musí patřit této scéně.');
+        this.#wasm.configure_melee(JSON.stringify({enemies:enemies.map(o=>o.id),swords:swords.map(o=>o.id),spawns,bounds,obstacles}));
+    }
+    /** @returns {import('./engine.d.ts').MeleeState|null} */
+    get meleeState(){return JSON.parse(this.#wasm.melee_state());}
+    /** @param {{ball:SceneObject,player:SceneObject,opponent:SceneObject,scorePanel:SceneObject}|null} options */
+    configureTableTennis(options) {
+        if(options===null){this.#wasm.table_tennis_command('stop',0,0);return;}
+        const {ball,player,opponent,scorePanel}=options;
+        if([ball,player,opponent,scorePanel].some(o=>handleBindings.get(o)!==this.#wasm))throw new Error('Objekty musí patřit této scéně.');
+        this.#wasm.configure_table_tennis(ball.id,player.id,opponent.id,scorePanel.id);
+    }
+    /** @param {'move'|'serve'|'reset'|'practice'|'match'} command @param {number} [x] @param {number} [y] */
+    tableTennisCommand(command,x=0,y=0){this.#wasm.table_tennis_command(command,x,y);}
+    /** @returns {import('./engine.d.ts').TableTennisState|null} */
+    get tableTennisState(){return JSON.parse(this.#wasm.table_tennis_state());}
     get objectCount() { return this.#wasm.scene_object_count(); }
     get lightCount() { return this.#wasm.scene_light_count(); }
     /** Resolve a live Rust-owned object ID returned by diagnostics or bindings.
