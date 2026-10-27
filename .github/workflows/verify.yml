@@ -8,7 +8,7 @@ concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  software-webgl:
+  native-wasm:
     runs-on: ubuntu-latest
     # Trusted loopback fixtures only; the disposable runner is the isolation boundary.
     env:
@@ -25,11 +25,47 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --version 0.15.0 --locked
       - run: npm ci
-      - name: Native, WASM, SDK and software WebGL
-        run: npm run verify -- --backend webgl --software
+      - name: Native, WASM, SDK and software WebGL smoke
+        run: npm run verify -- --backend webgl --software --page basic
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-wasm
+          path: pkg/
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: software-webgl-report
+          name: native-wasm-report
+          path: output/verification/
+          if-no-files-found: ignore
+  software-webgl:
+    needs: native-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      BROWSER_CI_NO_SANDBOX: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install pinned Rust for build identity verification
+        run: rustup show
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-wasm
+          path: pkg/
+      - name: Software WebGL shard ${{ matrix.shard }}/4
+        run: npm run test:browser -- --backend webgl --software --shard ${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: software-webgl-${{ matrix.shard }}-report
           path: output/verification/
           if-no-files-found: ignore

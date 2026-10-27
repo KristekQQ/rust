@@ -1,0 +1,416 @@
+{
+  "parent": "9d6104da9af6fba5b6a0c4c1146b1300088ae8e2",
+  "priorCancelledRun": 40487079527,
+  "rendererSourceUnchanged": true,
+  "frozenInputs": {
+    ".github/workflows/verify.yml": "9928520d15826b9335dac347b915552f9b501869b80256e2f460a835e56e3ae3",
+    "scripts/test-browser.mjs": "dd2c695f44d4d307d3c306035738e3108a728d26dda37ff1a13b7361d4474b12",
+    "scripts/browser-suite-plan.mjs": "c4c407843a43e9353ac5ba90bb8d92d372536b4ee7c30ae1cdc36fd851acfb03",
+    "tests/harness-unit.test.mjs": "5f6ceada206ba14a418eeacfa6a51c8d94e27600571417e378cb8aa4fcf91f6c"
+  },
+  "receipt": {
+    "passed": true,
+    "key": "6b52a3ea26ceccbf4a61b33a6f860a492b0312fa4f71dccdce7c40c1b2f3c950",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+      "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "0f9e29ee62be44b4395067b0a98dbcc350902c75bb3d44166410716a07845c8f",
+    "finished": "2026-10-27T11:10:44.349Z"
+  },
+  "nativePassed": 419,
+  "nativeIgnored": 2,
+  "fullBrowserPassed": 137,
+  "fullPlanMatchesResults": true,
+  "hardwareTimeoutsMs": 90000,
+  "softwareProbe": {
+    "software": true,
+    "results": [
+      {
+        "suite": "rim-three-stress",
+        "status": "PASS",
+        "actualBackend": "ThreeWebGL2",
+        "timeoutMs": 600000
+      },
+      {
+        "suite": "monster-room-xr",
+        "status": "PASS",
+        "actualBackend": "Gl",
+        "timeoutMs": 600000
+      }
+    ]
+  },
+  "cliPartitions": "All four real one-case integrations PASS; original order/coverage and90s hardware timeout checked",
+  "softwareCIPlannedPartitions": [
+    [
+      {
+        "backend": "webgl",
+        "suite": "rim-three-stress"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-cynatar"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-mirror"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-neon-font-preview"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-rim"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-crystal-cave"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-arena-entry"
+      },
+      {
+        "backend": "webgl",
+        "suite": "lights"
+      },
+      {
+        "backend": "webgl",
+        "suite": "crystal-cave"
+      },
+      {
+        "backend": "webgl",
+        "suite": "table-tennis"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-opaque-batching"
+      },
+      {
+        "backend": "webgl",
+        "suite": "scene-appearance"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-gameplay-120"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-gameplay"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-enemies"
+      },
+      {
+        "backend": "webgl",
+        "suite": "monkey"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-arena-benchmark"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-arena"
+      },
+      {
+        "backend": "webgl",
+        "suite": "webxr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "cutting-resident"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-full"
+      },
+      {
+        "backend": "webgl",
+        "suite": "postprocessing"
+      }
+    ],
+    [
+      {
+        "backend": "webgl",
+        "suite": "info-basic"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-fox-control"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-monkey"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-neon-robot"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-shadows"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-monster-room"
+      },
+      {
+        "backend": "webgl",
+        "suite": "basic"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf"
+      },
+      {
+        "backend": "webgl",
+        "suite": "crystal-cave-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "table-tennis-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-light-classes"
+      },
+      {
+        "backend": "webgl",
+        "suite": "antialias"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-cut-scheduler-control"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-robot"
+      },
+      {
+        "backend": "webgl",
+        "suite": "arena-minute"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-font-preview"
+      },
+      {
+        "backend": "webgl",
+        "suite": "webxr-contract"
+      },
+      {
+        "backend": "webgl",
+        "suite": "projectiles"
+      },
+      {
+        "backend": "webgl",
+        "suite": "scene-sdk"
+      },
+      {
+        "backend": "webgl",
+        "suite": "render-mirrored"
+      },
+      {
+        "backend": "webgl",
+        "suite": "fox-control"
+      }
+    ],
+    [
+      {
+        "backend": "webgl",
+        "suite": "info-culling"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-gltf"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-neon-arena"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-postprocessing"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-webxr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-table-tennis"
+      },
+      {
+        "backend": "webgl",
+        "suite": "shadows"
+      },
+      {
+        "backend": "webgl",
+        "suite": "forest-arena"
+      },
+      {
+        "backend": "webgl",
+        "suite": "monster-room"
+      },
+      {
+        "backend": "webgl",
+        "suite": "monster-combat"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-gpu-transforms"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-refresh"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-stress-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "shadow-cache"
+      },
+      {
+        "backend": "webgl",
+        "suite": "postprocess-fusion"
+      },
+      {
+        "backend": "webgl",
+        "suite": "arena-presets"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-arena-profile"
+      },
+      {
+        "backend": "webgl",
+        "suite": "webxr-simulation"
+      },
+      {
+        "backend": "webgl",
+        "suite": "cutting"
+      },
+      {
+        "backend": "webgl",
+        "suite": "lifecycle"
+      },
+      {
+        "backend": "webgl",
+        "suite": "render-target"
+      },
+      {
+        "backend": "webgl",
+        "suite": "culling"
+      }
+    ],
+    [
+      {
+        "backend": "webgl",
+        "suite": "info-cutting"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-lights"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-neon-enemies"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-projectiles"
+      },
+      {
+        "backend": "webgl",
+        "suite": "info-forest-arena"
+      },
+      {
+        "backend": "webgl",
+        "suite": "runtime-info-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "mirror"
+      },
+      {
+        "backend": "webgl",
+        "suite": "forest-arena-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "monster-room-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-batching"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-visibility"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-device-logs"
+      },
+      {
+        "backend": "webgl",
+        "suite": "rim-spatial-batches-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-material-cache"
+      },
+      {
+        "backend": "webgl",
+        "suite": "cynatar"
+      },
+      {
+        "backend": "webgl",
+        "suite": "arena-waves"
+      },
+      {
+        "backend": "webgl",
+        "suite": "neon-arena-xr"
+      },
+      {
+        "backend": "webgl",
+        "suite": "webxr-preview"
+      },
+      {
+        "backend": "webgl",
+        "suite": "cutting-compute"
+      },
+      {
+        "backend": "webgl",
+        "suite": "gltf-sdk"
+      },
+      {
+        "backend": "webgl",
+        "suite": "render-effects"
+      }
+    ]
+  ],
+  "independentReview": "No material findings; artifact identity, complete coverage, timeout precedence and nonzero failure propagation reviewed",
+  "yamlParse": "Ruby YAML PASS",
+  "browserReportSha256": "e91df4a92a092d23b74dba77a96c98f4a35f9961779a8e298c7e4af88949b5fd",
+  "softwareReportSha256": "f5604e17dee39b8b55c8659839475d5bda01a4ca6aaae3e6cfb80af45224b2e8",
+  "githubOutcome": "Not yet run for new CI configuration"
+}

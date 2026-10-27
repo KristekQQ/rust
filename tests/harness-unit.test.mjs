@@ -5,6 +5,35 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseShard, partitionCases, suiteTimeout } from '../scripts/browser-suite-plan.mjs';
+
+test('browser shards cover every backend case exactly once, preserving case identity', () => {
+    const cases = Array.from({length:137}, (_, index) => ({id:index}));
+    const groups = Array.from({length:4}, (_, index) => partitionCases(cases, parseShard(`${index+1}/4`)));
+    assert.deepEqual(groups.map(group=>group.length), [35,34,34,34]);
+    const combined = groups.flat();
+    assert.equal(new Set(combined).size, cases.length);
+    assert.deepEqual(combined.map(x=>x.id).sort((a,b)=>a-b), cases.map(x=>x.id));
+    assert.equal(partitionCases(cases), cases, 'unsharded runs retain the original plan');
+    assert.deepEqual(partitionCases(cases, parseShard('1/1')), cases);
+});
+
+test('invalid or empty browser shards cannot silently report success', () => {
+    for (const value of [undefined,'','0/4','5/4','1/0','-1/4','1.5/4','1/2/3','9007199254740992/9007199254740992']) {
+        assert.throws(()=>parseShard(value));
+    }
+    assert.throws(()=>partitionCases([]));
+    assert.throws(()=>partitionCases([1],parseShard('4/4')));
+});
+
+test('only named software-heavy suites get extra time and explicit timeout wins', () => {
+    const options = {software:false,timeout:90000,timeoutExplicit:false};
+    const heavy = {softwareTimeoutMs:600000};
+    assert.equal(suiteTimeout(heavy,options),90000);
+    assert.equal(suiteTimeout(heavy,{...options,software:true}),600000);
+    assert.equal(suiteTimeout({}, {...options,software:true}),90000);
+    assert.equal(suiteTimeout(heavy,{...options,software:true,timeout:1234,timeoutExplicit:true}),1234);
+});
 
 test('pre-push propagates test/generator failure and does not destroy a previous source dump', async t => {
     const root = await mkdtemp(path.join(tmpdir(), 'rust-hook-'));

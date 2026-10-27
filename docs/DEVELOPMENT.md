@@ -64,6 +64,16 @@ Results, browser version, source/WASM and authored SDK/test/example hashes, and 
 
 For machine-specific executables, set `BROWSER_NODE` / `BROWSER_EXECUTABLE` or local Git options `verification.node` / `verification.browser` to absolute executable paths. These overrides are not committed or inherited by CI. The Node override also works when npm itself uses an Intel Node on an Apple Silicon Mac.
 
+GitHub CI builds/tests native code and WASM once, including a software-WebGL smoke
+case, then transfers the matching `pkg/` artifact to four browser jobs. Each runs
+`test:browser -- --backend webgl --software --shard index/4`; partitions apply
+after backend filtering and cover the complete registry without duplication.
+Reports record the planned cases, shard, per-case budget and compact progress so
+cancelled runs retain useful evidence. The default remains 90 seconds per case;
+only `rim-three-stress` and `monster-room-xr` use 600 seconds under `--software`.
+An explicit `--timeout` overrides that policy. Hardware/local full-push coverage
+and all scene, image and XR assertions are unchanged.
+
 The installed `scripts/pre-push` requires the full successful gate (or a matching PASS receipt) before atomically generating `all_sources.txt`; any failure blocks push. Run it before committing so the dump is included. Keep unrelated staged changes intact. The hook is local configuration; each new clone installs it explicitly.
 
 GitHub Ubuntu can block Puppeteer's Chromium sandbox through AppArmor. The disposable `software-webgl` job explicitly sets `BROWSER_CI_NO_SANDBOX=1`; the runner honors it only on Linux with `GITHUB_ACTIONS=true`. It runs only trusted loopback fixtures. Ordinary local browsers (including root sessions) do not automatically disable their sandbox; sandbox state is recorded in the browser report. This does not disable test assertions or backend validation.

@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import { verifyCutting } from '../tests/cutting-browser.mjs';
 import { verifyProjectiles } from '../tests/projectiles-browser.mjs';
 import { browserArgs } from './browser-options.mjs';
+import { parseShard, partitionCases, suiteTimeout } from './browser-suite-plan.mjs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, readFile, readdir, realpath } from 'node:fs/promises';
@@ -21,7 +22,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
-    {name:'rim-three-stress',path:'examples/rim-three/?verify=1',status:'#three-stress-result',backends:['webgl']},
+    {name:'rim-three-stress',path:'examples/rim-three/?verify=1',status:'#three-stress-result',backends:['webgl'],softwareTimeoutMs:600000},
     ...['basic','culling','cutting','cynatar','fox-control','gltf','lights','mirror','monkey','neon-arena','neon-enemies','neon-font-preview','neon-robot','postprocessing','projectiles','rim','shadows','webxr','forest-arena','crystal-cave','monster-room','table-tennis'].map(scene=>({name:'info-'+scene,path:'tests/runtime-info-example.html?scene='+scene,status:'#result',backends:['webgl'],xrReport:true})),
     {name:"runtime-info-xr",path:"tests/runtime-info-xr.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"neon-arena-entry",path:"tests/neon-arena-entry.html",interaction:"arena-entry",backends:["webgl"]},
@@ -35,7 +36,7 @@ const suites = [
     {name:"crystal-cave",path:"examples/crystal-cave/?verify=1",status:"#result",button:"#verify"},
     {name:"crystal-cave-xr",path:"tests/crystal-cave-xr.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"monster-room",path:"examples/monster-room/?verify=1",status:"#result",button:"#verify"},
-    {name:"monster-room-xr",path:"tests/monster-room-xr.html",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"monster-room-xr",path:"tests/monster-room-xr.html",status:"#result",backends:["webgl"],xrReport:true,softwareTimeoutMs:600000},
     {name:"table-tennis",path:"examples/table-tennis/?verify=1",status:"#result",button:"#verify"},
     {name:"table-tennis-xr",path:"tests/table-tennis-xr.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"monster-combat",path:"tests/monster-combat.html",status:"#result",backends:["webgl"],xrReport:true},
@@ -92,6 +93,7 @@ const suites = [
     { name: 'culling', path: 'examples/culling/', interaction: 'culling' },
 ];
 let xrSlow = false, arenaLegacyStress = false, productionRoot = null;
+let shard = null, timeoutExplicit = false;
 let backends = ['webgpu', 'webgl'], selected = suites, software = false, headed = false, capture = false, timeout = 90000;
 for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
@@ -101,6 +103,7 @@ for (let i = 2; i < process.argv.length; i++) {
     else if (arg === '--software') software = true;
     else if (arg === '--capture') capture = true;
     else if (arg === '--headed') headed = true;
+    else if (arg === '--shard') shard = parseShard(process.argv[++i]);
     else if (arg === '--backend') {
         const value = process.argv[++i];
         if (!['all', 'webgpu', 'webgl'].includes(value)) throw new Error('--backend requires all, webgpu or webgl');
@@ -110,14 +113,19 @@ for (let i = 2; i < process.argv.length; i++) {
         if (names.some(name => !suites.some(suite => suite.name === name))) throw new Error(`Unknown suite. Choose: ${suites.map(suite => suite.name).join(', ')}`);
         selected = suites.filter(suite => names.includes(suite.name));
     } else if (arg === '--timeout') {
+        timeoutExplicit = true;
         timeout = Number(process.argv[++i]);
         if (!Number.isFinite(timeout) || timeout < 1000) throw new Error('--timeout must be at least 1000 ms');
     } else if (arg === '--help') {
-        console.log('node scripts/test-browser.mjs [--backend all|webgpu|webgl] [--page suite,suite] [--software] [--headed] [--capture] [--xr-slow] [--arena-legacy-stress] [--timeout ms]');
+        console.log('node scripts/test-browser.mjs [--backend all|webgpu|webgl] [--page suite,suite] [--shard index/count] [--software] [--headed] [--capture] [--xr-slow] [--arena-legacy-stress] [--timeout ms]');
         process.exit(0);
     } else throw new Error(`Unknown option ${arg}`);
 }
 
+const executionPlan = partitionCases(backends.flatMap(backend => selected
+    .filter(suite => !suite.backends || suite.backends.includes(backend))
+    .map(suite => ({backend, suite}))), shard);
+const timeoutOptions = {software, timeout, timeoutExplicit};
 if (productionRoot) process.env.VERIFY_WASM_PROFILE = 'release';
 let browser, server;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -385,8 +393,14 @@ async function verifyFox(page) {
     return 'PASS: solid obstacles, wall sliding, gravity, jump/landing on two platforms, R reset, fullscreen/mouse/Escape, clips and lifecycle';
 }
 let interrupted = false;
-const report = { started: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), software, node: process.execPath, architecture: process.arch, results: [] };
+const report = { started: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), software, node: process.execPath, architecture: process.arch, shard, plan: executionPlan.map(({backend,suite}) => ({backend,suite:suite.name})), results: [] };
 const output = path.join(root, 'output/verification');
+async function saveProgress(active = null) {
+    await writeFile(path.join(output, 'browser-progress.json'), JSON.stringify({
+        revision: report.revision, shard, plan: report.plan, active,
+        results: report.results.map(({suite,backend,status,error}) => ({suite,backend,status,error})),
+    }, null, 2) + '\n');
+}
 async function applicationFingerprint() {
     const hash = createHash('sha256');
     async function visit(directory) {
@@ -438,15 +452,17 @@ try {
     const args = browserArgs({ software });
     report.sandboxDisabled = args.includes('--no-sandbox');
     report.browserExecutable = process.env.BROWSER_EXECUTABLE || localOption('verification.browser') || await puppeteer.executablePath();
-    browser = await puppeteer.launch({ headless: !headed, args, executablePath: report.browserExecutable, timeout: 30000, protocolTimeout: timeout, dumpio: process.env.DEBUG_BROWSER_STARTUP === '1' });
+    const protocolTimeout = Math.max(...executionPlan.map(({suite}) => suiteTimeout(suite, timeoutOptions)));
+    browser = await puppeteer.launch({ headless: !headed, args, executablePath: report.browserExecutable, timeout: 30000, protocolTimeout, dumpio: process.env.DEBUG_BROWSER_STARTUP === '1' });
     report.browser = await browser.version();
-    for (const backend of backends) for (const suite of selected) {
-        if (suite.backends && !suite.backends.includes(backend)) continue;
+    for (const {backend, suite} of executionPlan) {
         if (interrupted) throw new Error('Verification interrupted');
+        await saveProgress({suite:suite.name,backend});
         const page = await browser.newPage();
         await page.setViewport({ width: 960, height: 640, deviceScaleFactor: 1 });
-        page.setDefaultTimeout(timeout);
-        page.setDefaultNavigationTimeout(timeout);
+        const caseTimeout = suiteTimeout(suite, timeoutOptions);
+        page.setDefaultTimeout(caseTimeout);
+        page.setDefaultNavigationTimeout(caseTimeout);
         const errors = [], abortedRequests = [];
         page.on('pageerror', error => errors.push(`JS: ${error.message || String(error)}`));
         // Dawn reports validation errors as warnings, not page/console errors.
@@ -469,7 +485,7 @@ try {
             if (request.failure()?.errorText === 'net::ERR_ABORTED') abortedRequests.push(message);
             else errors.push(message);
         });
-        const result = { suite: suite.name, backend, status: 'FAIL' };
+        const result = { suite: suite.name, backend, timeoutMs: caseTimeout, status: 'FAIL' };
         try {
             const url = new URL(suite.path, baseUrl);
             url.searchParams.set('backend', backend === 'webgl' ? 'webgl' : 'auto');
@@ -739,6 +755,7 @@ try {
         } finally {
             result.abortedRequests = abortedRequests;
             report.results.push(result);
+            await saveProgress();
             console.log(`${result.status} ${suite.name} ${backend}${result.error ? ': ' + result.error : ''}`);
             await page.close();
         }
