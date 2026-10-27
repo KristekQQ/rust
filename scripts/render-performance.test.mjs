@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {stats,geometricLoads,parseArgs,serveFrozen,hash,summarize,withinCapacity,workDeltas,pixelDifference,errorEvidence,calibrationSnapshot,protocolTimeoutMs,ratioStats,calibratedLoad,validateCalibrationInputs,boundedCleanup} from './render-performance-lib.mjs';
+import {stats,geometricLoads,parseArgs,serveFrozen,hash,summarize,withinCapacity,workDeltas,pixelDifference,errorEvidence,calibrationSnapshot,protocolTimeoutMs,ratioStats,calibratedLoad,validateCalibrationInputs,boundedCleanup,fixedLoadFamily,cpuScopeEvidence} from './render-performance-lib.mjs';
 test('statistics retain tails and budget overruns; absent measurements null',()=>{assert.equal(stats([]),null);assert.deepEqual(stats([1,3,2,100],2),{count:4,median:2,mean:26.5,p95:100,p99:100,max:100,budgetMs:2,overrunToleranceMs:.5,rawExactOverruns:2,rawExactOverrunDurationMs:99,overruns:2,overrunDurationMs:99});});
 test('bounded geometric loads and option validation',()=>{assert.deepEqual(geometricLoads(9),[1,2,4,8,9]);assert.equal(parseArgs(['smoke']).warmup,8000);assert.equal(parseArgs(['compare']).pairs,3);for(const args of [['smoke','--max-load','Infinity'],['smoke','--pairs','1.5'],['smoke','--backend','fallback'],['smoke','--wat','x']])assert.throws(()=>parseArgs(args));});
 test('GPU unavailable is not zero timing',()=>{const s=summarize({frames:[{stamp:1,cpu:2},{stamp:18,cpu:3}],gpu:[],samples:[],commands:{}},16);assert.equal(s.gpuPassMs,null);assert.equal(s.gpuAvailable,false);assert.equal(s.heapBytes,null);assert.equal(s.rafInterval.mean,17);});
@@ -96,6 +96,19 @@ test('a query spanning a missing sampler is discarded rather than published as f
 
 test('render dimensions are explicit bounded calibration inputs',()=>{const d=parseArgs(['smoke']);assert.equal(d.width,960);assert.equal(d.height,640);const o=parseArgs(['calibrate','--width','2880','--height','1920']);assert.equal(o.width,2880);assert.equal(o.height,1920);for(const v of ['0','63','4097','NaN','120.5'])assert.throws(()=>parseArgs(['smoke','--width',v]));const c=calibrationSnapshot({...o,budget:16.667},[]);assert.equal(c.width,2880);assert.equal(c.height,1920);});
 
-test('Rim stress authoring stays inside native model budget',()=>{assert.equal(parseArgs(['smoke','--family','rim-stress','--max-load','2048']).maxLoad,2048);assert.throws(()=>parseArgs(['smoke','--family','rim-stress','--max-load','2049']),/budget/);});
+test('Rim stress and clustered model workloads stay inside their native model budget',()=>{assert.equal(parseArgs(['smoke','--family','rim-stress','--max-load','2048']).maxLoad,2048);assert.equal(parseArgs(['smoke','--family','rim-clustered','--max-load','2048']).maxLoad,2048);assert.throws(()=>parseArgs(['smoke','--family','rim-stress','--max-load','2049']),/budget/);assert.throws(()=>parseArgs(['smoke','--family','rim-clustered','--max-load','2049']),/budget/);});
+test('authored Rome camera is fixed-load while clustered shared drones calibrate by model load',()=>{assert.equal(fixedLoadFamily('rim-camera'),true);assert.equal(fixedLoadFamily('rim-static'),true);assert.equal(fixedLoadFamily('rim-clustered'),false);assert.equal(fixedLoadFamily('rim-stress'),false);assert.equal(parseArgs(['calibrate','--family','rim-clustered','--max-load','2048']).maxLoad,2048);});
 
 test('fixed calibration probe stays within explicit budget',()=>{assert.throws(()=>parseArgs(['calibrate','--load','128','--max-load','64']),/Bounds exceeded/);assert.equal(parseArgs(['calibrate','--load','128','--max-load','128']).load,128);});
+
+// A cold scope must not be promoted to a recurring warm cost just because its
+// historical lastMs survives in every profiler snapshot.
+test('CPU scope evidence excludes unchanged cold histories and deduplicates snapshots',()=>{
+ const cold={lastMs:90,meanMs:90,samples:1},zero={lastMs:0,meanMs:0,samples:60};
+ const a={lastMs:2,meanMs:1,samples:60},b={lastMs:3,meanMs:1.1,samples:60};
+ const d={boundaryStart:{profile:{cpu:{cold,zero}}},samples:[{profile:{cpu:{cold,zero,queue:a}}},{profile:{cpu:{cold,zero,queue:a}}},{profile:{cpu:{cold,zero,queue:b}}}]};
+ const e=cpuScopeEvidence(d);assert.equal(e.perInvocationTimesAvailable,false);
+ assert.equal(e.scopes.cold.freshness,'unproven');assert.equal(e.scopes.cold.lastSampleMs,null);
+ assert.equal(e.scopes.zero.lastSampleMs,null);assert.equal(e.scopes.queue.observedHistoryChanges,2);
+ assert.equal(e.scopes.queue.lastSampleMs.count,2);assert.equal(e.scopes.queue.lastSampleMs.max,3);
+});

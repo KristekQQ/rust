@@ -1,0 +1,552 @@
+{
+  "version": 1,
+  "batch": 1,
+  "status": "complete-local-checkpoint",
+  "sourceHead": "b7de3be56ad2a8a79a30e7b4fe927fa6822e33c7",
+  "historicalTaskHead": "87447ea5070d5f0f580fbabbf8cbeec9980d41ae",
+  "branch": "codex/next-render-cycle-1",
+  "checkout": "/private/tmp/rust-next-render-cycle-1",
+  "build": {
+    "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+    "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "buildReusedFrom": "/private/tmp/rust-rim-publish-20261027/pkg",
+  "frozenRuntime": "output/next-render-cycle/baseline",
+  "frozenManifest": "output/next-render-cycle/baseline/render-build.json",
+  "protocol": {
+    "width": 1280,
+    "height": 720,
+    "deviceScaleFactor": 1,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "baselineRepetitions": 3,
+    "futureABPairs": 3,
+    "futureOrder": "AB/BA/AB",
+    "primaryProfiling": false
+  },
+  "physicalQuest": false,
+  "productionChanged": false,
+  "published": false,
+  "environment": {
+    "observedAt": "2026-10-27T15:58:09.368466+00:00",
+    "hardware": {
+      "model": "MacBookAir10,1",
+      "chip": "Apple M1",
+      "cpuCores": 8,
+      "gpuCores": 7,
+      "ramGB": 16
+    },
+    "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.1\nBuildVersion:\t\t25G76\n",
+    "power": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23593059)\t8%; charging; (no estimate) present: true\n",
+    "gpuProcesses": [
+      {
+        "pid": 30816,
+        "ppid": 30810,
+        "cpuPercentSnapshot": 32.1,
+        "memoryPercent": 0.4,
+        "gpuBusyPercent": null
+      },
+      {
+        "pid": 47270,
+        "ppid": 47262,
+        "cpuPercentSnapshot": 0.0,
+        "memoryPercent": 0.3,
+        "gpuBusyPercent": null
+      },
+      {
+        "pid": 56711,
+        "ppid": 56693,
+        "cpuPercentSnapshot": 0.0,
+        "memoryPercent": 0.2,
+        "gpuBusyPercent": null
+      },
+      {
+        "pid": 60293,
+        "ppid": 60270,
+        "cpuPercentSnapshot": 0.8,
+        "memoryPercent": 0.3,
+        "gpuBusyPercent": null
+      }
+    ],
+    "gpuBusyPercent": null,
+    "isolatedGpu": false,
+    "thermalState": null,
+    "actualLanIp": "192.168.11.134",
+    "shared8443": {
+      "pid": 12350,
+      "boundAddress": "192.168.0.17",
+      "cwd": "/Users/Honza/.codex/worktrees/rim-publish/rust",
+      "httpsObserved": false,
+      "failure": "curl bounded connect timeout; current LAN differs from bound historical home IP",
+      "onDiskManifestSha256": "ee4a1bbc7cc23ee995d6c28b3d49a59d2a6633b0542ed831f900d7bd3af743ba",
+      "onDiskReleaseId": "ba920dd931",
+      "onDiskBuild": {
+        "source": "128abfe22c6ea2f7f5d07082c857aa81a9ea1aff03fc2a0e20fd0f1117816114",
+        "wasm": "c7091506871c74c5055d501dfd85b3a12d8e70dd7905003135dee7939f8109eb",
+        "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "isBaselineWasm": false,
+      "restarted": false
+    }
+  },
+  "primary": {
+    "head": "ffa2e6bb64aa9df12541f0c897ab5564fb16e4a6",
+    "dirty": true
+  },
+  "frozenSdk": {
+    "js/engine.js": {
+      "sha256": "78a71b170d528928b3e5671b7a5db263fb37c95d335f1f3311a1dc832d436530",
+      "bytes": 46129
+    },
+    "js/engine.d.ts": {
+      "sha256": "408171435dbbd0db9bba04b8d647df63e4e4693f6a1ce4ad1cfe73dad7d2293f",
+      "bytes": 29564
+    },
+    "js/webxr.js": {
+      "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+      "bytes": 31081
+    },
+    "pkg/webgpu_wasm.js": {
+      "sha256": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "bytes": 189474
+    },
+    "pkg/webgpu_wasm_bg.wasm": {
+      "sha256": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+      "bytes": 5845974
+    }
+  },
+  "frozenManifestSha256": "455087bbf96443701aba9abaf6ddd4e15d2532b9a25dcc9bd693d1c785a88c5f",
+  "selectedLoads": {
+    "webgl": {
+      "load": 1024,
+      "config": "output/next-render-cycle/cal-webgl-1024/config.json",
+      "capacityPass": false,
+      "rafMedianMs": 16.700000000000273,
+      "rafP95Ms": 33.40000000000009,
+      "cpuP95Ms": 28.200000047683716
+    },
+    "webgpu": {
+      "load": 1024,
+      "config": "output/next-render-cycle/cal-webgpu-1024/config.json",
+      "capacityPass": false,
+      "rafMedianMs": 16.699999999999818,
+      "rafP95Ms": 33.399999999999636,
+      "cpuP95Ms": 26.700000047683716
+    }
+  },
+  "review": {
+    "sourceControls": "independent review; final bounded cut-retention review no material findings",
+    "apiPrototypes": "async/restart/upload/copy defects fixed before integration with regression tests",
+    "report": "independent numeric/coverage review; main-vs-all-pass wording corrected",
+    "runtimeReview": false
+  },
+  "helperUnits": {
+    "passed": 42,
+    "node": "v24.22.1",
+    "arch": "arm64",
+    "log": "output/next-render-cycle/audit/final-helper-tests-v2.log"
+  },
+  "primaryAcceptance": {
+    "primaryRuns": 48,
+    "hashVerifiedRequestedFiles": 828,
+    "unchangedHarness": true,
+    "profilerOff": true,
+    "cleanupComplete": true,
+    "frozenRuntimeWasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a"
+  },
+  "primaryCommonHarness": {
+    "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+    "scripts/render-performance.mjs": "97c974ca5d0b544d9adab134df764b6a58908b6e283063399b7d2c22b27c7ed5",
+    "scripts/render-performance-lib.mjs": "473864ded0cf0c2a4918cdfd8035e255be0fd29375fb9e533bb4ec9862b9b76a",
+    "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+    "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+    "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+    "tests/render-performance.js": "608a54a8aa6455c03ec2195ac2914f5233b1afd924e1043ed7ba23c07f0d00a5",
+    "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "scripts/benchmark-rim-cuts.mjs": "cd4993aeb4a3b926000fa40f3ce80375178b8837a5321c9638f35bbb2b291862",
+    "tests/rim-gameplay.js": "ad27454f222e43fa7c14f1dd88d762c0d67c01835233ee01e202d32568bf88b7"
+  },
+  "diagnosticCommonHarness": {
+    "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+    "scripts/render-performance.mjs": "32ca83c74ab2576cd34233ec81dc2ca02680ab3b77235b351ff27499ed7d0ca9",
+    "scripts/render-performance-lib.mjs": "473864ded0cf0c2a4918cdfd8035e255be0fd29375fb9e533bb4ec9862b9b76a",
+    "scripts/render-performance-api.mjs": "9e6a381922a0ff8ebc3911067addac299d99443846ff678bf0ba5b322f48e19c",
+    "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+    "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+    "tests/render-performance.js": "608a54a8aa6455c03ec2195ac2914f5233b1afd924e1043ed7ba23c07f0d00a5",
+    "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "scripts/benchmark-rim-cuts.mjs": "b8f1db30ecf308f4c22eda8bcc048991809f82e10b787ba6b99d6d889cf4cd03",
+    "tests/rim-gameplay.js": "ad27454f222e43fa7c14f1dd88d762c0d67c01835233ee01e202d32568bf88b7"
+  },
+  "primaryToDiagnosticChangedTools": [
+    "scripts/render-performance.mjs",
+    "scripts/render-performance-api.mjs",
+    "scripts/benchmark-rim-cuts.mjs"
+  ],
+  "diagnosticChangesScope": "extra API work counters and warm diagnostic window, optional cut stress; no runtime/clean primary source changes",
+  "backgroundGpuAfterPrimary": {
+    "scope": "after all48 primary browsers closed; no owned GPU runner active; aggregate device, no process attribution",
+    "samples": [
+      {
+        "at": "2026-10-27T16:31:09.287241+00:00",
+        "stats": [
+          {
+            "Alloc system memory": 3740467200,
+            "Allocated PB Size": 75104256,
+            "Device Utilization %": 45,
+            "In use system memory": 484622336,
+            "In use system memory (driver)": 0,
+            "Renderer Utilization %": 43,
+            "SplitSceneCount": 0,
+            "TiledSceneBytes": 142278656,
+            "Tiler Utilization %": 44,
+            "lastRecoveryTime": 0,
+            "recoveryCount": 0
+          }
+        ]
+      },
+      {
+        "at": "2026-10-27T16:31:09.827996+00:00",
+        "stats": [
+          {
+            "Alloc system memory": 3740762112,
+            "Allocated PB Size": 75104256,
+            "Device Utilization %": 39,
+            "In use system memory": 484622336,
+            "In use system memory (driver)": 0,
+            "Renderer Utilization %": 36,
+            "SplitSceneCount": 0,
+            "TiledSceneBytes": 950272,
+            "Tiler Utilization %": 37,
+            "lastRecoveryTime": 0,
+            "recoveryCount": 0
+          }
+        ]
+      },
+      {
+        "at": "2026-10-27T16:31:10.368215+00:00",
+        "stats": [
+          {
+            "Alloc system memory": 3750494208,
+            "Allocated PB Size": 75104256,
+            "Device Utilization %": 42,
+            "In use system memory": 492290048,
+            "In use system memory (driver)": 0,
+            "Renderer Utilization %": 40,
+            "SplitSceneCount": 0,
+            "TiledSceneBytes": 950272,
+            "Tiler Utilization %": 40,
+            "lastRecoveryTime": 0,
+            "recoveryCount": 0
+          }
+        ]
+      }
+    ]
+  },
+  "finalCommonHarness": {
+    "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+    "scripts/render-performance.mjs": "32ca83c74ab2576cd34233ec81dc2ca02680ab3b77235b351ff27499ed7d0ca9",
+    "scripts/render-performance-lib.mjs": "59f1a1d87c48ec89b6e4d75d043f2f745b402802ce4c72f7387982a53f555fc2",
+    "scripts/render-performance-api.mjs": "1c68c3e327fa5eea8519aeedb7f93e4bd21c3cb1bcee54b231e060e6eec69c7a",
+    "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+    "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+    "tests/render-performance.js": "608a54a8aa6455c03ec2195ac2914f5233b1afd924e1043ed7ba23c07f0d00a5",
+    "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "scripts/benchmark-rim-cuts.mjs": "b5a76d6c0c418fda5ca47d82ec19317637c5ee155bf265a100e366d07fdc0ca6",
+    "tests/rim-gameplay.js": "d091fc5420c5bbc1acb4d5a87b72df6c78c8d0c35dc6ad718747c6bba1aa11b6",
+    "scripts/render-performance.test.mjs": "fae2296c0d5a80deb800e2f284906c2c03373f720eeab433e1dcc2661834132a",
+    "scripts/render-performance-api.test.mjs": "d4a41b4e95a503df053685a43786ad2563a77c4dd858f05a7d04af1a29c68fc8"
+  },
+  "cutAcceptance": {
+    "rows": {
+      "next-cycle-1-stress-v2-webgpu-cuts": {
+        "status": "PASS",
+        "stress": 1024,
+        "runs": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ],
+        "inputHashesVerified": true,
+        "stableAtRun": true
+      },
+      "next-cycle-1-webgl-cuts": {
+        "status": "PASS",
+        "stress": 0,
+        "runs": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ],
+        "inputHashesVerified": true,
+        "stableAtRun": true
+      },
+      "next-cycle-1-stress-webgpu-cuts": {
+        "status": "FAIL",
+        "stress": 1024,
+        "runs": [
+          "FAIL",
+          "FAIL",
+          "FAIL"
+        ],
+        "inputHashesVerified": true,
+        "stableAtRun": true
+      },
+      "next-cycle-1-webgpu-cuts": {
+        "status": "PASS",
+        "stress": 0,
+        "runs": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ],
+        "inputHashesVerified": true,
+        "stableAtRun": true
+      },
+      "next-cycle-1-stress-v2-webgl-cuts": {
+        "status": "PASS",
+        "stress": 1024,
+        "runs": [
+          "PASS",
+          "PASS",
+          "PASS"
+        ],
+        "inputHashesVerified": true,
+        "stableAtRun": true
+      }
+    },
+    "verifiedFiles": 140,
+    "acceptedReplays": 12,
+    "failedHarnessReplays": 3,
+    "acceptedWorkerJobs": 72,
+    "acceptedWorkerMessages": 72,
+    "acceptedWorkerInflightAtPublication": 0,
+    "acceptedWorkerErrorsExpiredLate": 0
+  },
+  "diagnosticAcceptance": {
+    "runs": 15,
+    "requestedFilesVerified": 240,
+    "driverFileHashesVerified": 135,
+    "failures": []
+  },
+  "frozenRecheck": {
+    "checkedFrozenFiles": 2461,
+    "changedFrozenFiles": []
+  },
+  "gpuTimingCoverage": {
+    "primary": null,
+    "reason": "profiling disabled and GLqueriesBegun0 in clean throughput",
+    "webgpuDiagnostic": "valid asynchronous sampled named passes; small counts retained",
+    "webglDiagnostic": "native pass timer unavailable; asynchronous EXT application-RAF command interval supported; not pure GPU busy/compositor"
+  },
+  "apiProofLimits": {
+    "indexBytesAndMaskCap": 67108864,
+    "metadataBufferCap": 8192,
+    "ordinaryWebglProofComplete": true,
+    "stressWebglProofComplete": false,
+    "stressReason": "8192-entry index metadata cap; native glTF event counters retained separately",
+    "wholeApiUploadBytes": null
+  },
+  "metricsLimitations": [
+    "contended desktop and major repetition drift; not isolated capacity or small-gain evidence",
+    "sparse changed CPU histories; unchanged freshness unproven; no invocation sequence",
+    "group preparation and instance packing not timed independently",
+    "worker internal compute unavailable; request-publication latency includes scheduling/installation/observation",
+    "handler aggregates only3 jobs perconfiguration; not per-message tail distribution",
+    "GPU interval / CPU wall / RAF cadence are distinct and not summed",
+    "no physical Quest, newThree comparison, optimization or speedup claim"
+  ],
+  "sourceAudit": {
+    "worktreesObserved": 21,
+    "repositorySnapshot": "output/next-render-cycle/audit/repository-final.json",
+    "primaryStatusListingUnchanged": true,
+    "primaryStatusListingIsNotFullByteProof": true
+  },
+  "checkpoints": {
+    "scope": "local owned branch only",
+    "push": false,
+    "merge": false,
+    "deployment": false,
+    "sharedServerRestart": false,
+    "local": "this commit on codex/next-render-cycle-1"
+  },
+  "baselineReleaseWasmRecompiled": false,
+  "environmentFinal": {
+    "at": "2026-10-27T16:59:08.964289+00:00",
+    "scope": "final verification active; not a background GPU measurement",
+    "lan": {
+      "exit": 0,
+      "out": "192.168.11.134",
+      "error": ""
+    },
+    "shared8443Listener": {
+      "exit": 0,
+      "out": "COMMAND   PID  USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\nPython  12350 Honza    3u  IPv4 0xe2e9b3c1e7b7b084      0t0  TCP 192.168.0.17:8443 (LISTEN)",
+      "error": ""
+    },
+    "power": {
+      "exit": 0,
+      "out": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23593059)\t8%; charging; 20:00 remaining present: true",
+      "error": ""
+    },
+    "productionManifestSha256": "ee4a1bbc7cc23ee995d6c28b3d49a59d2a6633b0542ed831f900d7bd3af743ba",
+    "productionManifestUnchanged": true
+  },
+  "frozenRuntimeGitStatus": [
+    "?? node_modules"
+  ],
+  "baselineTrackedSourcesCleanAtFreeze": true,
+  "temporaryDependencySymlink": "node_modules -> primary node_modules; untracked, not checkpointed",
+  "verificationRunCompleted": {
+    "status": "PASS",
+    "command": "npm run verify:push",
+    "nativePassed": 419,
+    "nativeIgnoredManualBenchmarks": 2,
+    "browserPassed": 137,
+    "separatePerformanceHelperUnits": 42,
+    "receiptKey": "9508e96f07fad781f5d9c1f5f00ec7dd5732cbc3847ad4b24a2db925f4744b58",
+    "fullEvidence": "VERIFICATION.json",
+    "receiptReuseConfirmedVia": "npm exec --offline -- node scripts/verification-cache.mjs check all"
+  },
+  "reusableReceiptConfirmed": true,
+  "servedAfterResume": {
+    "at": "2026-10-27T18:10:47.741626+00:00",
+    "lan": "192.168.0.17",
+    "serverPid": 12350,
+    "mutated": false,
+    "url": "https://192.168.0.17:8443/production-manifest.json",
+    "tlsVerification": true,
+    "status": 200,
+    "sha256": "ee4a1bbc7cc23ee995d6c28b3d49a59d2a6633b0542ed831f900d7bd3af743ba",
+    "headers": {
+      "Server": "SimpleHTTP/0.6 Python/3.14.7",
+      "Date": "Tue, 27 Oct 2026 18:10:47 GMT",
+      "Content-type": "application/json",
+      "Content-Length": "117012",
+      "Last-Modified": "Tue, 27 Oct 2026 03:00:07 GMT",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0"
+    },
+    "manifestKeys": [
+      "version",
+      "profile",
+      "build",
+      "files",
+      "totals",
+      "releaseId"
+    ],
+    "verifiedPayloads": [
+      {
+        "path": "pkg/webgpu_wasm_bg.wasm",
+        "status": 200,
+        "bytes": 5845997,
+        "sha256": "c7091506871c74c5055d501dfd85b3a12d8e70dd7905003135dee7939f8109eb",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      },
+      {
+        "path": "pkg/webgpu_wasm.js",
+        "status": 200,
+        "bytes": 86455,
+        "sha256": "e64edc2b3bc9f35fb6bade2fe19509371a0fac429f559baa9f59e857d4123cf7",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      },
+      {
+        "path": "js/engine.js",
+        "status": 200,
+        "bytes": 21510,
+        "sha256": "248f0cb6725a257d8ef7a997949a37b257dee6fe547b2b23ddb3e99e90fbfc76",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      },
+      {
+        "path": "js/webxr.js",
+        "status": 200,
+        "bytes": 16666,
+        "sha256": "fc95f2f24650c693b0c2c8ce7265b3e707150cc2a41478f8b60a7a06b57cbc07",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      },
+      {
+        "path": "examples/rim/main.js",
+        "status": 200,
+        "bytes": 8453,
+        "sha256": "715b8d2af773b6e55cbb4447e34110e806f5ac2517513ec5baf6c9ff2c9aa1b9",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      },
+      {
+        "path": "examples/rim/cut-transport.js",
+        "status": 200,
+        "bytes": 2085,
+        "sha256": "e834871c6c0d31e698acff040cf90d104b117c40982f3e83f1c87002f7a10cf6",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      },
+      {
+        "path": "examples/rim/cut-worker.js",
+        "status": 200,
+        "bytes": 496,
+        "sha256": "e7f95e11f565aea76aa18b9bad57e74e9a29115aa07bff4f7ca6c1f2a2ff9887",
+        "manifestMatches": true,
+        "cacheControl": "no-store, no-cache, must-revalidate",
+        "tlsVerified": true
+      }
+    ],
+    "releaseId": "ba920dd931",
+    "build": {
+      "source": "128abfe22c6ea2f7f5d07082c857aa81a9ea1aff03fc2a0e20fd0f1117816114",
+      "wasm": "c7091506871c74c5055d501dfd85b3a12d8e70dd7905003135dee7939f8109eb",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sameAsBaselineWasm": false
+  },
+  "nextBatchAuthorized": false,
+  "evidenceArchive": {
+    "path": "baseline-evidence.tar.gz",
+    "sha256": "c7513d2e7154defb52852e15c7d42c4337ba43bb376392d4d25c53c20d7c3968",
+    "bytes": 29997122,
+    "files": 601,
+    "uniquePayloads": 466,
+    "losslessHardlinkDeduplication": true,
+    "duplicatePayloadBytesSaved": 17462848,
+    "archivePayloadVerification": "all unique archived bytes and every hardlink target/hash/size verified",
+    "contains": "all raw primary/profile/API/cut evidence, captures, commands, audits, exact harness versions, verified release pkg, full frozen hash manifest, final local verification logs/receipt",
+    "reconstructRuntime": "git checkout baseline b7de3be56 plus archived pkg; verify all2461 files using render-build.json; current tool revisions are separate from frozen runtime"
+  },
+  "derivedResults": {
+    "path": "RESULTS.json",
+    "sha256": "4179356b22280d33a8edef226735eeb459614eb063b01586aea0b793ea5813a2",
+    "scope": "descriptive aggregation; archived raw evidence authoritative"
+  }
+}

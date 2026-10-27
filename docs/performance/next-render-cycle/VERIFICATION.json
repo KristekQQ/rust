@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "command": "npm run verify:push",
+  "cwd": "/private/tmp/rust-next-render-cycle-1",
+  "node": "v24.22.1 arm64",
+  "env": {
+    "VERIFY_WASM_PROFILE": "release"
+  },
+  "receipt": {
+    "passed": true,
+    "key": "9508e96f07fad781f5d9c1f5f00ec7dd5732cbc3847ad4b24a2db925f4744b58",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+      "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "0f9e29ee62be44b4395067b0a98dbcc350902c75bb3d44166410716a07845c8f",
+    "finished": "2026-10-27T17:05:08.594Z"
+  },
+  "native": {
+    "passed": 419,
+    "failed": 0,
+    "ignored": 2,
+    "ignoredReason": "manual native timing benchmarks; not failures"
+  },
+  "browser": {
+    "passed": 137,
+    "failed": 0,
+    "physicalQuest": false
+  },
+  "separatePerformanceHelperUnits": {
+    "passed": 42,
+    "failed": 0,
+    "log": "output/next-render-cycle/audit/final-helper-tests-v2.log"
+  },
+  "releaseWasmRebuilt": false,
+  "sourceDumpRegenerated": true,
+  "log": "output/next-render-cycle/audit/verify-push.log",
+  "browserReportSha256": "7304bccb4c5017c8f8c8873f2b52eebed5a7cbf640dd75e5d0e895cf3395d533",
+  "finalToolHashesStillMatch": true,
+  "receiptResolution": {
+    "status": "resolved",
+    "cause": "verificationKey serializes relevant process.env entries in insertion order; npm reverses RUST_LOG and BROWSER_USE_ACCESS_VERIFYING_IDENTITY; values and Node are identical",
+    "directKey": "390616257f913e44c0e44fe80505c2a0840c7cdc4bca5c7900daa74bd2fdc431",
+    "npmKey": "9508e96f07fad781f5d9c1f5f00ec7dd5732cbc3847ad4b24a2db925f4744b58",
+    "receiptKey": "9508e96f07fad781f5d9c1f5f00ec7dd5732cbc3847ad4b24a2db925f4744b58",
+    "checkCommand": "VERIFY_WASM_PROFILE=release npm exec --offline -- node scripts/verification-cache.mjs check all",
+    "npmCheckPassed": true,
+    "testsRepeated": false,
+    "cacheImplementationChanged": false,
+    "followup": "Sort environment entries in a separately verified tooling change if needed; no runtime invalidation or evidence rewrite."
+  },
+  "reusableReceiptConfirmed": true
+}

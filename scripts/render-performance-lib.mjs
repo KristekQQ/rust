@@ -3,8 +3,25 @@ import path from 'node:path';
 import http from 'node:http';
 import {createHash} from 'node:crypto';
 export const hash=b=>createHash('sha256').update(b).digest('hex');
-export const families=['batching','batching-heterogeneous','primitives','heterogeneous','rigid','skin','morph','fragment','effects','dynamic','rim-static','rim-active','rim-stress','arena-static','arena-active'];
+export const families=['batching','batching-heterogeneous','primitives','heterogeneous','rigid','skin','morph','fragment','effects','dynamic','rim-static','rim-active','rim-stress','rim-camera','rim-clustered','arena-static','arena-active'];
+export const scalableLoadFamilies=['batching','batching-heterogeneous','primitives','heterogeneous','rigid','skin','morph','fragment','effects','dynamic','rim-stress','rim-clustered'];
+export function fixedLoadFamily(family){return !scalableLoadFamilies.includes(family);}
 export function stats(values,budget=1000/60){const a=values.filter(Number.isFinite).sort((a,b)=>a-b);if(!a.length)return null;const q=p=>a[Math.max(0,Math.ceil(a.length*p)-1)];return {count:a.length,median:q(.5),mean:a.reduce((s,v)=>s+v,0)/a.length,p95:q(.95),p99:q(.99),max:a.at(-1),budgetMs:budget,overrunToleranceMs:.5,rawExactOverruns:a.filter(v=>v>budget).length,rawExactOverrunDurationMs:a.reduce((s,v)=>s+Math.max(0,v-budget),0),overruns:a.filter(v=>v>budget+.5).length,overrunDurationMs:a.reduce((s,v)=>s+(v>budget+.5?v-budget:0),0)};}
+// CPU histories have no invocation sequence. An unchanged history cannot prove
+// that its last value belongs to this window; cold-only scopes remain visible.
+export function cpuScopeEvidence(data){
+ const previous=new Map(Object.entries(data.boundaryStart?.profile?.cpu||{}).map(([label,value])=>[label,JSON.stringify(value)]));
+ const values=new Map([...previous.keys()].map(label=>[label,[]]));
+ for(const sample of data.samples||[])for(const [label,value] of Object.entries(sample.profile?.cpu||{})){
+  if(!values.has(label))values.set(label,[]);
+  const signature=JSON.stringify(value);
+  if(signature!==previous.get(label)&&Number.isFinite(value.lastMs))values.get(label).push(value.lastMs);
+  previous.set(label,signature);
+ }
+ return {method:'changed reported CPU histories relative to the measurement boundary',perInvocationTimesAvailable:false,
+  limitation:'Identically remeasured and untouched histories are indistinguishable; intermediate invocations are not recovered. These are sparse observed last-sample changes, not per-frame scope histograms.',
+  scopes:Object.fromEntries([...values].map(([label,samples])=>[label,{observedHistoryChanges:samples.length,freshness:samples.length?'observed-history-changes':'unproven',lastSampleMs:stats(samples)}]))};
+}
 export function geometricLoads(max){const a=[];for(let n=1;n<=max;n*=2)a.push(n);if(a.at(-1)!==max)a.push(max);return a;}
 export function parseArgs(argv){
  const o={command:argv[0]||'help',backend:'webgpu',family:'primitives',width:960,height:640,warmup:8000,sample:25000,pairs:3,order:'spatial',seed:1337,overlap:0,level:'near',load:1,maxLoad:1024,maxMemory:512,maxTime:1800,startupTimeout:30000,slowFrame:250,maxSlowFrames:20,budget:1000/60,threeRoot:null,threeRepresentation:'instanced',profiling:true,diagnostics:false,smokeMatrix:false,pixelChannel:8,pixelFraction:.001,out:'output/render-performance'};
@@ -14,7 +31,7 @@ export function parseArgs(argv){
  if(!Number.isInteger(o.width)||!Number.isInteger(o.height)||o.width<64||o.height<64||o.width>4096||o.height>4096)throw Error('Invalid render dimensions');
  if(!Number.isInteger(o.load)||o.load>o.maxLoad||!Number.isInteger(o.maxLoad)||!Number.isInteger(o.pairs)||o.pairs>20||o.maxLoad>65536||o.sample>300000||o.warmup>300000||o.maxTime>14400||o.startupTimeout>120000)throw Error('Bounds exceeded');
  if(!Number.isFinite(o.pixelChannel)||o.pixelChannel<0||o.pixelChannel>255||!Number.isFinite(o.pixelFraction)||o.pixelFraction<0||o.pixelFraction>1)throw Error('Invalid pixel tolerance');
- if(o.family==='rim-stress'&&(o.maxLoad>2048||o.load>2048))throw Error('Rim stress model budget is 2048');
+ if(['rim-stress','rim-clustered'].includes(o.family)&&(o.maxLoad>2048||o.load>2048))throw Error('Rim stress model budget is 2048');
  if(!['spatial','shuffled','alternating'].includes(o.order)||!Number.isInteger(o.seed)||o.seed<0||o.seed>0xffffffff||!Number.isFinite(o.overlap)||o.overlap<0||o.overlap>1)throw Error('Invalid order/seed/overlap');
  if(!['instanced','objects'].includes(o.threeRepresentation))throw Error('Invalid Three representation');
  if(o.threeRepresentation!=='instanced'&&!o.threeRoot)throw Error('--three-representation objects requires --three-root');
@@ -33,7 +50,7 @@ export async function serveFrozen(root,harnessRoot){
  }catch(e){errors.push(String(e));res.writeHead(404);res.end(String(e));}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
  return {root,url:'http://127.0.0.1:'+server.address().port,errors:()=>[...errors],manifest:()=>[...manifest.values()].sort((a,b)=>a.url.localeCompare(b.url)),close:()=>new Promise(r=>server.close(r)),forceClose:()=>server.closeAllConnections()};
 }
-export function summarize(data,budget){const interval=data.frames.slice(1).map((v,i)=>v.stamp-data.frames[i].stamp),keys=[...new Set(data.gpu.flatMap(g=>Object.keys(g.passesMs||{})))],work=workDeltas(data),culled=work?.gltf?.primitiveCulled?.delta??null;return {glRafGpu:data.glRafGpu?{...data.glRafGpu,samples:undefined}:null,glRafGpuMs:data.glRafGpu?.samples?.length?stats(data.glRafGpu.samples.map(s=>s.elapsedMs),budget):null,work,phaseEvidence:data.phaseBoundaries?{...data.phaseBoundaries,commandScope:'requested workload commands and observed native state at measured boundaries; fields depend on workload family',nativeGltfPrimitiveCulledDelta:culled,cullingObserved:culled===null?null:culled>0,cullingRequiredForShortSmoke:false}:null,missedFrameFraction:interval.length?interval.filter(v=>v>budget*1.5+.5).length/interval.length:null,rafInterval:stats(interval,budget),rafCallbackCpu:stats(data.frames.map(r=>r.cpu),budget),gpuPassMs:data.gpu.length?Object.fromEntries(keys.map(k=>[k,stats(data.gpu.map(g=>g.passesMs?.[k]))])):null,gpuSamples:data.gpu.length,gpuAvailable:data.gpu.length>0,cpuScopes:data.samples.at(-1)?.profile.cpu||null,sampledCpuScopeMs:Object.fromEntries([...new Set(data.samples.flatMap(s=>Object.keys(s.profile.cpu||{})))].map(k=>[k,stats(data.samples.map(s=>s.profile.cpu?.[k]?.lastMs),budget)])),gpuSupported:data.samples.at(-1)?.profile.gpu?.supported??null,gpuError:data.samples.at(-1)?.profile.gpu?.error??null,renderer:data.samples.at(-1)?.renderer||null,debug:data.samples.at(-1)?.debug||null,heapBytes:data.heapBytes??null,backend:data.backend,profiling:data.profiling,frames:data.frames.length,commands:data.commands};}
+export function summarize(data,budget){const interval=data.frames.slice(1).map((v,i)=>v.stamp-data.frames[i].stamp),keys=[...new Set(data.gpu.flatMap(g=>Object.keys(g.passesMs||{})))],work=workDeltas(data),culled=work?.gltf?.primitiveCulled?.delta??null;return {cpuScopeEvidence:cpuScopeEvidence(data),glRafGpu:data.glRafGpu?{...data.glRafGpu,samples:undefined}:null,glRafGpuMs:data.glRafGpu?.samples?.length?stats(data.glRafGpu.samples.map(s=>s.elapsedMs),budget):null,work,phaseEvidence:data.phaseBoundaries?{...data.phaseBoundaries,commandScope:'requested workload commands and observed native state at measured boundaries; fields depend on workload family',nativeGltfPrimitiveCulledDelta:culled,cullingObserved:culled===null?null:culled>0,cullingRequiredForShortSmoke:false}:null,missedFrameFraction:interval.length?interval.filter(v=>v>budget*1.5+.5).length/interval.length:null,rafInterval:stats(interval,budget),rafCallbackCpu:stats(data.frames.map(r=>r.cpu),budget),gpuPassMs:data.gpu.length?Object.fromEntries(keys.map(k=>[k,stats(data.gpu.map(g=>g.passesMs?.[k]))])):null,gpuSamples:data.gpu.length,gpuAvailable:data.gpu.length>0,cpuScopes:data.samples.at(-1)?.profile.cpu||null,sampledCpuScopeMs:Object.fromEntries([...new Set(data.samples.flatMap(s=>Object.keys(s.profile.cpu||{})))].map(k=>[k,stats(data.samples.map(s=>s.profile.cpu?.[k]?.lastMs),budget)])),gpuSupported:data.samples.at(-1)?.profile.gpu?.supported??null,gpuError:data.samples.at(-1)?.profile.gpu?.error??null,renderer:data.samples.at(-1)?.renderer||null,debug:data.samples.at(-1)?.debug||null,heapBytes:data.heapBytes??null,backend:data.backend,profiling:data.profiling,frames:data.frames.length,commands:data.commands};}
 
 export function withinCapacity(result,budget){const r=result.rafInterval,c=result.rafCallbackCpu;return !!r&&!!c&&r.median<=budget+.5&&r.p95<=budget*2+.5&&result.missedFrameFraction<=.1&&c.p95<=budget+.5;}
 

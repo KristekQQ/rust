@@ -1,5 +1,10 @@
 # Renderer performance — current state
 
+## Next renderer cycle — batch1 evidence, 2026-10-27
+
+[Current baseline state](next-render-cycle/STATE.md), [report](next-render-cycle/REPORT.md), [manifest](next-render-cycle/MANIFEST.json). Isolated baselineGitHub mainb7de3be56/releaseWASMb5cc8eba;48 profiler-off8s/25s runs on both backends, separate diagnostics and actual worker replays. No renderer optimization/deployment/publication in this batch. Strong stress drift and observed backgroundGPU load limit comparative claims; no physicalQuest or freshThree comparison. Shared8443's declared older package is separate/unreachable on its historical bound IP. Earlier delivery, branch and LAN facts below are historical; consult the new state before using them.
+
+
 ## Spatial batches and lossless records — current delivery 2026-10-27
 
 [Report, exact metrics and retained experiments](2026-10-27-spatial-batches/REPORT.md). Generic Rust depth-bounded opaque grouping replaces128-root windows; existing pose stamps cache bounds/active lists, strict full-root proof skips child plane tests, exact shared-basis instances use16B with112Bfallback, absent normal maps omit unused tangents. No game/asset-name policy or quality reduction.512stress actualcalls308→174, instance buffers−84.85%, initial rigid geometry upload−25.69%; all6repeated native stress images exact. Three-pair8s/25s self-series: GL17.281→17.721FPS(one adverse pair),WG1024 24.233→24.898(all3improve),contendedM1. Separate directGL18.505/174calls vsThree26.179/108,Three wins; AA/PBR/shadow/full-game parity remains unresolved. Depth4/107calls rejected for adverseGL throughput.

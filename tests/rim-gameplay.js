@@ -68,10 +68,14 @@ await run.execute(async test=>{
   test.assert(load.objects.length===stressCount&&load.objects.every(o=>o.exists),'stress model handles exist in actual native scene');
   const withLoad=[await pixels('left'),await pixels('right')],after=engine.debugStats().gltf.trianglesDrawn;
   test.assert(after>before,'extra stress geometry is submitted to real GPU');
-  load.dispose();frame({dt:0});
-  const changed=[];for(const [i,eye] of ['left','right'].entries())changed.push(assertChanged(withLoad[i],await pixels(eye),'visible stress fleet '+eye,20));
-  test.assert(state().stressModels===0,'stress removal restores native panel count without resetting combat');
-  window.rimStressEvidence={count:stressCount,changedPixels:changed,trianglesDrawnDelta:after-before,mode:'simulated XR, actual native renderer'};
+  // Timing replay retains the requested fleet through the actual worker cut.
+  // The ordinary correctness scenario still verifies removal and visible pixels.
+  const changed=[];if(!measureOnly){
+   load.dispose();frame({dt:0});
+   for(const [i,eye] of ['left','right'].entries())changed.push(assertChanged(withLoad[i],await pixels(eye),'visible stress fleet '+eye,20));
+   test.assert(state().stressModels===0,'stress removal restores native panel count without resetting combat');
+  }
+  window.rimStressEvidence={count:stressCount,retainedForCut:measureOnly,changedPixels:changed,trianglesDrawnDelta:after-before,mode:'simulated XR, actual native renderer'};
  }
  const z=state().player.position.z;for(let i=0;i<Math.ceil(hz*15/72);i++)frame({controllers:{left:{axes:[0,0,0,-1]}}});frame({controllers:{left:{axes:[0,0,0,0]}}});
  test.assert(state().player.position.z<z-.3,'left stick moves native player through city',{z,player:state().player});
@@ -109,7 +113,7 @@ await run.execute(async test=>{
  test.assert(state().cuts.pieces>0&&state().cuts.errors===0&&(measureOnly||state().cuts.commits>previousCommits),'worker Rust slice atomically publishes uploaded visible halves');
  cutMeasuring=false;
  test.assert(cutRequestedAt>0&&cutPublishedAt>=cutRequestedAt,'cut timing observes a real serialized job and atomic publication frame');
- window.rimCutEvidence={...cutTiming,completionMs:performance.now()-deathAt,requestToPublishMs:cutPublishedAt-cutRequestedAt,requestToPublishScope:'first nonempty rimTakeCutJob invocation through end of first simulated XR frame exposing complete uploaded pieces; excludes GPU completion/compositor',completionScope:'first observed kill through post-stroke publication check; includes observation delay',stages:cutStages,transport:window.rimCutTransportDiagnostics};
+ window.rimCutEvidence={...cutTiming,stressCount:state().stressModels,completionMs:performance.now()-deathAt,requestToPublishMs:cutPublishedAt-cutRequestedAt,requestToPublishScope:'first nonempty rimTakeCutJob invocation through end of first simulated XR frame exposing complete uploaded pieces; excludes GPU completion/compositor',completionScope:'first observed kill through post-stroke publication check; includes observation delay',stages:cutStages,transport:window.rimCutTransportDiagnostics};
  // Preserve actual renderer pixels before XR exit/disposal clears its canvas.
  // Native state asserts the motion; these snapshots make its visual stages reviewable.
  const snapshots=[];
