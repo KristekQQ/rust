@@ -13,6 +13,7 @@ jobs:
     # Trusted loopback fixtures only; the disposable runner is the isolation boundary.
     env:
       BROWSER_CI_NO_SANDBOX: '1'
+      VERIFY_WASM_PROFILE: release
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +49,7 @@ jobs:
         shard: [1, 2, 3, 4]
     env:
       BROWSER_CI_NO_SANDBOX: '1'
+      VERIFY_WASM_PROFILE: release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

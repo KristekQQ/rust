@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { verifyCutting } from '../tests/cutting-browser.mjs';
+import { verifyFox } from '../tests/fox-browser.mjs';
 import { verifyProjectiles } from '../tests/projectiles-browser.mjs';
 import { browserArgs } from './browser-options.mjs';
 import { parseShard, partitionCases, suiteTimeout } from './browser-suite-plan.mjs';
@@ -48,21 +49,21 @@ const suites = [
     {name:"scene-appearance",path:"tests/scene-appearance.html",status:"#result"},
     {name:"antialias",path:"tests/antialias.html",status:"#result"},
     {name:"rim-refresh",path:"examples/rim/",interaction:"rim-refresh"},
-    {name:"rim-device-logs",path:"tests/rim-device-logs.html",status:"#device-result",xrReport:true},
-    {name:"rim-gameplay-120",path:"tests/rim-gameplay.html?hz=120",status:"#result",xrReport:true},
+    {name:"rim-device-logs",path:"tests/rim-device-logs.html",status:"#device-result",xrReport:true,softwareTimeoutMs:600000},
+    {name:"rim-gameplay-120",path:"tests/rim-gameplay.html?hz=120",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-cut-scheduler-control",path:"tests/rim-gameplay.html?omitXRHook=1",status:"#result",backends:["webgl"],xrReport:true},
     {name:"rim-stress-xr",path:"tests/rim-gameplay.html?stress=32",status:"#result",xrReport:true},
-    {name:"rim-spatial-batches-xr",path:"tests/rim-gameplay.html?stress=256",status:"#result",xrReport:true},
-    {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true},
+    {name:"rim-spatial-batches-xr",path:"tests/rim-gameplay.html?stress=256",status:"#result",xrReport:true,softwareTimeoutMs:600000},
+    {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
     { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
     { name: 'gltf-material-cache', path: 'tests/gltf-material-cache.html', status: '#result' },
-    { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify' },
+    { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
     { name: 'neon-robot', path: 'examples/neon-robot/?verify=1', status: '#result', button: '#verify' },
     { name: 'postprocess-fusion', path: 'tests/postprocess-fusion.html', status: '#result' },
     { name: 'cynatar', path: 'examples/cynatar/?verify=1', status: '#result', button: '#verify' },
     { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },
-    { name: 'arena-minute', path: 'tests/arena-minute.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'arena-minute', path: 'tests/arena-minute.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:600000 },
     { name: 'arena-presets', path: 'tests/arena-presets.html', status: '#result', backends:['webgl'] },
     { name: 'arena-waves', path: 'tests/arena-waves.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena-benchmark', path: 'tests/neon-arena-benchmark.html', status: '#result', backends:['webgl'], xrReport:true },
@@ -70,10 +71,10 @@ const suites = [
     { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
-    { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true },
-    { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify' },
+    { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:600000 },
+    { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
     { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },
-    { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true },
+    { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true, softwareTimeoutMs:600000 },
     { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },
     { name: 'webxr', path: 'tests/webxr.html', status: '#result', xrReport: true },
     { name: 'webxr-webgpu', path: 'tests/webxr-webgpu.html', status: '#result', backends: ['webgpu'], xrReport: true },
@@ -217,180 +218,6 @@ async function verifyCulling(page) {
     });
     if (final.fps <= 0 || final.frameMs <= 0) throw new Error(`Slow scene FPS missing: ${JSON.stringify(final)}`);
     return `PASS: 10k static BVH, ${bvh.visible} visible / ${bvh.objectTests} object tests; Rust HUD F3/cached/off/texture pixels`;
-}
-async function verifyFox(page) {
-    await page.waitForFunction(() => document.documentElement.dataset.rendererBackend);
-    await verifyHud(page);
-    const read = () => page.evaluate(async () => {
-        const { engine, fox } = await import('./main.js');
-        const info = fox.info;
-        return { ...engine.characterState(), clip: info.animations[info.playback?.clip]?.name };
-    });
-    const assert = (condition, message) => { if (!condition) throw new Error(message); };
-    const frameHash = () => page.evaluate(async () => {
-        const { capturePixels, assertForeground } = await import('../../tests/pixels.js');
-        const image = await capturePixels(document.querySelector('#gpu-canvas'));
-        assertForeground(image, 'Fox example');
-        let hash = 2166136261;
-        for (const value of image.data) hash = Math.imul(hash ^ value, 16777619);
-        return hash;
-    });
-    const distance = (a, b) => Math.hypot(b.position[0] - a.position[0], b.position[2] - a.position[2]);
-    const canvas = await page.$('#gpu-canvas');
-    const waitGameState = async (playing, label) => {
-        try {
-            await page.waitForFunction(active => active
-                ? document.pointerLockElement === document.querySelector('#gpu-canvas') && document.fullscreenElement === document.querySelector('#gpu-canvas')
-                : !document.pointerLockElement && !document.fullscreenElement,
-            { timeout: 10000 }, playing);
-        } catch {
-            const state = await page.evaluate(() => ({
-                lock: document.pointerLockElement?.id, fullscreen: document.fullscreenElement?.id,
-                focused: document.hasFocus(), status: document.querySelector('#status')?.textContent,
-            }));
-            throw new Error(`${label}: ${JSON.stringify(state)}`);
-        }
-    };
-    const enterGame = async () => {
-        const bounds = await canvas.boundingBox();
-        await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
-        await waitGameState(true, 'Click enters fullscreen and pointer lock');
-        await delay(120);
-    };
-    await enterGame();
-    const box = await canvas.boundingBox();
-    const spawn = await read();
-    assert(spawn.clip === 'Survey' && !spawn.moving && spawn.grounded, 'Fox starts idle on solid ground');
-    await page.keyboard.down('w');
-    await delay(750);
-    const blocked = await read();
-    assert(blocked.position[2] >= 1.1 && blocked.position[2] <= 1.201, 'Solid platform blocks forward movement at its front face');
-    await delay(250);
-    assert(distance(blocked, await read()) < 0.01, 'Holding W cannot walk through a platform');
-    await page.keyboard.down('Space');
-    await delay(220);
-    const airborne = await read();
-    assert(airborne.position[1] > 0.5 && !airborne.grounded && airborne.verticalVelocity > 0, 'Space produces an airborne upward jump');
-    await delay(800);
-    const landed = await read();
-    assert(Math.abs(landed.position[1] - 0.6) < 0.01 && landed.grounded, 'Fox lands on first platform instead of passing through it');
-    await delay(250);
-    assert(Math.abs((await read()).position[1] - 0.6) < 0.01, 'Holding Space does not auto-jump on landing');
-    await page.evaluate(async () => (await import('./main.js')).engine.set_simulation_paused(true));
-    await delay(120);
-    await page.evaluate(async () => (await import('./main.js')).engine.set_simulation_paused(false));
-    await page.keyboard.down('Space'); // Trusted repeat=true: this key is still held.
-    await delay(220);
-    const resumed = await read();
-    assert(Math.abs(resumed.position[1] - 0.6) < 0.01 && resumed.grounded, 'Space held across pause cannot become a fresh jump');
-    await page.keyboard.up('Space');
-    await page.keyboard.down('w');
-    await page.keyboard.down('d');
-    await delay(250);
-    const sliding = await read();
-    assert(sliding.position[0] - landed.position[0] > 0.2 && sliding.position[2] <= 3.901, 'Diagonal movement slides along the next blocked platform');
-    await page.keyboard.up('d');
-    await page.keyboard.press('Space');
-    await delay(1100);
-    const higher = await read();
-    assert(Math.abs(higher.position[1] - 1.2) < 0.01 && higher.grounded, 'A fresh jump reaches the higher second platform');
-    await page.keyboard.up('w');
-    // Reset through the same keyboard command as the player, then use an open lane.
-    await page.keyboard.press('r');
-    await delay(120);
-    const reset = await read();
-    assert(distance(reset, spawn) < 0.01 && Math.abs(reset.position[1]) < 0.01, 'R resets player and physics to the spawn');
-    await page.keyboard.down('a');
-    await delay(1200);
-    await page.keyboard.up('a');
-    await delay(120);
-    const initial = await read();
-    const initialFrame = await frameHash();
-    await page.keyboard.down('w');
-    await delay(500);
-    const walking = await read();
-    await page.keyboard.up('w');
-    await delay(120);
-    assert(distance(initial, walking) > 0.3 && walking.clip === 'Walk' && walking.moving, 'W moves real model and selects Walk');
-    const stopped = await read();
-    await delay(180);
-    const idle = await read();
-    assert(distance(stopped, idle) < 0.01 && idle.clip === 'Survey', 'Key release stops motion and selects idle');
-    await page.keyboard.down('Shift');
-    await page.keyboard.down('w');
-    await delay(500);
-    const running = await read();
-    await page.keyboard.up('w');
-    await page.keyboard.up('Shift');
-    await delay(120);
-    assert(running.running && running.clip === 'Run' && distance(idle, running) > distance(initial, walking) * 1.3, 'Shift runs faster and selects Run');
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2, { steps: 8 });
-    const turned = await read();
-    await page.keyboard.down('w');
-    await delay(450);
-    const afterTurn = await read();
-    assert(afterTurn.position[0] - turned.position[0] > 0.1, 'Mouse moving right turns right without holding any button');
-    assert(await frameHash() !== initialFrame, 'Real canvas pixels change after movement and mouse steering');
-    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
-    await waitGameState(false, 'Blur releases fullscreen and pointer lock');
-    await delay(120);
-    const blurred = await read();
-    await delay(180);
-    assert(distance(blurred, await read()) < 0.01, 'Blur releases held movement keys');
-    await page.keyboard.up('w');
-    await enterGame();
-    await page.keyboard.down('w');
-    await delay(160);
-    await page.evaluate(async () => {
-        const { engine } = await import('./main.js');
-        engine.set_camera_mode('free');
-    });
-    await delay(120);
-    const released = await page.evaluate(async () => {
-        const { engine, fox } = await import('./main.js');
-        const info = fox.info;
-        return { controller: engine.characterState(), clip: info.animations[info.playback?.clip]?.name };
-    });
-    assert(released.controller === null && released.clip === 'Survey', 'Changing camera releases control and the Walk animation');
-    await page.keyboard.up('w');
-    // Leave the example in its intended chase-camera mode for capture.
-    await page.evaluate(async () => {
-        const { engine, fox } = await import('./main.js');
-        engine.controlCharacter(fox, { animations: { idle: 'Survey', walk: 'Walk', run: 'Run' } });
-    });
-    await page.keyboard.down('w');
-    await delay(160);
-    await page.evaluate(async () => {
-        const { engine, fox } = await import('./main.js');
-        engine.set_camera_mode('free');
-        fox.playAnimation('Walk', { speed: 0.5 });
-    });
-    await delay(120);
-    const manual = await page.evaluate(async () => {
-        const { fox } = await import('./main.js');
-        const info = fox.info;
-        return { clip: info.animations[info.playback?.clip]?.name, speed: info.playback?.speed };
-    });
-    assert(manual.clip === 'Walk' && manual.speed === 0.5, 'Detached controller preserves an explicit same-clip animation command');
-    await page.keyboard.up('w');
-    await page.evaluate(async () => {
-        const { engine, fox } = await import('./main.js');
-        engine.controlCharacter(fox, { animations: { idle: 'Survey', walk: 'Walk', run: 'Run' } });
-    });
-    await delay(120);
-    await page.keyboard.press('Escape');
-    await waitGameState(false, 'Escape releases fullscreen and pointer lock');
-    const escaped = await read();
-    await page.keyboard.down('w');
-    await delay(180);
-    assert(distance(escaped, await read()) < 0.01, 'Escape pauses movement while cursor is released');
-    await page.keyboard.up('w');
-    await delay(600);
-    await enterGame();
-    await page.keyboard.press('r');
-    await delay(120);
-    return 'PASS: solid obstacles, wall sliding, gravity, jump/landing on two platforms, R reset, fullscreen/mouse/Escape, clips and lifecycle';
 }
 let interrupted = false;
 const report = { started: new Date().toISOString(), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), software, node: process.execPath, architecture: process.arch, shard, plan: executionPlan.map(({backend,suite}) => ({backend,suite:suite.name})), results: [] };
@@ -617,7 +444,19 @@ try {
                     const apple = shootApple();
                     if (!apple) throw new Error('Apple launcher failed');
                     const y = apple.meshInfo.position[1];
-                    await new Promise(resolve => setTimeout(resolve, 250));
+                    await new Promise((resolve, reject) => {
+                        let frame;
+                        const timer = setTimeout(() => {
+                            cancelAnimationFrame(frame);
+                            reject(new Error('Rust projectile did not rise within 15 seconds'));
+                        }, 15000);
+                        const sample = () => {
+                            if (apple.exists && apple.meshInfo.position[1] > y + .3) {
+                                clearTimeout(timer); resolve();
+                            } else frame = requestAnimationFrame(sample);
+                        };
+                        frame = requestAnimationFrame(sample);
+                    });
                     if (apple.meshInfo.position[1] <= y + 0.3) throw new Error('Rust projectile did not rise');
                     assertForeground(await capturePixels(document.querySelector('#gpu-canvas')), 'flying apple preview');
                     // This example deliberately requires WebGL, even when desktop WebGPU exists.
@@ -627,7 +466,7 @@ try {
             }
             else if (suite.interaction === 'cutting') result.text = await verifyCutting(page);
             else if (suite.interaction === 'projectiles') result.text = await verifyProjectiles(page);
-            else if (suite.interaction === 'fox') result.text = await verifyFox(page);
+            else if (suite.interaction === 'fox') result.text = await verifyFox(page, verifyHud);
             else if (suite.interaction === 'culling') result.text = await verifyCulling(page);
             else {
                 await page.waitForFunction(selector => /^(PASS|FAIL):/.test(document.querySelector(selector)?.textContent?.trim() || ''), { polling: suite.name.startsWith('rim-') ? 100 : suite.xrReport ? 'raf' : 100 }, suite.status);

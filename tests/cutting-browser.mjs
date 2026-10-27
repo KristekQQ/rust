@@ -63,7 +63,9 @@ export async function verifyCutting(page){
     await page.mouse.move(box.width*.4,box.height*.47);await page.mouse.down({button:'right'});await page.mouse.move(box.width*.5,box.height*.53,{steps:8});await page.mouse.up({button:'right'});await frames();
     state=await read();assert(cameraDistance(state.camera,initialCamera)>1,'RMB changes camera');assert.equal(state.cuts,0);
     const orbited=state.camera;await page.mouse.wheel({deltaY:180});await frames();assert(cameraDistance((await read()).camera,orbited)>.5,'Wheel zoom changes distance');
-    const panned=(await read()).camera;await page.keyboard.down('w');await new Promise(r=>setTimeout(r,180));await page.keyboard.up('w');await frames();assert(cameraDistance((await read()).camera,panned)>.1,'WASD moves through space');
+    const panned=(await read()).camera;await page.keyboard.down('w');
+    await page.waitForFunction(before=>Math.hypot(...JSON.parse(window.render_game_to_text()).camera.position.map((v,i)=>v-before.position[i]))>.1,{polling:'raf'},panned);
+    await page.keyboard.up('w');await frames();assert(cameraDistance((await read()).camera,panned)>.1,'WASD moves through space');
     const preResize=(await read()).camera;await page.setViewport({width:840,height:620,deviceScaleFactor:1});await frames();assert(cameraDistance((await read()).camera,preResize)<.001,'Resize preserves user camera');await page.setViewport({width:960,height:640,deviceScaleFactor:1});await frames();
     await page.click('#mode-camera');box=await(await page.$('#gpu-canvas')).boundingBox();const oldCamera=(await read()).camera;
     await page.mouse.move(box.width*.4,box.height*.5);await page.mouse.down();await page.mouse.move(box.width*.45,box.height*.5,{steps:6});await page.mouse.up();await frames();assert(cameraDistance((await read()).camera,oldCamera)>.1,'Camera mode primary drag');assert.equal((await read()).cuts,0);

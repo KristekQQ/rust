@@ -56,7 +56,9 @@ export async function verifyEnemies(engine,canvas,front,rear){
                             assertChanged(startStrike,endStrike,`${slug}/${name} weapon strike advances`,35);
                         }
                         if(name==='Run'){
-                            enemy.playAnimation('Run',{loop:true}).seekAnimation(duration-.03);
+                            // Cross the endpoint on the native clock without racing slow GPU frames
+                            // through most of the next loop before its phase is inspected.
+                            enemy.playAnimation('Run',{loop:true,speed:.001}).seekAnimation(duration-.00001);
                             await frames(12);
                             check(enemy.info.playback?.playing===true,`${slug}/Run loops after its endpoint`);
                             check((enemy.info.playback?.time??duration)<.4,`${slug}/Run wraps to its start`);

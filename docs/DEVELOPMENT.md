@@ -64,13 +64,15 @@ Results, browser version, source/WASM and authored SDK/test/example hashes, and 
 
 For machine-specific executables, set `BROWSER_NODE` / `BROWSER_EXECUTABLE` or local Git options `verification.node` / `verification.browser` to absolute executable paths. These overrides are not committed or inherited by CI. The Node override also works when npm itself uses an Intel Node on an Apple Silicon Mac.
 
-GitHub CI builds/tests native code and WASM once, including a software-WebGL smoke
+GitHub CI builds/tests native code and release WASM once, including a software-WebGL smoke
 case, then transfers the matching `pkg/` artifact to four browser jobs. Each runs
 `test:browser -- --backend webgl --software --shard index/4`; partitions apply
 after backend filtering and cover the complete registry without duplication.
 Reports record the planned cases, shard, per-case budget and compact progress so
 cancelled runs retain useful evidence. The default remains 90 seconds per case;
-only `rim-three-stress` and `monster-room-xr` use 600 seconds under `--software`.
+observed heavy suites declare a 600-second `softwareTimeoutMs` budget in the registry.
+Producer and consumer jobs both set `VERIFY_WASM_PROFILE=release` so software browser
+acceptance uses the same optimized profile as local release verification.
 An explicit `--timeout` overrides that policy. Hardware/local full-push coverage
 and all scene, image and XR assertions are unchanged.
 
