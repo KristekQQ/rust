@@ -1,0 +1,41 @@
+{
+  "parent": "87447ea5070d5f0f580fbabbf8cbeec9980d41ae",
+  "target": "origin/main",
+  "nativePassed": 419,
+  "nativeIgnored": 2,
+  "nativeFailed": 0,
+  "browserTotal": 137,
+  "browserStatuses": {
+    "PASS": 137
+  },
+  "browserByBackend": {
+    "webgpu": 50,
+    "webgl": 87
+  },
+  "receipt": {
+    "passed": true,
+    "key": "7c001715b032144579674fb5226db175c178814d58e5afe7dd9b3c52a88e9566",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+      "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "0f9e29ee62be44b4395067b0a98dbcc350902c75bb3d44166410716a07845c8f",
+    "finished": "2026-10-27T10:00:07.649Z"
+  },
+  "regressionBefore": "Failed on case7: cached fade0.99999994 rather than1.0",
+  "regressionAfter": "All22visibility tests PASS",
+  "independentReview": "No material findings; no reviewer builds or edits",
+  "visibilitySha256": "0cddfb64a1b4ffa1b3a528a59cd411ad93c499e341989ed55edbb50091f44705",
+  "browserReportSha256": "702cca2cec991d59375e0fcf1f6d7b888d155a33bb0fbef3897e1fbbd0d10566",
+  "sourceDumpSha256": "64577d859d29fa85584f0b56b276838643a2da210e14bf32e5dd8ea7f9973667",
+  "linuxCI": "New-run outcome pending publication"
+}
