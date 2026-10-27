@@ -632,5 +632,35 @@
     "deviceOrdinaryBothBackendsPassed": true,
     "independentSourceReview": "No material findings",
     "newRemoteCI": "Pending publication; not inferred from local checks"
+  },
+  "post728CharacterInputRepair": {
+    "base": "7288212d71bde5c74a1ad73391c71f7e0f4b5064",
+    "priorRemoteRun": 40521136559,
+    "priorSoftwarePassed": 86,
+    "priorSoftwareFailed": [
+      "fox-control"
+    ],
+    "sourceHashes": {
+      ".github/workflows/verify.yml": "2fc370c13c55ea5b764f5eaaee205bc70d670d7e3a65ea9fc90dbe54820fda48",
+      "scripts/test-browser.mjs": "75dc86b2aac621c08474528548799a21b466fcd6d8ff83718799de6ea1091ab4",
+      "tests/fox-browser.mjs": "83771e228a5bb845fc5bde6c7a3bce3a8600deed86c97a1bb363c07f454389d5"
+    },
+    "rendererBuildUnchanged": true,
+    "nativePassed": 419,
+    "nativeIgnored": 2,
+    "fullBrowserPassed": 137,
+    "webgpuPassed": 50,
+    "webglPassed": 87,
+    "uniqueBrowserCases": 137,
+    "receiptKey": "92659b6ddfdd10fea0b8def7c3744281c9e236d610bb09212223434a4035306c",
+    "finished": "2026-10-27T15:21:13.327Z",
+    "focusedFoxOrdinaryBothBackendsPassed": true,
+    "focusedFoxSoftware350msPerRafPassed": true,
+    "independentSourceReview": "No material findings in contact/input/motion sampler and CI headroom lines",
+    "causeEvidence": "Puppeteer concurrent move/down/up is source-proven; exact CI coalescing remains an inference. Unequal motion baseline windows were reproduced locally.",
+    "neonXrMeasuredAdjacentCaseSeconds": 1137.716519,
+    "neonXrSoftwareBudgetMs": 1800000,
+    "softwareJobBudgetMinutes": 45,
+    "newRemoteCI": "Pending publication; not inferred from local checks"
   }
 }

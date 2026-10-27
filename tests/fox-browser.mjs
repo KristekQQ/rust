@@ -26,15 +26,17 @@ export async function verifyFox(page, verifyHud) {
     const observeCharacter = async expected => {
         // Install and acknowledge the sampler before injecting the input. CDP
         // polling setup can itself miss a short airborne phase on slow frames.
-        const probe = await page.evaluateHandle(async ({minY, atY, maxX, grounded, upward, pause}) => {
+        const probe = await page.evaluateHandle(async ({minY, atY, atZ, maxX, grounded, moving, upward, pause}) => {
             const {engine} = await import('./main.js');
             const probe = {state:null, frame:0};
             const sample = () => {
                 const state = engine.characterState();
                 if (state && state.grounded === grounded
+                    && (moving === undefined || state.moving === moving)
                     && (maxX === undefined || state.position[0] <= maxX)
                     && (minY === undefined || state.position[1] > minY)
                     && (atY === undefined || Math.abs(state.position[1] - atY) < .01)
+                    && (atZ === undefined || Math.abs(state.position[2] - atZ) < .001)
                     && (!upward || state.verticalVelocity > 0)) {
                     probe.state = state;
                     if (pause) engine.set_simulation_paused(true);
@@ -54,6 +56,53 @@ export async function verifyFox(page, verifyHud) {
             } finally {
                 if (handle) await handle.dispose();
                 await probe.evaluate(probe => cancelAnimationFrame(probe.frame));
+                await probe.dispose();
+            }
+        };
+    };
+    const observeMovement = async duration => {
+        // Capture both endpoints in the page: CDP command latency must not add
+        // unmeasured movement to one side of the walk/run speed comparison.
+        const probe = await page.evaluateHandle(async duration => {
+            const {engine, fox} = await import('./main.js');
+            const snapshot = () => {
+                const info = fox.info;
+                return {...engine.characterState(), clip:info.animations[info.playback?.clip]?.name};
+            };
+            const probe = {start:null, end:null, elapsed:0, frames:0, frame:0};
+            let previous;
+            const step = () => {
+                const now = performance.now();
+                probe.elapsed += Math.min(Math.max(now - previous, 0), 100);
+                previous = now;
+                probe.frames++;
+                if (probe.elapsed >= duration) probe.end = snapshot();
+                else probe.frame = requestAnimationFrame(step);
+            };
+            const start = event => {
+                if (event.code !== 'KeyW' || !event.isTrusted || probe.start) return;
+                probe.start = snapshot();
+                previous = performance.now();
+                document.removeEventListener('keydown', start, true);
+                probe.frame = requestAnimationFrame(step);
+            };
+            document.addEventListener('keydown', start, true);
+            probe.cancel = () => {
+                document.removeEventListener('keydown', start, true);
+                cancelAnimationFrame(probe.frame);
+            };
+            return probe;
+        }, duration);
+        return async () => {
+            let handle;
+            try {
+                handle = await page.waitForFunction(probe => probe.end, {polling:'raf'}, probe);
+                return await probe.evaluate(({start,end,elapsed,frames}) => ({start,end,elapsed,frames}));
+            } catch (error) {
+                throw new Error(`Movement wait ${duration}ms: ${JSON.stringify(await read())}`, {cause:error});
+            } finally {
+                if (handle) await handle.dispose();
+                await probe.evaluate(probe => probe.cancel());
                 await probe.dispose();
             }
         };
@@ -92,6 +141,10 @@ export async function verifyFox(page, verifyHud) {
     };
     const enterGame = async () => {
         const bounds = await canvas.boundingBox();
+        // Puppeteer click dispatches move/down/up concurrently. Deliver the
+        // absolute cursor move while unlocked before the click captures it.
+        await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
         await waitGameState(true, 'Click enters fullscreen and pointer lock');
         await delay(120);
@@ -100,12 +153,19 @@ export async function verifyFox(page, verifyHud) {
     const box = await canvas.boundingBox();
     const spawn = await read();
     assert(spawn.clip === 'Survey' && !spawn.moving && spawn.grounded, 'Fox starts idle on solid ground');
+    const initialCamera = await page.evaluate(async () => (await import('./main.js')).engine.cameraViewState());
+    assert(Math.abs(initialCamera.position[0] - spawn.position[0]) < .001 && initialCamera.position[2] < spawn.position[2],
+        `Entry cursor movement preserves the initial forward direction: ${JSON.stringify({spawn,initialCamera})}`);
+    // The first platform starts at z=2; the character's .8 half-depth makes
+    // z=1.2 its contact plane. Sample actual stopped contact before comparing
+    // continued held input: a RAF duration alone does not establish contact.
+    const contactProbe = await observeCharacter({atZ:1.2, grounded:true, moving:false});
     await page.keyboard.down('w');
-    await delay(750);
-    const blocked = await read();
+    const blocked = await contactProbe();
     assert(blocked.position[2] >= 1.1 && blocked.position[2] <= 1.201, 'Solid platform blocks forward movement at its front face');
     await delay(250);
-    assert(distance(blocked, await read()) < 0.01, 'Holding W cannot walk through a platform');
+    const heldAgainstPlatform = await read();
+    assert(distance(blocked, heldAgainstPlatform) < 0.01, `Holding W cannot walk through a platform: ${JSON.stringify({blocked,heldAgainstPlatform})}`);
     const airborneProbe = await observeCharacter({minY:.5, grounded:false, upward:true});
     const landedProbe = await observeCharacter({atY:.6, grounded:true});
     await page.keyboard.down('Space');
@@ -148,22 +208,26 @@ export async function verifyFox(page, verifyHud) {
     await delay(120);
     const initial = await read();
     const initialFrame = await frameHash();
+    const walkingProbe = await observeMovement(500);
     await page.keyboard.down('w');
-    const walking = await delay(500);
+    const walkMeasurement = await walkingProbe();
+    const walking = walkMeasurement.end;
     await page.keyboard.up('w');
     await delay(120);
-    assert(distance(initial, walking) > 0.3 && walking.clip === 'Walk' && walking.moving, `W moves real model and selects Walk: ${JSON.stringify({initial,walking})}`);
+    assert(distance(walkMeasurement.start, walking) > 0.3 && walking.clip === 'Walk' && walking.moving, `W moves real model and selects Walk: ${JSON.stringify(walkMeasurement)}`);
     const stopped = await read();
     await delay(180);
     const idle = await read();
     assert(distance(stopped, idle) < 0.01 && idle.clip === 'Survey', 'Key release stops motion and selects idle');
     await page.keyboard.down('Shift');
+    const runningProbe = await observeMovement(500);
     await page.keyboard.down('w');
-    const running = await delay(500);
+    const runMeasurement = await runningProbe();
+    const running = runMeasurement.end;
     await page.keyboard.up('w');
     await page.keyboard.up('Shift');
     await delay(120);
-    assert(running.running && running.clip === 'Run' && distance(idle, running) > distance(initial, walking) * 1.3, `Shift runs faster and selects Run: ${JSON.stringify({idle,running,walkDistance:distance(initial,walking)})}`);
+    assert(running.running && running.clip === 'Run' && distance(runMeasurement.start, running) > distance(walkMeasurement.start, walking) * 1.3, `Shift runs faster and selects Run: ${JSON.stringify({walkMeasurement,runMeasurement})}`);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2, { steps: 8 });
     const turned = await read();

@@ -69,8 +69,10 @@ case, then transfers the matching `pkg/` artifact to four browser jobs. Each run
 `test:browser -- --backend webgl --software --shard index/4`; partitions apply
 after backend filtering and cover the complete registry without duplication.
 Reports record the planned cases, shard, per-case budget and compact progress so
-cancelled runs retain useful evidence. The default remains 90 seconds per case;
-observed heavy suites declare a 600-second `softwareTimeoutMs` budget in the registry.
+cancelled runs retain useful evidence. The default remains 90 seconds per case.
+Named heavy suites declare larger `softwareTimeoutMs` budgets in the registry,
+up to 1800 seconds for the full neon-arena XR scenario; each browser job has a
+finite 45-minute limit. These upper bounds preserve the complete workload.
 Producer and consumer jobs both set `VERIFY_WASM_PROFILE=release` so software browser
 acceptance uses the same optimized profile as local release verification.
 An explicit `--timeout` overrides that policy. Hardware/local full-push coverage
