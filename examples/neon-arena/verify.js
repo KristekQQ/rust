@@ -236,9 +236,9 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         const demo=previewCut(1,false); // Verify the alpha material at full diagnostic size.
         // Freeze the depth probe pose before wall-clock feedback animation moves/rotates it.
         const cutPoses=new Map(demo.report.pieces.map(piece=>[piece.id,piece.meshInfo]));
-        // Warm the first-use texture pipeline while native effect time is frozen.
+        // Native spawn initializes the real feedback at t=0. Keep that pose paused
+        // while warming textures: five slow CI frames can outlive the 0.65s burst.
         await wait();
-        engine.set_simulation_paused(false);await wait();engine.set_simulation_paused(true);
         // An oblique view proves the flat disc surface, not only its edge-on silhouette.
         engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         const hitFrame=await capturePixels(canvas);

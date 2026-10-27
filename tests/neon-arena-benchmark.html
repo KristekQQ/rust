@@ -15,6 +15,11 @@ await run.execute(async test=>{
     app=await import('../examples/neon-arena/main.js');
     const {engine,benchmarkState}=app;
     document.getElementById('benchmark').checked=true;
+    // Combo configuration changes both stock labels to "+0". Native mesh-font
+    // children are materialized by rendering, not by the configuration command.
+    // Complete that initial render before measuring benchmark-only allocations.
+    for(let frame=0;frame<2;frame++)await new Promise(requestAnimationFrame);
+    test.assert(app.world.stockScorePanels.every(panel=>panel.font3DInfo.text==='+0'&&panel.font3DInfo.glyphCount===2),'stock label glyphs initialized before allocation baseline');
     const before=engine.scene.objectCount;
     await engine.xr.enter();
     await sim.frame({dt:0,head:{position:[0,1.55,0],orientation:[-.25,0,0,.9682458]},controllers:{}});

@@ -52,7 +52,7 @@ const suites = [
     {name:"rim-device-logs",path:"tests/rim-device-logs.html",status:"#device-result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-gameplay-120",path:"tests/rim-gameplay.html?hz=120",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-cut-scheduler-control",path:"tests/rim-gameplay.html?omitXRHook=1",status:"#result",backends:["webgl"],xrReport:true},
-    {name:"rim-stress-xr",path:"tests/rim-gameplay.html?stress=32",status:"#result",xrReport:true},
+    {name:"rim-stress-xr",path:"tests/rim-gameplay.html?stress=32",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-spatial-batches-xr",path:"tests/rim-gameplay.html?stress=256",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
@@ -71,10 +71,10 @@ const suites = [
     { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
-    { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:600000 },
+    { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:1200000 },
     { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
     { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },
-    { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true, softwareTimeoutMs:600000 },
+    { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true, softwareTimeoutMs:1200000 },
     { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },
     { name: 'webxr', path: 'tests/webxr.html', status: '#result', xrReport: true },
     { name: 'webxr-webgpu', path: 'tests/webxr-webgpu.html', status: '#result', backends: ['webgpu'], xrReport: true },
@@ -161,10 +161,29 @@ async function verifyHud(page, simpleScene = false) {
         return bright;
     });
     if(drawRow<100)throw new Error('Draw-call HUD row has no glyph pixels');
-    await delay(800);
-    const second = await stats();
-    if (second.hudFrames <= first.hudFrames || second.hudRefreshes - first.hudRefreshes > 4
-        || second.hudRefreshes >= second.hudFrames) throw new Error('HUD text must be cached between refreshes');
+    // Cache cadence depends on native frame dt. SwiftShader can take >250ms per
+    // frame, legitimately refreshing every frame. Render six real frames while
+    // controlling only this short timing probe; keep pixel and draw checks real.
+    const cadence = await page.evaluate(async () => {
+        const {engine}=await import('./main.js');
+        const original=Object.getOwnPropertyDescriptor(performance,'now');
+        let time=performance.now();
+        Object.defineProperty(performance,'now',{configurable:true,value:()=>time});
+        try {
+            const before=engine.debugStats();
+            for(let frame=0;frame<6;frame++) {
+                time+=16;
+                await new Promise(requestAnimationFrame);
+            }
+            return {before,after:engine.debugStats()};
+        } finally {
+            if(original)Object.defineProperty(performance,'now',original);
+            else delete performance.now;
+        }
+    });
+    const {before:cacheBefore,after:cacheAfter}=cadence;
+    if (cacheAfter.hudFrames <= cacheBefore.hudFrames || cacheAfter.hudRefreshes - cacheBefore.hudRefreshes > 1
+        || cacheAfter.hudRefreshes >= cacheAfter.hudFrames) throw new Error('HUD text must be cached between refreshes: '+JSON.stringify(cadence));
     await page.evaluate(async () => (await import('./main.js')).engine.set_output_mode('texture'));
     if (await corner() < 150) throw new Error('HUD missing from texture output');
     if(simpleScene && (await stats()).drawCalls !== 3)throw new Error('Texture presentation must add exactly one draw');

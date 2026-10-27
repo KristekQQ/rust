@@ -600,5 +600,37 @@
     "matchedSlow350msSoftwareExitCode": 0,
     "rendererOrGameplayChanges": false,
     "independentReview": "no material findings; camera120Hz finding resolved by actual-distance wait"
+  },
+  "post607TimingRepair": {
+    "base": "607f917883c2d42699ed7d6751db80fe350ee1ce",
+    "priorRemoteRun": 40514439598,
+    "priorSoftwarePassed": 80,
+    "priorSoftwareFailed": 7,
+    "sourceHashes": {
+      "examples/neon-arena/verify.js": "389727c11958ac0a4367fb6bf099c82ac8824dbbc3f9fe90057e89627a0e1676",
+      "scripts/test-browser.mjs": "9138dc2b6437219af1a14082c90544832f454f6f35097d28544910df42e32ac4",
+      "tests/neon-arena-benchmark.html": "181089f477a521d78157d854cf378e1dac73cbdb2e03155ac99c62f661377c99",
+      "tests/rim-device-logs.js": "2fb650028c9081d5f237c79282c0308aa4bca177a0146b8a0164d98c37615c22"
+    },
+    "rendererBuildUnchanged": true,
+    "nativePassed": 419,
+    "nativeIgnored": 2,
+    "fullBrowserPassed": 137,
+    "webgpuPassed": 50,
+    "webglPassed": 87,
+    "receiptKey": "940fc4e009de7f00d538f9ea6e7b2bbbe23e66e54db3c219b1d52f1b241e2fad",
+    "finished": "2026-10-27T14:26:01.626Z",
+    "focusedSoftware": {
+      "suites": [
+        "rim-device-logs",
+        "neon-arena-benchmark",
+        "neon-arena",
+        "culling"
+      ],
+      "allPassed": true
+    },
+    "deviceOrdinaryBothBackendsPassed": true,
+    "independentSourceReview": "No material findings",
+    "newRemoteCI": "Pending publication; not inferred from local checks"
   }
 }

@@ -34,15 +34,16 @@ await run.execute(async test=>{
  const enemy=state().enemies[0];input({teleport:[enemy.position[0],0,enemy.position[2]+1.05]});
  frame({right:{position:[.6,1.4,-.4],buttons:[1,0,0,0,0,0]}});
  // The same 1.5m/s sweep failed the previous 1.8cm-per-frame gate at90Hz.
- for(let i=1;i<=72;i++)frame({right:{position:[.6-i/60,1.4,-.4]}});
+ // Real workers need browser tasks between simulated frames, just as in XR.
+ for(let i=1;i<=72;i++){frame({right:{position:[.6-i/60,1.4,-.4]}});await new Promise(r=>setTimeout(r,0));}
  test.assert(state().enemies.find(e=>e.id===enemy.id)?.hp===50,'authored game accepts a continuous 1.5m/s swing at90Hz');
  for(let i=0;i<32;i++)frame({right:{position:[-.6,1.4,-.4]}});
  const target=state().enemies.find(e=>e.id===enemy.id);input({teleport:[target.position[0],0,target.position[2]+1.05]});
  frame({right:{position:[-.6,1.4,-.4]}});
- for(let i=1;i<=72;i++)frame({right:{position:[-.6+i/60,1.4,-.4]}});
+ for(let i=1;i<=72;i++){frame({right:{position:[-.6+i/60,1.4,-.4]}});await new Promise(r=>setTimeout(r,0));}
  test.assert(state().enemies.find(e=>e.id===enemy.id)?.hp===0,'second continuous tracked swing reaches HP0 through actual bootstrap');
  for(let i=0;i<250&&state().cuts.pieces===0;i++){await new Promise(r=>setTimeout(r,10));frame();}
- test.assert(state().cuts.commits>0&&state().cuts.pieces>=2&&state().cuts.errors===0,'actual app worker publishes both halves without cut errors');
+ test.assert(state().cuts.commits>0&&state().cuts.pieces>=2&&state().cuts.errors===0,'actual app worker publishes both halves without cut errors',{cuts:state().cuts,transport:window.rimCutTransportDiagnostics});
  await new Promise(r=>setTimeout(r,1050));frame();
  const samples=requests.filter(r=>r.stage==='rim-xr-sample');
  test.assert(samples.length>=2&&samples.some(r=>r.details.cuts.commits>0&&r.details.transport.status==='ready'&&r.details.blade.hits>=2),'server-bound sample includes real hit, worker and published-cut counters');
