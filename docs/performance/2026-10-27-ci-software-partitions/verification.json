@@ -412,5 +412,41 @@
   "yamlParse": "Ruby YAML PASS",
   "browserReportSha256": "e91df4a92a092d23b74dba77a96c98f4a35f9961779a8e298c7e4af88949b5fd",
   "softwareReportSha256": "f5604e17dee39b8b55c8659839475d5bda01a4ca6aaae3e6cfb80af45224b2e8",
-  "githubOutcome": "Not yet run for new CI configuration"
+  "githubOutcome": "Not yet run for new CI configuration",
+  "hookEnvironmentRepair": {
+    "receipt": {
+      "passed": true,
+      "key": "dadab9b1adf423de700cdd19a7e40c666d1682333e89be3c495c5a1eb8b50e15",
+      "mode": "all",
+      "args": [],
+      "build": {
+        "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+        "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+        "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "types": "0f9e29ee62be44b4395067b0a98dbcc350902c75bb3d44166410716a07845c8f",
+      "finished": "2026-10-27T12:31:38.614Z"
+    },
+    "actualLinkedWorktreeRegression": {
+      "actualLinkedWorktreePush": true,
+      "pushBlocked": true,
+      "parentConfigUnchanged": true,
+      "fixtureOwnGitDir": true,
+      "remoteRefsEmpty": true,
+      "parentBare": "false"
+    },
+    "independentReview": "no material findings; targeted hook regression PASS",
+    "gate": "npm run verify:push exits 0; 419 native passed, 2 ignored; 137 browser passed; repeat reuses PASS",
+    "changedPaths": [
+      "scripts/pre-push",
+      "tests/harness-unit.test.mjs"
+    ],
+    "browserReportSha256": "40179fa25f6f73594ea86f6d5f55a17bb21449c8b58245d5e5843f8ede4dc192"
+  }
 }

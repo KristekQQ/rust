@@ -43,9 +43,10 @@ test('pre-push propagates test/generator failure and does not destroy a previous
     await copyFile(new URL('../scripts/pre-push', import.meta.url), path.join(root, 'scripts/pre-push'));
     await copyFile(new URL('../scripts/dump_sources.sh', import.meta.url), path.join(root, 'scripts/dump_sources.sh'));
     execFileSync('chmod', ['+x', path.join(root, 'scripts/dump_sources.sh')]);
-    await writeFile(path.join(root, 'bin/npm'), '#!/bin/sh\nexit "${TEST_VERIFY_EXIT:-0}"\n', { mode: 0o755 });
+    await writeFile(path.join(root, 'bin/npm'), '#!/bin/sh\nif test "${GIT_DIR+x}${GIT_WORK_TREE+x}${GIT_INDEX_FILE+x}" != ""; then exit 86; fi\nexit "${TEST_VERIFY_EXIT:-0}"\n', { mode: 0o755 });
     await writeFile(path.join(root, 'all_sources.txt'), 'previous valid dump');
-    const run = exit => spawnSync('bash', ['scripts/pre-push'], { cwd: root, env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, TEST_VERIFY_EXIT: String(exit) } });
+    const run = exit => spawnSync('bash', ['scripts/pre-push'], { cwd: root, env: { ...process.env, PATH: `${root}/bin:${process.env.PATH}`, TEST_VERIFY_EXIT: String(exit),
+        GIT_DIR: path.join(root, '.git'), GIT_WORK_TREE: root, GIT_INDEX_FILE: path.join(root, '.git/index') } });
     assert.equal(run(37).status, 37, 'Full verification failure must block push');
     assert.notEqual(run(0).status, 0, 'Missing manifest must block push');
     assert.equal(await readFile(path.join(root, 'all_sources.txt'), 'utf8'), 'previous valid dump', 'Failed dump must be atomic');

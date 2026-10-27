@@ -2,5 +2,10 @@
 # Install with: git config --local core.hooksPath scripts
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+# Linked-worktree hooks inherit GIT_DIR. Verification creates disposable repos;
+# let each command discover its repository from cwd instead of the parent hook.
+for git_variable in $(git rev-parse --local-env-vars); do
+    unset "$git_variable"
+done
 npm run verify
 scripts/dump_sources.sh
