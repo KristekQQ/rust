@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "backend": "webgl",
+  "family": "batching",
+  "order": "spatial",
+  "seed": 1337,
+  "overlap": 0,
+  "profiling": true,
+  "budget": 16.666666666666668,
+  "warmup": 1000,
+  "sample": 2500,
+  "load": 3584,
+  "levels": {
+    "light": 512,
+    "near": 3584,
+    "over": 6144
+  },
+  "loads": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    3072,
+    3584,
+    3712,
+    3840,
+    4096,
+    6144
+  ],
+  "underBudget": true,
+  "incomplete": false,
+  "unsafeLoad": null,
+  "overloadConfirmation": {
+    "firstFailedLoad": 4096,
+    "upperBound": {
+      "load": 6144,
+      "capacityPass": false,
+      "clampedToMaxLoad": true
+    },
+    "reason": "Baseline overload confirmation failed frame-capacity criteria."
+  },
+  "capacityProbes": [
+    {
+      "load": 1,
+      "capacityPass": true
+    },
+    {
+      "load": 2,
+      "capacityPass": true
+    },
+    {
+      "load": 4,
+      "capacityPass": true
+    },
+    {
+      "load": 8,
+      "capacityPass": true
+    },
+    {
+      "load": 16,
+      "capacityPass": true
+    },
+    {
+      "load": 32,
+      "capacityPass": true
+    },
+    {
+      "load": 64,
+      "capacityPass": true
+    },
+    {
+      "load": 128,
+      "capacityPass": true
+    },
+    {
+      "load": 256,
+      "capacityPass": true
+    },
+    {
+      "load": 512,
+      "capacityPass": true
+    },
+    {
+      "load": 1024,
+      "capacityPass": true
+    },
+    {
+      "load": 2048,
+      "capacityPass": true
+    },
+    {
+      "load": 4096,
+      "capacityPass": false
+    },
+    {
+      "load": 3072,
+      "capacityPass": true
+    },
+    {
+      "load": 3584,
+      "capacityPass": true
+    },
+    {
+      "load": 3840,
+      "capacityPass": false
+    },
+    {
+      "load": 3712,
+      "capacityPass": false
+    },
+    {
+      "load": 6144,
+      "capacityPass": false
+    }
+  ],
+  "selectionMetric": "frame capacity: RAF median <= budget+.5ms, p95 <= 2*budget+.5ms, missed intervals <= 10%, callback CPU p95 <= budget+.5ms; RAF is not compositor presentation",
+  "baselineManifest": [
+    {
+      "url": "/js/engine.js",
+      "bytes": 45835,
+      "sha256": "0f9a2629f2bd81280219412902356e4460f7ee9810063f8371a60f74709d1c36",
+      "source": "frozen"
+    },
+    {
+      "url": "/js/webxr.js",
+      "bytes": 31081,
+      "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+      "source": "frozen"
+    },
+    {
+      "url": "/pkg/webgpu_wasm_bg.wasm",
+      "bytes": 5802544,
+      "sha256": "c4301d8142f89cda9472095b128a458372101d646a7b9ed1980e84a5569b526a",
+      "source": "frozen"
+    },
+    {
+      "url": "/pkg/webgpu_wasm.js",
+      "bytes": 189395,
+      "sha256": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+      "source": "frozen"
+    },
+    {
+      "url": "/scripts/render-performance-order.mjs",
+      "bytes": 680,
+      "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/pixels.js",
+      "bytes": 1931,
+      "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/render-performance.html",
+      "bytes": 318,
+      "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/render-performance.js",
+      "bytes": 10487,
+      "sha256": "5d25a5027cd16f1f439c0f736e2e6d9a7413ad8ff0d032b26ddd68e12588c73a",
+      "source": "harness"
+    }
+  ],
+  "baselineRoot": "/Users/Honza/.codex/worktrees/rim-publish/rust/output/render-performance/baseline",
+  "driverIdentity": {
+    "capturedAt": "2026-10-25T17:13:14.050Z",
+    "nodeVersion": "v24.19.0",
+    "v8Version": "13.6.233.17-node.51",
+    "files": {
+      "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+      "scripts/render-performance.mjs": "b087b241c89a22977dfe962434ceb792ac99d94ae96f8619cca150b5a1c8ad9e",
+      "scripts/render-performance-lib.mjs": "9d771d552631a3f3a17f3bc3dbd2bb8fa840ac3b3a0af1ad04058e727849cd28",
+      "scripts/render-performance-api.mjs": "d38be5226844fc40c7ec04cab0cd01dab2cc2f8ecbebe58a96af78552e844f9b",
+      "scripts/render-performance-gl-timer.mjs": "e5976b188339bcd43e0a36512fc7b6fd301a646414d3de6dbb68e8fe49fc66eb",
+      "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "tests/render-performance.js": "5d25a5027cd16f1f439c0f736e2e6d9a7413ad8ff0d032b26ddd68e12588c73a",
+      "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+    },
+    "sha256": "a5c427cc3e6126f7c7eab034fc6422bf8e148fec8d8e2b2820f1524a1056fe7c"
+  }
+}

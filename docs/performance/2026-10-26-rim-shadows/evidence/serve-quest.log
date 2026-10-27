@@ -1,0 +1,16 @@
+
+> serve:quest
+> bash scripts/run-quest.sh /Users/Honza/.local/share/rust-webxr/tls/server.crt /Users/Honza/.local/share/rust-webxr/tls/server.key
+
+Production: output/production (218 files, 83074966 bytes; release WASM).
+Production release: https://192.168.11.134:8443/examples/neon-arena/?backend=auto
+No tunnel is started. Quest must be on a reachable local network.
+Confirm the local certificate on the headset, or trust the development CA there.
+Press Ctrl+C to stop.
+https://192.168.11.134:8443
+192.168.11.134 - - [26/Oct/2026 17:01:51] "GET /examples/rim/index.html HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 17:01:51] "GET /examples/rim/main.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 17:01:51] "GET /examples/rim/scene.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 17:01:51] "GET /js/engine.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 17:01:51] "GET /pkg/webgpu_wasm.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 17:01:51] "GET /pkg/webgpu_wasm_bg.wasm HTTP/1.1" 200 -

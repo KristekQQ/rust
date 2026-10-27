@@ -79,14 +79,18 @@ Indexovaná i neindexovaná geometrie podporuje body, čáry, smyčky, stripy, t
 Osvětlení je přímé GGX/Smith/Schlick ze světel enginu a jednoduchá ambientní složka. Zatím není environment IBL ani HDR tonemapping; kovový model proto nemá stejné okolní odrazy jako prohlížeč s HDR panoramatem. `reflectivity` enginu je samostatná možnost pro stávající SSR/rovinný odraz.
 
 Shader varianty se sdílejí podle přítomných materiálových map (5bit maska), nikoli
-podle ID modelu. Chybějící mapy mají přímo konstanty odpovídající původním fallback
-texelům; normálová mapa zachovává přesně hodnotu 128/255, ne aproximaci 0.5.
+podle ID modelu. Chybějící base/MR/AO/emissive mapy mají přímo konstanty
+odpovídající fallback texelům. Without `normalTexture`, keep the shading normal
+unchanged; a synthetic 128/255 normal would introduce a small unintended tilt.
+Real normal textures retain their original decoding and tangent-space path.
 OPAQUE hlavní průchod bez clip roviny neobsahuje dosažitelný `discard`. MASK,
 BLEND, stíny a průchody s clip rovinou zachovávají původní testy. `clipped` je
 samostatný klíč, nezaměňovat s obráceným windingem (`reflected`). Shader moduly
 vznikají líně a sdílejí se mezi pipeline včetně rigidní, skinning a instancované varianty; nemění se každý frame.
-Unused per-map UV inputs/varyings are omitted by material class; normal UVs and
-the full non-neutral fallback TBN path remain present. CPU vertex storage keeps
+Unused per-map UV inputs/varyings are omitted by material class. A missing
+normal map also omits UV2/TBN, while retaining world derivatives for flat normals
+and specular AA. An independent explicit normal texture with scale 0 checks this
+variant on both backends (supplied/missing normals/tangents, back faces, no UV). CPU vertex storage keeps
 the shared 96-byte format; this does not claim a packed-geometry bandwidth gain.
 Ověření zahrnuje `gltf-full`, `gltf-sdk`, `gltf-material-cache` a `render-mirrored` na obou
 backendech. Změna kompilace může mírně změnit zaokrouhlení odlesků; pixelová
@@ -174,3 +178,28 @@ Specifikace: [Khronos glTF 2.0](https://registry.khronos.org/glTF/specs/2.0/glTF
 ### Reusable render preparation storage
 
 The glTF queue retains flat index/value scratch across views and frames. `debugStats().gltf.queueScratchGrowths` is the cumulative count of tracked vectors whose capacity grew during a preparation call, not the total number of allocator calls. `queueScratchBytes` reports live retained capacity for those seven vectors; model-dependent cache clearing after removals releases it. Prepared GPU handle lists, diagnostic records and stable blend sorting can still allocate. See [the scoped Astra audit](ASTRA_RENDER_AUDIT_2026-10-24.md) for measurements and remaining scaling limits.
+
+
+### Order-independent rigid opaque instances
+
+`model.setRenderOptions({opaqueReorderable: true, ...otherOptions})` explicitly
+permits opaque parts of overlapping roots to be grouped by shared asset/part.
+This semantic promise is independent of `isStatic`; moving roots retain individual
+IDs, transforms, culling, collisions and lifetime. Default `false` preserves the
+existing order/AABB policy. As with the existing setter, omitted render options
+reset to their documented defaults; pass the complete intended options together.
+
+Opt in only when inter-root equal-depth/coplanar surfaces do not require draw
+order. The renderer additionally requires the entire immutable asset to contain
+only rigid, non-BLEND draws. Skin/morph and mixed transparent assets retain their
+fallback. A non-opted/unsupported root ends the run; the queue never jumps over it.
+The first implementation groups at most 128 contiguous roots per scheduling
+window, retaining input order between windows, existing auxiliary
+shadow/reflection/clipped queues and 1024-instance pages. It extends existing shared resources and per-view
+streams, not CPU geometry or gameplay object ownership.
+
+Rigid immutable GPU vertices also omit unused material UV slots from their stored
+Float32 stream (56–96 byte stride). Shader locations/types and CPU query/cutting
+geometry stay intact; skin and CPU-deformation retain the 96-byte layout. This
+storage optimization applies to rigid glTF assets independently of the optional
+root-reordering policy.

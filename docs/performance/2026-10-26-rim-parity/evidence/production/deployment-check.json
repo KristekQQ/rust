@@ -1,0 +1,56 @@
+{
+  "pass": true,
+  "date": "2026-10-26T14:46:27.463Z",
+  "base": "https://192.168.11.134:8443",
+  "releaseId": "ee1b8d0017",
+  "build": {
+    "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+    "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "files": [
+    {
+      "path": "examples/rim/index.html",
+      "sha256": "1d40285b63a3c34dc816dab6eeeb7e6309a1b20a8805e629daec560dca834b37",
+      "bytes": 4092,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/main.js",
+      "sha256": "ee01d88bb7c235b6255feb0ea63d8fc81bcdd294a03adc1142dd535aa0064c95",
+      "bytes": 7057,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "js/engine.js",
+      "sha256": "a8dffdc66ff0c2e265044900bf26134f056ec2cd67237af45cb79ba2483283db",
+      "bytes": 21426,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "pkg/webgpu_wasm.js",
+      "sha256": "4954bb7a8114383835769f3327ce263654524a67c26d4a9e09ce0e34da376fc5",
+      "bytes": 86451,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "pkg/webgpu_wasm_bg.wasm",
+      "sha256": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+      "bytes": 5833964,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    }
+  ],
+  "trust": "Existing local development CA explicitly supplied; system/Quest trust not established by this check.",
+  "scope": "Verified HTTPS certificate chain and hostname, actual served decoded payload bytes and no-store headers matched the same production package tested on WebGPU/WebGL. This does not verify physical Quest performance or CI."
+}

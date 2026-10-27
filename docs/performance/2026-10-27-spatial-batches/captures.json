@@ -1,0 +1,92 @@
+[
+  {
+    "backend": "webgpu",
+    "source": "output/spatial-batches/capture-webgpu/baseline-rim-static-1-pair0.png",
+    "sha256": "97ae8a8f077b594f3517876925627d339b4d35fb48040f962c1c46bd35e63cb2",
+    "metadata": {
+      "family": "rim-static",
+      "load": 1,
+      "quality": {
+        "profile": "examples/rim/appearance.js unchanged",
+        "renderEffects": [
+          true,
+          false
+        ],
+        "fxaa": {
+          "enabled": true,
+          "strength": 0.6
+        },
+        "sceneAppearance": "shared configureAppearance commands",
+        "camera": {
+          "authoredLayoutIndex": 0
+        },
+        "staticPose": "explicit Idle clip time0 for every original/encounter model; loading time excluded"
+      },
+      "workloadPhases": null,
+      "viewport": {
+        "width": 1280,
+        "height": 720,
+        "deviceScaleFactor": 1
+      },
+      "order": "spatial",
+      "seed": 1337,
+      "overlap": 0,
+      "insertionApplied": false,
+      "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+      "firstLogicalIds": [
+        0
+      ],
+      "poseClock": "elapsed performance.now seconds",
+      "scene": "actual Rome scene and native gameplay",
+      "unmatchedThreeReference": false,
+      "loadUnit": "fixed authored scene (load does not replicate it)"
+    },
+    "width": 1280,
+    "height": 720
+  },
+  {
+    "backend": "webgl",
+    "source": "output/spatial-batches/capture-webgl/baseline-rim-static-1-pair0.png",
+    "sha256": "823f4c9c77745f4aa580ea746493132c7392fa91ace98fdb05cec03e539c3454",
+    "metadata": {
+      "family": "rim-static",
+      "load": 1,
+      "quality": {
+        "profile": "examples/rim/appearance.js unchanged",
+        "renderEffects": [
+          true,
+          false
+        ],
+        "fxaa": {
+          "enabled": true,
+          "strength": 0.6
+        },
+        "sceneAppearance": "shared configureAppearance commands",
+        "camera": {
+          "authoredLayoutIndex": 0
+        },
+        "staticPose": "explicit Idle clip time0 for every original/encounter model; loading time excluded"
+      },
+      "workloadPhases": null,
+      "viewport": {
+        "width": 1280,
+        "height": 720,
+        "deviceScaleFactor": 1
+      },
+      "order": "spatial",
+      "seed": 1337,
+      "overlap": 0,
+      "insertionApplied": false,
+      "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+      "firstLogicalIds": [
+        0
+      ],
+      "poseClock": "elapsed performance.now seconds",
+      "scene": "actual Rome scene and native gameplay",
+      "unmatchedThreeReference": false,
+      "loadUnit": "fixed authored scene (load does not replicate it)"
+    },
+    "width": 1280,
+    "height": 720
+  }
+]

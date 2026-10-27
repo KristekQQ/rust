@@ -1,0 +1,3100 @@
+{
+  "metric": "FPS=1000/mean application RAF interval; medians across runs, not compositor FPS",
+  "limits": "Contended desktop M1; existing unknown headlessChrome30816 retained. Different campaigns cannot be mixed into one ranking. Native/Three AA,PBR,shadow,gameplay differences remain. No physical Quest.",
+  "campaigns": {
+    "pilot-webgl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.23733119400989,
+          "callbackMeanMs": 15.459210522864995,
+          "callbackP95Ms": 19.200000047683716,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 23.834127804260138,
+          "callbackMeanMs": 14.447222214606073,
+          "callbackP95Ms": 17.899999856948853,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.4940119760479096,
+              "cpuRatio": 0.9305555714225329
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1.4940119760479096,
+            "mean": 1.4940119760479096,
+            "p95": 1.4940119760479096,
+            "p99": 1.4940119760479096,
+            "max": 1.4940119760479096
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.9305555714225329,
+            "mean": 0.9305555714225329,
+            "p95": 0.9305555714225329,
+            "p99": 0.9305555714225329,
+            "max": 0.9305555714225329
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 25.23733119400989,
+          "callbackMeanMs": 15.459210522864995,
+          "callbackP95Ms": 19.200000047683716,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 23.834127804260138,
+          "callbackMeanMs": 14.447222214606073,
+          "callbackP95Ms": 17.899999856948853,
+          "actualCalls": 107
+        }
+      },
+      "pairedFpsRatios": [
+        0.9443996919102602
+      ],
+      "ratioOfMedianFps": 0.9443996919102602
+    },
+    "pilot-webgpu": {
+      "backend": "webgpu",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 60.003000150007466,
+          "callbackMeanMs": 14.124930752941776,
+          "callbackP95Ms": 16.299999952316284,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 59.836325149590785,
+          "callbackMeanMs": 12.415555557939742,
+          "callbackP95Ms": 17.199999809265137,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 103,
+                "meanAbsoluteChannelDelta": 0.002262867115162037,
+                "changedPixels": 542,
+                "changedFraction": 9.801793981481482e-05,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.8467153359617966
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1,
+            "mean": 1,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.8467153359617966,
+            "mean": 0.8467153359617966,
+            "p95": 0.8467153359617966,
+            "p99": 0.8467153359617966,
+            "max": 0.8467153359617966
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 60.003000150007466,
+          "callbackMeanMs": 14.124930752941776,
+          "callbackP95Ms": 16.299999952316284,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 59.836325149590785,
+          "callbackMeanMs": 12.415555557939742,
+          "callbackP95Ms": 17.199999809265137,
+          "actualCalls": 107
+        }
+      },
+      "pairedFpsRatios": [
+        0.9972222222222223
+      ],
+      "ratioOfMedianFps": 0.9972222222222223
+    },
+    "pilot-v3-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.334600063336495,
+          "callbackMeanMs": 15.19738562122669,
+          "callbackP95Ms": 18.40000009536743,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 23.967551622418874,
+          "callbackMeanMs": 12.374999990065893,
+          "callbackP95Ms": 15.5,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1179872,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.4940119760479096,
+              "cpuRatio": 0.8041958068774157
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1.4940119760479096,
+            "mean": 1.4940119760479096,
+            "p95": 1.4940119760479096,
+            "p99": 1.4940119760479096,
+            "max": 1.4940119760479096
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.8041958068774157,
+            "mean": 0.8041958068774157,
+            "p95": 0.8041958068774157,
+            "p99": 0.8041958068774157,
+            "max": 0.8041958068774157
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 25.334600063336495,
+          "callbackMeanMs": 15.19738562122669,
+          "callbackP95Ms": 18.40000009536743,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 23.967551622418874,
+          "callbackMeanMs": 12.374999990065893,
+          "callbackP95Ms": 15.5,
+          "actualCalls": 107
+        }
+      },
+      "pairedFpsRatios": [
+        0.9460402596646483
+      ],
+      "ratioOfMedianFps": 0.9460402596646483
+    },
+    "pilot-v3-wg": {
+      "backend": "webgpu",
+      "load": 1024,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 36.33454448481615,
+          "callbackMeanMs": 27.16438355402315,
+          "callbackP95Ms": 37.799999952316284,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 39.3346444881496,
+          "callbackMeanMs": 22.291139245536257,
+          "callbackP95Ms": 32.80000019073486,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 2244528,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 1024,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.7918367288550552
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1,
+            "mean": 1,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.7918367288550552,
+            "mean": 0.7918367288550552,
+            "p95": 0.7918367288550552,
+            "p99": 0.7918367288550552,
+            "max": 0.7918367288550552
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 36.33454448481615,
+          "callbackMeanMs": 27.16438355402315,
+          "callbackP95Ms": 37.799999952316284,
+          "actualCalls": 576
+        },
+        "candidate": {
+          "fps": 39.3346444881496,
+          "callbackMeanMs": 22.291139245536257,
+          "callbackP95Ms": 32.80000019073486,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        1.0825688073394497
+      ],
+      "ratioOfMedianFps": 1.0825688073394497
+    },
+    "pilot-v4-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.16792506291981,
+          "callbackMeanMs": 15.463815798884944,
+          "callbackP95Ms": 19.59999990463257,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 24.834575062086437,
+          "callbackMeanMs": 12.586666671435038,
+          "callbackP95Ms": 16.100000143051147,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.7945205466030104
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1,
+            "mean": 1,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.7945205466030104,
+            "mean": 0.7945205466030104,
+            "p95": 0.7945205466030104,
+            "p99": 0.7945205466030104,
+            "max": 0.7945205466030104
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 25.16792506291981,
+          "callbackMeanMs": 15.463815798884944,
+          "callbackP95Ms": 19.59999990463257,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 24.834575062086437,
+          "callbackMeanMs": 12.586666671435038,
+          "callbackP95Ms": 16.100000143051147,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        0.9867549668874173
+      ],
+      "ratioOfMedianFps": 0.9867549668874173
+    },
+    "pilot-v5-webgl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.26385772459071,
+          "callbackMeanMs": 15.12941174725302,
+          "callbackP95Ms": 18.40000009536743,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 21.059317076431945,
+          "callbackMeanMs": 13.542519706440723,
+          "callbackP95Ms": 18.100000143051147,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.497005988023948,
+              "cpuRatio": 0.8741258770406692
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1.497005988023948,
+            "mean": 1.497005988023948,
+            "p95": 1.497005988023948,
+            "p99": 1.497005988023948,
+            "max": 1.497005988023948
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.8741258770406692,
+            "mean": 0.8741258770406692,
+            "p95": 0.8741258770406692,
+            "p99": 0.8741258770406692,
+            "max": 0.8741258770406692
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 25.26385772459071,
+          "callbackMeanMs": 15.12941174725302,
+          "callbackP95Ms": 18.40000009536743,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 21.059317076431945,
+          "callbackMeanMs": 13.542519706440723,
+          "callbackP95Ms": 18.100000143051147,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        0.833574876252321
+      ],
+      "ratioOfMedianFps": 0.833574876252321
+    },
+    "pilot-v5-webgpu": {
+      "backend": "webgpu",
+      "load": 1024,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 31.33490007833725,
+          "callbackMeanMs": 27.614285703689333,
+          "callbackP95Ms": 39.700000047683716,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 32.180209171359614,
+          "callbackMeanMs": 22.85388601135096,
+          "callbackP95Ms": 32.10000014305115,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 1024,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.7894736826864357
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1,
+            "mean": 1,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.7894736826864357,
+            "mean": 0.7894736826864357,
+            "p95": 0.7894736826864357,
+            "p99": 0.7894736826864357,
+            "max": 0.7894736826864357
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 31.33490007833725,
+          "callbackMeanMs": 27.614285703689333,
+          "callbackP95Ms": 39.700000047683716,
+          "actualCalls": 576
+        },
+        "candidate": {
+          "fps": 32.180209171359614,
+          "callbackMeanMs": 22.85388601135096,
+          "callbackP95Ms": 32.10000014305115,
+          "actualCalls": 241
+        }
+      },
+      "pairedFpsRatios": [
+        1.0269766008798207
+      ],
+      "ratioOfMedianFps": 1.0269766008798207
+    },
+    "final/pairs-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.327175979930022,
+          "callbackMeanMs": 15.354330705282257,
+          "callbackP95Ms": 18.800000190734863,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 23.912808373087906,
+          "callbackMeanMs": 12.81622073602517,
+          "callbackP95Ms": 17,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 23.896919018665233,
+          "callbackMeanMs": 12.761705686814809,
+          "callbackP95Ms": 15.900000095367432,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 25.257882580867264,
+          "callbackMeanMs": 24.05348101409176,
+          "callbackP95Ms": 38.09999990463257,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 24.98440972832954,
+          "callbackMeanMs": 35.26246006229815,
+          "callbackP95Ms": 53.200000047683716,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 23.816862338535707,
+          "callbackMeanMs": 32.39664428666134,
+          "callbackP95Ms": 48.5,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.4940119760478552,
+              "cpuRatio": 0.8124999979303943
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.4940119760477737,
+              "cpuRatio": 0.5175438690970736
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.4940119760478283,
+              "cpuRatio": 0.8273809533101631
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 1.4940119760478283,
+            "mean": 1.494011976047819,
+            "p95": 1.4940119760478552,
+            "p99": 1.4940119760478552,
+            "max": 1.4940119760478552
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.8124999979303943,
+            "mean": 0.7191416067792104,
+            "p95": 0.8273809533101631,
+            "p99": 0.8273809533101631,
+            "max": 0.8273809533101631
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 25.257882580867264,
+          "callbackMeanMs": 24.05348101409176,
+          "callbackP95Ms": 38.09999990463257,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 23.896919018665233,
+          "callbackMeanMs": 12.81622073602517,
+          "callbackP95Ms": 17,
+          "actualCalls": 107
+        }
+      },
+      "pairedFpsRatios": [
+        0.9441561266853082,
+        0.9461172741679876,
+        0.9532689624253975
+      ],
+      "ratioOfMedianFps": 0.9461172741679876
+    },
+    "final/pairs-wg-1024": {
+      "backend": "webgpu",
+      "load": 1024,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 30.86074289643261,
+          "callbackMeanMs": 32.13130659983044,
+          "callbackP95Ms": 47.30000019073486,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 32.89947073026431,
+          "callbackMeanMs": 30.118446603562067,
+          "callbackP95Ms": 49,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14876592,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 33.72121396370269,
+          "callbackMeanMs": 29.365284362392966,
+          "callbackP95Ms": 47.10000014305115,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14876592,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 30.161031946724847,
+          "callbackMeanMs": 32.85158729931665,
+          "callbackP95Ms": 48.89999985694885,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 29.18179056268889,
+          "callbackMeanMs": 33.998632006377754,
+          "callbackP95Ms": 49.59999990463257,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 28.602930601939892,
+          "callbackMeanMs": 25.67977684611556,
+          "callbackP95Ms": 44.700000047683716,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14876592,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 1024,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.9113475178804
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.9999999999999454,
+              "cpuRatio": 0.8811188857242573
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.7939189214768246
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 1,
+            "mean": 0.9999999999999818,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.8811188857242573,
+            "mean": 0.8621284416938274,
+            "p95": 0.9113475178804,
+            "p99": 0.9113475178804,
+            "max": 0.9113475178804
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 30.161031946724847,
+          "callbackMeanMs": 32.85158729931665,
+          "callbackP95Ms": 48.89999985694885,
+          "actualCalls": 576
+        },
+        "candidate": {
+          "fps": 32.89947073026431,
+          "callbackMeanMs": 29.365284362392966,
+          "callbackP95Ms": 47.10000014305115,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        1.0660621761658036,
+        1.1180391315279394,
+        0.9801636585834074
+      ],
+      "ratioOfMedianFps": 1.0907939353128409
+    },
+    "final/three-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "authoredRomeDiagnostic",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 16.560596181462543,
+          "callbackMeanMs": 16.00144578749875,
+          "callbackP95Ms": 21.40000009536743,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 26.258485974125787,
+          "callbackMeanMs": 3.0587519017165836,
+          "callbackP95Ms": 4.299999952316284,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 25.481019240769644,
+          "callbackMeanMs": 3.546708460885529,
+          "callbackP95Ms": 4.5,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 18.65320647018093,
+          "callbackMeanMs": 15.212847957263921,
+          "callbackP95Ms": 19.600000143051147,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 17.720779714307447,
+          "callbackMeanMs": 15.706306299110791,
+          "callbackP95Ms": 20.800000190734863,
+          "actualCalls": 107,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7520480,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 27.7796680049475,
+          "callbackMeanMs": 3.5660431597730238,
+          "callbackP95Ms": 4.5,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.5015015015014797,
+              "cpuRatio": 0.23648648724841584
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.6679999999999927,
+              "cpuRatio": 0.26428570066179546
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.6660000000000582,
+              "cpuRatio": 0.2534246583171937
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.6660000000000582,
+            "mean": 0.6118338338338435,
+            "p95": 0.6679999999999927,
+            "p99": 0.6679999999999927,
+            "max": 0.6679999999999927
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.2534246583171937,
+            "mean": 0.2513989487424683,
+            "p95": 0.26428570066179546,
+            "p99": 0.26428570066179546,
+            "max": 0.26428570066179546
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 17.720779714307447,
+          "callbackMeanMs": 15.706306299110791,
+          "callbackP95Ms": 20.800000190734863,
+          "actualCalls": 107
+        },
+        "candidate": {
+          "fps": 26.258485974125787,
+          "callbackMeanMs": 3.546708460885529,
+          "callbackP95Ms": 4.5,
+          "actualCalls": 108
+        }
+      },
+      "pairedFpsRatios": [
+        1.5856002819221438,
+        1.3660396287096095,
+        1.5676323758214026
+      ],
+      "ratioOfMedianFps": 1.4817906659561455
+    },
+    "final-v4/profile-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 2000,
+      "sampleMs": 6000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.404890441409968,
+          "callbackMeanMs": 15.332026138804316,
+          "callbackP95Ms": 18.799999952316284,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 24.83416113870462,
+          "callbackMeanMs": 12.896666677792867,
+          "callbackP95Ms": 17.299999952316284,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1080736,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.8368794349026473
+            }
+          ],
+          "rafRatio": {
+            "count": 1,
+            "median": 1,
+            "mean": 1,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 1,
+            "median": 0.8368794349026473,
+            "mean": 0.8368794349026473,
+            "p95": 0.8368794349026473,
+            "p99": 0.8368794349026473,
+            "max": 0.8368794349026473
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 25.404890441409968,
+          "callbackMeanMs": 15.332026138804316,
+          "callbackP95Ms": 18.799999952316284,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 24.83416113870462,
+          "callbackMeanMs": 12.896666677792867,
+          "callbackP95Ms": 17.299999952316284,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        0.9775346678222607
+      ],
+      "ratioOfMedianFps": 0.9775346678222607
+    },
+    "final-v4/pairs-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 25.321114129021705,
+          "callbackMeanMs": 15.159305992562688,
+          "callbackP95Ms": 18.600000143051147,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 24.96089859234933,
+          "callbackMeanMs": 12.561919997406006,
+          "callbackP95Ms": 15.999999761581421,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 24.847995781433536,
+          "callbackMeanMs": 13.303370789195714,
+          "callbackP95Ms": 18.299999952316284,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 24.794017391861644,
+          "callbackMeanMs": 36.29903225552651,
+          "callbackP95Ms": 55.60000014305115,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 23.081015564684883,
+          "callbackMeanMs": 42.722837370159716,
+          "callbackP95Ms": 61.09999990463257,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 24.761089487937486,
+          "callbackMeanMs": 37.42419354415709,
+          "callbackP95Ms": 53.89999985694885,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.0000000000000544,
+              "cpuRatio": 0.8041958068774157
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.3469387787729085
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6693386773547678,
+              "cpuRatio": 0.8601583066649467
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 1,
+            "mean": 0.8897795591182741,
+            "p95": 1.0000000000000544,
+            "p99": 1.0000000000000544,
+            "max": 1.0000000000000544
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.8041958068774157,
+            "mean": 0.6704309641050902,
+            "p95": 0.8601583066649467,
+            "p99": 0.8601583066649467,
+            "max": 0.8601583066649467
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 24.794017391861644,
+          "callbackMeanMs": 36.29903225552651,
+          "callbackP95Ms": 55.60000014305115,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 24.847995781433536,
+          "callbackMeanMs": 13.303370789195714,
+          "callbackP95Ms": 18.299999952316284,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        0.9857741039814866,
+        1.0021770731511066,
+        1.072790294627382
+      ],
+      "ratioOfMedianFps": 1.0021770731511066
+    },
+    "final-v4/pairs-wg-1024": {
+      "backend": "webgpu",
+      "load": 1024,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 30.30109211851803,
+          "callbackMeanMs": 32.760342556183204,
+          "callbackP95Ms": 48.30000019073486,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 28.701975159599762,
+          "callbackMeanMs": 25.81919333135634,
+          "callbackP95Ms": 42.69999980926514,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 24.617429139831017,
+          "callbackMeanMs": 26.240746752008214,
+          "callbackP95Ms": 44.799999952316284,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 23.600849630586723,
+          "callbackMeanMs": 27.29221658859963,
+          "callbackP95Ms": 36.10000014305115,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 23.752683692761263,
+          "callbackMeanMs": 29.03602693377922,
+          "callbackP95Ms": 43,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 25.3440839153012,
+          "callbackMeanMs": 22.500000002628237,
+          "callbackP95Ms": 30.59999990463257,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 1024,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.7937062914036056
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6693386773547191,
+              "cpuRatio": 0.9917695453466595
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6693386773547314,
+              "cpuRatio": 0.75
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.6693386773547314,
+            "mean": 0.7795591182364835,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.7937062914036056,
+            "mean": 0.8451586122500884,
+            "p95": 0.9917695453466595,
+            "p99": 0.9917695453466595,
+            "max": 0.9917695453466595
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 23.752683692761263,
+          "callbackMeanMs": 29.03602693377922,
+          "callbackP95Ms": 43,
+          "actualCalls": 576
+        },
+        "candidate": {
+          "fps": 25.3440839153012,
+          "callbackMeanMs": 25.81919333135634,
+          "callbackP95Ms": 42.69999980926514,
+          "actualCalls": 241
+        }
+      },
+      "pairedFpsRatios": [
+        0.9472257649109289,
+        1.0430738522195746,
+        1.0669987544617927
+      ],
+      "ratioOfMedianFps": 1.0669987544617927
+    },
+    "final-v4/three-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "authoredRomeDiagnostic",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 17.149230283382046,
+          "callbackMeanMs": 15.829999996895014,
+          "callbackP95Ms": 21.99999976158142,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 26.983162506595882,
+          "callbackMeanMs": 3.194822482103427,
+          "callbackP95Ms": 4.400000095367432,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 25.120904352556703,
+          "callbackMeanMs": 3.258505556655423,
+          "callbackP95Ms": 4.400000095367432,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 17.852568208018457,
+          "callbackMeanMs": 15.458836697358679,
+          "callbackP95Ms": 20.90000009536743,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 16.83434205779792,
+          "callbackMeanMs": 16.205700711229916,
+          "callbackP95Ms": 22.59999990463257,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 25.858307681838753,
+          "callbackMeanMs": 3.378207102440977,
+          "callbackP95Ms": 4.599999904632568,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.664670658682688,
+              "cpuRatio": 0.2397260289631545
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.6679999999999927,
+              "cpuRatio": 0.2413793103448276
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.501501501501507,
+              "cpuRatio": 0.2384105912165016
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.664670658682688,
+            "mean": 0.6113907200613959,
+            "p95": 0.6679999999999927,
+            "p99": 0.6679999999999927,
+            "max": 0.6679999999999927
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.2397260289631545,
+            "mean": 0.23983864350816123,
+            "p95": 0.2413793103448276,
+            "p99": 0.2413793103448276,
+            "max": 0.2413793103448276
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 17.149230283382046,
+          "callbackMeanMs": 15.829999996895014,
+          "callbackP95Ms": 21.99999976158142,
+          "actualCalls": 174
+        },
+        "candidate": {
+          "fps": 25.858307681838753,
+          "callbackMeanMs": 3.258505556655423,
+          "callbackP95Ms": 4.400000095367432,
+          "actualCalls": 108
+        }
+      },
+      "pairedFpsRatios": [
+        1.5734328632080425,
+        1.4071311230881438,
+        1.5360450437004634
+      ],
+      "ratioOfMedianFps": 1.5078407167286092
+    },
+    "final-v5/pairs-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 18.588400837877188,
+          "callbackMeanMs": 16.48261802749061,
+          "callbackP95Ms": 20.600000143051147,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 17.21775466097802,
+          "callbackMeanMs": 15.610185189931482,
+          "callbackP95Ms": 21.59999990463257,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 17.984747011888388,
+          "callbackMeanMs": 15.889555554389954,
+          "callbackP95Ms": 20.800000190734863,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 15.840570260529377,
+          "callbackMeanMs": 18.0503778331526,
+          "callbackP95Ms": 23.90000009536743,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 17.280691227649115,
+          "callbackMeanMs": 17.105311780823847,
+          "callbackP95Ms": 20.59999990463257,
+          "actualCalls": 308,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 34343,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 7568720,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 17.72070882835315,
+          "callbackMeanMs": 15.826801802660968,
+          "callbackP95Ms": 21.09999990463257,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1.0020000000000073,
+              "cpuRatio": 0.8795180715969848
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.7507507507507262,
+              "cpuRatio": 0.8258427015203913
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.9980039920159246,
+              "cpuRatio": 0.873493982738811
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.9980039920159246,
+            "mean": 0.9169182475888861,
+            "p95": 1.0020000000000073,
+            "p99": 1.0020000000000073,
+            "max": 1.0020000000000073
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.873493982738811,
+            "mean": 0.8596182519520624,
+            "p95": 0.8795180715969848,
+            "p99": 0.8795180715969848,
+            "max": 0.8795180715969848
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 17.280691227649115,
+          "callbackMeanMs": 17.105311780823847,
+          "callbackP95Ms": 20.600000143051147,
+          "actualCalls": 308
+        },
+        "candidate": {
+          "fps": 17.72070882835315,
+          "callbackMeanMs": 15.826801802660968,
+          "callbackP95Ms": 21.09999990463257,
+          "actualCalls": 174
+        }
+      },
+      "pairedFpsRatios": [
+        0.9262633623594865,
+        1.1353598207699471,
+        1.0254629629629632
+      ],
+      "ratioOfMedianFps": 1.0254629629629632
+    },
+    "final-v5/pairs-wg-1024": {
+      "backend": "webgpu",
+      "load": 1024,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "sameRendererRevisionPair",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 23.960862591053285,
+          "callbackMeanMs": 27.621833329200744,
+          "callbackP95Ms": 36.39999985694885,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 24.89762752028436,
+          "callbackMeanMs": 22.89325842926246,
+          "callbackP95Ms": 31.199999809265137,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 24.58456089575748,
+          "callbackMeanMs": 23.020779218379552,
+          "callbackP95Ms": 31.600000143051147,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 24.25707698219547,
+          "callbackMeanMs": 27.770675455718692,
+          "callbackP95Ms": 37.59999990463257,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 24.23324801627834,
+          "callbackMeanMs": 28.92541254117544,
+          "callbackP95Ms": 42.89999985694885,
+          "actualCalls": 576,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": 68647,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": 14664320,
+          "instanceBufferBytes": 14973072,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 26.121044841793676,
+          "callbackMeanMs": 21.512079512307402,
+          "callbackP95Ms": 28.5,
+          "actualCalls": 241,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 20714924,
+          "translatedInstancesPerRaf": 66744,
+          "primitiveTestsPerRaf": 6987,
+          "rootFullyInsidePerRaf": 921,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 2211456,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 1024,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6693386773547678,
+              "cpuRatio": 0.8040816345993353
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 1,
+              "cpuRatio": 0.808943096443669
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.9999999999998911,
+              "cpuRatio": 0.7014925367823155
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.9999999999998911,
+            "mean": 0.8897795591182196,
+            "p95": 1,
+            "p99": 1,
+            "max": 1
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.8040816345993353,
+            "mean": 0.7715057559417732,
+            "p95": 0.808943096443669,
+            "p99": 0.808943096443669,
+            "max": 0.808943096443669
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 24.23324801627834,
+          "callbackMeanMs": 27.770675455718692,
+          "callbackP95Ms": 37.59999990463257,
+          "actualCalls": 576
+        },
+        "candidate": {
+          "fps": 24.89762752028436,
+          "callbackMeanMs": 22.89325842926246,
+          "callbackP95Ms": 31.199999809265137,
+          "actualCalls": 241
+        }
+      },
+      "pairedFpsRatios": [
+        1.039095626281036,
+        1.0135005513567188,
+        1.0779011061268897
+      ],
+      "ratioOfMedianFps": 1.0274160320382861
+    },
+    "final-v5/three-gl": {
+      "backend": "webgl",
+      "load": 512,
+      "viewport": {
+        "width": 2880,
+        "height": 1920,
+        "deviceScaleFactor": 1
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "profiling": false,
+      "comparisonKind": "authoredRomeDiagnostic",
+      "inputsChanged": [],
+      "serverErrors": {
+        "baseline": [],
+        "candidate": []
+      },
+      "runs": [
+        {
+          "side": "baseline",
+          "pair": 0,
+          "fps": 18.535977373324197,
+          "callbackMeanMs": 15.223655908338484,
+          "callbackP95Ms": 20,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 0,
+          "fps": 26.178639191104065,
+          "callbackMeanMs": 3.458625951796088,
+          "callbackP95Ms": 4.800000190734863,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 1,
+          "fps": 25.601126449563797,
+          "callbackMeanMs": 3.845085802762631,
+          "callbackP95Ms": 4.999999761581421,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 1,
+          "fps": 16.903258884224698,
+          "callbackMeanMs": 16.060283689634176,
+          "callbackP95Ms": 22.100000143051147,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "baseline",
+          "pair": 2,
+          "fps": 18.50538939424893,
+          "callbackMeanMs": 15.484233265046681,
+          "callbackP95Ms": 21.09999990463257,
+          "actualCalls": 174,
+          "actualCallsScope": "glTF actual commands + one FXAA compose; whole stress scene",
+          "gltfTrianglesPerRaf": 10553756,
+          "translatedInstancesPerRaf": 34296,
+          "primitiveTestsPerRaf": 2699,
+          "rootFullyInsidePerRaf": 473,
+          "rigidUploadBytesTotal": 10897232,
+          "instanceBufferBytes": 1146800,
+          "instanceBuffersCreated": 0,
+          "instanceUploadBytes": 0,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        },
+        {
+          "side": "candidate",
+          "pair": 2,
+          "fps": 27.103087673291864,
+          "callbackMeanMs": 3.7729013317287934,
+          "callbackP95Ms": 5.099999904632568,
+          "actualCalls": 108,
+          "actualCallsScope": "Three renderer.info.render.calls",
+          "gltfTrianglesPerRaf": null,
+          "translatedInstancesPerRaf": null,
+          "primitiveTestsPerRaf": null,
+          "rootFullyInsidePerRaf": null,
+          "rigidUploadBytesTotal": null,
+          "instanceBufferBytes": null,
+          "instanceBuffersCreated": null,
+          "instanceUploadBytes": null,
+          "gpuAvailable": false,
+          "gpuPassMs": null,
+          "glRafGpuMs": null
+        }
+      ],
+      "pixels": [
+        {
+          "load": 512,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.6679999999999563,
+              "cpuRatio": 0.264285717691694
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.5015015015014797,
+              "cpuRatio": 0.26027398311660077
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": null,
+                "exact": false,
+                "width": 2880,
+                "height": 1920,
+                "maxChannelDelta": 210,
+                "meanAbsoluteChannelDelta": 4.543614908854167,
+                "changedPixels": 1081742,
+                "changedFraction": 0.1956275318287037,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001,
+                "withinDiagnosticTolerance": false,
+                "gateDisabled": true,
+                "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+              },
+              "rafRatio": 0.6660000000000582,
+              "cpuRatio": 0.2638888838298527
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.6660000000000582,
+            "mean": 0.6118338338338313,
+            "p95": 0.6679999999999563,
+            "p99": 0.6679999999999563,
+            "max": 0.6679999999999563
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.2638888838298527,
+            "mean": 0.2628161948793825,
+            "p95": 0.264285717691694,
+            "p99": 0.264285717691694,
+            "max": 0.264285717691694
+          }
+        }
+      ],
+      "complete": true,
+      "medians": {
+        "baseline": {
+          "fps": 18.50538939424893,
+          "callbackMeanMs": 15.484233265046681,
+          "callbackP95Ms": 21.09999990463257,
+          "actualCalls": 174
+        },
+        "candidate": {
+          "fps": 26.178639191104065,
+          "callbackMeanMs": 3.7729013317287934,
+          "callbackP95Ms": 4.999999761581421,
+          "actualCalls": 108
+        }
+      },
+      "pairedFpsRatios": [
+        1.4123150165676561,
+        1.5145674940503076,
+        1.4646050994049826
+      ],
+      "ratioOfMedianFps": 1.4146494641847316
+    }
+  }
+}

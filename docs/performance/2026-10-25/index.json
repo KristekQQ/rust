@@ -1,0 +1,884 @@
+[
+  {
+    "name": "calibration-final-wg",
+    "results": 18,
+    "error": null,
+    "directory": "calibration-final-wg"
+  },
+  {
+    "name": "calibration-final-gl",
+    "results": 18,
+    "error": null,
+    "directory": "calibration-final-gl"
+  },
+  {
+    "name": "paired-off-wg",
+    "results": 6,
+    "error": null,
+    "directory": "paired-off-wg"
+  },
+  {
+    "name": "paired-profile-wg",
+    "results": 6,
+    "error": null,
+    "directory": "paired-profile-wg"
+  },
+  {
+    "name": "paired-off-gl",
+    "results": 6,
+    "error": null,
+    "directory": "paired-off-gl"
+  },
+  {
+    "name": "paired-profile-gl",
+    "results": 6,
+    "error": null,
+    "directory": "paired-profile-gl"
+  },
+  {
+    "name": "three-geometry-gl",
+    "results": 6,
+    "error": null,
+    "directory": "three-geometry-gl"
+  },
+  {
+    "name": "cal-rim-static-wg",
+    "results": 1,
+    "error": null,
+    "directory": "cal-rim-static-wg"
+  },
+  {
+    "name": "paired-rim-static-wg",
+    "results": 6,
+    "error": null,
+    "directory": "paired-rim-static-wg"
+  },
+  {
+    "name": "cal-arena-static-wg",
+    "results": 1,
+    "error": null,
+    "directory": "cal-arena-static-wg"
+  },
+  {
+    "name": "paired-arena-static-wg",
+    "results": 6,
+    "error": null,
+    "directory": "paired-arena-static-wg"
+  },
+  {
+    "name": "smoke-final-wg",
+    "results": 14,
+    "error": null,
+    "directory": "smoke-final-wg"
+  },
+  {
+    "name": "cal-rim-static-gl",
+    "results": 1,
+    "error": null,
+    "directory": "cal-rim-static-gl"
+  },
+  {
+    "name": "paired-rim-static-gl",
+    "results": 6,
+    "error": null,
+    "directory": "paired-rim-static-gl"
+  },
+  {
+    "name": "cal-arena-static-gl",
+    "results": 1,
+    "error": null,
+    "directory": "cal-arena-static-gl"
+  },
+  {
+    "name": "paired-arena-static-gl",
+    "results": 6,
+    "error": null,
+    "directory": "paired-arena-static-gl"
+  },
+  {
+    "name": "adversarial-wg-shuffled-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-shuffled-p0-before"
+  },
+  {
+    "name": "adversarial-wg-shuffled-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-shuffled-p0-after"
+  },
+  {
+    "name": "adversarial-wg-shuffled-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-shuffled-p1-after"
+  },
+  {
+    "name": "adversarial-wg-shuffled-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-shuffled-p1-before"
+  },
+  {
+    "name": "adversarial-wg-shuffled-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-shuffled-p2-before"
+  },
+  {
+    "name": "adversarial-wg-shuffled-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-shuffled-p2-after"
+  },
+  {
+    "name": "adversarial-wg-alternating-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-alternating-p0-before"
+  },
+  {
+    "name": "adversarial-wg-alternating-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-alternating-p0-after"
+  },
+  {
+    "name": "adversarial-wg-alternating-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-alternating-p1-after"
+  },
+  {
+    "name": "adversarial-wg-alternating-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-alternating-p1-before"
+  },
+  {
+    "name": "adversarial-wg-alternating-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-alternating-p2-before"
+  },
+  {
+    "name": "adversarial-wg-alternating-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "adversarial-wg-alternating-p2-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-shuffled-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-shuffled-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-shuffled-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-shuffled-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-shuffled-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-shuffled-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-shuffled-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-shuffled-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-shuffled-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-shuffled-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-shuffled-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-shuffled-p2-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-alternating-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-alternating-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-alternating-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-alternating-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-alternating-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-alternating-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-alternating-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-alternating-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-alternating-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-alternating-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-alternating-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-alternating-p2-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense-p0-before",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:62797/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-wg-spatial-dense-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense-p0-after",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:62814/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-wg-spatial-dense-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense-p1-after",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:62830/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-wg-spatial-dense-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense-p1-before",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:62848/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-wg-spatial-dense-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense-p2-before",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:62868/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-wg-spatial-dense-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense-p2-after",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:62887/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-wg-spatial-dense-p2-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-shuffled-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-shuffled-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-shuffled-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-shuffled-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-shuffled-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-shuffled-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-shuffled-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-shuffled-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-shuffled-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-shuffled-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-shuffled-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-shuffled-p2-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense-p0-before",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:63018/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-gl-spatial-dense-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense-p0-after",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:63035/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-gl-spatial-dense-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense-p1-after",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:63050/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-gl-spatial-dense-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense-p1-before",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:63069/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-gl-spatial-dense-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense-p2-before",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:63082/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-gl-spatial-dense-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense-p2-after",
+    "results": 0,
+    "error": "Error: benchmark workload: missing rendered geometry (4 pixels)\n    at evaluate (evaluate at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:26), <anonymous>:0:146)\n    at #evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:402:19)\n    at async ExecutionContext.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)\n    at async IsolatedWorld.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)\n    at async CdpFrame.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)\n    at async CdpPage.evaluate (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)\n    at async run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:100:15)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:137:573\n    at assertForeground (http://127.0.0.1:63097/tests/pixels.js:23:36)",
+    "directory": "fixed-adversarial-gl-spatial-dense-p2-after"
+  },
+  {
+    "name": "final-calibration-wg",
+    "results": 18,
+    "error": null,
+    "directory": "final-calibration-wg"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense97-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-spatial-dense97-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense97-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-spatial-dense97-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense97-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-spatial-dense97-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense97-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-spatial-dense97-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense97-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-spatial-dense97-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-wg-spatial-dense97-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-wg-spatial-dense97-p2-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense97-p0-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-spatial-dense97-p0-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense97-p0-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-spatial-dense97-p0-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense97-p1-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-spatial-dense97-p1-after"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense97-p1-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-spatial-dense97-p1-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense97-p2-before",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-spatial-dense97-p2-before"
+  },
+  {
+    "name": "fixed-adversarial-gl-spatial-dense97-p2-after",
+    "results": 1,
+    "error": null,
+    "directory": "fixed-adversarial-gl-spatial-dense97-p2-after"
+  },
+  {
+    "name": "final-paired-off-wg",
+    "results": 6,
+    "error": null,
+    "directory": "final-paired-off-wg"
+  },
+  {
+    "name": "final-profile-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-profile-wg"
+  },
+  {
+    "name": "final-capacity-wg",
+    "results": 36,
+    "error": null,
+    "directory": "final-capacity-wg"
+  },
+  {
+    "name": "final-smoke-matrix-wg",
+    "results": 14,
+    "error": null,
+    "directory": "final-smoke-matrix-wg"
+  },
+  {
+    "name": "final-stress-rigid-wg",
+    "results": 7,
+    "error": null,
+    "directory": "final-stress-rigid-wg"
+  },
+  {
+    "name": "final-family-rigid-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-rigid-wg"
+  },
+  {
+    "name": "final-stress-skin-wg",
+    "results": 6,
+    "error": null,
+    "directory": "final-stress-skin-wg"
+  },
+  {
+    "name": "final-family-skin-wg",
+    "results": 0,
+    "error": "Error: Workload failure: {\"family\":\"skin\",\"operationStage\":\"setup\",\"message\":\"Rust engine odm\u00edtl p\u0159\u00edkaz: neplatn\u00fd objekt nebo parametry.\",\"stack\":\"Error: Rust engine odm\u00edtl p\u0159\u00edkaz: neplatn\u00fd objekt nebo parametry.\\n    at accepted (http://127.0.0.1:63743/js/engine.js:10:20)\\n    at ModelObject.seekAnimation (http://127.0.0.1:63743/js/engine.js:203:30)\\n    at pose (http://127.0.0.1:63743/tests/render-performance.js:45:431)\\n    at tick (http://127.0.0.1:63743/tests/render-performance.js:52:32)\\n    at <anonymous>:3:95\"}\n    at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:92:22)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:134:178",
+    "directory": "final-family-skin-wg"
+  },
+  {
+    "name": "final-stress-morph-wg",
+    "results": 6,
+    "error": null,
+    "directory": "final-stress-morph-wg"
+  },
+  {
+    "name": "final-family-morph-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-morph-wg"
+  },
+  {
+    "name": "final-stress-fragment-wg",
+    "results": 7,
+    "error": null,
+    "directory": "final-stress-fragment-wg"
+  },
+  {
+    "name": "final-stress-skin-wg-timefix",
+    "results": 6,
+    "error": null,
+    "directory": "final-stress-skin-wg-timefix"
+  },
+  {
+    "name": "final-family-skin-wg-timefix",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-skin-wg-timefix"
+  },
+  {
+    "name": "final-stress-fragment-wg-timefix",
+    "results": 7,
+    "error": null,
+    "directory": "final-stress-fragment-wg-timefix"
+  },
+  {
+    "name": "final-family-fragment-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-fragment-wg"
+  },
+  {
+    "name": "final-stress-effects-wg",
+    "results": 6,
+    "error": "Error: GPU profiler error: Timestamp readback unavailable\n    at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:92:22)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:116:35",
+    "directory": "final-stress-effects-wg"
+  },
+  {
+    "name": "final-family-effects-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-effects-wg"
+  },
+  {
+    "name": "final-stress-batching-heterogeneous-wg",
+    "results": 9,
+    "error": null,
+    "directory": "final-stress-batching-heterogeneous-wg"
+  },
+  {
+    "name": "final-family-batching-heterogeneous-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-batching-heterogeneous-wg"
+  },
+  {
+    "name": "final-stress-dynamic-wg",
+    "results": 10,
+    "error": null,
+    "directory": "final-stress-dynamic-wg"
+  },
+  {
+    "name": "final-family-dynamic-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-dynamic-wg"
+  },
+  {
+    "name": "final-soak-dynamic-wg",
+    "results": 1,
+    "error": null,
+    "directory": "final-soak-dynamic-wg"
+  },
+  {
+    "name": "final-cal-rim-static-wg",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-rim-static-wg"
+  },
+  {
+    "name": "final-control-rim-static-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-rim-static-wg"
+  },
+  {
+    "name": "final-cal-arena-static-wg",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-arena-static-wg"
+  },
+  {
+    "name": "final-control-arena-static-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-arena-static-wg"
+  },
+  {
+    "name": "final-calibration-gl",
+    "results": 18,
+    "error": null,
+    "directory": "final-calibration-gl"
+  },
+  {
+    "name": "final-paired-off-gl",
+    "results": 6,
+    "error": null,
+    "directory": "final-paired-off-gl"
+  },
+  {
+    "name": "final-profile-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-profile-gl"
+  },
+  {
+    "name": "final-capacity-gl",
+    "results": 36,
+    "error": null,
+    "directory": "final-capacity-gl"
+  },
+  {
+    "name": "final-smoke-matrix-gl",
+    "results": 14,
+    "error": null,
+    "directory": "final-smoke-matrix-gl"
+  },
+  {
+    "name": "final-stress-rigid-gl",
+    "results": 7,
+    "error": null,
+    "directory": "final-stress-rigid-gl"
+  },
+  {
+    "name": "final-family-rigid-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-rigid-gl"
+  },
+  {
+    "name": "final-stress-skin-gl",
+    "results": 6,
+    "error": null,
+    "directory": "final-stress-skin-gl"
+  },
+  {
+    "name": "final-family-skin-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-skin-gl"
+  },
+  {
+    "name": "final-stress-morph-gl",
+    "results": 6,
+    "error": null,
+    "directory": "final-stress-morph-gl"
+  },
+  {
+    "name": "final-family-morph-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-morph-gl"
+  },
+  {
+    "name": "final-stress-fragment-gl",
+    "results": 7,
+    "error": null,
+    "directory": "final-stress-fragment-gl"
+  },
+  {
+    "name": "final-family-fragment-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-fragment-gl"
+  },
+  {
+    "name": "final-stress-effects-gl",
+    "results": 11,
+    "error": null,
+    "directory": "final-stress-effects-gl"
+  },
+  {
+    "name": "final-family-effects-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-effects-gl"
+  },
+  {
+    "name": "final-stress-batching-heterogeneous-gl",
+    "results": 9,
+    "error": null,
+    "directory": "final-stress-batching-heterogeneous-gl"
+  },
+  {
+    "name": "final-family-batching-heterogeneous-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-batching-heterogeneous-gl"
+  },
+  {
+    "name": "final-stress-dynamic-gl",
+    "results": 10,
+    "error": null,
+    "directory": "final-stress-dynamic-gl"
+  },
+  {
+    "name": "final-family-dynamic-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-family-dynamic-gl"
+  },
+  {
+    "name": "final-soak-dynamic-gl",
+    "results": 1,
+    "error": null,
+    "directory": "final-soak-dynamic-gl"
+  },
+  {
+    "name": "final-cal-rim-static-gl",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-rim-static-gl"
+  },
+  {
+    "name": "final-control-rim-static-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-rim-static-gl"
+  },
+  {
+    "name": "final-cal-arena-static-gl",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-arena-static-gl"
+  },
+  {
+    "name": "final-control-arena-static-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-arena-static-gl"
+  },
+  {
+    "name": "final-three-calibration-gl",
+    "results": 18,
+    "error": null,
+    "directory": "final-three-calibration-gl"
+  },
+  {
+    "name": "final-three-geometry-gl",
+    "results": 6,
+    "error": null,
+    "directory": "final-three-geometry-gl"
+  },
+  {
+    "name": "final-three-objects-gl",
+    "results": 6,
+    "error": null,
+    "directory": "final-three-objects-gl"
+  },
+  {
+    "name": "final-cal-rim-active-wg",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-rim-active-wg"
+  },
+  {
+    "name": "final-control-rim-active-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-rim-active-wg"
+  },
+  {
+    "name": "final-cal-arena-active-wg",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-arena-active-wg"
+  },
+  {
+    "name": "final-control-arena-active-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-arena-active-wg"
+  },
+  {
+    "name": "final-cal-rim-active-gl",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-rim-active-gl"
+  },
+  {
+    "name": "final-control-rim-active-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-rim-active-gl"
+  },
+  {
+    "name": "final-cal-arena-active-gl",
+    "results": 1,
+    "error": null,
+    "directory": "final-cal-arena-active-gl"
+  },
+  {
+    "name": "final-control-arena-active-gl",
+    "results": 2,
+    "error": null,
+    "directory": "final-control-arena-active-gl"
+  },
+  {
+    "name": "final-effects-off-calibration-wg",
+    "results": 7,
+    "error": null,
+    "directory": "final-effects-off-calibration-wg"
+  },
+  {
+    "name": "final-effects-off-compare-wg",
+    "results": 2,
+    "error": null,
+    "directory": "final-effects-off-compare-wg"
+  },
+  {
+    "name": "final-dynamic-paired-off-wg",
+    "results": 6,
+    "error": null,
+    "directory": "final-dynamic-paired-off-wg"
+  },
+  {
+    "name": "final-dynamic-paired-off-gl",
+    "results": 6,
+    "error": null,
+    "directory": "final-dynamic-paired-off-gl"
+  },
+  {
+    "name": "fresh-skill-smoke",
+    "results": 1,
+    "error": null,
+    "directory": "fresh-skill-smoke"
+  },
+  {
+    "name": "fresh-gl-timer-final",
+    "results": 1,
+    "error": null,
+    "directory": "fresh-gl-timer-final"
+  },
+  {
+    "name": "smoke-gl-timer",
+    "results": 1,
+    "error": null,
+    "directory": "smoke-gl-timer"
+  },
+  {
+    "name": "baseline-calibrate-wg",
+    "results": 17,
+    "error": "TimeoutError: Navigation timeout of 29973 ms exceeded\n    at new Deferred (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:57:34)\n    at Deferred.create (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:18:16)\n    at new LifecycleWatcher (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/LifecycleWatcher.js:70:46)\n    at CdpFrame.goto (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/Frame.js:152:29)\n    at CdpFrame.<anonymous> (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:101:27)\n    at CdpPage.goto (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:582:43)\n    at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:65:161)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:122:19",
+    "directory": "baseline-calibrate-wg"
+  },
+  {
+    "name": "final-calibrate-wg",
+    "results": 17,
+    "error": "TimeoutError: Navigation timeout of 120000 ms exceeded\n    at new Deferred (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:57:34)\n    at Deferred.create (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/util/Deferred.js:18:16)\n    at new LifecycleWatcher (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/LifecycleWatcher.js:70:46)\n    at CdpFrame.goto (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/cdp/Frame.js:152:29)\n    at CdpFrame.<anonymous> (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/util/decorators.js:101:27)\n    at CdpPage.goto (file:///Users/Honza/WebstormProjects/rust/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:582:43)\n    at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:64:54)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:119:19",
+    "directory": "final-calibrate-wg"
+  },
+  {
+    "name": "smoke-dynamic-detail",
+    "results": 0,
+    "error": "Error\n    at run (file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:81:25)\n    at async file:///Users/Honza/.codex/worktrees/rim-publish/rust/scripts/render-performance.mjs:121:573",
+    "directory": "smoke-dynamic-detail"
+  },
+  {
+    "name": "v2-alternating-profile",
+    "results": 1,
+    "error": null,
+    "directory": "v2-alternating-profile"
+  },
+  {
+    "name": "v3-alternating-pilot",
+    "results": 1,
+    "error": null,
+    "directory": "v3-alternating-pilot"
+  },
+  {
+    "name": "v3-alternating-baseline-control",
+    "results": 1,
+    "error": null,
+    "directory": "v3-alternating-baseline-control"
+  },
+  {
+    "name": "v4-alternating-pilot",
+    "results": 1,
+    "error": null,
+    "directory": "v4-alternating-pilot"
+  },
+  {
+    "name": "v5-alternating-pilot",
+    "results": 1,
+    "error": null,
+    "directory": "v5-alternating-pilot"
+  }
+]

@@ -1,0 +1,162 @@
+{
+  "date": "2026-10-26",
+  "hypothesis": "Three-style resource identity caching: same five texture/sampler resources share group2; skip identical group2 while preserving every material uniform/draw order/quality.",
+  "before": "292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b",
+  "candidate": "7c0e7a79ae63ff2d7858241bc72ca638a5ccf20da2e794087e2cf21ecc5d484f",
+  "quality": "same authored Rome/runtime/assets/960x640DPR1; no shader/AA/resolution/order modification",
+  "acceptance": "Browser pixels/material correctness, all static pixel gates original tolerance8/0.001, actual binding reduction and no frame/CPU regression; descriptive paired timings with adverse repetitions retained. No language or whole-game Three parity claim.",
+  "primaryProtocol": {
+    "pairs": 3,
+    "order": "AB/BA/AB",
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "profiling": false
+  },
+  "threeReference": "Unchanged original Three Rome frozen locally; same gate camera/viewport/authored lighting, MSAA vs FXAA, shaders/shadow/gameplay differences explicitly recorded; static diagnostic not established image/full-game equivalence.",
+  "files": {
+    "src/render/gltf_gpu.rs": "d27a58b8c8220fa9d785424f317a60597aa7e184d4e02e6269ebafcd871f4eb8",
+    "tests/gltf-batching.js": "66982108aa5930e07115eeb2b043039bcc4087dc68602857ac278c2d27e7e0c2",
+    "tests/render-performance-three-rim.js": "0d433c877521b30c668dcd3eb5f5bfc78ea9b3da5af03d7af3ece6160d66a657",
+    "tests/render-performance-three-rim.html": "0d6815e6676100795614918fc192ebea166ecd15572c0ba001c353d534a6ec4c",
+    "scripts/render-performance.mjs": "1c2c5a87b6659566663e44ff0d6e126b050510ebed41b3005286e6734af508d1",
+    "scripts/render-performance-lib.mjs": "428440ee899aa7c37e39577c83449ec5d4e9bd17dba703dc30527a7cc9b899a6"
+  },
+  "delivery": "isolated candidate only; no8443/8878 change or push",
+  "secondExperiment": {
+    "candidate": "7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435",
+    "hypothesis": "Consolidate existing rigid instance records per pass/view into one upload, preserve material/group ordering and singleton/skin/blend paths; Rc canonical texture ownership avoids per-draw backend-handle cloning.",
+    "boundedFallback": "16MiB and device max buffer limit; larger streams retain standalone group buffers.",
+    "checks": "strict WASM Clippy, 13 affected browser/backend cases including CPU/independent-resource references, stream2/3/9/3 growth, exact call/bytes and actualXR/cut coverage; initial test diagnostics/HUD reference mistakes corrected without tolerance changes.",
+    "primary": "3AB/BA/AB pairs8s/25s actual activeRome both backends; static pixel/control pair and originalThree3pair static diagnostics separately labelled",
+    "sourceSha256": "b7c7ae56b9cb574bbfb0567de1fc3104e88eeb752bd6465fa52cc5a868bf8989",
+    "rejectedCausalGuess": "WebGPU BindGroup Eq is already a local Identifier comparison (wgpu backend webgpu.rs/cmp.rs), not a JS equality round trip; do not attribute regression to that guess."
+  },
+  "shadow_dispatch_experiment": {
+    "declared": "2026-10-26T12:11:49.736875+00:00",
+    "hypothesis": "Move uniform light/resource dispatch outside unchanged 3x3 shadow PCF loops; avoid repeated sampler selection on GL without changing samples, tap accumulation order, per-tap min, bias, resolution or shadow update policy. Actual high-resolution ablation identified shadow-dependent cost.",
+    "baseline": "candidate-stream",
+    "files": [
+      "src/render/gltf_pbr.wgsl",
+      "src/shader.wgsl"
+    ],
+    "acceptance": "Maintained shadow/PBR tests both backends, same-renderer exact/tolerance pixel comparison and repeated profiler-OFF high-resolution pairs. Ablations never retained."
+  },
+  "shadow_layers_experiment": {
+    "declared": "2026-10-26T12:17:57.211206+00:00",
+    "baseline": "candidate-shadow (dispatch only)",
+    "hypothesis": "Hoist uniform static-only/dynamic-only/both layer selection outside the nine ordered PCF taps in each fixed-resource helper. Preserve identical samples and per-tap min; do not change filter/resolution/AA.",
+    "acceptance": "96exact frozen-baseline probe cases, maintained affected tests and profiler-off actualRome matched timing; reject if larger shader yields no improvement/regression.",
+    "firstPilot": {
+      "wasm": "9223a5e8425303fa688981d94e9129e057e401f3d1fa2e479934959924e625f4",
+      "pixelOracle": {
+        "baseline": "669d",
+        "cases": 96,
+        "exact": 96
+      },
+      "nativeGl2880x1920Off": {
+        "warmupMs": 3000,
+        "sampleMs": 8000,
+        "rafMeanMs": 16.66604166666667,
+        "fps": 60.002250084378154,
+        "overruns": 0
+      },
+      "status": "Promising pilot only; final 3pair runs against7b0/669d/Three and WG control in progress"
+    }
+  },
+  "light_unroll_experiment": {
+    "declared": "2026-10-26T12:29:48.073159+00:00",
+    "baseline": "candidate-shadow-layers 9223",
+    "reference": "Pinned Three r170 lights_fragment_begin and WebGLProgram unrollLoops lines19701-19722",
+    "hypothesis": "Unroll four fixed LIGHT_COUNT contributions using constant indices, with identical ordered additions and zero-color guards, allowing compile-time light/resource selection. Preserve all equations, shadow taps, updatepolicy, quality and rendering boundaries.",
+    "acceptance": "Expanded exact oracle with simultaneous colored lights, zeros, shadowcount0/1/4, legacy/authored modes and metallic/roughness; repeated matchedGL/WG and directThree, reject if no reproducible gain.",
+    "outcome": "Neutral at2880x1920: all6 runs in3pairs capped60, no demonstrated incremental throughput gain; firstversionGLinvalidgl_1 naming fixed and retested144exact. Reject addedfourfoldlightingbody complexity; restore9223 lightingloop before next experiment."
+  },
+  "pcf_four_fetch_experiment": {
+    "declared": "2026-10-26T12:50:49.929148+00:00",
+    "baseline": "candidate-shadow-layers 9223 (light-loop unroll reverted)",
+    "hypothesis": "Preserve original3x3 box-of-bilinear depth-comparison kernel using four weighted bilinear fetches for single occupied layer only. Underlying1Dweights[1-f,1,1,f], totalsA=2-f/B=1+f, normalizedCartesianproduct/9. Bothlayersretainoriginal9 per-tap minimum. No shadow resolution, bias, AA or lighting changes.",
+    "independentNumeric": {
+      "cases": 536768,
+      "maxAbsoluteError": 2.9976021664879227e-15,
+      "test": "scripts/shadow-pcf-equivalence.test.mjs",
+      "pass": true
+    },
+    "qualityAcceptance": "Explicit tolerated pixel equivalence (NOT exact): existing8/255 and0.001fraction gates, additionally ALL probe pixels maxdelta<=8; shadow-edge-only RGB RMSE<=1byte and max<=8, no background dilution. Include moving/diagonal shadows and mask3 overlap. Retain adverse results; reject if those gates or repeated actual scene timing fail.",
+    "outcome": "Weighted four-fetch GPU oracle296cases and edge gate passed(max2); short4096 pilot39.96FPS vs earlier~40 provides no matched gain. Rejected and source restored.",
+    "status": "Rejected; retained raw probes/pilot, no shader change retained"
+  },
+  "pcf_uniform_experiment": {
+    "declared": "2026-10-26T13:00:45.616760+00:00",
+    "baseline": "candidate-shadow-layers9223",
+    "hypothesis": "For one occupied shadow layer only, four linear-comparison samples at centers of four disjoint2x2 blocks cover full original4x4 texel support. Exact all-zero/all-one classification returns0/1. Mixed samples execute originalordered9taps. Texel-boundary phase guardscaledf32error+1/256 retains9tapfallback. Mask3unchanged. No image settings/filter changes.",
+    "acceptance": "Exact GPU pixel equality all312expandedprobe cases +visibleedgecontrols, f32 support-containment numeric oracle, actualRome same-renderer gates and repeated pairedtiming. 4fetchinterior/13edge/9boundary, mayregresshigh-frequencyshadow workloads; measure and retainadversecontrols.",
+    "outcome": {
+      "quality": "296/296exact GPU cases,32negativecontrolsPASS,178shadowsettings154visibleedgesmeasured/24zero-directlight unavailable, edgeerror0",
+      "pilot": "NativeGL4096x2730 OFF3s/8s34.07FPS vsprior6b1~40; adverse, rejected. No continued speedup claim; originaledgefallback may add work, attributionunproven."
+    }
+  },
+  "zeroLight": {
+    "baseline": "9223",
+    "candidate": "ad310eb6",
+    "hypothesis": "Skip shadow lookup only if direct-light multiplier is exactly zero. Preserve BRDF, PCF and all image settings.",
+    "quality": "224/224 exact probe cases on both backends including signed light elevations near zero, legacy/authored, dielectric/metallic, double-sided glTF.",
+    "pilot": "4096x2730 single3s/8s pair30.812\u219232.319FPS; small preliminary gain, needs repeated confirmation. Absolute cadence lower than earlier runs; preserve matched evidence without cross-run attribution."
+  },
+  "singleStaticShadow": {
+    "baseline": "candidate-zero-light ad310eb6",
+    "hypothesis": "Three-style program parameter specialization for exact uploaded effects uniform params.x1/layers[1,0,0,0]. Main color glTF opaque and in-pass blend variants; reflection/environment, depth and separate transparent-overlay paths remain generic. Literal matrix0 and one map, identical ordered9tap kernel. Key includes occupancy boolean.",
+    "acceptance": "Fresh expanded exact pixel oracle with single-light masks1/2/3 transitions, independent translated source resource inspection, repeated paired actual4096Rome and active both-backend regression checks; reject absent reproducible gain."
+  },
+  "singleSun": {
+    "baseline": "a9975d26",
+    "hypothesis": "Exact Three-style directional-light program specialization when prepared light0 is nonzero/all remaining lights zero and authored appearance enabled. Compile one literal light0 contribution and authored sun vector, removing generic loop and eagerly evaluated point-light normalization. Shadow kernel unchanged. Other states generic.",
+    "acceptance": "384-case exact both-backend oracle; translated-source check; reject absent clear4096actualRome pilot gain, then repeated paired confirmation if promising. No quality changes.",
+    "result": "REJECTED before performance measurement: declared exact probe gate failed on one WebGPU metallic pixel by1/255 (53rd case). Retain failure; restore a997 source/pkg. No tolerance relaxation or performance claim."
+  },
+  "fixedStaticPose": {
+    "cause": "createScene clears scene and resets global pause during loading. Idle clip poses could advance before final pause; all >8 differences in prior4096 comparisons localized around one small animated character. Timing remains diagnostic but exactstaticstate not guaranteed.",
+    "fix": "Explicitly play/pause/seek Idle time0 for originals and encounter models after native configuration. OriginalThree exposed original-character mixers setTime0 afterready/manualtime. Runtime apps unchanged.",
+    "next": "Completed fresh calibrations and paired neutral-final series; archived older pose-drift evidence retained."
+  },
+  "neutralMissingNormal": {
+    "baseline": "a9975d26",
+    "status": "Retained a54; independent quality and combined-checkpoint final timings/maintainedproductioncheckscomplete. No isolated long timing claim.",
+    "reference": "Khronos glTF2 material.normalTexture absent => no tangent-space normal texture; pinnedThree r170 normal_fragment_begin/normal_fragment_maps14124/14126. https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#material-normaltexture",
+    "hypothesis": "MissingnormalTexture should preserve authored shadingnormal, not decode128/255 syntheticmap. Remove onlynoMap TBN/UV2 using existingtexturemask variant; all realnormalmaps stayfullpath. This is an explicit semantic correction if spec confirms, no image-quality reduction.",
+    "acceptance": "Independent noMap vs sameglTFexplicitnormalTexture.scale0 fullTBN reference across normals/flat/doubleSided/rotation/mirrors/bothbackends with max1byte predeclared; originalRomequality8/.001unchanged plus visibleedgegate; oldbiasedfallbackdiffrecorded, nevercalledexact. Inspecttranslatedshaderthenperformancematched4096pilot; reject/restoreifregression.",
+    "oracle": "24 base +8 noUV states on each actual backend PASS. NoMap vs fullTBN normalTexture.scale0 reference max1/255. Existing neutral/mapped old/new exact. Actualcity19primitives allNORMAL, noUV/tangents/normalMaps."
+  },
+  "integerPowers": {
+    "baseline": "a54c09c9",
+    "reference": "PinnedThreecommon.pow2 usesx*x. Nativea54translatedMetal shader45 stillmetal::powr(base,2.0)line804andpowr(x,5.0)826. ThreeSchlickexp2approx isNOT copied.",
+    "hypothesis": "Replace onlyintegerpowers byorderedmultiplication, samepositive-domainGGX/Schlickformula, no clamps/roughness/shadows/resolution changes. NegativeSchlickinputwhenvh>1: oldpowr undefined, do notclaimguaranteedequivalence there.",
+    "qualityBeforePerformance": "Numericf32domainoracle; max2/255 for ALL independentprobe pixels ofnormalMapneutral+mapped paths vs a54, no fraction dilution. noMapvsneutralreference max1. Addroughness.05metallic andgrazingdoubleSided. ActualRome original8/.001gate unchanged; retain failures; no performancemeasure beforequalitypasses.",
+    "timing": "4096Romefreshcal+3s/8ssinglepilot onlyifqualitypasses; longpairedfinal onlyifpromising.",
+    "outcome": {
+      "decision": "REJECTED; source restored to a54, exact frozen pkg restored and assertFreshBuild passed",
+      "numeric": "100001 bases [0,1], square error0, fifth error<=1.1920928955078125e-7",
+      "quality": "44states/backend noMap vs scale0 max1, real maps old/new max2; direct no-map supplement88captures max0, actual4096Rome exact",
+      "pilotFps": [
+        38.67120741489216,
+        38.70725291243894
+      ],
+      "reason": "No demonstrated pilot gain; retain simpler prior formula."
+    }
+  },
+  "finalCandidate": {
+    "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+    "root": "candidate-neutral-normal",
+    "longComparisons": "All12 commands in commands-neutral-final.json exit0; six final scenarios complete",
+    "integerPowersRetained": false,
+    "verification": "22 release/minified maintained browser cases, strictWASMClippy, types and32tooling testsPASS; sixmode UI/slider/mobilePASS",
+    "deployment": "Explicituserapproval: currentLAN192.168.11.134:8443 app ee1b8d0017, a54WASM actual5payloadhashes/no-store/explicitlocalCA PASS; old192.168.0.17unassigned",
+    "publication": "No commit/push/CI/physicalQuestclaim",
+    "staticGlFpsMedianBeforeAfter": [
+      24.560982439297597,
+      38.57592862054063
+    ],
+    "staticGlFpsScope": "Use exact neutral-final-over report for unrounded per-run values, baseline7b0",
+    "directThree": "Separate series nativea54 median36.081 vsoriginalThree60.002, AA/shaders/shadowsunmatched; targetnotachieved"
+  },
+  "finalized": "2026-10-26T14:54:41.154548+00:00"
+}

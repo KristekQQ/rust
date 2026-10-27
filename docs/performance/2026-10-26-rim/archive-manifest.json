@@ -1,0 +1,462 @@
+{
+  "REPORT.md": {
+    "bytes": 4747,
+    "sha256": "28291564f1729beb293889c54e3dff79c87367cdfa91d6316ccdf289dabdcb2c"
+  },
+  "build-results.py": {
+    "bytes": 10908,
+    "sha256": "a1df34cd8c7cfd98aa4334c74397183f40b1bdb622985063ce1bcee05fa1a919"
+  },
+  "build-view.mjs": {
+    "bytes": 14561,
+    "sha256": "699c1c0ee3d80fc519b8b880e7b38fc8d55979641fe4d1bd202e22ddc0b689c6"
+  },
+  "cal-rim-active-gl/baseline-rim-active-1-pair0.png": {
+    "bytes": 198889,
+    "sha256": "08809cf2bc9525e1ff405910e2fd60864e9bd99623e4f610f6941ea3b79006e3"
+  },
+  "cal-rim-active-gl/config.json": {
+    "bytes": 5751,
+    "sha256": "ef95db877465610d6f47e02e7217cb3fa619fe6deef5b492c6e331b50ea0aadb"
+  },
+  "cal-rim-active-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "cal-rim-active-gl/raw.json.gz": {
+    "bytes": 6469,
+    "sha256": "e926c0c38eab87a5effb2ef03971941d38a2e29f5d6ad820add02661e1807b99"
+  },
+  "cal-rim-active-gl/report.json.gz": {
+    "bytes": 9310,
+    "sha256": "92b4bee94c7810f5dc3be5b7ebc4f0505d7607ef3e2533b323b6835f3a0b61bf"
+  },
+  "cal-rim-active-wg/baseline-rim-active-1-pair0.png": {
+    "bytes": 199317,
+    "sha256": "9b7feb66a547e645d082b609a9d74c8fe6e80b181e23bb09c7d274441ce762d3"
+  },
+  "cal-rim-active-wg/config.json": {
+    "bytes": 5752,
+    "sha256": "651c664abb742f2bc5201ed9d7fdf7b081ae1b5469dde955f49535fd2694bdc8"
+  },
+  "cal-rim-active-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "cal-rim-active-wg/raw.json.gz": {
+    "bytes": 6587,
+    "sha256": "6a264f34313adfe5e6257d49eb701cbed5d817c485422a85dd5fee5a0ab0c230"
+  },
+  "cal-rim-active-wg/report.json.gz": {
+    "bytes": 9336,
+    "sha256": "3bc08e3aca832710ecabc1b99a0003c53896e9fd760fa2ecd3955b1741394dfc"
+  },
+  "cal-rim-static-gl/baseline-rim-static-1-pair0.png": {
+    "bytes": 148062,
+    "sha256": "f865212cd017bddd1799620df2bf24182f6daa1d44a2e969b105b94c0c5b7054"
+  },
+  "cal-rim-static-gl/config.json": {
+    "bytes": 5751,
+    "sha256": "3f67d45cb45444f3bc1cdc2478c161e504a69827ccc6b05131137b7412ba5416"
+  },
+  "cal-rim-static-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "cal-rim-static-gl/raw.json.gz": {
+    "bytes": 4679,
+    "sha256": "620f6fdadaa0f9de9e5f392c06d3852809e35b3caebfbf818aba032563d4d464"
+  },
+  "cal-rim-static-gl/report.json.gz": {
+    "bytes": 8391,
+    "sha256": "b86d3a9d9923ead25b24d3ceb91bb6516addf4565c2a6f66e7ddea8272076cc4"
+  },
+  "cal-rim-static-wg/baseline-rim-static-1-pair0.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "cal-rim-static-wg/config.json": {
+    "bytes": 5752,
+    "sha256": "655e8ebded506bfc1485431f4a55fa16b6641f6f779b58c1bb40b4d908ae4def"
+  },
+  "cal-rim-static-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "cal-rim-static-wg/raw.json.gz": {
+    "bytes": 4476,
+    "sha256": "680b741403500f56b1d531e2fda827a7eb668408481c72295f65a28a74b2944d"
+  },
+  "cal-rim-static-wg/report.json.gz": {
+    "bytes": 8404,
+    "sha256": "59ac829f6fe258ac4aac548c193a1870b2b52a929336ad70efee1a97fb9e1873"
+  },
+  "commands.json": {
+    "bytes": 10683,
+    "sha256": "2a9b2f41c5dbd7e20cb02b7d757afc078975d71770150ec9fd695d08513c9021"
+  },
+  "finalize-results.py": {
+    "bytes": 8960,
+    "sha256": "2b3ce8eabbc10a7c10785f91b20216a1922ad001c9d31b0eabeee40216377f69"
+  },
+  "index.html": {
+    "bytes": 54475,
+    "sha256": "b80171d2e9ec722fd8ca9fb801564c8772e98b6f88d63b8c31901af325fc319d"
+  },
+  "measurement-source.tar.gz": {
+    "bytes": 22298,
+    "sha256": "0f665e8758ee3ef0ce49f5f5b7deacd0669fbebbf2ce4db2ee02846dff1d24e7"
+  },
+  "paired-rim-active-gl/baseline-rim-active-1-pair0.png": {
+    "bytes": 223955,
+    "sha256": "4d7a0c1de1a241575e85ec20c51dd08eccc4ea174936b8315aa5dbe20866c315"
+  },
+  "paired-rim-active-gl/baseline-rim-active-1-pair1.png": {
+    "bytes": 224138,
+    "sha256": "0515c5fd25c906a748d4be11e196c0fb02d7c7e7cb6339768270b6d243901900"
+  },
+  "paired-rim-active-gl/baseline-rim-active-1-pair2.png": {
+    "bytes": 223879,
+    "sha256": "4052f8b95c5c8b789b4b436dff5468838d1745ec3d906630ce0aa3adb681bbad"
+  },
+  "paired-rim-active-gl/candidate-rim-active-1-pair0.png": {
+    "bytes": 223312,
+    "sha256": "74b70fcc2100c91522140e4954f54df2d80b03c4ab79cd8f1aa7f4092b41f13a"
+  },
+  "paired-rim-active-gl/candidate-rim-active-1-pair1.png": {
+    "bytes": 223530,
+    "sha256": "652c591192e7c6af14d460edb9a7dd009af0c1eaad603225019557cbc65a6d2b"
+  },
+  "paired-rim-active-gl/candidate-rim-active-1-pair2.png": {
+    "bytes": 224135,
+    "sha256": "2a0f852cf098e1fc2dee1cd01b346807d2f2e7cc6b0aa76ce4cba909f325cc98"
+  },
+  "paired-rim-active-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "paired-rim-active-gl/manifest-candidate.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "paired-rim-active-gl/raw.json.gz": {
+    "bytes": 204412,
+    "sha256": "63154a1f0dd06a11a8851b62d14cf6060805c7f5704d7ba38396c13a97899e5d"
+  },
+  "paired-rim-active-gl/report.json.gz": {
+    "bytes": 18612,
+    "sha256": "f6e2ef7013b5f24fc644e915681c846388c46193ba482949fc9082c6adaebb3c"
+  },
+  "paired-rim-active-wg/baseline-rim-active-1-pair0.png": {
+    "bytes": 224206,
+    "sha256": "a8c70f58d7f7bf118f1074ef94aeecfcdf15d0dea2b231d018d816d6f9d83461"
+  },
+  "paired-rim-active-wg/baseline-rim-active-1-pair1.png": {
+    "bytes": 223634,
+    "sha256": "d1b8936f9e32f1a21909a29a5d67e9acbb76b512254c60b67e3523999f5ddb88"
+  },
+  "paired-rim-active-wg/baseline-rim-active-1-pair2.png": {
+    "bytes": 223794,
+    "sha256": "673fd4e4cc4976c4fcee52ef16a47027c23f1a198946560f722a408842cecc1e"
+  },
+  "paired-rim-active-wg/candidate-rim-active-1-pair0.png": {
+    "bytes": 223460,
+    "sha256": "6fcfb985e8be05030b241fdcb15ee4abb9f450a804d711357209643b4dc9db6b"
+  },
+  "paired-rim-active-wg/candidate-rim-active-1-pair1.png": {
+    "bytes": 223537,
+    "sha256": "27642ab89ae98f9f44dbff7fa69003f543733bd93bbe53cd751d68259489a7b6"
+  },
+  "paired-rim-active-wg/candidate-rim-active-1-pair2.png": {
+    "bytes": 223928,
+    "sha256": "ec70228b4b8aae2c64bb8046b77e969e6ff85f32f6c0fe075110abce7b7aaa65"
+  },
+  "paired-rim-active-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "paired-rim-active-wg/manifest-candidate.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "paired-rim-active-wg/raw.json.gz": {
+    "bytes": 203403,
+    "sha256": "7d49cfc94148fca2408cdd48a3bf5e55cc3daafc4aedaf0e4a1f2877c6f06dad"
+  },
+  "paired-rim-active-wg/report.json.gz": {
+    "bytes": 18616,
+    "sha256": "34f5ea0683ac872443a35f66a18c6b16982aca799cf19ee188f14724beb8559f"
+  },
+  "paired-rim-static-gl/baseline-rim-static-1-pair0.png": {
+    "bytes": 148062,
+    "sha256": "44878f3258d45a85f17843dc82c980c19c1cc3906c4e7f07ceda9cd3f55e9d65"
+  },
+  "paired-rim-static-gl/baseline-rim-static-1-pair1.png": {
+    "bytes": 148062,
+    "sha256": "f865212cd017bddd1799620df2bf24182f6daa1d44a2e969b105b94c0c5b7054"
+  },
+  "paired-rim-static-gl/baseline-rim-static-1-pair2.png": {
+    "bytes": 148062,
+    "sha256": "f865212cd017bddd1799620df2bf24182f6daa1d44a2e969b105b94c0c5b7054"
+  },
+  "paired-rim-static-gl/candidate-rim-static-1-pair0.png": {
+    "bytes": 148062,
+    "sha256": "44878f3258d45a85f17843dc82c980c19c1cc3906c4e7f07ceda9cd3f55e9d65"
+  },
+  "paired-rim-static-gl/candidate-rim-static-1-pair1.png": {
+    "bytes": 148062,
+    "sha256": "44878f3258d45a85f17843dc82c980c19c1cc3906c4e7f07ceda9cd3f55e9d65"
+  },
+  "paired-rim-static-gl/candidate-rim-static-1-pair2.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "paired-rim-static-gl/manifest-candidate.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "paired-rim-static-gl/raw.json.gz": {
+    "bytes": 136889,
+    "sha256": "f3e43b12de27fbbae36c49d3f98b87c55c630dabc257ca5b90a24034e20d42ef"
+  },
+  "paired-rim-static-gl/report.json.gz": {
+    "bytes": 13032,
+    "sha256": "a3b3d030d92448bcba91846d03202f6a55582370a7a9cecc2e8adcc697a9fcd9"
+  },
+  "paired-rim-static-wg/baseline-rim-static-1-pair0.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-wg/baseline-rim-static-1-pair1.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-wg/baseline-rim-static-1-pair2.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-wg/candidate-rim-static-1-pair0.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-wg/candidate-rim-static-1-pair1.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-wg/candidate-rim-static-1-pair2.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "paired-rim-static-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "paired-rim-static-wg/manifest-candidate.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "paired-rim-static-wg/raw.json.gz": {
+    "bytes": 134952,
+    "sha256": "e358fba73d99931abc5d251104e9fdad245a068943091dd064528eed239657ea"
+  },
+  "paired-rim-static-wg/report.json.gz": {
+    "bytes": 12904,
+    "sha256": "e7d74ab0b53750b8f8bb4908911238d55c16c5624ca7a9a7cb849d538b9e5381"
+  },
+  "plan.json": {
+    "bytes": 3881,
+    "sha256": "0c23ef6b20b78533d4d74cf59f0ec1dfcbe88eb8009593a93146700f2b413c7b"
+  },
+  "profile-after-rim-active-gl/baseline-rim-active-1-pair0.png": {
+    "bytes": 208640,
+    "sha256": "5fc624446973cbed07db524492aebc9cb74789187bd66b341a3145086f69e03d"
+  },
+  "profile-after-rim-active-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "profile-after-rim-active-gl/raw.json.gz": {
+    "bytes": 25156,
+    "sha256": "5671c72436fe9cc0c90dbe47e02cedd0e75173374460a731cfdc44c90f3d8708"
+  },
+  "profile-after-rim-active-gl/report.json.gz": {
+    "bytes": 11038,
+    "sha256": "39b106eef4f50d0ccf2245b2953c32eab318c1e675ae9ae4cd7363cc53c1dcb5"
+  },
+  "profile-after-rim-active-wg/baseline-rim-active-1-pair0.png": {
+    "bytes": 208760,
+    "sha256": "05cb8d60c20d44537eb3d80ec94cc2c5da0bb65c23243af26184ac430a2dfe83"
+  },
+  "profile-after-rim-active-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "profile-after-rim-active-wg/raw.json.gz": {
+    "bytes": 26869,
+    "sha256": "16115626cc91a8271de44b20fe79510b80f863922ec6f200f3636b9fd7e451b1"
+  },
+  "profile-after-rim-active-wg/report.json.gz": {
+    "bytes": 10808,
+    "sha256": "71ab0ffbada0227cf8d6b049bb3976e821a223a4f4115625931432468b9cfad6"
+  },
+  "profile-after-rim-static-gl/baseline-rim-static-1-pair0.png": {
+    "bytes": 148062,
+    "sha256": "44878f3258d45a85f17843dc82c980c19c1cc3906c4e7f07ceda9cd3f55e9d65"
+  },
+  "profile-after-rim-static-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "profile-after-rim-static-gl/raw.json.gz": {
+    "bytes": 17744,
+    "sha256": "9df11de265ed44b213ebeccc51bbfe9732afa63a3e728feb87ffc696e40fad93"
+  },
+  "profile-after-rim-static-gl/report.json.gz": {
+    "bytes": 9714,
+    "sha256": "7af7a0645efc622db5b7753499ea6c0775772639fea5c716d9ddcc2832070923"
+  },
+  "profile-after-rim-static-wg/baseline-rim-static-1-pair0.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "profile-after-rim-static-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "c59a836d005cfdd941c40f46dfbc2fd8856c461d7038fdc183d5fc99ac36da6b"
+  },
+  "profile-after-rim-static-wg/raw.json.gz": {
+    "bytes": 18053,
+    "sha256": "c38df1f3f7dd6d409d21aa4d3e4431b147d7b22c19125a2be1d9dd95ec279e0b"
+  },
+  "profile-after-rim-static-wg/report.json.gz": {
+    "bytes": 9501,
+    "sha256": "7a73b546cc2d883b4450b59b23efe7fd5703dbb30e6a34d48feefddf5ff0a064"
+  },
+  "profile-before-rim-active-gl/baseline-rim-active-1-pair0.png": {
+    "bytes": 208715,
+    "sha256": "54c92c09d8cdef67fea9ed43f067bc60b4d5bc4d8f3aa1994f5eede44426c55b"
+  },
+  "profile-before-rim-active-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "profile-before-rim-active-gl/raw.json.gz": {
+    "bytes": 23132,
+    "sha256": "069b4bf4079b0244b120b0ce3f588d29119573bb7f0c365d5818db7f7d2dd25a"
+  },
+  "profile-before-rim-active-gl/report.json.gz": {
+    "bytes": 10548,
+    "sha256": "baa3e2545d9b53082627ebc79e2dff0f1ca2e62a58f4200762b566b7d61a9d87"
+  },
+  "profile-before-rim-active-wg/baseline-rim-active-1-pair0.png": {
+    "bytes": 208248,
+    "sha256": "693a9b80b19081ccb108ecd01c2df76b29be3619b66f04515d0e0c5e8eaa6750"
+  },
+  "profile-before-rim-active-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "profile-before-rim-active-wg/raw.json.gz": {
+    "bytes": 23979,
+    "sha256": "a774bef9d0868080a79000a5a009fbbaf83e8921c7986bcd22fc21ffd9fabab8"
+  },
+  "profile-before-rim-active-wg/report.json.gz": {
+    "bytes": 10257,
+    "sha256": "ad8352e9072af7aada0eb0215f355bcacd14255ec469b953058b83ebc3353aaf"
+  },
+  "profile-before-rim-static-gl/baseline-rim-static-1-pair0.png": {
+    "bytes": 148062,
+    "sha256": "f865212cd017bddd1799620df2bf24182f6daa1d44a2e969b105b94c0c5b7054"
+  },
+  "profile-before-rim-static-gl/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "profile-before-rim-static-gl/raw.json.gz": {
+    "bytes": 17190,
+    "sha256": "c4f1aadc6352bd96eee13721182bdbf061e5f59905e7894182fd606ab98fc4f8"
+  },
+  "profile-before-rim-static-gl/report.json.gz": {
+    "bytes": 9173,
+    "sha256": "223cb57f04a8cbf8d710495f43e43092dd1aa16ec4b1458e9c2da5d103891832"
+  },
+  "profile-before-rim-static-wg/baseline-rim-static-1-pair0.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "profile-before-rim-static-wg/manifest-baseline.json": {
+    "bytes": 3368,
+    "sha256": "5671c6ec0cde456521e33aca4428600dbd908b3cf6ccf08fe0d4208a598c671f"
+  },
+  "profile-before-rim-static-wg/raw.json.gz": {
+    "bytes": 16809,
+    "sha256": "c24d44e983dcba6e98016345e57504d41858622a1efd265e66a1401c31fb4598"
+  },
+  "profile-before-rim-static-wg/report.json.gz": {
+    "bytes": 8958,
+    "sha256": "d0b010faab6126b0296aad10223f4736675bfb7fca18066beb2c8f408f96c2fb"
+  },
+  "report-desktop.png": {
+    "bytes": 430624,
+    "sha256": "7a61be6fa59626d8155a138f786a508f7fa2b1789f44717aa982ed1ad89195cf"
+  },
+  "report-mobile.png": {
+    "bytes": 288696,
+    "sha256": "5202a81305b6abfde6b62492c68d2e8f2561318a592bcd6c0a7940d1154ac9dd"
+  },
+  "rim-active-gl-after.png": {
+    "bytes": 223312,
+    "sha256": "74b70fcc2100c91522140e4954f54df2d80b03c4ab79cd8f1aa7f4092b41f13a"
+  },
+  "rim-active-gl-before.png": {
+    "bytes": 223955,
+    "sha256": "4d7a0c1de1a241575e85ec20c51dd08eccc4ea174936b8315aa5dbe20866c315"
+  },
+  "rim-active-wg-after.png": {
+    "bytes": 223460,
+    "sha256": "6fcfb985e8be05030b241fdcb15ee4abb9f450a804d711357209643b4dc9db6b"
+  },
+  "rim-active-wg-before.png": {
+    "bytes": 224206,
+    "sha256": "a8c70f58d7f7bf118f1074ef94aeecfcdf15d0dea2b231d018d816d6f9d83461"
+  },
+  "rim-static-gl-after.png": {
+    "bytes": 148062,
+    "sha256": "44878f3258d45a85f17843dc82c980c19c1cc3906c4e7f07ceda9cd3f55e9d65"
+  },
+  "rim-static-gl-before.png": {
+    "bytes": 148062,
+    "sha256": "44878f3258d45a85f17843dc82c980c19c1cc3906c4e7f07ceda9cd3f55e9d65"
+  },
+  "rim-static-wg-after.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "rim-static-wg-before.png": {
+    "bytes": 148083,
+    "sha256": "fb0a429c47d4b03208975992ca072aa70bf23df79b3579e582146cc75a845650"
+  },
+  "run-series.py": {
+    "bytes": 2201,
+    "sha256": "1655c73085b5d898bde8b8965812ff9080e74251f6a8f957bfcecfa6fcef8960"
+  },
+  "validation.json": {
+    "bytes": 1716,
+    "sha256": "08c88f80935d6f2ffe59e5225e63eb61e5bd543bed0bab7e0779ef14671880a1"
+  },
+  "verify-view.mjs": {
+    "bytes": 3636,
+    "sha256": "2f385f8923f58886d4cbf714119f9575d243bd68f77e012859fc5cdad7c91336"
+  },
+  "view-data.json": {
+    "bytes": 93956,
+    "sha256": "a92ced51bbb64658df56a303ffcb4127212368bafe629ebcce2ac2ab314ffdd6"
+  },
+  "view-verification.json": {
+    "bytes": 3200,
+    "sha256": "16abb714462919846c85b555a2991772f51bb2e86113d3fe24cd9c038849bb97"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "baseline": "output/render-performance/candidate-adaptive",
+  "baselineWasm": "6f9a3bba80c0681fbf4908ac4dbda7fd5088ed72aa6c4f8523b3a2d5a68518b9",
+  "candidate": "output/render-performance/candidate-compose",
+  "hypothesis": "Direct affine Euler YXZ column composition inspired by local Three r170 Matrix4.compose removes four general Mat4 products per Transform::model without changing convention/quality.",
+  "constraints": [
+    "No shader/layout/presentation/gameplay changes",
+    "Legacy chained matrix numerical oracle",
+    "Native transform correctness and both backend independent pixels before full paired performance",
+    "Serialize GPU runs and builds; preserve 8443/8878 and ignored production output"
+  ],
+  "protocol": {
+    "calibration": "6f9 baseline, max6144 objects,500ms warmup/2500ms sample; existing maintained bounded algorithm",
+    "pilot": "6144 objects,1000ms warmup/5000ms sample,1pair both backends; exact pixels, no profiler",
+    "decision": "Retain only if improvement repeats in three AB/BA/AB pairs,8000ms warmup/25000ms sample; disclose adverse cases; if no gain revert and choose next hypothesis",
+    "three": "Retained Rust vs unchanged local Three r170 objects + instanced,3 alternating AB/BA/AB pairs,4000ms warmup/10000ms measurement,6144 submitted objects/12288 triangles; secondary geometric controls, shading/lighting equivalence not claimed. Main before/after remains8000/25000ms."
+  },
+  "commands": [],
+  "secondStep": {
+    "change": "Reuse ObjectRenderData cached root model for glTF publication; no new cache invalidation, no normal-matrix shortcut.",
+    "candidateRoot": "output/render-performance/candidate-cache",
+    "decision": "First direct-only pilot: WG15.6->15.2ms,GL16.1->15.3ms, exact captures; modest single-pair evidence, no reliable individual speedup claim. Measure combined path against frozen6f9 baseline with unchanged common harness/load; retain final only after full paired evidence.",
+    "oracle": "Native actual Fox glTF root setters, spin, projectile, playback and seek; cached matrix must equal fresh model() after each."
+  }
+}

@@ -8,3 +8,6 @@ node_modules/
 render.png
 all_sources.txt.*
 /output/
+
+# Pinned runtime dependency of the independent Three.js reference.
+!examples/rim-three/vendor/

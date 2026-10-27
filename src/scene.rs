@@ -164,11 +164,20 @@ impl Transform {
         }
     }
     pub fn model(&self) -> Mat4 {
-        Mat4::from_translation(self.position)
-            * Mat4::from_rotation_y(self.rotation.y)
-            * Mat4::from_rotation_x(self.rotation.x)
-            * Mat4::from_rotation_z(self.rotation.z)
-            * Mat4::from_scale(self.scale)
+        // Compose the affine columns directly, as in Three's Matrix4.compose,
+        // while preserving our Euler convention T * Ry * Rx * Rz * S.
+        // Keep the products grouped like the original rotation matrices.
+        let (sx, cx) = self.rotation.x.sin_cos();
+        let (sy, cy) = self.rotation.y.sin_cos();
+        let (sz, cz) = self.rotation.z.sin_cos();
+        let ys = sy * sx;
+        let yc = cy * sx;
+        Mat4::from_cols(
+            (Vec3::new(cy * cz + ys * sz, cx * sz, -sy * cz + yc * sz) * self.scale.x).extend(0.0),
+            (Vec3::new(-cy * sz + ys * cz, cx * cz, sy * sz + yc * cz) * self.scale.y).extend(0.0),
+            (Vec3::new(sy * cx, -sx, cy * cx) * self.scale.z).extend(0.0),
+            self.position.extend(1.0),
+        )
     }
     fn is_valid(&self) -> bool {
         self.position.is_finite()
@@ -206,6 +215,9 @@ pub struct RenderOptions {
     pub casts_shadow: bool,
     pub receives_shadow: bool,
     pub reflectivity: f32,
+    /// Author guarantees opaque parts have no inter-root coplanar/order dependency.
+    /// Independent of mobility: moving instances can share immutable geometry.
+    pub opaque_reorderable: bool,
 }
 impl Default for RenderOptions {
     fn default() -> Self {
@@ -214,6 +226,7 @@ impl Default for RenderOptions {
             casts_shadow: true,
             receives_shadow: true,
             reflectivity: 0.0,
+            opaque_reorderable: false,
         }
     }
 }
@@ -3513,6 +3526,34 @@ mod tests {
         }
     }
     #[test]
+    fn opaque_reorderable_invalidates_static_and_dynamic_render_plans() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        for is_static in [false, true] {
+            let mut options = RenderOptions {
+                is_static,
+                ..Default::default()
+            };
+            scene.set_render_options(id, options);
+            for enabled in [true, false] {
+                let before = (scene.render_revision(), scene.static_revision());
+                options.opaque_reorderable = enabled;
+                assert!(scene.set_render_options(id, options));
+                assert!(scene.render_revision() > before.0);
+                assert_eq!(scene.static_revision() > before.1, is_static);
+                assert_eq!(
+                    scene.objects[&id].render_options.opaque_reorderable,
+                    enabled
+                );
+                let after = (scene.render_revision(), scene.static_revision());
+                assert!(scene.set_render_options(id, options));
+                assert_eq!((scene.render_revision(), scene.static_revision()), after);
+            }
+        }
+        scene.remove_object(id);
+        assert!(!scene.set_render_options(id, RenderOptions::default()));
+    }
+    #[test]
     fn shadow_revisions_follow_casters_and_category_transitions() {
         let mut scene = SceneManager::default();
         let id = scene.add_object(
@@ -3595,6 +3636,52 @@ mod tests {
         scene.remove_object(id);
         assert!(scene.mirror_plane().is_none());
     }
+    #[test]
+    fn direct_transform_composition_matches_independent_matrix_chain() {
+        // Independent old path: cover Euler order, mirrors, nonuniform and
+        // singular scales, translations and the actual transformed geometry.
+        let mut seed = 0x5c31_2a9du32;
+        let mut random = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / 16_777_215.0 * 2.0 - 1.0
+        };
+        for index in 0..4096 {
+            let position = Vec3::new(random(), random(), random()) * 1000.0;
+            let rotation = Vec3::new(random(), random(), random()) * 100.0;
+            let mut scale = Vec3::new(random(), random(), random()) * 10.0;
+            if index % 11 == 0 {
+                scale[index % 3] = 0.0;
+            }
+            let transform = Transform::new(position, rotation, scale);
+            let legacy = Mat4::from_translation(position)
+                * Mat4::from_rotation_y(rotation.y)
+                * Mat4::from_rotation_x(rotation.x)
+                * Mat4::from_rotation_z(rotation.z)
+                * Mat4::from_scale(scale);
+            let actual = transform.model();
+            for (a, b) in actual.to_cols_array().iter().zip(legacy.to_cols_array()) {
+                assert!(
+                    (a - b).abs() <= 2e-6 * b.abs().max(1.0),
+                    "case {index}: {a} != {b}"
+                );
+            }
+            for point in [
+                Vec3::ZERO,
+                Vec3::X,
+                Vec3::Y,
+                Vec3::Z,
+                Vec3::new(-2.3, 4.1, -0.7),
+            ] {
+                assert!(
+                    actual
+                        .transform_point3(point)
+                        .abs_diff_eq(legacy.transform_point3(point), 0.0002),
+                    "case {index}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn normal_transform_preserves_perpendicularity_under_nonuniform_scale() {
         let transform = super::Transform::new(

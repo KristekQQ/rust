@@ -1,0 +1,18 @@
+---
+name: wasm-render-performance
+description: Measure and improve this engine renderer on WASM, WebGPU, WebGL2 and WebXR using bounded load sweeps, matched release builds and paired comparisons, including Three.js comparisons and 60 FPS caps and performance regressions.
+---
+
+# Renderer performance experiments
+
+Use this skill for renderer optimization and capacity/regression measurements. Keep [frame-pipeline](../frame-pipeline/SKILL.md) for resource/pass invariants and [parallel-work](../parallel-work/SKILL.md) for ownership. Read [the protocol and commands](../../../docs/RENDER_PERFORMANCE.md) and [current experiment state](../../../docs/performance/STATE.md) before running.
+
+1. Identify source HEAD/dirty hashes, verified release WASM/SDK, production package and actually served bytes separately. Freeze the baseline before changes with `VERIFY_WASM_PROFILE=release node scripts/freeze-render-build.mjs output/perf/baseline`. This refuses an existing destination and verifies source/package stability. Keep the live Quest package intact.
+2. Use the maintained `scripts/benchmark-core.mjs` entry point or its `scripts/render-performance.mjs` driver. Run `--help`, then smoke. Calibrate one workload axis on the baseline; save configuration and limits. Reuse the exact selected loads on the candidate.
+3. Profile the limiting workload. Check actual visible instances/commands/triangles and real resource creations; a declared object count is insufficient. Separate frame interval, RAF CPU, named CPU scopes, asynchronous valid GPU samples, cut handlers and cut completion latency. WebGPU uses the native sampled pass profiler; desktop WebGL adds bounded asynchronous EXT timer queries around application RAF commands. Neither scope proves compositor latency. Use the maintained `scripts/benchmark-rim-cuts.mjs` for separate worker/installation/commit evidence. Missing metrics are null/unavailable.
+4. Inspect the exact reference renderer version and relevant implementation before porting a technique. Record the source locations, work removed, independent oracle and acceptance/rejection evidence; see [the Three transfer journal](../../../docs/performance/THREE_TRANSFER_2026-10-25.md). Reuse already published transform data before inventing another cache; preserve general inverse-transpose normals for hierarchy shear and singular fallbacks. Change one hypothesis at a time. Preserve quality, draw ordering, pass/eye ownership and cleanup. Run affected correctness/pixel checks against an independent path before measuring.
+5. Run alternating baseline/candidate repetitions (default three pairs, 8s warmup/25s measurement), including explicitly asserted profiler-off controls. Retain each run, unfavorable samples and failure reasons. A capped60Hz control does not measure throughput; use baseline-calibrated near/over-budget loads.
+6. Accept, revise or revert based on matched work, correctness, resource use and per-run distributions. Never sum CPU/GPU scopes into a fabricated frame cost. Label synthetic fragment stress separately from gameplay, and desktop/simulated XR separately from Quest.
+7. Update compact versioned experiment evidence and STATE.md, link raw compressed data, record rejected hypotheses and the next experiment. Keep MEMORY.md a short index. Validate this skill and rerun its smoke/regression workflow from a fresh process.
+
+No busy-wait, forced GPU completion or synchronous readback inside timing. Resolution is an explicit diagnostic axis, never an unlabelled quality reduction. Investigate the actual local Three version/materials/AA/XR settings before declaring a matched cross-engine comparison. Use the release/push gates in AGENTS.md only when their scope applies; this skill grants no publication permission.

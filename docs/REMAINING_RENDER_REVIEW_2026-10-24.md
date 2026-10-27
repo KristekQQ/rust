@@ -1,4 +1,9 @@
 # Remaining renderer review: implementation and measured scope
+> Follow-up 2026-10-26: the absent-normal-map entry below records the older state.
+> A separately verified glTF correction now preserves the shading normal without a
+> synthetic 128/255 map, and omits that variant's TBN/UV2. See
+> [current Rome evidence](performance/2026-10-26-rim-parity/REPORT.md).
+
 
 This completes the remaining review follow-up on `codex/core-render-optimization`, based on `088fdb34` plus the already-owned uncommitted follow-ups. The work is local and served on HTTPS 8443; it is not a new commit, push, CI result or physical Quest acceptance. Primary-checkout work was preserved.
 

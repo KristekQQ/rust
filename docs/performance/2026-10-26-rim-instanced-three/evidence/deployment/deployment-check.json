@@ -1,0 +1,133 @@
+{
+  "pass": true,
+  "date": "2026-10-26T17:30:54.680Z",
+  "base": "https://192.168.11.134:8443",
+  "releaseId": "613216e02e",
+  "build": {
+    "source": "eae9f0a3d0b60d131a4031465d86d7006cdc5ab816fa83912967a023cfab48e0",
+    "wasm": "36cabbf4ac596d867181c8278a848b99fc3197910f344835b02a3aba519c7ea2",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "files": [
+    {
+      "path": "examples/rim/index.html",
+      "sha256": "2baabf75f2ecc7fece0557fe44def4a89a73b31ec146169e11963fe5da563a6b",
+      "bytes": 4565,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/main.js",
+      "sha256": "0d5fa66492bcf3d9904618ccb898a7edc71821fc60ff22b853054b202d9dce6d",
+      "bytes": 8502,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/scene.js",
+      "sha256": "a56f7f32e5c59506d9fac2c6e313e9c5ab804680c893ae9d604df9b71cf24d7c",
+      "bytes": 3838,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/stress.js",
+      "sha256": "ce729a328552d98bba129d3d136bb373ac2d4a32e0866f1e6b04fdd4b93f1b72",
+      "bytes": 1718,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/diagnostics.js",
+      "sha256": "8c5a3bebd53ede3d07fe0495475209e472cdda8d64a351e4d9d4904d36f86a4b",
+      "bytes": 3680,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "js/engine.js",
+      "sha256": "2903f132b2c4ff7175a1a2e9fbd2fee398486a15de7d42acde4e7e1f7c83d2d4",
+      "bytes": 21485,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "pkg/webgpu_wasm.js",
+      "sha256": "4954bb7a8114383835769f3327ce263654524a67c26d4a9e09ce0e34da376fc5",
+      "bytes": 86451,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "pkg/webgpu_wasm_bg.wasm",
+      "sha256": "36cabbf4ac596d867181c8278a848b99fc3197910f344835b02a3aba519c7ea2",
+      "bytes": 5834944,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/index.html",
+      "sha256": "67295229e82573818b0809d91eaaf6d2310a700a6eaaf522b3cdf22e83f3ff08",
+      "bytes": 3996,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/main.js",
+      "sha256": "75ec470a8811aa842e36c11dbf9ff81634ceb83b72a372e4e001dcf51e8f0373",
+      "bytes": 2802,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/app.js",
+      "sha256": "0391351465bb3726fa55442d3857feda09a39f995e22961d77e5a4f09c73ed53",
+      "bytes": 16830,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/stress.js",
+      "sha256": "f77a693910adddc8067a51e61c25618390aa2880a698acbe87b93db5b25db531",
+      "bytes": 2914,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/verify.js",
+      "sha256": "dcf192b45dba29033f0b7faa0bb26d4f6c4ae6032d0d72f980cd08166f7b9574",
+      "bytes": 2602,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/vr-debug-panel.js",
+      "sha256": "6aa4e6b97b707007df97660b99e5f6abaaaa6c7ad7aaf53d85612bf4a55b3e65",
+      "bytes": 2342,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/vendor/three.module.js",
+      "sha256": "009c124ea8ed0beb9fe3166002295fb8dbe1bfb1a2c1cac3600a601ea7017e05",
+      "bytes": 688373,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim-three/models/drone-orbiter.glb",
+      "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+      "bytes": 905200,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    }
+  ],
+  "trust": "Existing local development CA explicitly supplied; system/Quest trust not established by this check.",
+  "scope": "Verified HTTPS certificate chain and hostname, actual served decoded payload bytes and no-store headers matched the same production package tested on WebGPU/WebGL. This does not verify physical Quest performance or CI."
+}

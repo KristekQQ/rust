@@ -1,0 +1,193 @@
+{
+  "checks": [
+    {
+      "id": "neutral-final-over",
+      "rows": 3,
+      "pixel": "Pixelová kontrola prošla. Přesné pixely: ne; max. odchylka kanálu: 18 · Největší odchylka kanálu 18/255. Nejvýše 11 z 11182080 pixelů má odchylku nad tolerancí (0.0001 %). Mez brány: 8/255 a 0.100 % pixelů.",
+      "caption": "Stejná testovací konfigurace a rozlišení v uvedených bězích. Výsledek platí pro tuto scénu a tuto konfiguraci.",
+      "images": [
+        [
+          4096,
+          2730
+        ],
+        [
+          4096,
+          2730
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1643,
+          1046,
+          697.15625
+        ],
+        [
+          117,
+          1643,
+          1046,
+          697.15625
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "neutral-final-three",
+      "rows": 3,
+      "pixel": "Pixelová shoda není vyhodnocená. · Diagnostické srovnání s původním Three.js; AA, shadery a stíny nejsou sjednocené. Největší odchylka kanálu 228/255. Nejvýše 204148 z 11182080 pixelů má odchylku nad tolerancí (1.8257 %). Pixelová brána je vypnutá pro diagnostické srovnání.",
+      "caption": "Diagnostické srovnání s původním Three.js. Rozdílné vyhlazení, shadery a stíny znamenají, že nejde o pixelovou bránu ani důkaz obecné parity.",
+      "images": [
+        [
+          4096,
+          2730
+        ],
+        [
+          4096,
+          2730
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1691,
+          1046,
+          697.15625
+        ],
+        [
+          117,
+          1691,
+          1046,
+          697.15625
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "neutral-final-active-wg",
+      "rows": 3,
+      "pixel": "Pixelová shoda není vyhodnocená. · Aktivní simulace nemá deterministicky shodný replay; pixelová brána není vyhodnocená.",
+      "caption": "Aktivní scéna s pohybující se simulací. Běhy nemají deterministicky shodný stav pro přesnou pixelovou kontrolu.",
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "neutral-final-active-gl",
+      "rows": 3,
+      "pixel": "Pixelová shoda není vyhodnocená. · Aktivní simulace nemá deterministicky shodný replay; pixelová brána není vyhodnocená.",
+      "caption": "Aktivní scéna s pohybující se simulací. Běhy nemají deterministicky shodný stav pro přesnou pixelovou kontrolu.",
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "neutral-final-wg",
+      "rows": 1,
+      "pixel": "Pixelová kontrola prošla. Přesné pixely: ne; max. odchylka kanálu: 52 · Největší odchylka kanálu 52/255. Nejvýše 22 z 5529600 pixelů má odchylku nad tolerancí (0.0004 %). Mez brány: 8/255 a 0.100 % pixelů.",
+      "caption": "Stejná testovací konfigurace a rozlišení v uvedených bězích. Výsledek platí pro tuto scénu a tuto konfiguraci.",
+      "images": [
+        [
+          2880,
+          1920
+        ],
+        [
+          2880,
+          1920
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "neutral-final-gl",
+      "rows": 1,
+      "pixel": "Pixelová kontrola prošla. Přesné pixely: ne; max. odchylka kanálu: 52 · Největší odchylka kanálu 52/255. Nejvýše 22 z 5529600 pixelů má odchylku nad tolerancí (0.0004 %). Mez brány: 8/255 a 0.100 % pixelů.",
+      "caption": "Stejná testovací konfigurace a rozlišení v uvedených bězích. Výsledek platí pro tuto scénu a tuto konfiguraci.",
+      "images": [
+        [
+          2880,
+          1920
+        ],
+        [
+          2880,
+          1920
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1643,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    }
+  ],
+  "mobileOverflow": false,
+  "pageErrors": [],
+  "scope": "actual standalone results UI, not renderer/headset performance"
+}

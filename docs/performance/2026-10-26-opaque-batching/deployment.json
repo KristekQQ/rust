@@ -1,0 +1,106 @@
+{
+  "time": "2026-10-26T21:30:51.199Z",
+  "host": "https://192.168.0.17:8443",
+  "serverPID": 65385,
+  "sessionID": 69215,
+  "releaseId": "767d2bb4b3",
+  "wasm": "547da17e984617d00d63d681e36401b1d77da7c5cdd1aabc902eb5f61cc23356",
+  "source": "a1efeeb002b1f9109e20e3320653b6aa3b5b6b67df7d18138f79633e2e01e2a4",
+  "files": 254,
+  "fullManifestMatch": true,
+  "payloadChecks": [
+    {
+      "file": "examples/rim/index.html",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "828f18103d6908bb56b706021a61fe82b9b179535fd5244f592bb7f93301cf29"
+    },
+    {
+      "file": "examples/rim/main.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "0d5fa66492bcf3d9904618ccb898a7edc71821fc60ff22b853054b202d9dce6d"
+    },
+    {
+      "file": "examples/rim/scene.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "807db15ff6e430f6a98fd6d29cd4b7b5587b77198afb2968b81b3f27371c024d"
+    },
+    {
+      "file": "examples/rim/stress.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "fff2b9ea8e8bd0f1720c78507306e7720fce09b0b479387f10d7f05a49f0bea8"
+    },
+    {
+      "file": "js/engine.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "248f0cb6725a257d8ef7a997949a37b257dee6fe547b2b23ddb3e99e90fbfc76"
+    },
+    {
+      "file": "pkg/webgpu_wasm.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "e64edc2b3bc9f35fb6bade2fe19509371a0fac429f559baa9f59e857d4123cf7"
+    },
+    {
+      "file": "pkg/webgpu_wasm_bg.wasm",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "547da17e984617d00d63d681e36401b1d77da7c5cdd1aabc902eb5f61cc23356"
+    },
+    {
+      "file": "assets/models/rim/drone-orbiter.glb",
+      "status": 200,
+      "tls": true,
+      "encoding": null,
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438"
+    },
+    {
+      "file": "examples/rim-three/index.html",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "536d5164ae42e17036365c21eac796cc7669799a2880a507e8d6bc6d73485b95"
+    },
+    {
+      "file": "examples/rim-three/stress.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "f77a693910adddc8067a51e61c25618390aa2880a698acbe87b93db5b25db531"
+    },
+    {
+      "file": "examples/rim-three/vendor/three.module.js",
+      "status": 200,
+      "tls": true,
+      "encoding": "br",
+      "cacheControl": "no-store, no-cache, must-revalidate",
+      "sha256": "009c124ea8ed0beb9fe3166002295fb8dbe1bfb1a2c1cac3600a601ea7017e05"
+    }
+  ],
+  "productionBrowserCases": 10,
+  "physicalQuestAcceptance": false,
+  "commitPushCI": false,
+  "backup": "output/production-before-opaque-batching-20261026",
+  "backgroundGPUProcess30810": "untouched; approval pending"
+}

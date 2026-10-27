@@ -42,6 +42,10 @@ pub struct Effects {
     pub stats: EffectStats,
 }
 impl Effects {
+    // Select from the exact uploaded uniform, including auxiliary-view changes.
+    pub(super) fn single_static_shadow(&self) -> bool {
+        self.last_uniform.params[0] == 1.0 && self.last_uniform.shadow_layers == [1, 0, 0, 0]
+    }
     pub fn new(device: &wgpu::Device) -> Self {
         let mut entries = vec![];
         for binding in [6, 7, 8, 9, 10, 11] {

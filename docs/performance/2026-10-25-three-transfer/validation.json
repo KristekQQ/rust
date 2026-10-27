@@ -1,0 +1,126 @@
+{
+  "scope": "Focused checks for Three-inspired continuation only; see first experiment for prior evidence. No push/CI/headset acceptance.",
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "direct_transform_composition"
+      ],
+      "result": "PASS1:4096 cases"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "transform"
+      ],
+      "result": "PASS14"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "cached_gltf_root_model"
+      ],
+      "result": "PASS1 actual Fox GLB setters/motion/playback/seek"
+    },
+    {
+      "argv": [
+        "env",
+        "RUSTFLAGS=--cfg=web_sys_unstable_apis",
+        "cargo",
+        "clippy",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "result": "PASS"
+    },
+    {
+      "argv": [
+        "env",
+        "VERIFY_WASM_PROFILE=release",
+        "node",
+        "scripts/test-browser.mjs",
+        "--page",
+        "gltf-batching,gltf-gpu-transforms,gltf-visibility,render-mirrored,shadow-cache,rim-gameplay,neon-arena-xr,webxr-webgpu",
+        "--backend",
+        "all"
+      ],
+      "result": "PASS14 final292f; direct-only6236 had14PASS too"
+    },
+    {
+      "argv": [
+        "env",
+        "PYTHONPATH=/tmp/rust-perf-skill-validator",
+        "python3",
+        "/Users/Honza/.codex/skills/.system/skill-creator/scripts/quick_validate.py",
+        ".agents/skills/wasm-render-performance"
+      ],
+      "result": "PASS updated transfer workflow schema"
+    }
+  ],
+  "sourceReview": "Independent Astra read-only source review: direct YXZ sign/order/grouping and existing cache invalidation no scoped blocker; not browser/device proof.",
+  "builds": {
+    "baseline": "6f9a3bba80c0681fbf4908ac4dbda7fd5088ed72aa6c4f8523b3a2d5a68518b9",
+    "direct": "6236f6b42b7dca9faf86a6abdb7aa4bd958d529546d036d167d15aca00d0e5f6",
+    "cache": "292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b"
+  },
+  "buildCommands": [
+    [
+      "env",
+      "RUSTFLAGS=--cfg=web_sys_unstable_apis",
+      "wasm-pack",
+      "build",
+      "--target",
+      "web",
+      "--release",
+      "--",
+      "--locked"
+    ],
+    [
+      "env",
+      "VERIFY_WASM_PROFILE=release",
+      "node",
+      "scripts/build-fingerprint.mjs",
+      "--write"
+    ]
+  ],
+  "freezeCommands": [
+    [
+      "env",
+      "VERIFY_WASM_PROFILE=release",
+      "node",
+      "scripts/freeze-render-build.mjs",
+      "output/render-performance/candidate-compose"
+    ],
+    [
+      "env",
+      "VERIFY_WASM_PROFILE=release",
+      "node",
+      "scripts/freeze-render-build.mjs",
+      "output/render-performance/candidate-cache"
+    ]
+  ],
+  "freshness": "PASS final292f source/WASM/configuration fingerprint, checked after main paired runs",
+  "dataReview": "Independent Astra inspection confirms main paired CPU ratios, all6 exact pixels, fixed work, no driver/server errors; oneGL+0.1ms and mixed RAFtails must be disclosed. Three geometric controls have no full-game/material equivalence.",
+  "finalDataAudit": {
+    "cliCommands": 27,
+    "allExitZero": true,
+    "sameRendererImagePairs": 16,
+    "exactImagePairs": 15,
+    "mainExactPairs": 6,
+    "nonExact": "Rome static WebGL: max channel delta1/255; pixel PASS under unchanged tolerance8; no golden change",
+    "threePairsWithoutPixelGate": 6,
+    "invalidGlTimerWindows": 0,
+    "driverInputMutations": 0,
+    "serverErrors": 0
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "pass": true,
+  "url": "https://192.168.11.134:8878/examples/rim/",
+  "date": "2026-10-26T14:48:50.133424+00:00",
+  "indexSha256": "7ab9f4e90e7d26c5cb30eac960695decf7533f8f10859a52d6706e4c28e649fd",
+  "sourceFilesCompared": 30,
+  "differentSourceFiles": [],
+  "tls": "Existing local development CA and current hostname verified; server restarted to load the current leaf certificate. App sources unchanged."
+}

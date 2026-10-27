@@ -1,0 +1,7 @@
+{
+  "pass": true,
+  "archiveFiles": 1836,
+  "archiveSha256": "36730749f38326effdd8bf551c0ad0c0321101cc72179601013b2c1a45c37c5d",
+  "copiedTimingInputs": 24,
+  "scope": "Every included archive-file hash and every final copied report/raw/capture identity checked. Report gzips are also decoded and compared to their original source hashes. No new GPU run."
+}

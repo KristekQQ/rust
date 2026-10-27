@@ -59,7 +59,7 @@ export function installRimDiagnostics(engine,options){
    const state=/** @type {Data|null} */(engine.scene.rimState);
    const enemies=Array.isArray(state?.enemies)?state.enemies:[];
    emit('rim-xr-sample',{
-    sample:samples,game:pick(state,['active','paused','health','dead','wave','kills','deaths','hitsTaken','deathMode','simDt']),
+    sample:samples,game:pick(state,['active','paused','health','dead','wave','kills','deaths','hitsTaken','deathMode','simDt','stressModels']),
     frame:pick(state?.frame,['simulation','visual']),
     blade:pick(state?.blade,['contactSamples','hits','slowSamples','discontinuities','maxSpeedForFrame']),
     enemies:enemies.slice(0,64).map(enemy=>pick(enemy,['id','slug','hp','maxHp','phase'])),

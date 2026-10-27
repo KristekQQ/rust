@@ -1,0 +1,45 @@
+{
+  "time": "2026-10-26T23:05:51.166786+00:00",
+  "release": "7ee4df8ebe",
+  "wasm": "dcce4c0c",
+  "serverRestarted": false,
+  "payloads": [
+    {
+      "path": "examples/rim/?backend=webgpu",
+      "sha256": "3c0b377acf3c2992531844f4c4b1c10444888f2d67f77761fd6f9007b1c1e0f4",
+      "tls": true,
+      "noStore": true
+    },
+    {
+      "path": "examples/rim/?backend=webgl",
+      "sha256": "3c0b377acf3c2992531844f4c4b1c10444888f2d67f77761fd6f9007b1c1e0f4",
+      "tls": true,
+      "noStore": true
+    },
+    {
+      "path": "examples/rim/main.js",
+      "sha256": "715b8d2af773b6e55cbb4447e34110e806f5ac2517513ec5baf6c9ff2c9aa1b9",
+      "tls": true,
+      "noStore": true
+    },
+    {
+      "path": "pkg/webgpu_wasm.js",
+      "sha256": "e64edc2b3bc9f35fb6bade2fe19509371a0fac429f559baa9f59e857d4123cf7",
+      "tls": true,
+      "noStore": true
+    },
+    {
+      "path": "pkg/webgpu_wasm_bg.wasm",
+      "sha256": "dcce4c0c43ed29bf26bbdefa2830823cd3c9bffd34d1d0d47a786f1d84415b48",
+      "tls": true,
+      "noStore": true
+    },
+    {
+      "path": "examples/rim-three/",
+      "sha256": "536d5164ae42e17036365c21eac796cc7669799a2880a507e8d6bc6d73485b95",
+      "tls": true,
+      "noStore": true
+    }
+  ],
+  "physicalQuest": false
+}

@@ -1,0 +1,65 @@
+{
+  "hypothesis": "Explicit order-independent rigid opaque roots can share existing per-part instance streams despite overlapping root AABBs. No shader/geometry/resolution/gameplay reduction.",
+  "baseline": "output/opaque-batching/baseline",
+  "candidate": "output/opaque-batching/candidate-v4-packed",
+  "primary": {
+    "family": "rim-stress",
+    "load": 512,
+    "width": 2880,
+    "height": 1920,
+    "backends": [
+      "webgpu",
+      "webgl"
+    ],
+    "pairs": 3,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "profiling": false,
+    "sequence": "AB/BA/AB"
+  },
+  "directThree": {
+    "family": "rim-stress",
+    "load": 512,
+    "backend": "webgl",
+    "representation": "instanced",
+    "root": "output/rim-stress/three-reference",
+    "pairs": 3,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "limitations": "AA/material/shader/shadow differences retained; no full image or physical Quest equivalence"
+  },
+  "controls": {
+    "families": [
+      "dynamic",
+      "rim-static"
+    ],
+    "backends": [
+      "webgpu",
+      "webgl"
+    ],
+    "pairs": 1,
+    "warmupMs": 2000,
+    "sampleMs": 8000,
+    "scope": "bounded regression/mutation controls, not standalone reliable speedup claim"
+  },
+  "acceptance": [
+    "independent asset image oracle on both backends including policy-only static toggles, mask cutouts, mirrors, barriers, removal",
+    "auxiliary shadow/reflection actual draw-order and pixel control",
+    "matched native before/after pixel gates; no workload reduction",
+    "retain each adverse run; no Quest FPS claim from desktop",
+    "inspect actual submitted draw/triangle/resource counters, not scene estimates"
+  ],
+  "publication": "No commit/push requested; preserve current live package until verified candidate accepted.",
+  "rejectedPilot": "candidate v1 required !PipelineKey.reflected, but this flag describes winding, not a reflection pass. Rim authored camera excluded; 5265 main calls unchanged. Retain pilot and frozen v1. Actual planar reflection is clipped.",
+  "windowExperiment": {
+    "hypothesis": "Global part-major ordering across all512 roots can delay near depth coverage. Bound contiguous reorderable run at128 roots, same on both backends; original order between windows, no geometry/quality/workload reduction.",
+    "reason": "v2 WG improves all pairs; GL CPU improves but FPS does not consistently improve. Retain all v2 pairs.",
+    "acceptance": "pilot both backends with matched pixels, then repeated same protocol if worthwhile; no claim overdraw causality without fragment evidence"
+  },
+  "packingExperiment": {
+    "hypothesis": "Losslessly compact immutable rigid vertices by material-used attributes. Existing no-texture layout reads56B of96B; compact storage reduces stride/bandwidth without shader/numeric/CPUgeometry changes.",
+    "base": "candidate-v3-window128",
+    "scope": "rigid only, CPUdeformed/skin unchanged96B, same locations/types, pipelines keyed bystorage class",
+    "limits": "Not yet proven bottleneck or speed gain. Background headlessNeonArena remains active without approval to close."
+  }
+}

@@ -1,0 +1,10 @@
+PASS rim-refresh webgpu
+PASS rim-stress-xr webgpu
+PASS rim webgpu
+PASS shadow-cache webgpu
+PASS rim-three-stress webgl
+PASS rim-refresh webgl
+PASS rim-stress-xr webgl
+PASS rim webgl
+PASS shadow-cache webgl
+Report: /Users/Honza/.codex/worktrees/rim-publish/rust/output/verification/browser-report.json

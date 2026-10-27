@@ -1,0 +1,53 @@
+(node:64834) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/Honza/.codex/worktrees/rim-publish/rust/examples/rim/stress.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/Honza/.codex/worktrees/rim-publish/rust/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ limits, validated atomic counts, stable incremental instances and static paused poses (2.541833ms)
+✔ stress positions are pure deterministic values and reject invalid indices (0.151375ms)
+✔ growth initialization failure rolls back new handles and leaves count unchanged (0.152ms)
+✔ shrink and idempotent disposal remove only owned instances and signal zero (0.147208ms)
+✔ command failures preserve live counts and disposal still cleans owned handles (0.190959ms)
+(node:64835) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/Honza/.codex/worktrees/rim-publish/rust/js/webxr.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/Honza/.codex/worktrees/rim-publish/rust/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cutting commands preserve handle ownership, typed buffers and Rust piece IDs (5.678291ms)
+✔ orbit and world/screen commands forward to Rust, including lifecycle guards (14.731417ms)
+✔ Rim configuration serializes optional owned blob shadows and keeps old payloads compatible (2.589292ms)
+✔ 3D font handles forward layout and lifetime commands to Rust (2.394709ms)
+✔ 3D font streaming cancels on scene clear and does not register late data (7.401209ms)
+✔ 3D font loader enforces byte budget and preserves decoder/transport errors (2.8025ms)
+✔ character command resolves clip names, validates parameters and preserves runtime ownership (3.123375ms)
+✔ HUD is opt-in and only forwards commands and explicit diagnostic queries (2.469334ms)
+✔ concurrent/repeated init and cache-busted SDK imports start one runtime (4.222542ms)
+✔ initialization failures can be retried (2.100917ms)
+✔ init rejects detached/foreign/duplicate canvas and invalid or conflicting backend (2.390875ms)
+✔ resize rejects values that WASM u32 coercion would silently corrupt (2.102ms)
+✔ clear aborts all pending fetches and permits subsequent imports (3.526ms)
+✔ clear cancels an active body read even for a custom stream (2.81525ms)
+✔ clear aborts external resource fetches after root parsing (2.180584ms)
+✔ completed loads release cancellation tracking and resolve redirected resources (2.343083ms)
+✔ stream failure preserves original error when cancellation fails and releases lock (2.138417ms)
+✔ dispose aborts transport, releases ownership, and rejects every old command after reinit (2.830542ms)
+✔ XR controller bindings enforce engine handle ownership and disposal (2.542ms)
+✔ environment maps validate upload shape and intensity before WASM (2.7365ms)
+✔ world bitmap panels forward static inscriptions and diagnostic kind to Rust (2.759625ms)
+✔ color cutout forwards validation to Rust and remains chainable (2.14475ms)
+✔ cut feedback and blade trail are thin ownership-checked native commands (2.246667ms)
+✔ XRPlayer exposes native tracking and generic inventory without weapon assumptions (2.492333ms)
+✔ profiling is opt-in and initialization cannot silently change its device features (2.673042ms)
+✔ WASM initialization explicitly bypasses the HTTP cache (2.671125ms)
+✔ mesh opacity is a thin native command with an optional opaque facet threshold (2.329917ms)
+✔ shared mesh assets forward immutable color tables and independent variant instance commands (3.615209ms)
+✔ numeric text forwards static digits and transforms to Rust shared glyph instances (3.876958ms)
+✔ model instances delegate asset sharing to Rust without transport (2.345792ms)
+✔ XR locomotion forwards authored bounds and owned marker; foreign/disposed handles fail (2.37175ms)
+✔ opaque reorder policy is explicit and independent of mobility at the Rust boundary (2.428875ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 157.104917

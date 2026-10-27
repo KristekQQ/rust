@@ -39,6 +39,11 @@ pub(crate) struct ObjectRenderData {
     half_extent: Vec3,
 }
 impl ObjectRenderData {
+    /// Reuse the same published root transform for glTF and primitive rendering.
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn model(&self) -> Mat4 {
+        Mat4::from_cols_array_2d(&self.instance.model)
+    }
     pub(crate) fn plane_normal(&self) -> Vec3 {
         Mat4::from_cols_array_2d(&self.instance.normal_matrix)
             .transform_vector3(Vec3::Y)
@@ -89,6 +94,22 @@ impl Frustum {
             tolerance: planes.map(|p| 1e-5 * p.truncate().length()),
             planes,
         }
+    }
+    /// Strict containment is a proof that every child AABB is also visible.
+    /// Touching/partial/invalid bounds must retain the individual test path.
+    #[cfg(any(test, target_arch = "wasm32"))]
+    pub(crate) fn fully_contains_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
+        center.is_finite()
+            && half_extent.is_finite()
+            && half_extent.cmpge(Vec3::ZERO).all()
+            && self
+                .planes
+                .iter()
+                .zip(self.tolerance)
+                .all(|(plane, tolerance)| {
+                    let normal = plane.truncate();
+                    normal.dot(center) + plane.w - normal.abs().dot(half_extent) > tolerance
+                })
     }
     pub fn intersects_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
         self.planes
@@ -549,6 +570,7 @@ mod tests {
                     casts_shadow: i % 5 != 0,
                     receives_shadow: i % 3 == 0,
                     reflectivity: 0.25,
+                    ..Default::default()
                 },
             );
         }
@@ -583,6 +605,7 @@ mod tests {
                 casts_shadow: false,
                 receives_shadow: false,
                 reflectivity: 0.6,
+                ..Default::default()
             },
         );
         compare_passes(&scene);
@@ -828,6 +851,43 @@ mod tests {
             instance.normal_matrix,
             crate::scene::normal_matrix(scene.objects()[&id].transform.model()).to_cols_array_2d()
         );
+    }
+
+    #[test]
+    fn cached_gltf_root_model_tracks_commands_motion_and_pose_updates() {
+        let asset = crate::gltf_loader::parse_model(
+            include_bytes!("../assets/models/fox/Fox.glb"),
+            &[],
+            &[],
+        )
+        .unwrap();
+        let mut scene = SceneManager::default();
+        let clip = asset
+            .animations
+            .iter()
+            .position(|clip| clip.name.as_deref() == Some("Walk"))
+            .unwrap();
+        let id = scene.add_model(std::sync::Arc::new(asset)).unwrap();
+        let check = |scene: &SceneManager| {
+            let object = &scene.objects()[&id];
+            assert_eq!(object.render_data.model(), object.transform.model());
+        };
+        check(&scene);
+        assert!(scene.set_object_position(id, Vec3::new(1.0, 3.0, -2.0)));
+        check(&scene);
+        assert!(scene.set_object_rotation(id, Vec3::new(0.4, -0.7, 1.2)));
+        check(&scene);
+        assert!(scene.set_object_scale(id, Vec3::new(-0.5, 0.2, 1.5)));
+        check(&scene);
+        assert!(scene.set_object_spin(id, Vec3::new(0.2, 0.3, -0.4)));
+        assert!(scene.set_projectile(id, Vec3::new(0.5, 0.1, 0.2), 0.0, 0.0));
+        scene.play_model_animation(id, clip, true, 1.0).unwrap();
+        let old = scene.objects()[&id].render_data.model();
+        scene.update(1.0 / 72.0);
+        check(&scene);
+        assert_ne!(old, scene.objects()[&id].render_data.model());
+        scene.seek_model_animation(id, 0.25).unwrap();
+        check(&scene);
     }
 
     #[test]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "WASM renderer performance"
+  short_description: "Measure renderer capacity and verify optimizations"
+  default_prompt: "Use $wasm-render-performance to calibrate a release workload and verify a measured renderer improvement."

@@ -5,6 +5,9 @@ fn fixture() -> (Game, SceneManager) {
     fixture_with_playing_pool(false)
 }
 fn fixture_with_playing_pool(playing: bool) -> (Game, SceneManager) {
+    fixture_with_shadow_pool(playing, false)
+}
+fn fixture_with_shadow_pool(playing: bool, blobs: bool) -> (Game, SceneManager) {
     static ASSETS: OnceLock<Vec<Arc<crate::gltf_model::ModelAsset>>> = OnceLock::new();
     let assets = ASSETS.get_or_init(|| {
         [
@@ -96,6 +99,11 @@ fn fixture_with_playing_pool(playing: bool) -> (Game, SceneManager) {
             beams,
             charges,
             health_bars,
+            blob_shadows: if blobs {
+                (0..14).map(|_| scene.add_cube(HIDDEN)).collect()
+            } else {
+                Vec::new()
+            },
             hud,
             marker,
             shapes,
@@ -1138,4 +1146,108 @@ fn same_physical_vr_swings_hit_at_72_90_and_120_hz() {
             "HP zero queues actual worker geometry at {hz} Hz"
         );
     }
+}
+
+#[test]
+fn blob_shadows_follow_living_npcs_without_invalidating_shadow_maps() {
+    let (mut game, mut scene) = fixture_with_shadow_pool(false, true);
+    assert!(game
+        .enemies
+        .iter()
+        .all(|e| !scene.objects()[&e.spec.id].render_options.casts_shadow));
+    // Match the authored encounter's non-casters; retain one unrelated caster in
+    // each layer to catch accidental broad invalidation during NPC movement.
+    let ids: Vec<_> = scene.objects().keys().copied().collect();
+    for id in ids {
+        scene.set_render_options(
+            id,
+            crate::scene::RenderOptions {
+                casts_shadow: false,
+                ..Default::default()
+            },
+        );
+    }
+    let city = scene.add_cube(Vec3::new(5., 0., 5.));
+    scene.set_render_options(
+        city,
+        crate::scene::RenderOptions {
+            is_static: true,
+            ..Default::default()
+        },
+    );
+    let dynamic = scene.add_cube(Vec3::new(-5., 0., 5.));
+    start(&mut game, &mut scene);
+    let revisions = (scene.shadow_revision(true), scene.shadow_revision(false));
+    game.enemies[0].position = Vec3::new(3., 2., -7.);
+    game.sync(&mut scene, None);
+    let id = game.blob_shadows[0];
+    let t = &scene.objects()[&id].transform;
+    assert_eq!(t.position, Vec3::new(3., 0.136, -7.));
+    assert!(t.scale.x > 0. && t.scale.x <= 0.9);
+    assert_eq!(
+        revisions,
+        (scene.shadow_revision(true), scene.shadow_revision(false))
+    );
+    game.hurt_enemy(&mut scene, 0, 50., Vec3::Y);
+    game.sync(&mut scene, None);
+    assert_ne!(scene.objects()[&id].transform.position, HIDDEN);
+    game.hurt_enemy(&mut scene, 0, 50., Vec3::Y);
+    game.sync(&mut scene, None);
+    assert_eq!(scene.objects()[&id].transform.position, HIDDEN);
+    game.teardown(&mut scene);
+    assert!(game
+        .blob_shadows
+        .iter()
+        .all(|id| scene.objects()[id].transform.position == HIDDEN));
+    assert!(game
+        .enemies
+        .iter()
+        .all(|e| scene.objects()[&e.spec.id].render_options.casts_shadow));
+    assert!(game
+        .blob_shadows
+        .iter()
+        .all(|id| scene.objects()[id].render_options.casts_shadow));
+    // The generic dynamic shadow path still invalidates independently.
+    let revisions = (scene.shadow_revision(true), scene.shadow_revision(false));
+    scene.set_object_position(dynamic, Vec3::new(-4., 0., 5.));
+    assert_eq!(scene.shadow_revision(true), revisions.0);
+    assert!(scene.shadow_revision(false) > revisions.1);
+}
+
+#[test]
+fn stress_count_is_bounded_preserves_combat_reset_and_clears_on_teardown() {
+    let (mut game, mut scene) = fixture();
+    assert_eq!(game.state()["stressModels"], 0);
+    game.input(
+        Input {
+            stress_count: Some(128),
+            ..Default::default()
+        },
+        &mut scene,
+    )
+    .unwrap();
+    assert_eq!(game.stress_count(), 128);
+    assert!(game
+        .input(
+            Input {
+                stress_count: Some(MAX_STRESS_MODELS + 1),
+                reset: true,
+                ..Default::default()
+            },
+            &mut scene
+        )
+        .is_err());
+    assert_eq!(game.stress_count(), 128);
+    start(&mut game, &mut scene);
+    game.input(
+        Input {
+            reset: true,
+            ..Default::default()
+        },
+        &mut scene,
+    )
+    .unwrap();
+    assert_eq!(game.stress_count(), 128);
+    game.teardown(&mut scene);
+    assert_eq!(game.stress_count(), 0);
 }

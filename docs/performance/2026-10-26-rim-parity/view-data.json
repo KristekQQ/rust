@@ -1,0 +1,541 @@
+{
+  "title": "Řím: pokrok našeho rendereru a srovnání s Three.js",
+  "subtitle": "Chrome/155.0.8059.85 · ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76)) · desktopová měření",
+  "verdict": "Náš renderer: 24,56 → 38,58 FPS ve stejném náročném pohledu. Přímý samostatný test: náš 36,08, původní Three.js 60 FPS. Cíl stejné rychlosti a grafiky dosud splněný není; vyhlazování a detaily stínování obou rendererů nejsou sjednocené. Výkon na Questu nebyl měřen.",
+  "protocol": "FPS každého běhu = 1 000 / průměrný RAF interval v ms. Souhrn a poměr používají medián běhů; párová tabulka uvádí FPS, CPU medián a Frame P95/P99.",
+  "builds": {
+    "before": "WASM SHA-256 7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435 · source SHA-256 cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+    "after": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b"
+  },
+  "scenes": [
+    {
+      "id": "neutral-final-over",
+      "backend": "WebGL2",
+      "mode": "Řím při vyšším rozlišení · 4096 × 2730",
+      "labels": {
+        "before": "Checkpoint 7b0",
+        "after": "Finální kandidát a54 · a54c09c9"
+      },
+      "builds": {
+        "before": "WASM SHA-256 7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435 · source SHA-256 cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+        "after": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b"
+      },
+      "caption": "Stejná testovací konfigurace a rozlišení v uvedených bězích. Výsledek platí pro tuto scénu a tuto konfiguraci.",
+      "cpuBefore": [
+        1.1999999284744263,
+        1.2000000476837158,
+        1.2999999523162842
+      ],
+      "cpuAfter": [
+        1.1999999284744263,
+        1.1999999284744263,
+        1.2000000476837158
+      ],
+      "cpuRatio": 0.9999999006589293,
+      "fpsBefore": [
+        24.44097763910558,
+        24.560982439297597,
+        24.591898247028837
+      ],
+      "fpsAfter": [
+        38.57592862054063,
+        38.615749309433475,
+        38.45584972637171
+      ],
+      "fpsRatio": 1.570618305512857,
+      "gpuBefore": null,
+      "gpuAfter": null,
+      "gpuScope": "Čas GPU není v těchto reportech dostupný.",
+      "pairs": [
+        {
+          "pair": 0,
+          "beforeFps": 24.44097763910558,
+          "afterFps": 38.57592862054063,
+          "beforeCpu": 1.1999999284744263,
+          "afterCpu": 1.1999999284744263,
+          "beforeFrameP95": 50.099999999998545,
+          "afterFrameP95": 33.400000000001455,
+          "beforeFrameP99": 50.10000000000218,
+          "afterFrameP99": 33.400000000001455
+        },
+        {
+          "pair": 1,
+          "beforeFps": 24.560982439297597,
+          "afterFps": 38.615749309433475,
+          "beforeCpu": 1.2000000476837158,
+          "afterCpu": 1.1999999284744263,
+          "beforeFrameP95": 50.099999999998545,
+          "afterFrameP95": 33.400000000001455,
+          "beforeFrameP99": 50.10000000000218,
+          "afterFrameP99": 33.400000000001455
+        },
+        {
+          "pair": 2,
+          "beforeFps": 24.591898247028837,
+          "afterFps": 38.45584972637171,
+          "beforeCpu": 1.2999999523162842,
+          "afterCpu": 1.2000000476837158,
+          "beforeFrameP95": 50.099999999998545,
+          "afterFrameP95": 33.400000000001455,
+          "beforeFrameP99": 50.10000000000218,
+          "afterFrameP99": 33.400000000001455
+        }
+      ],
+      "images": {
+        "before": "evidence/neutral-final-over/before-pair0.png",
+        "after": "evidence/neutral-final-over/after-pair0.png"
+      },
+      "pixel": {
+        "pass": true,
+        "exact": false,
+        "maxChannelDelta": 18,
+        "maxChangedPixels": 11,
+        "maxChangedFraction": 9.837168040293041e-7,
+        "reason": "Největší odchylka kanálu 18/255. Nejvýše 11 z 11182080 pixelů má odchylku nad tolerancí (0.0001 %). Mez brány: 8/255 a 0.100 % pixelů."
+      },
+      "caveats": [
+        "FPS se počítá pro každý běh jako 1 000 / průměrný RAF interval v ms; limit 60 Hz může výsledek zastropovat."
+      ]
+    },
+    {
+      "id": "neutral-final-three",
+      "backend": "WebGL2",
+      "mode": "Původní Three.js · diagnostické srovnání · 4096 × 2730",
+      "labels": {
+        "before": "Původní checkpoint · a54c09c9",
+        "after": "Původní Three.js"
+      },
+      "builds": {
+        "before": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "after": "original authored Rome at same gate camera/resolution; MSAA vs FXAA, shading, shadow and gameplay differences remain; no proven pixel/full-game parity · reprezentace: instanced · zdroj: /Users/Honza/.codex/worktrees/rim-publish/rust/output/render-performance-rim-parity/three-original"
+      },
+      "caption": "Diagnostické srovnání s původním Three.js. Rozdílné vyhlazení, shadery a stíny znamenají, že nejde o pixelovou bránu ani důkaz obecné parity.",
+      "cpuBefore": [
+        1.2999999523162842,
+        1.2999999523162842,
+        1.2999999523162842
+      ],
+      "cpuAfter": [
+        3.200000047683716,
+        3.200000047683716,
+        3.1999999284744263
+      ],
+      "cpuRatio": 2.46153858850694,
+      "fpsBefore": [
+        36.08144325773019,
+        36.44145765830621,
+        35.04140165606613
+      ],
+      "fpsAfter": [
+        60.002400096003775,
+        60.00264011616507,
+        60.002400096003825
+      ],
+      "fpsRatio": 1.662971175166302,
+      "gpuBefore": null,
+      "gpuAfter": null,
+      "gpuScope": "Čas GPU není v těchto reportech dostupný.",
+      "pairs": [
+        {
+          "pair": 0,
+          "beforeFps": 36.08144325773019,
+          "afterFps": 60.002400096003775,
+          "beforeCpu": 1.2999999523162842,
+          "afterCpu": 3.200000047683716,
+          "beforeFrameP95": 33.400000000001455,
+          "afterFrameP95": 16.799999999999272,
+          "beforeFrameP99": 33.400000000001455,
+          "afterFrameP99": 16.80000000000109
+        },
+        {
+          "pair": 1,
+          "beforeFps": 36.44145765830621,
+          "afterFps": 60.00264011616507,
+          "beforeCpu": 1.2999999523162842,
+          "afterCpu": 3.200000047683716,
+          "beforeFrameP95": 33.400000000001455,
+          "afterFrameP95": 16.700000000004366,
+          "beforeFrameP99": 33.400000000001455,
+          "afterFrameP99": 16.80000000000109
+        },
+        {
+          "pair": 2,
+          "beforeFps": 35.04140165606613,
+          "afterFps": 60.002400096003825,
+          "beforeCpu": 1.2999999523162842,
+          "afterCpu": 3.1999999284744263,
+          "beforeFrameP95": 33.400000000001455,
+          "afterFrameP95": 16.700000000004366,
+          "beforeFrameP99": 33.5,
+          "afterFrameP99": 16.799999999999272
+        }
+      ],
+      "images": {
+        "before": "evidence/neutral-final-three/before-pair0.png",
+        "after": "evidence/neutral-final-three/after-pair0.png"
+      },
+      "pixel": {
+        "pass": null,
+        "exact": false,
+        "maxChannelDelta": 228,
+        "maxChangedPixels": 204148,
+        "maxChangedFraction": 0.018256710737179487,
+        "reason": "Diagnostické srovnání s původním Three.js; AA, shadery a stíny nejsou sjednocené. Největší odchylka kanálu 228/255. Nejvýše 204148 z 11182080 pixelů má odchylku nad tolerancí (1.8257 %). Pixelová brána je vypnutá pro diagnostické srovnání."
+      },
+      "caveats": [
+        "FPS se počítá pro každý běh jako 1 000 / průměrný RAF interval v ms; limit 60 Hz může výsledek zastropovat.",
+        "Původní Three.js má jiné vyhlazení a shoda shaderů/stínů nebyla prokázána."
+      ]
+    },
+    {
+      "id": "neutral-final-active-wg",
+      "backend": "WebGPU",
+      "mode": "Aktivní scéna · WebGPU · 960 × 640",
+      "labels": {
+        "before": "Checkpoint 292f",
+        "after": "Finální kandidát a54 · a54c09c9"
+      },
+      "builds": {
+        "before": "WASM SHA-256 292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b · source SHA-256 95b7e8c1bdd40f5f58f887076346113c981866dc3ee3ea6a0d2ae9ae32cb17b8",
+        "after": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b"
+      },
+      "caption": "Aktivní scéna s pohybující se simulací. Běhy nemají deterministicky shodný stav pro přesnou pixelovou kontrolu.",
+      "cpuBefore": [
+        2.299999952316284,
+        2.299999952316284,
+        2.3000000715255737
+      ],
+      "cpuAfter": [
+        2.100000023841858,
+        2.1999999284744263,
+        2.1999999284744263
+      ],
+      "cpuRatio": 0.9565217278630159,
+      "fpsBefore": [
+        60.002318543954374,
+        60.002400096003825,
+        60.00231854395439
+      ],
+      "fpsAfter": [
+        60.00255840355613,
+        60.002400096003804,
+        60.00240009600379
+      ],
+      "fpsRatio": 1.0000013591483028,
+      "gpuBefore": null,
+      "gpuAfter": null,
+      "gpuScope": "Čas GPU není v těchto reportech dostupný.",
+      "pairs": [
+        {
+          "pair": 0,
+          "beforeFps": 60.002318543954374,
+          "afterFps": 60.00255840355613,
+          "beforeCpu": 2.299999952316284,
+          "afterCpu": 2.100000023841858,
+          "beforeFrameP95": 16.700000000004366,
+          "afterFrameP95": 16.799999999999272,
+          "beforeFrameP99": 16.80000000000109,
+          "afterFrameP99": 16.80000000000109
+        },
+        {
+          "pair": 1,
+          "beforeFps": 60.002400096003825,
+          "afterFps": 60.002400096003804,
+          "beforeCpu": 2.299999952316284,
+          "afterCpu": 2.1999999284744263,
+          "beforeFrameP95": 16.700000000000728,
+          "afterFrameP95": 16.700000000004366,
+          "beforeFrameP99": 16.80000000000109,
+          "afterFrameP99": 16.80000000000109
+        },
+        {
+          "pair": 2,
+          "beforeFps": 60.00231854395439,
+          "afterFps": 60.00240009600379,
+          "beforeCpu": 2.3000000715255737,
+          "afterCpu": 2.1999999284744263,
+          "beforeFrameP95": 16.799999999999272,
+          "afterFrameP95": 16.700000000004366,
+          "beforeFrameP99": 16.799999999999272,
+          "afterFrameP99": 16.80000000000109
+        }
+      ],
+      "images": {
+        "before": "evidence/neutral-final-active-wg/before-pair0.png",
+        "after": "evidence/neutral-final-active-wg/after-pair0.png"
+      },
+      "pixel": {
+        "pass": null,
+        "exact": null,
+        "maxChannelDelta": null,
+        "reason": "Aktivní simulace nemá deterministicky shodný replay; pixelová brána není vyhodnocená."
+      },
+      "caveats": [
+        "FPS se počítá pro každý běh jako 1 000 / průměrný RAF interval v ms; limit 60 Hz může výsledek zastropovat.",
+        "Aktivní simulace nemá deterministicky resetovaný capture stav; pixelový výsledek se nehodnotí."
+      ]
+    },
+    {
+      "id": "neutral-final-active-gl",
+      "backend": "WebGL2",
+      "mode": "Aktivní scéna · WebGL · 960 × 640",
+      "labels": {
+        "before": "Checkpoint 292f",
+        "after": "Finální kandidát a54 · a54c09c9"
+      },
+      "builds": {
+        "before": "WASM SHA-256 292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b · source SHA-256 95b7e8c1bdd40f5f58f887076346113c981866dc3ee3ea6a0d2ae9ae32cb17b8",
+        "after": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b"
+      },
+      "caption": "Aktivní scéna s pohybující se simulací. Běhy nemají deterministicky shodný stav pro přesnou pixelovou kontrolu.",
+      "cpuBefore": [
+        3.4000000953674316,
+        3.3000000715255737,
+        3.399999976158142
+      ],
+      "cpuAfter": [
+        2.799999952316284,
+        2.700000047683716,
+        2.8000000715255737
+      ],
+      "cpuRatio": 0.823529403514928,
+      "fpsBefore": [
+        60.00216007776275,
+        60.002400096003804,
+        60.00216007776277
+      ],
+      "fpsAfter": [
+        60.00216007776274,
+        60.00216007776277,
+        60.00231854395439
+      ],
+      "fpsRatio": 1,
+      "gpuBefore": null,
+      "gpuAfter": null,
+      "gpuScope": "Čas GPU není v těchto reportech dostupný.",
+      "pairs": [
+        {
+          "pair": 0,
+          "beforeFps": 60.00216007776275,
+          "afterFps": 60.00216007776274,
+          "beforeCpu": 3.4000000953674316,
+          "afterCpu": 2.799999952316284,
+          "beforeFrameP95": 16.700000000000728,
+          "afterFrameP95": 16.700000000004366,
+          "beforeFrameP99": 16.80000000000109,
+          "afterFrameP99": 16.80000000000109
+        },
+        {
+          "pair": 1,
+          "beforeFps": 60.002400096003804,
+          "afterFps": 60.00216007776277,
+          "beforeCpu": 3.3000000715255737,
+          "afterCpu": 2.700000047683716,
+          "beforeFrameP95": 16.700000000004366,
+          "afterFrameP95": 16.799999999999272,
+          "beforeFrameP99": 16.80000000000109,
+          "afterFrameP99": 16.80000000000109
+        },
+        {
+          "pair": 2,
+          "beforeFps": 60.00216007776277,
+          "afterFps": 60.00231854395439,
+          "beforeCpu": 3.399999976158142,
+          "afterCpu": 2.8000000715255737,
+          "beforeFrameP95": 16.700000000004366,
+          "afterFrameP95": 16.700000000000728,
+          "beforeFrameP99": 16.80000000000109,
+          "afterFrameP99": 16.80000000000109
+        }
+      ],
+      "images": {
+        "before": "evidence/neutral-final-active-gl/before-pair0.png",
+        "after": "evidence/neutral-final-active-gl/after-pair0.png"
+      },
+      "pixel": {
+        "pass": null,
+        "exact": null,
+        "maxChannelDelta": null,
+        "reason": "Aktivní simulace nemá deterministicky shodný replay; pixelová brána není vyhodnocená."
+      },
+      "caveats": [
+        "FPS se počítá pro každý běh jako 1 000 / průměrný RAF interval v ms; limit 60 Hz může výsledek zastropovat.",
+        "Aktivní simulace nemá deterministicky resetovaný capture stav; pixelový výsledek se nehodnotí."
+      ]
+    },
+    {
+      "id": "neutral-final-wg",
+      "backend": "WebGPU",
+      "mode": "Klidová scéna · WebGPU kontrola · 2880 × 1920",
+      "labels": {
+        "before": "Checkpoint 7b0",
+        "after": "Finální kandidát a54 · a54c09c9"
+      },
+      "builds": {
+        "before": "WASM SHA-256 7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435 · source SHA-256 cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+        "after": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b"
+      },
+      "caption": "Stejná testovací konfigurace a rozlišení v uvedených bězích. Výsledek platí pro tuto scénu a tuto konfiguraci.",
+      "cpuBefore": [
+        0.7000000476837158
+      ],
+      "cpuAfter": [
+        0.6999999284744263
+      ],
+      "cpuRatio": 0.9999998297010265,
+      "fpsBefore": [
+        60.00240009600379
+      ],
+      "fpsAfter": [
+        60.002318543954374
+      ],
+      "fpsRatio": 0.9999986408535444,
+      "gpuBefore": null,
+      "gpuAfter": null,
+      "gpuScope": "Čas GPU není v těchto reportech dostupný.",
+      "pairs": [
+        {
+          "pair": 0,
+          "beforeFps": 60.00240009600379,
+          "afterFps": 60.002318543954374,
+          "beforeCpu": 0.7000000476837158,
+          "afterCpu": 0.6999999284744263,
+          "beforeFrameP95": 16.799999999999272,
+          "afterFrameP95": 16.799999999995634,
+          "beforeFrameP99": 16.80000000000109,
+          "afterFrameP99": 16.80000000000109
+        }
+      ],
+      "images": {
+        "before": "evidence/neutral-final-wg/before-pair0.png",
+        "after": "evidence/neutral-final-wg/after-pair0.png"
+      },
+      "pixel": {
+        "pass": true,
+        "exact": false,
+        "maxChannelDelta": 52,
+        "maxChangedPixels": 22,
+        "maxChangedFraction": 0.000003978587962962963,
+        "reason": "Největší odchylka kanálu 52/255. Nejvýše 22 z 5529600 pixelů má odchylku nad tolerancí (0.0004 %). Mez brány: 8/255 a 0.100 % pixelů."
+      },
+      "caveats": [
+        "FPS se počítá pro každý běh jako 1 000 / průměrný RAF interval v ms; limit 60 Hz může výsledek zastropovat."
+      ]
+    },
+    {
+      "id": "neutral-final-gl",
+      "backend": "WebGL2",
+      "mode": "Klidová scéna · WebGL2 kontrola · 2880 × 1920",
+      "labels": {
+        "before": "Checkpoint 7b0",
+        "after": "Finální kandidát a54 · a54c09c9"
+      },
+      "builds": {
+        "before": "WASM SHA-256 7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435 · source SHA-256 cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+        "after": "WASM SHA-256 a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317 · source SHA-256 b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b"
+      },
+      "caption": "Stejná testovací konfigurace a rozlišení v uvedených bězích. Výsledek platí pro tuto scénu a tuto konfiguraci.",
+      "cpuBefore": [
+        1.100000023841858
+      ],
+      "cpuAfter": [
+        1
+      ],
+      "cpuRatio": 0.9090908893868948,
+      "fpsBefore": [
+        47.92172518210636
+      ],
+      "fpsAfter": [
+        60.002400096003825
+      ],
+      "fpsRatio": 1.2520918198998459,
+      "gpuBefore": null,
+      "gpuAfter": null,
+      "gpuScope": "Čas GPU není v těchto reportech dostupný.",
+      "pairs": [
+        {
+          "pair": 0,
+          "beforeFps": 47.92172518210636,
+          "afterFps": 60.002400096003825,
+          "beforeCpu": 1.100000023841858,
+          "afterCpu": 1,
+          "beforeFrameP95": 33.400000000001455,
+          "afterFrameP95": 16.700000000004366,
+          "beforeFrameP99": 33.400000000001455,
+          "afterFrameP99": 16.799999999999272
+        }
+      ],
+      "images": {
+        "before": "evidence/neutral-final-gl/before-pair0.png",
+        "after": "evidence/neutral-final-gl/after-pair0.png"
+      },
+      "pixel": {
+        "pass": true,
+        "exact": false,
+        "maxChannelDelta": 52,
+        "maxChangedPixels": 22,
+        "maxChangedFraction": 0.000003978587962962963,
+        "reason": "Největší odchylka kanálu 52/255. Nejvýše 22 z 5529600 pixelů má odchylku nad tolerancí (0.0004 %). Mez brány: 8/255 a 0.100 % pixelů."
+      },
+      "caveats": [
+        "FPS se počítá pro každý běh jako 1 000 / průměrný RAF interval v ms; limit 60 Hz může výsledek zastropovat."
+      ]
+    }
+  ],
+  "limits": [
+    "Měření se vztahuje jen na uvedené scény, buildy a rozlišení; obecnou obrazovou paritu ani výkon všech scén nedokazuje.",
+    "60 Hz může omezit naměřené FPS; dosažený limit sám o sobě neměří rezervu výkonu.",
+    "Jde o desktopová měření. Fyzický Quest ani jeho výkon zde ověřen nebyl.",
+    "Pixelová brána se agreguje přes dostupné páry. Three.js je diagnostické srovnání bez pixelové brány; aktivní scény nemají přesný replay."
+  ],
+  "evidence": [
+    {
+      "label": "neutral-final-over: měřicí report",
+      "href": "./evidence/neutral-final-over/report.json.gz"
+    },
+    {
+      "label": "neutral-final-over: surová data",
+      "href": "./evidence/neutral-final-over/raw.json.gz"
+    },
+    {
+      "label": "neutral-final-three: měřicí report",
+      "href": "./evidence/neutral-final-three/report.json.gz"
+    },
+    {
+      "label": "neutral-final-three: surová data",
+      "href": "./evidence/neutral-final-three/raw.json.gz"
+    },
+    {
+      "label": "neutral-final-active-wg: měřicí report",
+      "href": "./evidence/neutral-final-active-wg/report.json.gz"
+    },
+    {
+      "label": "neutral-final-active-wg: surová data",
+      "href": "./evidence/neutral-final-active-wg/raw.json.gz"
+    },
+    {
+      "label": "neutral-final-active-gl: měřicí report",
+      "href": "./evidence/neutral-final-active-gl/report.json.gz"
+    },
+    {
+      "label": "neutral-final-active-gl: surová data",
+      "href": "./evidence/neutral-final-active-gl/raw.json.gz"
+    },
+    {
+      "label": "neutral-final-wg: měřicí report",
+      "href": "./evidence/neutral-final-wg/report.json.gz"
+    },
+    {
+      "label": "neutral-final-wg: surová data",
+      "href": "./evidence/neutral-final-wg/raw.json.gz"
+    },
+    {
+      "label": "neutral-final-gl: měřicí report",
+      "href": "./evidence/neutral-final-gl/report.json.gz"
+    },
+    {
+      "label": "neutral-final-gl: surová data",
+      "href": "./evidence/neutral-final-gl/raw.json.gz"
+    }
+  ]
+}

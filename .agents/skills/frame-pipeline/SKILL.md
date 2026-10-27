@@ -53,7 +53,13 @@ diagnostics and selects established effects. This is not an arbitrary WGSL edito
   on both backends; never skip a whole setter before its motion-cancellation logic.
 - glTF shader variants use actual map presence and an explicit clip-plane key.
   OPAQUE main views may omit discard; MASK/BLEND, clipped views and shadow coverage
-  must retain it. Preserve fallback texel values and derivative/TBN behavior.
+  must retain it. Missing `normalTexture` preserves the authored shading normal;
+  do not synthesize a non-neutral 128/255 fallback normal. That variant may omit
+  normal-map sampling, UV2 and TBN only; preserve world derivatives for flat
+  shading/specular AA and the complete real-normal-map path. Compare against an
+  independent normal texture with scale 0 on both backends, including absent UV,
+  supplied/missing NORMAL and TANGENT, back faces and negative scale. Keep other
+  fallback texels and actual map decoding unchanged.
   `gltf-material-cache` also guards zero shader/pipeline creation during stable animation;
   use `gltf-full` and `gltf-sdk` for textured PBR, alpha, skinning and auxiliary passes.
 - Keep scene finalization after controller mutations and before either eye. Adding

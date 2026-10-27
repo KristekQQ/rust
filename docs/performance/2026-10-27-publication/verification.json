@@ -1,0 +1,88 @@
+{
+  "base": "64bfda680483e71f6aeb6bf902e63b29b3e90791",
+  "branch": "codex/rim-optimizations-20261027",
+  "target": "origin/codex/rim-optimizations-20261027",
+  "native": {
+    "passed": 418,
+    "ignored": 2,
+    "failed": 0
+  },
+  "sdkPassed": 32,
+  "xrPlatformPassed": 59,
+  "browser": {
+    "total": 137,
+    "statuses": {
+      "PASS": 137
+    },
+    "byBackend": {
+      "webgpu": 50,
+      "webgl": 87
+    },
+    "reportSha256": "2df9602321ee594a8473a0c9b92c2010510c0701205888f2049098aa9265097b"
+  },
+  "receipt": {
+    "passed": true,
+    "key": "3c7b876c978c41be04663e1f0ad5382a605bf368c71ccaf2eb01f7f12aa9f32e",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "128abfe22c6ea2f7f5d07082c857aa81a9ea1aff03fc2a0e20fd0f1117816114",
+      "wasm": "c7091506871c74c5055d501dfd85b3a12d8e70dd7905003135dee7939f8109eb",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "0f9e29ee62be44b4395067b0a98dbcc350902c75bb3d44166410716a07845c8f",
+    "finished": "2026-10-27T08:10:41.702Z"
+  },
+  "selectedInputsUnchanged": true,
+  "excludedLocalFiles": [
+    "assets/models/forest-arena/forest-arena.blend1",
+    "node_modules",
+    "scripts/__pycache__/arena-tools.cpython-314.pyc",
+    "scripts/__pycache__/serve-local.cpython-314.pyc"
+  ],
+  "vendorFiles": [
+    {
+      "path": "examples/rim-three/vendor/BufferGeometryUtils.js",
+      "sha256": "c25b7930e570e9ec56173cd3b866ec8d2e10016630db3937efb439daf1cedbf6",
+      "bytes": 31768,
+      "addedForCleanCheckout": true
+    },
+    {
+      "path": "examples/rim-three/vendor/GLTFExporter.js",
+      "sha256": "76526d2be01c3fdf17c8efcf7c1c67dfd1ef30ede3196865eb69fa49196f80aa",
+      "bytes": 81884,
+      "addedForCleanCheckout": true
+    },
+    {
+      "path": "examples/rim-three/vendor/GLTFLoader.js",
+      "sha256": "8a7db5a19d1018d79fb9a7a8b8372f317682027321a67d86023002e264ea479d",
+      "bytes": 110266,
+      "addedForCleanCheckout": true
+    },
+    {
+      "path": "examples/rim-three/vendor/LICENSE-three.txt",
+      "sha256": "4c40a1ef62450b857c3b2aaf294936304cd552d965fbcd9d32d4c5bcf4ba4454",
+      "bytes": 1081,
+      "addedForCleanCheckout": true
+    },
+    {
+      "path": "examples/rim-three/vendor/three.module.js",
+      "sha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+      "bytes": 1314681,
+      "addedForCleanCheckout": true
+    }
+  ],
+  "selectionManifestSha256": "977b5ea7f5a56d4a55a4856aeecc18ebe88aadc707699de455a8cc53f310ed7f",
+  "sourceDumpSha256": "5d39e2b89d9c899feda80361ec04626a2acea8079f488282bdeb267848844fb9",
+  "limits": [
+    "No main merge or runtime deployment in this publication",
+    "No physical Quest acceptance",
+    "CI outcome not established by local verification"
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "suite": "rim-gameplay",
+  "environment": "simulated-webxr-real-rust-renderer",
+  "status": "PASS",
+  "profile": {
+    "id": "aurelia-90",
+    "hz": 90,
+    "ipd": 0.064,
+    "eyeWidth": 320,
+    "eyeHeight": 320
+  },
+  "checks": [
+    {
+      "name": "six-orbiter first wave",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "shared native diagnostics panel exists in XR",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "desktop diagnostics hide in XR",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "XR eyes/head share original gate spawn",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "both tracked hands hold original gladii",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "one pooled ground shadow per enemy",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "ground shadows darken pavement in left eye",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "ground shadows darken pavement in right eye",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "blob visibility leaves both shadow maps cached",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "left stick moves native player through city",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "right trigger starts bullet-time jump aiming",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "trigger release launches ballistic jump",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "native teleport updates same XR origin",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "A dashes and spends native stamina",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "tracking reentry never invents a slash",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "first tracked blade swing removes 50 HP without killing",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "nonfatal tracked strike never requests worker cuts",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "second separated tracked blade swing kills original orbiter",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "gameplay updates before the current stereo frame",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "cut work stays bounded inside large primitives",
+      "status": "PASS",
+      "observations": 10
+    },
+    {
+      "name": "staged halves remain invisible before atomic commit",
+      "status": "PASS",
+      "observations": 9
+    },
+    {
+      "name": "worker Rust slice atomically publishes uploaded visible halves",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "cut timing observes a real serialized job and atomic publication frame",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "published cut halves visibly separate before dissolution",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "death publishes at least two actual fragment meshes",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "actual halves move to opposite sides of cut plane",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "evaporated halves are removed after three seconds",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "diagnostics panel releases head binding on XR exit",
+      "status": "PASS",
+      "observations": 1
+    },
+    {
+      "name": "XR reentry preserves encounter state",
+      "status": "PASS",
+      "observations": 1
+    }
+  ]
+}

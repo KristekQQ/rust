@@ -1,0 +1,51 @@
+diff --git a/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v4/src/render/gltf_gpu.rs b/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v5/src/render/gltf_gpu.rs
+index 8753c0a78..3e6382e06 100644
+--- a/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v4/src/render/gltf_gpu.rs
++++ b/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v5/src/render/gltf_gpu.rs
+@@ -24,9 +24,11 @@ impl Vertex {
+         let mut offset = 0;
+         A.into_iter()
+             .filter(|a| {
+-                a.shader_location < 3
++                a.shader_location < 2
++                    || (a.shader_location == 2 && texture_mask & (1 << 2) != 0)
+                     || a.shader_location == 8
+-                    || texture_mask & (1 << (a.shader_location - 3)) != 0
++                    || (a.shader_location >= 3
++                        && texture_mask & (1 << (a.shader_location - 3)) != 0)
+             })
+             .map(|mut a| {
+                 if compact {
+@@ -2204,6 +2206,12 @@ fn material_shader_source(key: ShaderKey) -> String {
+             "normal-map derivatives"
+         );
+         source = source.replace(derivatives, "");
++        // A tangent affects only the removed normal-map branch. Omit its input
++        // fetch/layout as Three does for materials without a normal map. Keep
++        // unused deformation helper outputs well-typed without altering position
++        // or normal calculations, including the skinning path.
++        source = source.replacen("@location(2) tangent:vec4<f32>, ", "", 1);
++        source = source.replace("v.tangent", "vec4<f32>(0.0,0.0,0.0,1.0)");
+     }
+     source = source.replace(
+         "fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }",
+diff --git a/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v4/tests/gltf-batching.js b/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v5/tests/gltf-batching.js
+index 93ea983c7..338abbfc4 100644
+--- a/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v4/tests/gltf-batching.js
++++ b/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-batches/candidate-v5/tests/gltf-batching.js
+@@ -21,11 +21,13 @@ try{
+  const reset=()=>{engine.scene.clear();engine.scene.createLight({position:[-2,3,5],color:[12,12,12]});};
+  const captures=[];const evidence=[];
+  for(const cpu of [false,true]){
+-  reset();const url=fixture({cpu}),source=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const models=[source,source.createInstance(),source.createInstance()];
++  reset();const rigidBytesBefore=engine.debugStats().gltf.rigidUploadBytes;const url=fixture({cpu}),source=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const models=[source,source.createInstance(),source.createInstance()];
+   for(const mirrored of [false,true]){
+    models.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
+    const pixels=await capturePixels(canvas);assertForeground(pixels,'three actual model instances',300);
+-   const stats=engine.debugStats();evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
++   const stats=engine.debugStats();
++   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*40+6*4,'normal-map-free shared geometry uploads40-byte vertices and original indices');
++   evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
+    assert(stats.mainDrawCalls===(cpu?3:1),`${cpu?'CPU reference':'rigid instances'} ${mirrored}: ${stats.mainDrawCalls} draws`);
+    if(cpu)assert(stats.gltf.batchBreaks.rootBounds>0&&stats.gltf.batchBreaks.drawDeformed===0,'morph fallback stops at unavailable bounds before draw-merge checks '+JSON.stringify(stats.gltf.batchBreaks));
+   }

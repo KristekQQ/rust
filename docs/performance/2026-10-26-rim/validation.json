@@ -1,0 +1,65 @@
+{
+  "scope": "actual authored Rome original/current desktop; no new renderer implementation/deployment",
+  "commandsExitZero": 16,
+  "primaryMeasuredRuns": 24,
+  "profileRuns": 8,
+  "staticPixelPairs": 6,
+  "staticExactPairs": 4,
+  "staticMaxChannelDelta": 1,
+  "activePixelParityUnavailablePairs": 6,
+  "archivedReportsAndRawEqualToOriginal": 16,
+  "uiModesPass": 4,
+  "mobileNoOverflow": true,
+  "imageOverlayGeometryMatches": true,
+  "mainProfilingOff": true,
+  "toolingTestsPreviouslyPassed": 26,
+  "glProfileBoundaryDiscards": [
+    {
+      "name": "profile-before-rim-static-gl",
+      "incomplete": [
+        {
+          "sampleFrame": 481,
+          "stamp": 10658.9,
+          "ageFrames": 0,
+          "reason": "measurement ended before asynchronous result available"
+        }
+      ]
+    },
+    {
+      "name": "profile-after-rim-static-gl",
+      "incomplete": [
+        {
+          "sampleFrame": 481,
+          "stamp": 10633,
+          "ageFrames": 0,
+          "reason": "measurement ended before asynchronous result available"
+        }
+      ]
+    },
+    {
+      "name": "profile-before-rim-active-gl",
+      "incomplete": [
+        {
+          "sampleFrame": 481,
+          "stamp": 10633.6,
+          "ageFrames": 0,
+          "reason": "measurement ended before asynchronous result available"
+        }
+      ]
+    },
+    {
+      "name": "profile-after-rim-active-gl",
+      "incomplete": [
+        {
+          "sampleFrame": 481,
+          "stamp": 10614.9,
+          "ageFrames": 0,
+          "reason": "measurement ended before asynchronous result available"
+        }
+      ]
+    }
+  ],
+  "physicalQuestMeasured": false,
+  "threeWholeGameParity": false,
+  "noNewBuildOrDeployment": true
+}

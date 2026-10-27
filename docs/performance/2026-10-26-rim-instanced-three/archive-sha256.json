@@ -1,0 +1,16 @@
+{
+  "evidence/gl-three-512/raw.json.gz": "beb71620ecbbae84b36805da7489ab24e2266be494d0777a0a4d20fa624ca305",
+  "evidence/gl-three-512/report.json.gz": "6be5b904aeda22c9565acba7483d3f39b46f21d512d4eee36f6823f4d4ac2bd3",
+  "evidence/gl-three-512/manifest-baseline.json.gz": "c54b0e9c04452f3fdba89bd631ab11d47702fffd89c88c44ee8810abe08166b8",
+  "evidence/gl-three-512/manifest-candidate.json.gz": "4e7c39ef6bc4c11e01ae2dc47e36224b2815946c664ce5fc47b03fc87bb0615d",
+  "evidence/wg-512-0/raw.json.gz": "29a1d10b94183cc304c41b41a2e75f80c4f336f22ef11fb574c2b4cd5311cafd",
+  "evidence/wg-512-0/report.json.gz": "629638acab0fa98b99aa8a315c01409a4c9e1b25a8b033ed8327291903128d2d",
+  "evidence/wg-512-0/manifest-baseline.json.gz": "c54b0e9c04452f3fdba89bd631ab11d47702fffd89c88c44ee8810abe08166b8",
+  "evidence/wg-512-1/raw.json.gz": "e26ec30fcbfe4bf66e82de3a8e8969837100013ce0fa8cb8597f2c13d616838c",
+  "evidence/wg-512-1/report.json.gz": "741521465d1c0f5d4903ad31cc81aa9e2bc1569b91213d739fb0250f077231dc",
+  "evidence/wg-512-1/manifest-baseline.json.gz": "c54b0e9c04452f3fdba89bd631ab11d47702fffd89c88c44ee8810abe08166b8",
+  "evidence/wg-512-2/raw.json.gz": "50a0cea12755f1057fba39d5487ff2e4a3dc953c0908e52c6fed0e184c1a2368",
+  "evidence/wg-512-2/report.json.gz": "d2de44bb2f6fecb71b6f2b40b0dd132297d081e1e1f042628239b0a5c361b237",
+  "evidence/wg-512-2/manifest-baseline.json.gz": "c54b0e9c04452f3fdba89bd631ab11d47702fffd89c88c44ee8810abe08166b8",
+  "evidence/browser-production-final.json.gz": "139e300dae9f671dc0668827fe9c79e4652d84da50ab622cd2f1178aa0abfcb3"
+}

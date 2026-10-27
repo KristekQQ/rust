@@ -21,6 +21,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:'rim-three-stress',path:'examples/rim-three/?verify=1',status:'#three-stress-result',backends:['webgl']},
     ...['basic','culling','cutting','cynatar','fox-control','gltf','lights','mirror','monkey','neon-arena','neon-enemies','neon-font-preview','neon-robot','postprocessing','projectiles','rim','shadows','webxr','forest-arena','crystal-cave','monster-room','table-tennis'].map(scene=>({name:'info-'+scene,path:'tests/runtime-info-example.html?scene='+scene,status:'#result',backends:['webgl'],xrReport:true})),
     {name:"runtime-info-xr",path:"tests/runtime-info-xr.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"neon-arena-entry",path:"tests/neon-arena-entry.html",interaction:"arena-entry",backends:["webgl"]},
@@ -39,6 +40,8 @@ const suites = [
     {name:"table-tennis-xr",path:"tests/table-tennis-xr.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"monster-combat",path:"tests/monster-combat.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"gltf-batching",path:"tests/gltf-batching.html",status:"#result"},
+    {name:"gltf-opaque-batching",path:"tests/gltf-opaque-batching.html",status:"#result"},
+    {name:"gltf-light-classes",path:"tests/gltf-light-classes.html",status:"#result"},
     {name:"gltf-gpu-transforms",path:"tests/gltf-gpu-transforms.html",status:"#result"},
     {name:"gltf-visibility",path:"tests/gltf-visibility.html",status:"#result"},
     {name:"scene-appearance",path:"tests/scene-appearance.html",status:"#result"},
@@ -47,6 +50,8 @@ const suites = [
     {name:"rim-device-logs",path:"tests/rim-device-logs.html",status:"#device-result",xrReport:true},
     {name:"rim-gameplay-120",path:"tests/rim-gameplay.html?hz=120",status:"#result",xrReport:true},
     {name:"rim-cut-scheduler-control",path:"tests/rim-gameplay.html?omitXRHook=1",status:"#result",backends:["webgl"],xrReport:true},
+    {name:"rim-stress-xr",path:"tests/rim-gameplay.html?stress=32",status:"#result",xrReport:true},
+    {name:"rim-spatial-batches-xr",path:"tests/rim-gameplay.html?stress=256",status:"#result",xrReport:true},
     {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true},
     {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
     { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
@@ -478,6 +483,10 @@ try {
                     return /FAIL/.test(document.querySelector(status)?.textContent || '') || (control && typeof control.onclick === 'function');
                 }, { polling: 100 }, suite.button, suite.status);
                 const failure = await page.$eval(suite.status, node => /FAIL/.test(node.textContent || ''));
+                if(suite.name==='rim'){
+                    result.verifyControl=await page.evaluate(selector=>{const node=document.querySelector(selector),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {hit:hit?.id,hitElement:hit?.outerHTML.slice(0,700),stack:document.elementsFromPoint(r.x+r.width/2,r.y+r.height/2).slice(0,5).map(n=>({tag:n.tagName,id:n.id,cls:n.className})),rect:{x:r.x,y:r.y,w:r.width,h:r.height},expected:node.id,detailsOpen:document.querySelector('details').open,ready:document.documentElement.dataset.ready,visibility:document.visibilityState};},suite.button);
+                    if(result.verifyControl.hit!==result.verifyControl.expected)throw Error('Verify button covered: '+JSON.stringify(result.verifyControl));
+                }
                 if (!failure) await page.click(suite.button);
             }
             if (suite.interaction === 'arena-entry') {
@@ -525,6 +534,40 @@ try {
                 if(after.build!==before.build||after.backend!==before.backend||after.preference!=='preserve')throw Error('Refresh changed build/backend or erased preferences');
                 if(responses.some(r=>r.cache||r.serviceWorker||r.status!==200||!r.policy?.includes('no-store')))throw Error('Refresh reused cached or invalid runtime resources: '+JSON.stringify(responses));
                 for(const suffix of ['/examples/rim/','/examples/rim/main.js','/examples/rim/cut-worker.js','/pkg/webgpu_wasm_bg.wasm'])if(!responses.some(r=>r.path===suffix))throw Error('Missing fresh runtime request '+suffix);
+                await page.select('#stress-load','32');
+                const stressEvidence=await page.evaluate(async()=>{
+                    const demo=window.rimDemo;
+                    for(let i=0;i<4;i++)await new Promise(requestAnimationFrame);
+                    const value={count:demo.stress.count,native:demo.engine.scene.rimState.stressModels,query:new URL(location.href).searchParams.get('stress'),select:document.querySelector('#stress-load').value};
+                    if(value.count!==32||value.native!==32||value.query!=='32'||value.select!=='32')throw Error('Stress selection/state/URL disagree: '+JSON.stringify(value));
+                    return value;
+                });
+                await page.reload({waitUntil:'load'});await ready();
+                await page.evaluate(()=>{const d=window.rimDemo;if(d.stress.count!==32||d.engine.scene.rimState.stressModels!==32)throw Error('Stress query lost after refresh');d.setStress(0);if(new URL(location.href).searchParams.has('stress')||d.stress.objects.length)throw Error('Stress reset leaves geometry or URL state');});
+                await page.setViewport({width:390,height:740,deviceScaleFactor:1});
+                await page.evaluate(async()=>{
+                    await new Promise(requestAnimationFrame);
+                    for(const selector of ['#enter','#stress-load']){
+                        const node=document.querySelector(selector),r=node.getBoundingClientRect();
+                        if(r.width<=0||r.height<=0||r.top<0||r.bottom>innerHeight||r.left<0||r.right>innerWidth)throw Error('Stress/VR control offscreen: '+selector);
+                        const top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);if(top!==node&&!node.contains(top))throw Error('Stress/VR control obscured: '+selector);
+                    }
+                });
+                // A discarded/cached document can receive input and XR-end
+                // events after pagehide. Restoring its dead engine must reload.
+                await page.evaluate(()=>{
+                    window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
+                    window.dispatchEvent(new FocusEvent('blur'));
+                    window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW'}));
+                    window.rimDemo.engine.xr.dispatchEvent(new Event('end'));
+                });
+                const restoredNavigation=page.waitForNavigation({waitUntil:'load',timeout:10000});
+                await page.evaluate(()=>{setTimeout(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})),0);});
+                await restoredNavigation;await ready();
+                await page.click('#play');
+                result.lifecycleEvidence=await page.evaluate(()=>({build:document.documentElement.dataset.buildId,active:window.rimDemo.engine.scene.rimState.active}));
+                if(!result.lifecycleEvidence.active||result.lifecycleEvidence.build!==before.build)throw Error('Restored scene cannot start current gameplay');
+                result.stressEvidence=stressEvidence;
                 result.refreshEvidence={before,after,resources:responses};
                 result.text='PASS: plain page reload with cache enabled fetched current modules, worker and WASM; canonical URL and preferences preserved';
             }
@@ -587,13 +630,44 @@ try {
             }
             if (!result.text.startsWith('PASS:')) throw new Error(result.text);
             result.actualBackend = await page.evaluate(() => document.documentElement.dataset.rendererBackend || document.querySelector('[role="status"]')?.textContent?.match(/BrowserWebGpu|\bGl\b/)?.[0]);
-            const expected = backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
+            const expected = suite.name === 'rim-three-stress' ? 'ThreeWebGL2' : backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
             if (result.actualBackend !== expected) throw new Error(`Requested ${backend}, observed ${result.actualBackend || 'unknown'}; fallback is not a pass`);
             if (errors.length) throw new Error(errors.join('\n'));
             if (suite.name === 'rim-gameplay' || suite.name === 'rim-gameplay-120') result.rimCutEvidence = await page.evaluate(() => ({halfVisibility:window.rimCutEvidence.halfVisibility,transport:window.rimCutEvidence.transport,completionMs:window.rimCutEvidence.completionMs}));
             if (suite.name === 'rim-device-logs') result.rimDeviceLogEvidence = await page.evaluate(() => window.rimDeviceLogEvidence);
+            if (['rim-stress-xr','rim-spatial-batches-xr'].includes(suite.name)) result.rimStressEvidence = await page.evaluate(() => window.rimStressEvidence);
+            if (suite.name === 'rim-three-stress') {
+                result.threeStressEvidence = await page.evaluate(() => window.threeStressVerification);
+                await page.select('#stress-count','32');
+                await page.select('#stress-representation','objects');
+                await page.waitForFunction(()=>cityDebug.stress.count===32&&cityDebug.stress.representation==='objects');
+                await page.evaluate(()=>{const u=new URL(location.href);u.searchParams.delete('verify');history.replaceState(null,'',u);});
+                await page.reload({waitUntil:'networkidle0'});
+                await page.waitForFunction(()=>window.cityDebug?.stress?.count===32&&cityDebug.stress.representation==='objects');
+                await page.setViewport({width:390,height:740,deviceScaleFactor:1});
+                await page.evaluate(()=>{for(const id of ['vr','stress-count','stress-representation']){const n=document.getElementById(id),r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);if(r.x<0||r.y<0||r.right>innerWidth||r.bottom>innerHeight||!(hit===n||n.contains(hit)))throw Error('Three mobile control covered/offscreen: '+id);}});
+                await page.select('#stress-count','0');
+                await page.waitForFunction(()=>cityDebug.stress.count===0&&cityDebug.stress.group.children.length===0);
+                await page.setViewport({width:1280,height:720,deviceScaleFactor:1});
+                await page.click('#walk');
+                await page.waitForFunction(()=>document.body.classList.contains('walking'));
+                const vrChecks=[];
+                for(const viewport of [{width:1280,height:720,deviceScaleFactor:1},{width:960,height:540,deviceScaleFactor:1},{width:390,height:740,deviceScaleFactor:1}]){
+                    await page.setViewport(viewport);
+                    vrChecks.push(await page.evaluate(()=>{const n=document.getElementById('vr'),r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);if(r.width<44||r.height<44||r.x<0||r.y<0||r.right>innerWidth||r.bottom>innerHeight||!(hit===n||n.contains(hit)))throw Error('Three VR entry hidden/covered after Walk: '+JSON.stringify({width:innerWidth,height:innerHeight,rect:{x:r.x,y:r.y,w:r.width,h:r.height},hit:hit?.id}));return {width:innerWidth,height:innerHeight,walking:true,visible:true,hit:true};}));
+                }
+                await page.evaluate(()=>{
+                    window.threeVrRequestProbe=0;
+                    Object.defineProperty(navigator,'xr',{configurable:true,value:{requestSession:async()=>{window.threeVrRequestProbe++;throw new Error('Controlled VR request rejection');}}});
+                    document.getElementById('vr').disabled=false;
+                });
+                await page.click('#vr');
+                await page.waitForFunction(()=>window.threeVrRequestProbe===1&&document.getElementById('status').textContent.includes('Controlled VR request rejection'));
+                result.threeStressControls={refresh:true,mobileHitTargets:true,removal:true,walkingVrEntry:vrChecks,physicalClickReachedRequestSession:true,requestScope:'controlled rejected request only; not an immersive XR session'};
+            }
             if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);
             if (suite.name === 'gltf-material-cache') result.materialCacheEvidence = await page.evaluate(() => window.materialCacheEvidence);
+            if (suite.name === 'gltf-light-classes') result.lightClassEvidence = await page.evaluate(() => window.lightClassEvidence);
             if (suite.name === 'postprocess-fusion') {
                 result.pixelEvidence = await page.evaluate(() => window.fusionEvidence.map(({png,...item})=>item));
                 if (capture) for (const item of await page.evaluate(() => window.fusionEvidence)) {
@@ -621,7 +695,7 @@ try {
                 result.screenshot = `${suite.name}-${backend}.png`;
                 const png = await page.evaluate(() => new Promise((resolve, reject) => requestAnimationFrame(() => {
                     try {
-                        const canvas = document.querySelector('#gpu-canvas');
+                        const canvas = document.querySelector('#gpu-canvas, #world');
                         const copy = document.createElement('canvas');
                         copy.width = canvas.width; copy.height = canvas.height;
                         copy.getContext('2d').drawImage(canvas, 0, 0);

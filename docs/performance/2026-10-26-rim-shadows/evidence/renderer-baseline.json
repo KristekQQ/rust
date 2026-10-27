@@ -1,0 +1,18 @@
+{
+  "src/render/gltf_gpu.rs": {
+    "matches_a54_baseline": true,
+    "sha256": "1722c2615a822020f947a56e17d8f832e353cb609b8dae6aa38c123987c305c3"
+  },
+  "src/render/effects.rs": {
+    "matches_a54_baseline": true,
+    "sha256": "9a8a3fe4bb2d87c18aafdc681f7e555f40244842c31a9f2e7b488334949ec860"
+  },
+  "src/render/gltf_pbr.wgsl": {
+    "matches_a54_baseline": true,
+    "sha256": "d6a62dda04ca667d3708dd2c064eebedea8be5a83faf619cf8b50af143c59808"
+  },
+  "scripts/render-performance-lib.mjs": {
+    "matches_a54_baseline": true,
+    "sha256": "42ea424a7e4f8502f5ec3f27b5595491dfeaa707cbe9b66e4736f89481b2dc88"
+  }
+}

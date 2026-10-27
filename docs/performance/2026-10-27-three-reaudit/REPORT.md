@@ -1,0 +1,27 @@
+# Exact Three r170 re-audit — 2026-10-27
+
+This is a source, asset and retained-profile audit, not a new benchmark or an implemented optimization. Owned checkout: rim-publish/rust, codex/spatial-opaque-batches, archived base 7b90d4d18. Current live WASM c7091506/app ba920dd931 is unchanged. Primary checkout, shared server and Neon output are untouched.
+
+## Decisive finding: repeated preparation of unchanged batches
+
+Native `src/render/gltf_gpu.rs::prepare_draws` collects models, reconstructs eligible draw lists, groups compatible primitives, compares instance bases and reconstructs payload bytes on every invocation. Existing upload suppression compares the resulting stream with previous bytes; it avoids GPU upload but not CPU reconstruction. The higher-level pass cache does not retain this prepared glTF submission plan. `src/render/renderer.rs::encode_color` invokes preparation again for opaque and, where applicable, blend content.
+
+The retained **profile-gl** report, 512 static stress models, has 60 samples of the `gltf.queue` wall-clock CPU scope: mean **7.787 ms**, p95 **8.600 ms**. The enclosing `render.encode.color` mean is **8.162 ms**; these overlap and must not be added. `gltf.update` mean is **0.225 ms**. Separate **profile-wg** has 1024 models and `gltf.queue` mean **14.203 ms**, p95 **16.200 ms**, 60 samples. Different loads/backends cannot be ranked by these two values. These are profiled, contended desktop diagnostics, not isolated CPU busy-time measurements or profiler-off throughput results. Raw reports and hashes are identified in facts.json.
+
+The actual Three comparison uses authored `InstancedMesh` groups in `examples/rim-three/stress.js::setCount`. It constructs per-part groups, matrices and bounds on workload changes and disables matrix auto updates. `WebGLAttributes` checks attribute versions before upload. Three still traverses, culls and submits at render time: it does not cache the entire frame automatically. This benchmark gives its fixed static grouping a preparation advantage over native automatic batching. A correct reusable engine should exploit the same unchanged-data property without requiring each game to build its own batches.
+
+## Lossless bandwidth candidates
+
+All three inspected Rome assets have **zero COLOR_0 primitives**. The loader supplies identity-white RGBA and the current native rigid vertex layout still packs it. For an untextured rigid vertex without a normal map, omitting proven identity-white color can reduce **40 to 24 bytes per vertex**. This is a 40% reduction in those vertex bytes, not a measured FPS or whole-scene memory gain. Preserve real vertex colors and existing skin/morph/CPU fallbacks; distinguish layouts in shader/pipeline/geometry ownership. Three's GLTFLoader enables material vertex colors only when the geometry has that attribute.
+
+The orbiter has 67 primitives, 15,670 summed vertices and original **Uint16** indices. Native expands indices to **Uint32** and always submits that format; Three preserves typed index width. Native city GLB has 19 nonindexed primitives and 186,228 summed vertices; native loading synthesizes sequential u32 indices. Three supports nonindexed submission, but this asset inspection alone does not establish the original procedural Three city's actual index representation. Index-width/nonindexed paths are independent candidates requiring winding, topology, cut/deformation and pixel checks. Exact source asset facts and SHA-256 hashes are in facts.json; the native and Three orbiter GLBs were byte-identical during the audit.
+
+## Next bounded implementation
+
+Retain a reusable batch structure and stable instance buffers. Track successful resource/transform/pose/options revisions, ordered membership and layout/offset generations; update changed records instead of rebuilding and byte-comparing complete payloads. Separate reusable scene grouping from per-view visibility and depth ordering. Camera movement, asymmetric VR eyes, removal, material/alpha/order changes, clipping/shadow passes and deformed geometry must invalidate the appropriate layer or use the existing fallback. View-dependent depth windows cannot be reused solely because scene transforms are unchanged. Bound cache memory and preserve cleanup/device recreation.
+
+First measure this change alone with static camera/scene, then a single-object mutation, camera movement and asymmetric simulated XR. Keep current pixels, resolution, effects and gameplay. Use affected-backend correctness plus repeated profiler-off A/B measurements; compare actual Three separately. The current direct diagnostic remains native GL **18.505 FPS / 174 calls** versus Three **26.179 FPS / 108 calls**. AA, PBR/shadows and full gameplay differ, so it is not full-quality equivalence. Fewer calls alone did not close the gap. Do not claim the preparation scope accounts for the whole FPS gap or promise a gain before testing.
+
+## Rejected shortcuts and evidence limits
+
+No shader approximation, resolution/effect reduction or blindly moved vertex shadow bias. Existing final-fragment normal bias must retain its semantics. Per-draw API binding cost is not attributed without inspecting/tracing wgpu backend caching. GPU fill/shading costs remain: preparation is one concrete outstanding source of work, not proof of a single universal bottleneck. No fresh FPS run, runtime/build change, commit, push, CI or physical Quest evidence was produced by this audit.

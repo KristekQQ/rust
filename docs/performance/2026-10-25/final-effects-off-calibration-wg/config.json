@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "backend": "webgpu",
+  "family": "effects",
+  "order": "spatial",
+  "seed": 1337,
+  "overlap": 0,
+  "profiling": false,
+  "budget": 16.666666666666668,
+  "warmup": 500,
+  "sample": 2500,
+  "load": 64,
+  "levels": {
+    "light": 16,
+    "near": 64,
+    "over": null
+  },
+  "loads": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64
+  ],
+  "underBudget": true,
+  "incomplete": false,
+  "unsafeLoad": null,
+  "overloadConfirmation": {
+    "firstFailedLoad": null,
+    "upperBound": null,
+    "reason": "No failure observed within max-load; overload unavailable."
+  },
+  "capacityProbes": [
+    {
+      "load": 1,
+      "capacityPass": true
+    },
+    {
+      "load": 2,
+      "capacityPass": true
+    },
+    {
+      "load": 4,
+      "capacityPass": true
+    },
+    {
+      "load": 8,
+      "capacityPass": true
+    },
+    {
+      "load": 16,
+      "capacityPass": true
+    },
+    {
+      "load": 32,
+      "capacityPass": true
+    },
+    {
+      "load": 64,
+      "capacityPass": true
+    }
+  ],
+  "selectionMetric": "frame capacity: RAF median <= budget+.5ms, p95 <= 2*budget+.5ms, missed intervals <= 10%, callback CPU p95 <= budget+.5ms; RAF is not compositor presentation",
+  "baselineManifest": [
+    {
+      "url": "/js/engine.js",
+      "bytes": 45835,
+      "sha256": "0f9a2629f2bd81280219412902356e4460f7ee9810063f8371a60f74709d1c36",
+      "source": "frozen"
+    },
+    {
+      "url": "/js/webxr.js",
+      "bytes": 31081,
+      "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+      "source": "frozen"
+    },
+    {
+      "url": "/pkg/webgpu_wasm_bg.wasm",
+      "bytes": 5802544,
+      "sha256": "c4301d8142f89cda9472095b128a458372101d646a7b9ed1980e84a5569b526a",
+      "source": "frozen"
+    },
+    {
+      "url": "/pkg/webgpu_wasm.js",
+      "bytes": 189395,
+      "sha256": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+      "source": "frozen"
+    },
+    {
+      "url": "/scripts/render-performance-order.mjs",
+      "bytes": 680,
+      "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/pixels.js",
+      "bytes": 1931,
+      "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/render-performance.html",
+      "bytes": 318,
+      "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/render-performance.js",
+      "bytes": 11646,
+      "sha256": "5dc21b2dd4e18ac919381f0e1ddfa8d504d430965b812363a690161f3c1f726c",
+      "source": "harness"
+    }
+  ],
+  "baselineRoot": "/Users/Honza/.codex/worktrees/rim-publish/rust/output/render-performance/baseline",
+  "driverIdentity": {
+    "capturedAt": "2026-10-25T19:02:55.005Z",
+    "nodeVersion": "v24.19.0",
+    "v8Version": "13.6.233.17-node.51",
+    "files": {
+      "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+      "scripts/render-performance.mjs": "6fdd00a0cc8608c59bd1fa6843e2b9eea0e1669bece72798ee7add087add154a",
+      "scripts/render-performance-lib.mjs": "6d7599fba660d250e921e8813818ad6f08334e5a9407bddc4c90d4f8cc2ea15b",
+      "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+      "scripts/render-performance-gl-timer.mjs": "e5976b188339bcd43e0a36512fc7b6fd301a646414d3de6dbb68e8fe49fc66eb",
+      "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "tests/render-performance.js": "5dc21b2dd4e18ac919381f0e1ddfa8d504d430965b812363a690161f3c1f726c",
+      "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+    },
+    "sha256": "c534482a4401e065e9f12f9f9b48c13ab8cd8aa425b5a060e37ae2bad517a4c2"
+  }
+}

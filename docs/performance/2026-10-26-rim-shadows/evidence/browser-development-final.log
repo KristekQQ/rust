@@ -1,0 +1,5 @@
+PASS rim-gameplay webgpu
+PASS shadow-cache webgpu
+PASS rim-gameplay webgl
+PASS shadow-cache webgl
+Report: /Users/Honza/.codex/worktrees/rim-publish/rust/output/verification/browser-report.json

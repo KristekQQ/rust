@@ -5,7 +5,7 @@ import {installRimDiagnostics} from '../examples/rim/diagnostics.js';
 function fixture(extra={}){
  let time=0,reads=0;
  const records=[],xr=new EventTarget(),target=new EventTarget();xr.isPresenting=true;
- const state={health:83,kills:2,wave:3,player:{position:[9,9,9]},blade:{contactSamples:25,hits:3,slowSamples:6,discontinuities:2,maxSpeedForFrame:1.5,position:[8,8,8]},enemies:[{id:4,hp:12,phase:3,position:[1,2,3]}],cuts:{queued:1,pending:2,staging:3,commits:4,errors:5,motion:[{direction:[9,9,9]}]}};
+ const state={stressModels:128,health:83,kills:2,wave:3,player:{position:[9,9,9]},blade:{contactSamples:25,hits:3,slowSamples:6,discontinuities:2,maxSpeedForFrame:1.5,position:[8,8,8]},enemies:[{id:4,hp:12,phase:3,position:[1,2,3]}],cuts:{queued:1,pending:2,staging:3,commits:4,errors:5,motion:[{direction:[9,9,9]}]}};
  const engine={xr,scene:{get rimState(){reads++;return state;}},renderer_backend:()=> 'BrowserWebGpu'};
  const dispose=installRimDiagnostics(engine,{build:'app-123',wasmBuild:'wasm-456',now:()=>time,eventTarget:target,userAgent:'Quest test',send:record=>records.push(record),getTransport:()=>({status:'ready',jobs:7,inflight:2}),...extra});
  const event=(name,detail)=>{const event=new Event(name);Object.assign(event,{detail});xr.dispatchEvent(event);};
@@ -19,6 +19,7 @@ test('XR samples use actual frames at 1 Hz, include IDs and cut phases, omit spa
  f.setTime(1000);f.event('frame');assert.equal(f.reads(),2);
  const sample=f.records.filter(r=>r.stage==='rim-xr-sample').at(-1);
  assert.equal(sample.build,'app-123');assert.equal(sample.wasmBuild,'wasm-456');assert.equal(sample.backend,'BrowserWebGpu');assert.equal(sample.userAgent,'Quest test');
+ assert.equal(sample.details.game.stressModels,128);
  assert.deepEqual(sample.details.cuts,{queued:1,pending:2,staging:3,errors:5,commits:4});
  assert.deepEqual(sample.details.enemies,[{id:4,hp:12,phase:3}]);
  assert.deepEqual(sample.details.transport,{status:'ready',jobs:7,inflight:2});

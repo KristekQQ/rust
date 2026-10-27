@@ -1,0 +1,396 @@
+{
+  "schema": 1,
+  "outputRoot": "../../../output/render-performance-rim-parity",
+  "included": [
+    "neutral-final-over",
+    "neutral-final-three",
+    "neutral-final-active-wg",
+    "neutral-final-active-gl",
+    "neutral-final-wg",
+    "neutral-final-gl"
+  ],
+  "missing": [],
+  "incomplete": [],
+  "buildFingerprints": {
+    "neutral-final-over": {
+      "before": {
+        "source": "cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+        "wasm": "7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "after": {
+        "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "neutral-final-three": {
+      "before": {
+        "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "after": {
+        "root": "/Users/Honza/.codex/worktrees/rim-publish/rust/output/render-performance-rim-parity/three-original",
+        "representation": "instanced",
+        "scope": "original authored Rome at same gate camera/resolution; MSAA vs FXAA, shading, shadow and gameplay differences remain; no proven pixel/full-game parity"
+      }
+    },
+    "neutral-final-active-wg": {
+      "before": {
+        "source": "95b7e8c1bdd40f5f58f887076346113c981866dc3ee3ea6a0d2ae9ae32cb17b8",
+        "wasm": "292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b",
+        "bindings": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "after": {
+        "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "neutral-final-active-gl": {
+      "before": {
+        "source": "95b7e8c1bdd40f5f58f887076346113c981866dc3ee3ea6a0d2ae9ae32cb17b8",
+        "wasm": "292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b",
+        "bindings": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "after": {
+        "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "neutral-final-wg": {
+      "before": {
+        "source": "cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+        "wasm": "7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "after": {
+        "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "neutral-final-gl": {
+      "before": {
+        "source": "cbcd277d2b35a432ce0a0189d39b6a94b10d2090d6cc83c5069565d0379326b8",
+        "wasm": "7b0e83ab09664aeab4df428a903098f39cd71025b43bcc51a64121e727cf6435",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "after": {
+        "source": "b6bc0aeef47435635542d7a1c4ee970c177034663cbfe68011a080807e96966b",
+        "wasm": "a54c09c90f591f16399196a0806fb0945161e045f4340d1bf3bd714f16df9317",
+        "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    }
+  },
+  "inputs": [
+    {
+      "scenario": "neutral-final-over",
+      "kind": "report",
+      "source": "neutral-final-over/report.json",
+      "copy": "evidence/neutral-final-over/report.json.gz",
+      "bytes": 158583,
+      "sha256": "d9c02367c5b9a858b1633f5ead34f4a4726b1a1b023a0881d1fd9ef268917900",
+      "copiedBytes": 14172,
+      "copiedSha256": "903991cae6aad8e072df4ce59e9e1cfd2c7d9f5bda4185f94bf1c4302a86c866"
+    },
+    {
+      "scenario": "neutral-final-over",
+      "kind": "raw",
+      "source": "neutral-final-over/raw.json.gz",
+      "copy": "evidence/neutral-final-over/raw.json.gz",
+      "bytes": 122674,
+      "sha256": "9a4036401254b685c974aadad6b7f600ab83b7abb9407c02c75c2d530a8f88e9",
+      "copiedBytes": 122674,
+      "copiedSha256": "9a4036401254b685c974aadad6b7f600ab83b7abb9407c02c75c2d530a8f88e9"
+    },
+    {
+      "scenario": "neutral-final-over",
+      "kind": "image-before",
+      "source": "neutral-final-over/baseline-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-over/before-pair0.png",
+      "bytes": 1189536,
+      "sha256": "bea818240ba26390d2d4c7d78b7e892d7ee24d81964381475415e4eddd64822c",
+      "copiedBytes": 1189536,
+      "copiedSha256": "bea818240ba26390d2d4c7d78b7e892d7ee24d81964381475415e4eddd64822c"
+    },
+    {
+      "scenario": "neutral-final-over",
+      "kind": "image-after",
+      "source": "neutral-final-over/candidate-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-over/after-pair0.png",
+      "bytes": 1190288,
+      "sha256": "4197bc5bc342a30ad39804462612b3ca2beb76123ce67430b53e194d83f652f6",
+      "copiedBytes": 1190288,
+      "copiedSha256": "4197bc5bc342a30ad39804462612b3ca2beb76123ce67430b53e194d83f652f6"
+    },
+    {
+      "scenario": "neutral-final-three",
+      "kind": "report",
+      "source": "neutral-final-three/report.json",
+      "copy": "evidence/neutral-final-three/report.json.gz",
+      "bytes": 144154,
+      "sha256": "e9deedfb51877a5359d8ed267285b587f59b83b251d3d3f3c8a44ad6c40244e7",
+      "copiedBytes": 16549,
+      "copiedSha256": "a3f512ea0e493cb6e5a06b300db2287c2cbd0f652d2761e47b8437f047bf998c"
+    },
+    {
+      "scenario": "neutral-final-three",
+      "kind": "raw",
+      "source": "neutral-final-three/raw.json.gz",
+      "copy": "evidence/neutral-final-three/raw.json.gz",
+      "bytes": 98998,
+      "sha256": "3063ba87d2e4d15c3a0888280c526e5b53fb5d5003491c0083fd846ca94d7394",
+      "copiedBytes": 98998,
+      "copiedSha256": "3063ba87d2e4d15c3a0888280c526e5b53fb5d5003491c0083fd846ca94d7394"
+    },
+    {
+      "scenario": "neutral-final-three",
+      "kind": "image-before",
+      "source": "neutral-final-three/baseline-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-three/before-pair0.png",
+      "bytes": 1190288,
+      "sha256": "4197bc5bc342a30ad39804462612b3ca2beb76123ce67430b53e194d83f652f6",
+      "copiedBytes": 1190288,
+      "copiedSha256": "4197bc5bc342a30ad39804462612b3ca2beb76123ce67430b53e194d83f652f6"
+    },
+    {
+      "scenario": "neutral-final-three",
+      "kind": "image-after",
+      "source": "neutral-final-three/candidate-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-three/after-pair0.png",
+      "bytes": 1301844,
+      "sha256": "5de0bb8038ce132bb2ac46f65f0ce2a537473ef9357802c155f280c9214e093f",
+      "copiedBytes": 1301844,
+      "copiedSha256": "5de0bb8038ce132bb2ac46f65f0ce2a537473ef9357802c155f280c9214e093f"
+    },
+    {
+      "scenario": "neutral-final-active-wg",
+      "kind": "report",
+      "source": "neutral-final-active-wg/report.json",
+      "copy": "evidence/neutral-final-active-wg/report.json.gz",
+      "bytes": 182594,
+      "sha256": "61789c59442b99912eda72ad02e06a1b1fee4ab4f6d687aadd8fa149320d4e9c",
+      "copiedBytes": 20785,
+      "copiedSha256": "249a72000fc1e3f1ece2bfc0116a92bb7473ca4215a49f0080c7a70db9e820b3"
+    },
+    {
+      "scenario": "neutral-final-active-wg",
+      "kind": "raw",
+      "source": "neutral-final-active-wg/raw.json.gz",
+      "copy": "evidence/neutral-final-active-wg/raw.json.gz",
+      "bytes": 221507,
+      "sha256": "9b0fde6f84e40795eac57110b4992e010d6ad01cd2fdf608ed00d08d6ce90797",
+      "copiedBytes": 221507,
+      "copiedSha256": "9b0fde6f84e40795eac57110b4992e010d6ad01cd2fdf608ed00d08d6ce90797"
+    },
+    {
+      "scenario": "neutral-final-active-wg",
+      "kind": "image-before",
+      "source": "neutral-final-active-wg/baseline-rim-active-1-pair0.png",
+      "copy": "evidence/neutral-final-active-wg/before-pair0.png",
+      "bytes": 223751,
+      "sha256": "6ed6f313d59631f55815048006ba44a94fd54269c286f06a7bae7ae108882f95",
+      "copiedBytes": 223751,
+      "copiedSha256": "6ed6f313d59631f55815048006ba44a94fd54269c286f06a7bae7ae108882f95"
+    },
+    {
+      "scenario": "neutral-final-active-wg",
+      "kind": "image-after",
+      "source": "neutral-final-active-wg/candidate-rim-active-1-pair0.png",
+      "copy": "evidence/neutral-final-active-wg/after-pair0.png",
+      "bytes": 203916,
+      "sha256": "9fd52915eb3c16d20ccd38f0dd65a80e908ff954199c50341c1a7178d7703804",
+      "copiedBytes": 203916,
+      "copiedSha256": "9fd52915eb3c16d20ccd38f0dd65a80e908ff954199c50341c1a7178d7703804"
+    },
+    {
+      "scenario": "neutral-final-active-gl",
+      "kind": "report",
+      "source": "neutral-final-active-gl/report.json",
+      "copy": "evidence/neutral-final-active-gl/report.json.gz",
+      "bytes": 182523,
+      "sha256": "bbd3fcb6532afd8bb90e5d5f779d647383417bed8cd6cbef2769f4237f0a18c4",
+      "copiedBytes": 20164,
+      "copiedSha256": "d529b8ff58d50dc0c3a91e168e49556c5b02bbd47a94ad0a52ae64cbed822be3"
+    },
+    {
+      "scenario": "neutral-final-active-gl",
+      "kind": "raw",
+      "source": "neutral-final-active-gl/raw.json.gz",
+      "copy": "evidence/neutral-final-active-gl/raw.json.gz",
+      "bytes": 221894,
+      "sha256": "c803ae5882efc46e2df3a190a22d4f53a3ded06acb4d15f460cada8032f84bd4",
+      "copiedBytes": 221894,
+      "copiedSha256": "c803ae5882efc46e2df3a190a22d4f53a3ded06acb4d15f460cada8032f84bd4"
+    },
+    {
+      "scenario": "neutral-final-active-gl",
+      "kind": "image-before",
+      "source": "neutral-final-active-gl/baseline-rim-active-1-pair0.png",
+      "copy": "evidence/neutral-final-active-gl/before-pair0.png",
+      "bytes": 223218,
+      "sha256": "e8bb6aff4da59f91a55a88afc6d89a92a8ea9abd84f82c7e0948537651ed2d03",
+      "copiedBytes": 223218,
+      "copiedSha256": "e8bb6aff4da59f91a55a88afc6d89a92a8ea9abd84f82c7e0948537651ed2d03"
+    },
+    {
+      "scenario": "neutral-final-active-gl",
+      "kind": "image-after",
+      "source": "neutral-final-active-gl/candidate-rim-active-1-pair0.png",
+      "copy": "evidence/neutral-final-active-gl/after-pair0.png",
+      "bytes": 223431,
+      "sha256": "550bc3bb7e22f920df9d10f295310b9c295173723d4c721ff6cf048f4aa3eb53",
+      "copiedBytes": 223431,
+      "copiedSha256": "550bc3bb7e22f920df9d10f295310b9c295173723d4c721ff6cf048f4aa3eb53"
+    },
+    {
+      "scenario": "neutral-final-wg",
+      "kind": "report",
+      "source": "neutral-final-wg/report.json",
+      "copy": "evidence/neutral-final-wg/report.json.gz",
+      "bytes": 64148,
+      "sha256": "ed0bc50464dc8b5f4129f9c2f7b3f8e4d41f59c4f913ef6b185f76d3346564d3",
+      "copiedBytes": 10185,
+      "copiedSha256": "4bb652fc6f3cd93235154c369932b13f5d2932805f6bd10eb92d76653553d49d"
+    },
+    {
+      "scenario": "neutral-final-wg",
+      "kind": "raw",
+      "source": "neutral-final-wg/raw.json.gz",
+      "copy": "evidence/neutral-final-wg/raw.json.gz",
+      "bytes": 49416,
+      "sha256": "d6821743d89e642863a10fc53bfc2f33e3461ce029b0eb66019f72d2b609ec0c",
+      "copiedBytes": 49416,
+      "copiedSha256": "d6821743d89e642863a10fc53bfc2f33e3461ce029b0eb66019f72d2b609ec0c"
+    },
+    {
+      "scenario": "neutral-final-wg",
+      "kind": "image-before",
+      "source": "neutral-final-wg/baseline-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-wg/before-pair0.png",
+      "bytes": 672794,
+      "sha256": "eb24b261c1d1a9b3c45f439278bf4fa983b3d7a6a0ee4a9fc0b75db12b96c596",
+      "copiedBytes": 672794,
+      "copiedSha256": "eb24b261c1d1a9b3c45f439278bf4fa983b3d7a6a0ee4a9fc0b75db12b96c596"
+    },
+    {
+      "scenario": "neutral-final-wg",
+      "kind": "image-after",
+      "source": "neutral-final-wg/candidate-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-wg/after-pair0.png",
+      "bytes": 671912,
+      "sha256": "7055ae3e57a8ebb1352f9095624a51816bf2d3df812083279564b044c403ecb4",
+      "copiedBytes": 671912,
+      "copiedSha256": "7055ae3e57a8ebb1352f9095624a51816bf2d3df812083279564b044c403ecb4"
+    },
+    {
+      "scenario": "neutral-final-gl",
+      "kind": "report",
+      "source": "neutral-final-gl/report.json",
+      "copy": "evidence/neutral-final-gl/report.json.gz",
+      "bytes": 64234,
+      "sha256": "5fff4443e69ef3412097187621741422e5d474a0bc1745b71b95de421a4adf87",
+      "copiedBytes": 10318,
+      "copiedSha256": "4a6668a05404ce35816cbbbb64512fa8a4096c3a30fc7eeaba07a02a9371dc61"
+    },
+    {
+      "scenario": "neutral-final-gl",
+      "kind": "raw",
+      "source": "neutral-final-gl/raw.json.gz",
+      "copy": "evidence/neutral-final-gl/raw.json.gz",
+      "bytes": 47674,
+      "sha256": "632cab410ff30db476c8f8cec9b7fadea7611ca2ddc60f158588b43d21ce3c22",
+      "copiedBytes": 47674,
+      "copiedSha256": "632cab410ff30db476c8f8cec9b7fadea7611ca2ddc60f158588b43d21ce3c22"
+    },
+    {
+      "scenario": "neutral-final-gl",
+      "kind": "image-before",
+      "source": "neutral-final-gl/baseline-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-gl/before-pair0.png",
+      "bytes": 672809,
+      "sha256": "f3a10f7c07b3c069ac892574335284378d4189e7e5c255e855327f8bcc0af25e",
+      "copiedBytes": 672809,
+      "copiedSha256": "f3a10f7c07b3c069ac892574335284378d4189e7e5c255e855327f8bcc0af25e"
+    },
+    {
+      "scenario": "neutral-final-gl",
+      "kind": "image-after",
+      "source": "neutral-final-gl/candidate-rim-static-1-pair0.png",
+      "copy": "evidence/neutral-final-gl/after-pair0.png",
+      "bytes": 671723,
+      "sha256": "f3dd7d419976b8859a961210fad74a8bffadfd2ba0a72316be517e6670a5f82a",
+      "copiedBytes": 671723,
+      "copiedSha256": "f3dd7d419976b8859a961210fad74a8bffadfd2ba0a72316be517e6670a5f82a"
+    }
+  ]
+}

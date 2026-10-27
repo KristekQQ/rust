@@ -1,0 +1,50 @@
+[
+  {
+    "url": "/js/engine.js",
+    "bytes": 45835,
+    "sha256": "0f9a2629f2bd81280219412902356e4460f7ee9810063f8371a60f74709d1c36",
+    "source": "frozen"
+  },
+  {
+    "url": "/js/webxr.js",
+    "bytes": 31081,
+    "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+    "source": "frozen"
+  },
+  {
+    "url": "/pkg/webgpu_wasm_bg.wasm",
+    "bytes": 5802544,
+    "sha256": "c4301d8142f89cda9472095b128a458372101d646a7b9ed1980e84a5569b526a",
+    "source": "frozen"
+  },
+  {
+    "url": "/pkg/webgpu_wasm.js",
+    "bytes": 189395,
+    "sha256": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+    "source": "frozen"
+  },
+  {
+    "url": "/scripts/render-performance-order.mjs",
+    "bytes": 680,
+    "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/pixels.js",
+    "bytes": 1931,
+    "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance.html",
+    "bytes": 318,
+    "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance.js",
+    "bytes": 11646,
+    "sha256": "5dc21b2dd4e18ac919381f0e1ddfa8d504d430965b812363a690161f3c1f726c",
+    "source": "harness"
+  }
+]

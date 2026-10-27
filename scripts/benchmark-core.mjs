@@ -1,3 +1,4 @@
+if (['smoke','calibrate','compare','capacity','soak','regression','--help'].includes(process.argv[2])) { await import('./render-performance.mjs'); process.exit(process.exitCode || 0); }
 // Headless release benchmark; GPU times come only from the existing asynchronous profiler.
 import fs from "node:fs/promises";
 import path from "node:path";

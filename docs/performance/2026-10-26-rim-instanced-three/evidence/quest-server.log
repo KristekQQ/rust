@@ -1,0 +1,26 @@
+
+> serve:quest
+> bash scripts/run-quest.sh /Users/Honza/.local/share/rust-webxr/tls/server.crt /Users/Honza/.local/share/rust-webxr/tls/server.key
+
+Production: output/production (254 files, 86839898 bytes; release WASM).
+Production release: https://192.168.11.134:8443/examples/neon-arena/?backend=auto
+No tunnel is started. Quest must be on a reachable local network.
+Confirm the local certificate on the headset, or trust the development CA there.
+Press Ctrl+C to stop.
+https://192.168.11.134:8443
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim/index.html HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim/main.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim/scene.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim/stress.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim/diagnostics.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /js/engine.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /pkg/webgpu_wasm.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /pkg/webgpu_wasm_bg.wasm HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/index.html HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/main.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/app.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/stress.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/verify.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/vr-debug-panel.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/vendor/three.module.js HTTP/1.1" 200 -
+192.168.11.134 - - [26/Oct/2026 18:30:54] "GET /examples/rim-three/models/drone-orbiter.glb HTTP/1.1" 200 -

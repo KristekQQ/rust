@@ -7,6 +7,7 @@ use glam::{Mat4, Quat, Vec2, Vec3};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+pub const MAX_STRESS_MODELS: u32 = 2048;
 const HIDDEN: Vec3 = Vec3::new(0., -10000., 0.);
 #[derive(Deserialize)]
 pub struct EnemySpec {
@@ -25,6 +26,8 @@ pub struct Config {
     pub charges: Vec<u32>,
     #[serde(default, rename = "healthBars")]
     pub health_bars: Vec<[u32; 2]>,
+    #[serde(default, rename = "blobShadows")]
+    pub blob_shadows: Vec<u32>,
     pub hud: Vec<u32>,
     pub marker: u32,
     pub shapes: Vec<Shape>,
@@ -44,6 +47,7 @@ pub struct Input {
     pub look: Option<[f32; 2]>,
     pub teleport: Option<[f32; 3]>,
     pub death_mode: Option<String>,
+    pub stress_count: Option<u32>,
 }
 struct Enemy {
     spec: EnemySpec,
@@ -123,6 +127,8 @@ pub struct Game {
     config_ids: ConfigIds,
     enemies: Vec<Enemy>,
     health_bars: Vec<[u32; 2]>,
+    blob_shadows: Vec<u32>,
+    shadow_options: Vec<(u32, crate::scene::RenderOptions)>,
     obstacles: Vec<[f32; 4]>,
     corners: Vec<Vec2>,
     edges: Vec<Vec<f32>>,
@@ -150,6 +156,7 @@ pub struct Game {
     frame: u64,
     visual_frame: u64,
     death_mode: String,
+    stress_count: u32,
     tasks: VecDeque<CutTask>,
     pending: BTreeMap<u32, Pending>,
     completed: VecDeque<CompletedCut>,
@@ -184,6 +191,8 @@ impl Game {
             || config.charges.len() != 14
             || config.hud.len() != 5
             || (!config.health_bars.is_empty() && config.health_bars.len() != config.enemies.len())
+            || (!config.blob_shadows.is_empty()
+                && config.blob_shadows.len() != config.enemies.len())
             || [("drone-orbiter", 8), ("core-tank", 3), ("blade-wraith", 3)]
                 .iter()
                 .any(|(kind, count)| {
@@ -191,7 +200,7 @@ impl Game {
                 })
         {
             return Err(
-                "Aurelia needs 8/3/3 enemies, 32 bolts, 14 beams/charges, five HUD parts and paired optional health bars"
+                "Aurelia needs 8/3/3 enemies, 32 bolts, 14 beams/charges, five HUD parts and paired optional health bars/blob shadows"
                     .into(),
             );
         }
@@ -206,6 +215,7 @@ impl Game {
             .chain(config.charges.iter().copied())
             .chain(config.hud.iter().copied())
             .chain(config.health_bars.iter().flatten().copied())
+            .chain(config.blob_shadows.iter().copied())
             .chain([config.marker])
         {
             if ids.contains(&id) || !scene.object_exists(id) {
@@ -303,6 +313,8 @@ impl Game {
             ),
             enemies,
             health_bars: config.health_bars,
+            blob_shadows: config.blob_shadows,
+            shadow_options: Vec::new(),
             obstacles,
             corners,
             edges,
@@ -330,6 +342,7 @@ impl Game {
             frame: 0,
             visual_frame: 0,
             death_mode: "cut".into(),
+            stress_count: 0,
             tasks: VecDeque::new(),
             pending: BTreeMap::new(),
             completed: VecDeque::new(),
@@ -356,6 +369,31 @@ impl Game {
             turn_latched: false,
             sim_dt: 0.,
         };
+        // Blob mode is local to this encounter. Other dynamic scene casters retain
+        // their independent shadow-map layer.
+        if !g.blob_shadows.is_empty() {
+            for e in &g.enemies {
+                let mut options = scene.objects()[&e.spec.id].render_options;
+                g.shadow_options.push((e.spec.id, options));
+                options.is_static = false;
+                options.casts_shadow = false;
+                scene.set_render_options(e.spec.id, options);
+            }
+            for &id in &g.blob_shadows {
+                g.shadow_options
+                    .push((id, scene.objects()[&id].render_options));
+                scene.set_render_options(
+                    id,
+                    crate::scene::RenderOptions {
+                        is_static: false,
+                        casts_shadow: false,
+                        receives_shadow: false,
+                        reflectivity: 0.,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
         for id in ids {
             scene.set_object_position(id, HIDDEN);
         }
@@ -368,6 +406,7 @@ impl Game {
     /// Release pooled visuals and asynchronous work before removing this encounter.
     pub fn teardown(&mut self, scene: &mut SceneManager) {
         self.active = false;
+        self.stress_count = 0;
         self.tasks.clear();
         self.pending.clear();
         self.completed.clear();
@@ -388,7 +427,7 @@ impl Game {
             e.last_strikes = [0; 2];
             hide_enemy(scene, e.spec.id);
         }
-        for id in self.health_bars.iter().flatten() {
+        for id in self.health_bars.iter().flatten().chain(&self.blob_shadows) {
             scene.set_object_position(*id, HIDDEN);
         }
         for id in self
@@ -403,6 +442,9 @@ impl Game {
         {
             scene.set_object_position(*id, HIDDEN);
         }
+        for (id, options) in self.shadow_options.drain(..) {
+            scene.set_render_options(id, options);
+        }
     }
     pub fn input(&mut self, input: Input, scene: &mut SceneManager) -> Result<(), String> {
         if input
@@ -415,6 +457,9 @@ impl Game {
                 .teleport
                 .is_some_and(|a| a.iter().any(|v| !v.is_finite()))
             || input.slash.is_some_and(|h| h > 1)
+            || input
+                .stress_count
+                .is_some_and(|count| count > MAX_STRESS_MODELS)
             || input
                 .death_mode
                 .as_ref()
@@ -446,6 +491,9 @@ impl Game {
         if let Some([x, y]) = input.look {
             self.player.yaw -= x * 0.003;
             self.player.pitch = (self.player.pitch - y * 0.003).clamp(-1.35, 1.35);
+        }
+        if let Some(count) = input.stress_count {
+            self.stress_count = count;
         }
         if let Some(mode) = input.death_mode {
             self.death_mode = mode;
@@ -1597,6 +1645,21 @@ impl Game {
                 }
             }
         }
+        for (e, &id) in self.enemies.iter().zip(&self.blob_shadows) {
+            if !self.playing() || self.health <= 0. || !matches!(e.phase, 1 | 2) {
+                scene.set_object_position(id, HIDDEN);
+                continue;
+            }
+            // Rim's authored pavement is flat; no per-frame raycast or shadow pass.
+            // Match the original Three exhibition's ground-shadow height/radius.
+            let radius = (e.spec.height * 0.65).clamp(0.3, 0.9);
+            scene.set_object_transform(
+                id,
+                Vec3::new(e.position.x, 0.136, e.position.z),
+                Vec3::ZERO,
+                Vec3::new(radius, 1., radius),
+            );
+        }
         let head = head.unwrap_or_else(|| {
             Mat4::from_rotation_translation(
                 Quat::from_rotation_y(self.player.yaw) * Quat::from_rotation_x(self.player.pitch),
@@ -1671,8 +1734,11 @@ impl Game {
             },
         );
     }
+    pub fn stress_count(&self) -> u32 {
+        self.stress_count
+    }
     pub fn state(&self) -> Value {
-        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
+        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"stressModels":self.stress_count,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
     }
 }
 fn max_hp(kind: &str) -> f32 {

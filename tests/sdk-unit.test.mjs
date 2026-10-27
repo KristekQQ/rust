@@ -132,6 +132,24 @@ function response(bytes = new Uint8Array([1]), url = '') {
     }) };
 }
 
+test('Rim configuration serializes optional owned blob shadows and keeps old payloads compatible', async () => {
+    const {Scene,SceneObject,ModelObject}=await sdk(),calls=[];
+    const wasm=wasmMock({configure_rim:json=>calls.push(JSON.parse(json))}),scene=new Scene(wasm);
+    const object=id=>new SceneObject(wasm,id),model=new ModelObject(wasm,11),blob=object(17);
+    const base={
+        enemies:[{model,kind:'drone',height:1,offset:[0,0,0],scale:[1,1,1]}],
+        swords:[object(1),object(2)],bolts:[],beams:[],charges:[],hud:[],marker:object(3),
+        shapes:[],obstacles:[],
+    };
+    scene.configureRim({...base,blobShadows:[blob]});
+    assert.deepEqual(calls[0].blobShadows,[17]);
+    scene.configureRim(base);
+    assert.deepEqual(calls[1].blobShadows,[],'Omitting the option defaults to no blobs.');
+    scene.configureRim({...base,blobShadows:null});
+    assert.deepEqual(calls[2].blobShadows,[],'An explicit null remains backward compatible.');
+    assert.throws(()=>scene.configureRim({...base,blobShadows:[new SceneObject({},17)]}),/patřit této scéně/);
+});
+
 test('3D font handles forward layout and lifetime commands to Rust', async () => {
     const {Scene,Font3D,Text3D}=await sdk(),calls=[];
     let value='AAA';
@@ -727,4 +745,17 @@ test('XR locomotion forwards authored bounds and owned marker; foreign/disposed 
     assert.throws(()=>player.configureLocomotion({bounds:[-1,1,-1,1]}),/marker/);
     player.configureLocomotion(null);assert.equal(calls[1],null);alive=false;
     assert.throws(()=>player.configureLocomotion(null),/ukončen/);
+});
+
+
+test('opaque reorder policy is explicit and independent of mobility at the Rust boundary', async () => {
+    const {SceneObject} = await sdk();
+    const calls=[];
+    const object=new SceneObject({set_object_render_options(...args){calls.push(args);return true;}},17);
+    assert.equal(object.setRenderOptions({opaqueReorderable:true}),object);
+    assert.deepEqual(calls.pop(),[17,false,true,true,0,true]);
+    object.setRenderOptions({isStatic:true,opaqueReorderable:true,castsShadow:false});
+    assert.deepEqual(calls.pop(),[17,true,false,true,0,true]);
+    object.setRenderOptions();
+    assert.deepEqual(calls.pop(),[17,false,true,true,0,false]);
 });

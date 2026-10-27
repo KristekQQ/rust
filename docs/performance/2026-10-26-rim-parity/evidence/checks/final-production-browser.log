@@ -1,0 +1,19 @@
+PASS gltf-batching webgpu
+PASS scene-appearance webgpu
+PASS rim-gameplay webgpu
+PASS shadow-cache webgpu
+PASS gltf-material-cache webgpu
+PASS webxr-webgpu webgpu
+PASS gltf-sdk webgpu
+PASS gltf-full webgpu
+PASS render-mirrored webgpu
+PASS neon-arena-entry webgl
+PASS gltf-batching webgl
+PASS scene-appearance webgl
+PASS rim-gameplay webgl
+PASS shadow-cache webgl
+PASS gltf-material-cache webgl
+PASS gltf-sdk webgl
+PASS gltf-full webgl
+PASS render-mirrored webgl
+Report: /Users/Honza/.codex/worktrees/rim-publish/rust/output/verification/browser-report.json

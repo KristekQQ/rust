@@ -561,6 +561,7 @@ pub fn set_object_render_options(
     casts_shadow: bool,
     receives_shadow: bool,
     reflectivity: f32,
+    opaque_reorderable: bool,
 ) -> bool {
     STATE.with(|state| {
         state.borrow().as_ref().is_some_and(|state| {
@@ -571,6 +572,7 @@ pub fn set_object_render_options(
                     casts_shadow,
                     receives_shadow,
                     reflectivity,
+                    opaque_reorderable,
                 },
             )
         })
@@ -2977,6 +2979,13 @@ pub fn rim_input(input: &str) -> Result<(), JsValue> {
                 .ok_or("Aurelia is not configured")?
                 .input(input, scene)
         })
+    })
+}
+pub(crate) fn rim_stress_count() -> Option<u32> {
+    RIM.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map(crate::rim_game::Game::stress_count)
     })
 }
 #[wasm_bindgen]

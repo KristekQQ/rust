@@ -1,0 +1,5 @@
+PASS rim-refresh webgpu
+PASS rim webgpu
+PASS rim-refresh webgl
+PASS rim webgl
+Report: /Users/Honza/.codex/worktrees/rim-publish/rust/output/verification/browser-report.json

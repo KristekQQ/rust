@@ -1,0 +1,312 @@
+{
+  "started": "2026-10-26T15:59:11.297Z",
+  "revision": "64bfda680483e71f6aeb6bf902e63b29b3e90791",
+  "software": false,
+  "node": "/Users/Honza/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+  "architecture": "arm64",
+  "results": [
+    {
+      "suite": "rim-gameplay",
+      "backend": "webgpu",
+      "status": "PASS",
+      "url": "http://127.0.0.1:58399/tests/rim-gameplay.html?backend=auto",
+      "text": "PASS: rim-gameplay · 29/29 kontrol · simulované XR, skutečný Rust renderer",
+      "xrReport": "rim-gameplay-report.json",
+      "xrTrace": "rim-gameplay-trace.json",
+      "actualBackend": "BrowserWebGpu",
+      "rimCutEvidence": {
+        "halfVisibility": [
+          {
+            "side": 0,
+            "meshes": 10,
+            "leftPixels": 5580,
+            "rightPixels": 5605
+          },
+          {
+            "side": 1,
+            "meshes": 8,
+            "leftPixels": 2986,
+            "rightPixels": 2985
+          }
+        ],
+        "transport": {
+          "status": "ready",
+          "errors": 0,
+          "lastError": "",
+          "messages": 6,
+          "jobs": 6,
+          "expired": 0,
+          "late": 0,
+          "onmessageMs": 0,
+          "onmessageMaxMs": 0.20000004768371582,
+          "prepareMs": 0,
+          "prepareMaxMs": 1.1000001430511475,
+          "inflight": 0
+        },
+        "completionMs": 114.40000009536743
+      },
+      "xrScreenshot": "rim-gameplay-report.png",
+      "screenshot": "rim-gameplay-webgpu.png",
+      "abortedRequests": [
+        "request: http://127.0.0.1:58399/assets/models/rim/rim-city.glb net::ERR_ABORTED",
+        "request: http://127.0.0.1:58399/assets/models/rim/blade-wraith.glb net::ERR_ABORTED",
+        "request: http://127.0.0.1:58399/assets/models/rim/core-tank.glb net::ERR_ABORTED",
+        "request: http://127.0.0.1:58399/assets/models/rim/drone-orbiter.glb net::ERR_ABORTED"
+      ]
+    },
+    {
+      "suite": "shadow-cache",
+      "backend": "webgpu",
+      "status": "PASS",
+      "url": "http://127.0.0.1:58399/tests/shadow-cache.html?backend=auto",
+      "text": "PASS: static/dynamic independent maps, camera/non-caster cache reuse, new/removed casters, actual pixels; {\"before\":{\"staticUpdates\":3,\"dynamicUpdates\":3,\"reflectionUpdates\":0,\"staticVisible\":3,\"dynamicVisible\":0,\"reflectionVisible\":0,\"passes\":1,\"shadowResolution\":1024,\"reflectionWidth\":1,\"reflectionHeight\":1,\"shadowLightCount\":3,\"staticUpdatesByLight\":[1,1,1,0],\"dynamicUpdatesByLight\":[1,1,1,0]},\"after\":{\"staticUpdates\":3,\"dynamicUpdates\":3,\"reflectionUpdates\":0,\"staticVisible\":3,\"dynamicVisible\":0,\"reflectionVisible\":0,\"passes\":1,\"shadowResolution\":1024,\"reflectionWidth\":1,\"reflectionHeight\":1,\"shadowLightCount\":3,\"staticUpdatesByLight\":[1,1,1,0],\"dynamicUpdatesByLight\":[1,1,1,0]},\"moved\":{\"staticUpdates\":6,\"dynamicUpdates\":3,\"reflectionUpdates\":0,\"staticVisible\":3,\"dynamicVisible\":0,\"reflectionVisible\":0,\"passes\":4,\"shadowResolution\":1024,\"reflectionWidth\":1,\"reflectionHeight\":1,\"shadowLightCount\":3,\"staticUpdatesByLight\":[2,2,2,0],\"dynamicUpdatesByLight\":[1,1,1,0]},\"noopStaticUpdates\":0,\"movedStaticUpdates\":3,\"cameraStaticUpdates\":0,\"cameraDynamicUpdates\":0,\"dynamicMotionStaticUpdates\":0,\"dynamicMotionDynamicUpdates\":3,\"nonCasterStaticUpdates\":0,\"nonCasterDynamicUpdates\":0}",
+      "actualBackend": "BrowserWebGpu",
+      "shadowCacheEvidence": {
+        "before": {
+          "staticUpdates": 3,
+          "dynamicUpdates": 3,
+          "reflectionUpdates": 0,
+          "staticVisible": 3,
+          "dynamicVisible": 0,
+          "reflectionVisible": 0,
+          "passes": 1,
+          "shadowResolution": 1024,
+          "reflectionWidth": 1,
+          "reflectionHeight": 1,
+          "shadowLightCount": 3,
+          "staticUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "dynamicUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "after": {
+          "staticUpdates": 3,
+          "dynamicUpdates": 3,
+          "reflectionUpdates": 0,
+          "staticVisible": 3,
+          "dynamicVisible": 0,
+          "reflectionVisible": 0,
+          "passes": 1,
+          "shadowResolution": 1024,
+          "reflectionWidth": 1,
+          "reflectionHeight": 1,
+          "shadowLightCount": 3,
+          "staticUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "dynamicUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "moved": {
+          "staticUpdates": 6,
+          "dynamicUpdates": 3,
+          "reflectionUpdates": 0,
+          "staticVisible": 3,
+          "dynamicVisible": 0,
+          "reflectionVisible": 0,
+          "passes": 4,
+          "shadowResolution": 1024,
+          "reflectionWidth": 1,
+          "reflectionHeight": 1,
+          "shadowLightCount": 3,
+          "staticUpdatesByLight": [
+            2,
+            2,
+            2,
+            0
+          ],
+          "dynamicUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "noopStaticUpdates": 0,
+        "movedStaticUpdates": 3,
+        "cameraStaticUpdates": 0,
+        "cameraDynamicUpdates": 0,
+        "dynamicMotionStaticUpdates": 0,
+        "dynamicMotionDynamicUpdates": 3,
+        "nonCasterStaticUpdates": 0,
+        "nonCasterDynamicUpdates": 0
+      },
+      "screenshot": "shadow-cache-webgpu.png",
+      "abortedRequests": []
+    },
+    {
+      "suite": "rim-gameplay",
+      "backend": "webgl",
+      "status": "PASS",
+      "url": "http://127.0.0.1:58399/tests/rim-gameplay.html?backend=webgl",
+      "text": "PASS: rim-gameplay · 29/29 kontrol · simulované XR, skutečný Rust renderer",
+      "xrReport": "rim-gameplay-report.json",
+      "xrTrace": "rim-gameplay-trace.json",
+      "actualBackend": "Gl",
+      "rimCutEvidence": {
+        "halfVisibility": [
+          {
+            "side": 0,
+            "meshes": 10,
+            "leftPixels": 5580,
+            "rightPixels": 5605
+          },
+          {
+            "side": 1,
+            "meshes": 8,
+            "leftPixels": 2986,
+            "rightPixels": 2985
+          }
+        ],
+        "transport": {
+          "status": "ready",
+          "errors": 0,
+          "lastError": "",
+          "messages": 6,
+          "jobs": 6,
+          "expired": 0,
+          "late": 0,
+          "onmessageMs": 0.09999990463256836,
+          "onmessageMaxMs": 0.2999999523162842,
+          "prepareMs": 0,
+          "prepareMaxMs": 1.1999998092651367,
+          "inflight": 0
+        },
+        "completionMs": 177.70000004768372
+      },
+      "xrScreenshot": "rim-gameplay-report.png",
+      "screenshot": "rim-gameplay-webgl.png",
+      "abortedRequests": [
+        "request: http://127.0.0.1:58399/assets/models/rim/rim-city.glb net::ERR_ABORTED",
+        "request: http://127.0.0.1:58399/assets/models/rim/drone-orbiter.glb net::ERR_ABORTED",
+        "request: http://127.0.0.1:58399/assets/models/rim/madmechanic.glb net::ERR_ABORTED"
+      ]
+    },
+    {
+      "suite": "shadow-cache",
+      "backend": "webgl",
+      "status": "PASS",
+      "url": "http://127.0.0.1:58399/tests/shadow-cache.html?backend=webgl",
+      "text": "PASS: static/dynamic independent maps, camera/non-caster cache reuse, new/removed casters, actual pixels; {\"before\":{\"staticUpdates\":3,\"dynamicUpdates\":3,\"reflectionUpdates\":0,\"staticVisible\":3,\"dynamicVisible\":0,\"reflectionVisible\":0,\"passes\":1,\"shadowResolution\":1024,\"reflectionWidth\":1,\"reflectionHeight\":1,\"shadowLightCount\":3,\"staticUpdatesByLight\":[1,1,1,0],\"dynamicUpdatesByLight\":[1,1,1,0]},\"after\":{\"staticUpdates\":3,\"dynamicUpdates\":3,\"reflectionUpdates\":0,\"staticVisible\":3,\"dynamicVisible\":0,\"reflectionVisible\":0,\"passes\":1,\"shadowResolution\":1024,\"reflectionWidth\":1,\"reflectionHeight\":1,\"shadowLightCount\":3,\"staticUpdatesByLight\":[1,1,1,0],\"dynamicUpdatesByLight\":[1,1,1,0]},\"moved\":{\"staticUpdates\":6,\"dynamicUpdates\":3,\"reflectionUpdates\":0,\"staticVisible\":3,\"dynamicVisible\":0,\"reflectionVisible\":0,\"passes\":4,\"shadowResolution\":1024,\"reflectionWidth\":1,\"reflectionHeight\":1,\"shadowLightCount\":3,\"staticUpdatesByLight\":[2,2,2,0],\"dynamicUpdatesByLight\":[1,1,1,0]},\"noopStaticUpdates\":0,\"movedStaticUpdates\":3,\"cameraStaticUpdates\":0,\"cameraDynamicUpdates\":0,\"dynamicMotionStaticUpdates\":0,\"dynamicMotionDynamicUpdates\":3,\"nonCasterStaticUpdates\":0,\"nonCasterDynamicUpdates\":0}",
+      "actualBackend": "Gl",
+      "shadowCacheEvidence": {
+        "before": {
+          "staticUpdates": 3,
+          "dynamicUpdates": 3,
+          "reflectionUpdates": 0,
+          "staticVisible": 3,
+          "dynamicVisible": 0,
+          "reflectionVisible": 0,
+          "passes": 1,
+          "shadowResolution": 1024,
+          "reflectionWidth": 1,
+          "reflectionHeight": 1,
+          "shadowLightCount": 3,
+          "staticUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "dynamicUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "after": {
+          "staticUpdates": 3,
+          "dynamicUpdates": 3,
+          "reflectionUpdates": 0,
+          "staticVisible": 3,
+          "dynamicVisible": 0,
+          "reflectionVisible": 0,
+          "passes": 1,
+          "shadowResolution": 1024,
+          "reflectionWidth": 1,
+          "reflectionHeight": 1,
+          "shadowLightCount": 3,
+          "staticUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "dynamicUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "moved": {
+          "staticUpdates": 6,
+          "dynamicUpdates": 3,
+          "reflectionUpdates": 0,
+          "staticVisible": 3,
+          "dynamicVisible": 0,
+          "reflectionVisible": 0,
+          "passes": 4,
+          "shadowResolution": 1024,
+          "reflectionWidth": 1,
+          "reflectionHeight": 1,
+          "shadowLightCount": 3,
+          "staticUpdatesByLight": [
+            2,
+            2,
+            2,
+            0
+          ],
+          "dynamicUpdatesByLight": [
+            1,
+            1,
+            1,
+            0
+          ]
+        },
+        "noopStaticUpdates": 0,
+        "movedStaticUpdates": 3,
+        "cameraStaticUpdates": 0,
+        "cameraDynamicUpdates": 0,
+        "dynamicMotionStaticUpdates": 0,
+        "dynamicMotionDynamicUpdates": 3,
+        "nonCasterStaticUpdates": 0,
+        "nonCasterDynamicUpdates": 0
+      },
+      "screenshot": "shadow-cache-webgl.png",
+      "abortedRequests": []
+    }
+  ],
+  "build": {
+    "source": "fd8bbe73edfdc4922ae41eb8c66870e0e6c7751d6b3666098b8df3ade7ef113f",
+    "wasm": "6c4bc5dd9e4e98c0ad42ebbc52aec25034511fb7ba75068c07fcc414b597219e",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "application": "f2c3e63e2f136e4cf040214402f0878ce730c7ceb9ff7af7aab4bd975de32c14",
+  "sandboxDisabled": false,
+  "browserExecutable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "browser": "Chrome/155.0.8059.85",
+  "finished": "2026-10-26T15:59:17.561Z"
+}

@@ -39,31 +39,120 @@ struct EffectsUniforms {
 @group(1) @binding(9) var dynamic_shadow_2:texture_depth_2d;
 @group(1) @binding(10) var static_shadow_3:texture_depth_2d;
 @group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
-fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
-    let layers=effects.shadow_layers[index];
-    var visibility=1.0;
-    // Uniform branches skip only maps known to contain no casters. Preserve
-    // per-texel min(static,dynamic) before the unchanged 3x3 PCF filter.
-    switch index {
-        case 0u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
-        }
-        case 1u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
-        }
-        case 2u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
-        }
-        case 3u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
-        }
-        default: {}
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_0(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
     }
-    return visibility;
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_1(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_1,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_2(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_2,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_3(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_3,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
     if(effects.shadow_layers[index]==0u) { return 1.0; }
@@ -76,13 +165,14 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
     let bias=effects.params.w*(1.0+2.0*(1.0-max(dot(normal,light_direction),0.0)));
     let depth=ndc.z-bias;
     let texel=1.0/vec2<f32>(textureDimensions(static_shadow));
-    var visibility=0.0;
-    // Combine static and dynamic visibility per texel, then apply 3x3 PCF.
-    for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
-        let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
-        visibility+=compare_shadow(index,sample_uv,depth);
-    }}
-    return visibility/9.0;
+    let layers=effects.shadow_layers[index];
+    switch index {
+        case 0u: { return filter_shadow_0(uv,depth,texel,layers); }
+        case 1u: { return filter_shadow_1(uv,depth,texel,layers); }
+        case 2u: { return filter_shadow_2(uv,depth,texel,layers); }
+        case 3u: { return filter_shadow_3(uv,depth,texel,layers); }
+        default: { return 1.0; }
+    }
 }
 
 
@@ -179,7 +269,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
         let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
         let gv=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv)); let gl=2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
         let f=f0+(vec3(1.0)-f0)*pow(1.0-vh,5.0); let spec=d*gv*gl*f/max(4.0*nv*nl,0.0001);
-        var visibility=1.0; if(i<u32(effects.params.x) && material.options.y>0.5) { visibility=shadow_visibility(i,v.world,n,l); }
+        var visibility=1.0; if(nl>0.0 && i<u32(effects.params.x) && material.options.y>0.5) { visibility=shadow_visibility(i,v.world,n,l); }
         color+=((vec3(1.0)-f)*(1.0-metallic)*base.rgb/3.14159265+spec)*scene.lights[i].color*nl*visibility;
     }
     color+=emission;

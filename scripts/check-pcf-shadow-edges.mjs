@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {PNG} from 'pngjs';
+import {hash} from './render-performance-lib.mjs';
+const root=path.resolve(process.argv[2]||''),inputBytes=await fs.readFile(path.join(root,'report.json')),input=JSON.parse(inputBytes);if(input.errors.length||input.changed.length||!['pcf4','pcf-uniform'].includes(input.qualityMode))throw Error('Requires completed stable pcf4 oracle');
+const results=[];
+for(const row of input.results){
+ const {name,settings}=row,{index:light,bias,mask:layers,mode,options={}}=settings;if(!layers||options.shadows===false)continue;
+ const litName=name.replace(`-layers${layers}-`,'-layers0-'),names=[`baseline-${litName}.png`,`baseline-${name}.png`,`candidate-${name}.png`],bytes=await Promise.all(names.map(f=>fs.readFile(path.join(root,f)))),[lit,reference,candidate]=bytes.map(b=>PNG.sync.read(b)),{width,height}=lit,pixels=width*height,darkness=new Float64Array(pixels),seeds=new Uint8Array(pixels),selected=new Uint8Array(pixels);
+ for(let p=0;p<pixels;p++){const i=p*4;darkness[p]=Math.max(0,.2126*(lit.data[i]-reference.data[i])+.7152*(lit.data[i+1]-reference.data[i+1])+.0722*(lit.data[i+2]-reference.data[i+2]));}
+ for(let y=1;y<height-1;y++)for(let x=1;x<width-1;x++){const p=y*width+x,d=darkness[p],gradient=Math.max(Math.abs(d-darkness[p-1]),Math.abs(d-darkness[p+1]),Math.abs(d-darkness[p-width]),Math.abs(d-darkness[p+width]));if(d>.25&&gradient>1)seeds[p]=1;}
+ // Dilate baseline-derived edges one pixel into the originally lit side too.
+ for(let y=1;y<height-1;y++)for(let x=1;x<width-1;x++)if(seeds[y*width+x])for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)selected[(y+dy)*width+x+dx]=1;
+ const mask=new PNG({width,height});let count=0,sum=0,squared=0,max=0,above1=0;
+ for(let p=0;p<pixels;p++)if(selected[p]){count++;let changed=false;for(let c=0;c<3;c++){const delta=Math.abs(reference.data[p*4+c]-candidate.data[p*4+c]);sum+=delta;squared+=delta*delta;max=Math.max(max,delta);if(delta>1)changed=true;}if(changed)above1++;mask.data[p*4]=mask.data[p*4+1]=mask.data[p*4+2]=mask.data[p*4+3]=255;}
+ const noDirectLight=options.pattern==='alternating'&&options.lightCount===1,rmse=count?Math.sqrt(squared/(count*3)):null,mae=count?sum/(count*3):null,measured=count>=20,pass=measured?max<=8&&rmse<=1:noDirectLight,maskFile=`edge-${name}.png`,maskBytes=PNG.sync.write(mask);await fs.writeFile(path.join(root,maskFile),maskBytes);
+ results.push({name,settings,sourceImages:names,sourceHashes:bytes.map(hash),edgeDefinition:'reference lit-shadow luminance difference>.25 with four-neighbor gradient>1 byte, dilated1px onto both sides; mask exclusively frozen-baseline-derived',edgePixels:count,edgeMeasured:measured,unavailableReason:measured?null:noDirectLight?'all direct lights are zero; global pixel gate still applies':'missing visible baseline shadow edge',edgeMaxChannelDelta:max,edgeRgbRmseBytes:rmse,edgeRgbMaeBytes:mae,edgePixelsAnyChannelAbove1:above1,maskFile,maskSha256:hash(maskBytes),pass});
+}
+const measured=results.filter(r=>r.edgeMeasured),report={scope:'Shadow-edge-only quality oracle over every shadow-bearing captured setting, including materials/multilight/legacy/three displaced diagonal poses; not a temporal-animation, timing or Quest test. Unchanged background excluded.',sourceReportSha256:hash(inputBytes),criteria:{minimumEdgePixels:20,maxChannelDelta:8,rgbRmseBytes:1,maskDilationPixels:1},pass:results.every(r=>r.pass)&&measured.length>=32,results};await fs.writeFile(path.join(root,'shadow-edge-quality.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({cases:results.length,measured:measured.length,unavailable:results.length-measured.length,pass:report.pass,maxChannel:Math.max(...measured.map(r=>r.edgeMaxChannelDelta)),maxRmse:Math.max(...measured.map(r=>r.edgeRgbRmseBytes)),failures:results.filter(r=>!r.pass).map(r=>({name:r.name,count:r.edgePixels,max:r.edgeMaxChannelDelta,rmse:r.edgeRgbRmseBytes}))}));if(!report.pass)process.exitCode=1;

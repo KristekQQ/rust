@@ -1,0 +1,16 @@
+{
+  "build": {
+    "source": "535ac6bc5010023563b42dca1688247e76b623247d0a7ebdb697e8eb1fdb1509",
+    "wasm": "dcce4c0c43ed29bf26bbdefa2830823cd3c9bffd34d1d0d47a786f1d84415b48",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "releaseId": "3064e3f3ea",
+  "files": 254,
+  "sourceAndProductionFresh": true
+}

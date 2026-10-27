@@ -1,0 +1,32 @@
+[
+  {
+    "url": "/scripts/render-performance-order.mjs",
+    "bytes": 680,
+    "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/pixels.js",
+    "bytes": 1931,
+    "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance-three.html",
+    "bytes": 342,
+    "sha256": "cb35b6c7cce32d957b01f2e6cbfcbcda1a84b71655106a6c978b84d903830bbf",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance-three.js",
+    "bytes": 6163,
+    "sha256": "6af09688795b4b1b696eb8b7d9eb305209ac321a53289dbe3b0a153c091d60a0",
+    "source": "harness"
+  },
+  {
+    "url": "/vendor/three.module.js",
+    "bytes": 1314681,
+    "sha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+    "source": "frozen"
+  }
+]

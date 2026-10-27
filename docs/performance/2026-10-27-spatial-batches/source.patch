@@ -1,0 +1,1066 @@
+diff --git a/js/engine.d.ts b/js/engine.d.ts
+index 50be53ff1..3afebb8a4 100644
+--- a/js/engine.d.ts
++++ b/js/engine.d.ts
+@@ -264,7 +264,7 @@ export interface EffectStats {
+ export interface DebugStats {
+     /** Cumulative glTF work and currently live shared asset resources. */
+     gltfDraws: {enabled:boolean;limit:number;draws:{object:number;node:number;primitive:number;indices:number;instances:number;objects:number[];viewSlot:number;shadow:boolean;reflected:boolean;blend:boolean;materialMask:boolean}[]};
+-    gltf: {primitiveTests:number;primitiveCulled:number;instancedDrawCalls:number;instancesDrawn:number;trianglesDrawn:number;overlapTests:number;overlapNodeTests:number;batchBreaks:{rootBlend:number;rootUnsupported:number;rootBounds:number;rootAsset:number;rootOverlap:number;drawCap:number;drawOrdinal:number;drawAsset:number;drawDeformed:number;drawMirror:number;drawMaterial:number;drawPrimitive:number;drawOptions:number};instancePagesCreated:number;instanceBuffersCreated:number;instanceBindGroupsCreated:number;instancePagesActive:number;instancePagesRetained:number;instanceUploadBytes:number;instanceBufferBytes:number;queueScratchGrowths:number;queueScratchBytes:number;cpuDeformedVertices:number;rigidUploadBytes:number;skinUploadBytes:number;uniformUploadBytes:number;bufferUploadCalls:number;skinPaletteUploadBytes:number;geometryCacheHits:number;materialCacheHits:number;geometryResources:number;materialResources:number;cachedAssets:number;drawCalls:number;pipelineChanges:number;bindGroupChanges:number};
++    gltf: {primitiveTests:number;primitiveCulled:number;rootBoundsTests:number;rootFullyInside:number;activeDrawIndexBytes:number;instancedDrawCalls:number;translatedDrawCalls:number;translatedInstances:number;instancesDrawn:number;trianglesDrawn:number;overlapTests:number;overlapNodeTests:number;batchBreaks:{rootBlend:number;rootUnsupported:number;rootBounds:number;rootAsset:number;rootOverlap:number;rootSpatial:number;drawCap:number;drawOrdinal:number;drawAsset:number;drawDeformed:number;drawMirror:number;drawMaterial:number;drawPrimitive:number;drawOptions:number};instancePagesCreated:number;instanceBuffersCreated:number;instanceBindGroupsCreated:number;instancePagesActive:number;instancePagesRetained:number;instanceUploadBytes:number;instanceBufferBytes:number;queueScratchGrowths:number;queueScratchBytes:number;cpuDeformedVertices:number;rigidUploadBytes:number;skinUploadBytes:number;uniformUploadBytes:number;bufferUploadCalls:number;skinPaletteUploadBytes:number;geometryCacheHits:number;materialCacheHits:number;geometryResources:number;materialResources:number;cachedAssets:number;drawCalls:number;pipelineChanges:number;bindGroupChanges:number};
+     font3d: {
+         runtime:{fonts:number;texts:number;cachedGlyphs:number;liveGlyphs:number;layoutRebuilds:number;syncUpdates:number};
+         geometryBytes:number;instanceGeometryBytes:number;
+diff --git a/scripts/render-performance-lib.mjs b/scripts/render-performance-lib.mjs
+index 8702d5109..3cdf74969 100644
+--- a/scripts/render-performance-lib.mjs
++++ b/scripts/render-performance-lib.mjs
+@@ -39,7 +39,7 @@ export function withinCapacity(result,budget){const r=result.rafInterval,c=resul
+ 
+ // The renderer's glTF fields below are monotonic event counters. Gauges such as
+ // instanceBufferBytes/pagesActive and scratch capacities are deliberately excluded.
+-export const gltfEventCounters=['cpuDeformedVertices','rigidUploadBytes','uniformUploadBytes','bufferUploadCalls','skinUploadBytes','skinPaletteUploadBytes','drawCalls','primitiveTests','primitiveCulled','instancedDrawCalls','instancesDrawn','trianglesDrawn','overlapTests','overlapNodeTests','instancePagesCreated','instanceBuffersCreated','instanceBindGroupsCreated','instanceUploadBytes','queueScratchGrowths','pipelineChanges','bindGroupChanges','geometryCacheHits','materialCacheHits',...['rootBlend','rootUnsupported','rootBounds','rootAsset','rootOverlap','drawCap','drawOrdinal','drawAsset','drawDeformed','drawMirror','drawMaterial','drawPrimitive','drawOptions'].map(reason=>'batchBreaks.'+reason)];
++export const gltfEventCounters=['cpuDeformedVertices','rigidUploadBytes','uniformUploadBytes','bufferUploadCalls','skinUploadBytes','skinPaletteUploadBytes','drawCalls','primitiveTests','primitiveCulled','rootBoundsTests','rootFullyInside','instancedDrawCalls','translatedDrawCalls','translatedInstances','instancesDrawn','trianglesDrawn','overlapTests','overlapNodeTests','instancePagesCreated','instanceBuffersCreated','instanceBindGroupsCreated','instanceUploadBytes','queueScratchGrowths','pipelineChanges','bindGroupChanges','geometryCacheHits','materialCacheHits',...['rootBlend','rootUnsupported','rootBounds','rootAsset','rootOverlap','rootSpatial','drawCap','drawOrdinal','drawAsset','drawDeformed','drawMirror','drawMaterial','drawPrimitive','drawOptions'].map(reason=>'batchBreaks.'+reason)];
+ export function workDeltas(data){
+  const a=data.boundaryStart,b=data.boundaryEnd;if(!a||!b)return null;
+  const profilerFrames=Number.isInteger(a.profile.frame)&&Number.isInteger(b.profile.frame)?b.profile.frame-a.profile.frame:null;
+diff --git a/scripts/test-browser.mjs b/scripts/test-browser.mjs
+index 78e8cb676..7c9a3dbb9 100644
+--- a/scripts/test-browser.mjs
++++ b/scripts/test-browser.mjs
+@@ -51,6 +51,7 @@ const suites = [
+     {name:"rim-gameplay-120",path:"tests/rim-gameplay.html?hz=120",status:"#result",xrReport:true},
+     {name:"rim-cut-scheduler-control",path:"tests/rim-gameplay.html?omitXRHook=1",status:"#result",backends:["webgl"],xrReport:true},
+     {name:"rim-stress-xr",path:"tests/rim-gameplay.html?stress=32",status:"#result",xrReport:true},
++    {name:"rim-spatial-batches-xr",path:"tests/rim-gameplay.html?stress=256",status:"#result",xrReport:true},
+     {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true},
+     {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
+     { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
+@@ -634,7 +635,7 @@ try {
+             if (errors.length) throw new Error(errors.join('\n'));
+             if (suite.name === 'rim-gameplay' || suite.name === 'rim-gameplay-120') result.rimCutEvidence = await page.evaluate(() => ({halfVisibility:window.rimCutEvidence.halfVisibility,transport:window.rimCutEvidence.transport,completionMs:window.rimCutEvidence.completionMs}));
+             if (suite.name === 'rim-device-logs') result.rimDeviceLogEvidence = await page.evaluate(() => window.rimDeviceLogEvidence);
+-            if (suite.name === 'rim-stress-xr') result.rimStressEvidence = await page.evaluate(() => window.rimStressEvidence);
++            if (['rim-stress-xr','rim-spatial-batches-xr'].includes(suite.name)) result.rimStressEvidence = await page.evaluate(() => window.rimStressEvidence);
+             if (suite.name === 'rim-three-stress') {
+                 result.threeStressEvidence = await page.evaluate(() => window.threeStressVerification);
+                 await page.select('#stress-count','32');
+diff --git a/src/lib.rs b/src/lib.rs
+index b3ead8111..19893f305 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -23,6 +23,8 @@ mod projectile;
+ pub mod render;
+ pub mod render_appearance;
+ #[cfg(any(test, target_arch = "wasm32"))]
++mod render_batch;
++#[cfg(any(test, target_arch = "wasm32"))]
+ mod render_lights;
+ pub mod render_math;
+ #[cfg(any(test, target_arch = "wasm32"))]
+diff --git a/src/render/gltf_gpu.rs b/src/render/gltf_gpu.rs
+index 1ddc56cc6..3e6382e06 100644
+--- a/src/render/gltf_gpu.rs
++++ b/src/render/gltf_gpu.rs
+@@ -24,9 +24,11 @@ impl Vertex {
+         let mut offset = 0;
+         A.into_iter()
+             .filter(|a| {
+-                a.shader_location < 3
++                a.shader_location < 2
++                    || (a.shader_location == 2 && texture_mask & (1 << 2) != 0)
+                     || a.shader_location == 8
+-                    || texture_mask & (1 << (a.shader_location - 3)) != 0
++                    || (a.shader_location >= 3
++                        && texture_mask & (1 << (a.shader_location - 3)) != 0)
+             })
+             .map(|mut a| {
+                 if compact {
+@@ -98,15 +100,16 @@ struct InstancePage {
+     bind: wgpu::BindGroup,
+     material: Option<Uniform>,
+     capacity: usize,
+-    last: Vec<RigidInstance>,
++    last: Vec<u8>,
+ }
+ // Bounded pass/view-owned stream. Material uniforms remain per draw group;
+ // only the existing rigid instance records share one contiguous upload.
+ struct InstanceStream {
+     buffer: wgpu::Buffer,
++    // Bytes, because groups can mix 16B translation and 112B affine records.
+     capacity: usize,
+-    last: Vec<RigidInstance>,
+-    scratch: Vec<RigidInstance>,
++    last: Vec<u8>,
++    scratch: Vec<u8>,
+ }
+ struct InstanceBinding {
+     buffer: wgpu::Buffer,
+@@ -145,7 +148,8 @@ struct QueueScratch {
+     ordered: Vec<QueueItem>,
+     groups: Vec<std::ops::Range<usize>>,
+     occupied: crate::render_overlap::OrderedBounds,
+-    payload: Vec<RigidInstance>,
++    payload: Vec<u8>,
++    translated: Vec<bool>,
+ }
+ impl QueueScratch {
+     fn clear(&mut self) {
+@@ -156,8 +160,9 @@ impl QueueScratch {
+         self.groups.clear();
+         self.occupied.clear();
+         self.payload.clear();
++        self.translated.clear();
+     }
+-    fn capacities(&self) -> [usize; 7] {
++    fn capacities(&self) -> [usize; 8] {
+         [
+             self.eligible.capacity(),
+             self.model_ranges.capacity(),
+@@ -166,6 +171,7 @@ impl QueueScratch {
+             self.groups.capacity(),
+             self.occupied.capacity(),
+             self.payload.capacity(),
++            self.translated.capacity(),
+         ]
+     }
+     fn bytes(&self) -> usize {
+@@ -176,7 +182,8 @@ impl QueueScratch {
+             std::mem::size_of::<QueueItem>(),
+             std::mem::size_of::<std::ops::Range<usize>>(),
+             0,
+-            std::mem::size_of::<RigidInstance>(),
++            1,
++            std::mem::size_of::<bool>(),
+         ];
+         self.capacities()
+             .into_iter()
+@@ -242,6 +249,37 @@ struct Uniform {
+     normal: [[f32; 4]; 4],
+     transform: [f32; 4],
+ }
++impl Uniform {
++    fn affine_basis(&self) -> bool {
++        self.model[0][3] == 0.0
++            && self.model[1][3] == 0.0
++            && self.model[2][3] == 0.0
++            && self.model[3][3] == 1.0
++            && self.model.iter().flatten().all(|x| x.is_finite())
++            && self.normal[..3]
++                .iter()
++                .all(|n| n[..3].iter().all(|x| x.is_finite()))
++    }
++    fn same_basis(&self, other: &Self) -> bool {
++        other.model[3][3] == 1.0
++            && other.model[3][..3].iter().all(|x| x.is_finite())
++            && self.model[..3] == other.model[..3]
++            && (0..3).all(|i| self.normal[i][..3] == other.normal[i][..3])
++            && self.transform[..2] == other.transform[..2]
++    }
++}
++struct TranslationInstance;
++impl TranslationInstance {
++    fn layout() -> wgpu::VertexBufferLayout<'static> {
++        const A: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![9=>Float32x4];
++        wgpu::VertexBufferLayout {
++            array_stride: 16,
++            step_mode: wgpu::VertexStepMode::Instance,
++            attributes: &A,
++        }
++    }
++}
++
+ struct Material {
+     textures: Rc<wgpu::BindGroup>,
+     texture_mask: u8,
+@@ -320,13 +358,17 @@ pub struct GltfGpuStats {
+     pub cached_assets: usize,
+     pub primitive_tests: u64,
+     pub primitive_culled: u64,
++    pub root_bounds_tests: u64,
++    pub root_fully_inside: u64,
+     pub instanced_draw_calls: u64,
++    pub translated_draw_calls: u64,
++    pub translated_instances: u64,
+     pub instances_drawn: u64,
+     pub triangles_drawn: u64,
+     pub overlap_tests: u64,
+     pub overlap_node_tests: u64,
+-    /// Root-run barriers with an eligible draw: blend, unsupported, bounds, asset, overlap.
+-    pub root_batch_breaks: [u64; 5],
++    /// Root-run barriers with an eligible draw: blend, unsupported, bounds, asset, overlap, spatial.
++    pub root_batch_breaks: [u64; 6],
+     /// First failed merge condition: cap, ordinal, asset, rigid, mirror, material, primitive, options.
+     pub draw_batch_breaks: [u64; 8],
+     pub instance_pages_created: u64,
+@@ -368,6 +410,18 @@ pub struct GpuModel {
+     active: HashSet<usize>,
+     pub opaque_reorderable: bool,
+     reorderable_draws: bool,
++    // Union of all active draw bounds, invalidated by the existing pose stamp.
++    bounds: Option<(Vec3, Vec3)>,
++    // Per-pose draw classification; not rebuilt for each eye/pass/frame.
++    active_draws: [Vec<usize>; 2],
++}
++impl GpuModel {
++    pub(crate) fn active_draw_index_bytes(&self) -> usize {
++        self.active_draws
++            .iter()
++            .map(|v| v.capacity() * std::mem::size_of::<usize>())
++            .sum()
++    }
+ }
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+ pub struct PipelineKey {
+@@ -393,6 +447,7 @@ struct Variant {
+     negative: bool,
+     skinned: bool,
+     instanced: bool,
++    translated: bool,
+     compact_vertex: bool,
+ }
+ #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+@@ -402,6 +457,7 @@ struct ShaderKey {
+     opaque_unclipped: bool,
+     skinned: bool,
+     instanced: bool,
++    translated: bool,
+     single_static_shadow: bool,
+     light_class: crate::render_lights::LightClass,
+ }
+@@ -1070,14 +1126,12 @@ impl GltfGpu {
+             .instance_pages
+             .values()
+             .flatten()
+-            .map(|p| {
+-                p.buffer.as_ref().map_or(0, |_| p.capacity * 112) + std::mem::size_of::<Uniform>()
+-            })
++            .map(|p| p.buffer.as_ref().map_or(0, |_| p.capacity) + std::mem::size_of::<Uniform>())
+             .sum::<usize>()
+             + self
+                 .instance_streams
+                 .values()
+-                .map(|s| s.capacity * 112)
++                .map(|s| s.capacity)
+                 .sum::<usize>();
+         stats
+     }
+@@ -1186,7 +1240,16 @@ impl GltfGpu {
+         let reorderable_draws = draws
+             .iter()
+             .all(|d| d.rigid && materials[d.material].alpha != AlphaMode::Blend);
++        let active_draws = std::array::from_fn(|index| {
++            Vec::with_capacity(
++                draws
++                    .iter()
++                    .filter(|d| (materials[d.material].alpha == AlphaMode::Blend) == (index == 1))
++                    .count(),
++            )
++        });
+         GpuModel {
++            active_draws,
+             opaque_reorderable: false,
+             reorderable_draws,
+             draws,
+@@ -1195,6 +1258,7 @@ impl GltfGpu {
+             palettes,
+             last_pose: None,
+             active: HashSet::new(),
++            bounds: None,
+         }
+     }
+     #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
+@@ -1331,6 +1395,22 @@ impl GltfGpu {
+             }
+         }
+         self.counters.set(stats);
++        for list in &mut model.active_draws {
++            list.clear();
++        }
++        for (ordinal, d) in model.draws.iter().enumerate() {
++            if model.active.contains(&d.node) {
++                let blend = model.materials[d.material].alpha == AlphaMode::Blend;
++                model.active_draws[usize::from(blend)].push(ordinal);
++            }
++        }
++        model.bounds = crate::render_overlap::union_bounds(
++            model
++                .active_draws
++                .iter()
++                .flatten()
++                .map(|&i| model.draws[i].bounds),
++        );
+         model.last_pose = Some(stamp);
+         Ok(bytes)
+     }
+@@ -1356,34 +1436,22 @@ impl GltfGpu {
+             ],
+             immediate_size: 0,
+         });
+-        let shader = self
+-            .shaders
+-            .entry(ShaderKey {
+-                texture_mask: variant.texture_mask,
+-                shadow: variant.key.shadow,
+-                opaque_unclipped: variant.opaque_unclipped,
+-                skinned: variant.skinned,
+-                instanced: variant.instanced,
+-                single_static_shadow: variant.key.single_static_shadow,
+-                light_class: variant.key.light_class,
++        let shader_key = ShaderKey {
++            texture_mask: variant.texture_mask,
++            shadow: variant.key.shadow,
++            opaque_unclipped: variant.opaque_unclipped,
++            skinned: variant.skinned,
++            instanced: variant.instanced,
++            translated: variant.translated,
++            single_static_shadow: variant.key.single_static_shadow,
++            light_class: variant.key.light_class,
++        };
++        let shader = self.shaders.entry(shader_key).or_insert_with(|| {
++            device.create_shader_module(wgpu::ShaderModuleDescriptor {
++                label: Some("glTF material-class shader"),
++                source: wgpu::ShaderSource::Wgsl(material_shader_source(shader_key).into()),
+             })
+-            .or_insert_with(|| {
+-                device.create_shader_module(wgpu::ShaderModuleDescriptor {
+-                    label: Some("glTF material-class shader"),
+-                    source: wgpu::ShaderSource::Wgsl(
+-                        material_shader_source(
+-                            variant.texture_mask,
+-                            variant.key.shadow,
+-                            variant.opaque_unclipped,
+-                            variant.skinned,
+-                            variant.instanced,
+-                            variant.key.single_static_shadow,
+-                            variant.key.light_class,
+-                        )
+-                        .into(),
+-                    ),
+-                })
+-            });
++        });
+         let mut targets = Vec::new();
+         if !variant.key.shadow {
+             targets.push(Some(wgpu::ColorTargetState {
+@@ -1406,7 +1474,9 @@ impl GltfGpu {
+         let attributes = Vertex::attributes(variant.texture_mask, variant.compact_vertex);
+         let vertex_buffers = [
+             Some(Vertex::layout(&attributes, variant.compact_vertex)),
+-            Some(if variant.instanced {
++            Some(if variant.translated {
++                TranslationInstance::layout()
++            } else if variant.instanced {
+                 RigidInstance::layout()
+             } else {
+                 SkinInfluences::layout()
+@@ -1529,14 +1599,19 @@ impl GltfGpu {
+         scratch.clear();
+         for (model_index, &(_, model)) in models.iter().enumerate() {
+             let start = scratch.eligible.len();
+-            for (ordinal, d) in model.draws.iter().enumerate() {
+-                if model.last_pose.is_none()
+-                    || !model.active.contains(&d.node)
+-                    || (model.materials[d.material].alpha == AlphaMode::Blend) != blend
+-                {
+-                    continue;
+-                }
+-                if culling {
++            let fully_inside = culling
++                && model.bounds.is_some_and(|(min, max)| {
++                    stats.root_bounds_tests += 1;
++                    if frustum.fully_contains_aabb((min + max) * 0.5, (max - min) * 0.5) {
++                        stats.root_fully_inside += 1;
++                        true
++                    } else {
++                        false
++                    }
++                });
++            for &ordinal in &model.active_draws[usize::from(blend)] {
++                let d = &model.draws[ordinal];
++                if culling && !fully_inside {
+                     if let Some((min, max)) = d.bounds {
+                         stats.primitive_tests += 1;
+                         if !frustum.intersects_aabb((min + max) * 0.5, (max - min) * 0.5) {
+@@ -1554,14 +1629,6 @@ impl GltfGpu {
+             scratch.cursors.push(start);
+         }
+         self.counters.set(stats);
+-        let model_bounds = |m: &GpuModel| {
+-            crate::render_overlap::union_bounds(
+-                m.draws
+-                    .iter()
+-                    .filter(|d| m.active.contains(&d.node))
+-                    .map(|d| d.bounds),
+-            )
+-        };
+         // `reflected` is a winding flag (also set by authored cameras), not
+         // the pass identity. Real planar reflection uses `clipped`.
+         // Keep auxiliary passes on their existing ordering path. The authored
+@@ -1572,13 +1639,15 @@ impl GltfGpu {
+         };
+         let mut overlap_tests = 0;
+         let mut overlap_node_tests = 0;
+-        let mut root_batch_breaks = [0; 5];
++        let mut root_batch_breaks = [0; 6];
+         let mut draw_batch_breaks = [0; 8];
+         let mut start = 0;
+         while start < models.len() {
+             let mut end = start + 1;
+             let may_reorder = reorderable(models[start].1);
+-            let bounds = model_bounds(models[start].1);
++            let bounds = models[start].1.bounds;
++            let mut depth_window = bounds
++                .and_then(|b| crate::render_batch::DepthWindow::new(view_projection, camera, b));
+             let mut run_has_draws = !scratch.model_ranges[start].is_empty();
+             scratch.occupied.clear();
+             if let Some(b) = bounds {
+@@ -1592,13 +1661,6 @@ impl GltfGpu {
+                 root_batch_breaks[2] += u64::from(run_has_draws);
+             } else {
+                 while end < models.len() {
+-                    // Bound the scheduling window as well as the instance page:
+-                    // drawing one part across a whole deep scene can delay depth
+-                    // coverage from nearer objects and increase fragment work.
+-                    // Preserve input locality between windows on every backend.
+-                    if may_reorder && end - start >= 128 {
+-                        break;
+-                    }
+                     if !Rc::ptr_eq(&models[start].1._shared, &models[end].1._shared) {
+                         root_batch_breaks[3] += u64::from(run_has_draws);
+                         break;
+@@ -1608,11 +1670,22 @@ impl GltfGpu {
+                         break;
+                     }
+                     if may_reorder {
++                        // A nearby compatible run is not split by root count.
++                        // Limit its camera-relative depth span instead, so part-
++                        // major submission cannot span an arbitrarily deep scene.
++                        if !models[end]
++                            .1
++                            .bounds
++                            .is_some_and(|b| depth_window.as_mut().is_some_and(|w| w.include(b)))
++                        {
++                            root_batch_breaks[5] += u64::from(run_has_draws);
++                            break;
++                        }
+                         run_has_draws |= !scratch.model_ranges[end].is_empty();
+                         end += 1;
+                         continue;
+                     }
+-                    let Some(b) = model_bounds(models[end].1) else {
++                    let Some(b) = models[end].1.bounds else {
+                         root_batch_breaks[2] += u64::from(run_has_draws);
+                         break;
+                     };
+@@ -1693,29 +1766,48 @@ impl GltfGpu {
+         };
+         // Blend preparation shares this key with the opaque preparation and
+         // occurs before its submission. It must never overwrite/drop its stream.
+-        let records = scratch
+-            .groups
+-            .iter()
+-            .filter(|g| g.len() > 1)
+-            .map(|g| g.len())
+-            .sum::<usize>();
++        let mut records = 0usize;
++        let mut required_bytes = 0usize;
++        for group in &scratch.groups {
++            let item = scratch.ordered[group.start];
++            let first = &models[item.model].1.draws[item.draw].last_uniform;
++            let translated = group.len() > 1
++                && !blend
++                && !key.shadow
++                && !key.clipped
++                && first.affine_basis()
++                && scratch.ordered[group.clone()].iter().all(|item| {
++                    first.same_basis(&models[item.model].1.draws[item.draw].last_uniform)
++                });
++            scratch.translated.push(translated);
++            if group.len() > 1 {
++                records = records.saturating_add(group.len());
++                required_bytes =
++                    required_bytes.saturating_add(group.len().saturating_mul(if translated {
++                        16
++                    } else {
++                        112
++                    }));
++            }
++        }
+         let stream_limit = device.limits().max_buffer_size.min(16 * 1024 * 1024);
+-        let stream_bytes = records
+-            .checked_mul(112)
+-            .filter(|&n| n as u64 <= stream_limit);
++        let stream_bytes = (required_bytes as u64 <= stream_limit).then_some(required_bytes);
+         let mut stream = if !blend && records > 0 && stream_bytes.is_some() {
+-            let capacity = records
++            let capacity = required_bytes
+                 .next_power_of_two()
+-                .min((stream_limit / 112) as usize);
++                .min(stream_limit as usize);
+             let mut existing = self.instance_streams.remove(&(storage_key, view_slot));
+-            if existing.as_ref().is_none_or(|s| s.capacity < records) {
++            if existing
++                .as_ref()
++                .is_none_or(|s| s.capacity < required_bytes)
++            {
+                 let mut stats = self.counters.get();
+                 stats.instance_buffers_created += 1;
+                 self.counters.set(stats);
+                 existing = Some(InstanceStream {
+                     buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                         label: Some("glTF pass-view instance stream"),
+-                        size: (capacity * 112) as u64,
++                        size: capacity as u64,
+                         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                         mapped_at_creation: false,
+                     }),
+@@ -1733,7 +1825,8 @@ impl GltfGpu {
+             None
+         };
+         let mut page_index = 0;
+-        for group in &scratch.groups {
++        for (group_index, group) in scratch.groups.iter().enumerate() {
++            let translated = scratch.translated[group_index];
+             let first = scratch.ordered[group.start];
+             let model = models[first.model].1;
+             let d = &model.draws[first.draw];
+@@ -1751,6 +1844,7 @@ impl GltfGpu {
+                 negative: d.negative,
+                 skinned: d.skin.is_some(),
+                 instanced,
++                translated,
+                 compact_vertex: d.rigid,
+             };
+             self.ensure_pipeline(device, variant);
+@@ -1771,13 +1865,16 @@ impl GltfGpu {
+             let mut draw_bind = d.bind.clone();
+             let instance = if instanced {
+                 scratch.payload.clear();
+-                scratch
+-                    .payload
+-                    .extend(scratch.ordered[group.clone()].iter().map(|item| {
+-                        RigidInstance::from_uniform(
+-                            &models[item.model].1.draws[item.draw].last_uniform,
+-                        )
+-                    }));
++                for item in &scratch.ordered[group.clone()] {
++                    let u = &models[item.model].1.draws[item.draw].last_uniform;
++                    if translated {
++                        scratch.payload.extend_from_slice(as_bytes(&[u.model[3]]));
++                    } else {
++                        scratch
++                            .payload
++                            .extend_from_slice(as_bytes(&[RigidInstance::from_uniform(u)]));
++                    }
++                }
+                 let payload = &scratch.payload;
+                 let pages = self
+                     .instance_pages
+@@ -1813,7 +1910,7 @@ impl GltfGpu {
+                         buffer: stream.is_none().then(|| {
+                             device.create_buffer(&wgpu::BufferDescriptor {
+                                 label: Some("glTF rigid instances"),
+-                                size: (capacity * 112) as u64,
++                                size: capacity as u64,
+                                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                                 mapped_at_creation: false,
+                             })
+@@ -1829,9 +1926,17 @@ impl GltfGpu {
+                 }
+                 let page = &mut pages[page_index];
+                 let mut material = d.last_uniform;
+-                material.model = Mat4::IDENTITY.to_cols_array_2d();
+-                material.normal = Mat4::IDENTITY.to_cols_array_2d();
+-                material.transform = [1., 1., 0., 0.];
++                if translated {
++                    material.model[3] = [0., 0., 0., 1.];
++                    for n in &mut material.normal[..3] {
++                        n[3] = 0.;
++                    }
++                    material.normal[3] = [0., 0., 0., 1.];
++                } else {
++                    material.model = Mat4::IDENTITY.to_cols_array_2d();
++                    material.normal = Mat4::IDENTITY.to_cols_array_2d();
++                    material.transform = [1., 1., 0., 0.];
++                }
+                 if page.material != Some(material) {
+                     queue.write_buffer(&page.material_buffer, 0, as_bytes(&[material]));
+                     page.material = Some(material);
+@@ -1840,28 +1945,28 @@ impl GltfGpu {
+                 }
+                 draw_bind = page.bind.clone();
+                 let binding = if let Some(s) = stream.as_mut() {
+-                    let offset = (s.scratch.len() * 112) as u64;
++                    let offset = s.scratch.len() as u64;
+                     s.scratch.extend_from_slice(payload);
+                     page.buffer = None;
+                     page.last.clear();
+                     InstanceBinding {
+                         buffer: s.buffer.clone(),
+                         offset,
+-                        bytes: (payload.len() * 112) as u64,
++                        bytes: payload.len() as u64,
+                     }
+                 } else {
+                     let buffer = page.buffer.as_ref().expect("standalone instance buffer");
+                     if page.last != *payload {
+-                        queue.write_buffer(buffer, 0, as_bytes(payload));
++                        queue.write_buffer(buffer, 0, payload);
+                         stats.buffer_upload_calls += 1;
+-                        stats.uniform_upload_bytes += (payload.len() * 112) as u64;
+-                        stats.instance_upload_bytes += (payload.len() * 112) as u64;
++                        stats.uniform_upload_bytes += payload.len() as u64;
++                        stats.instance_upload_bytes += payload.len() as u64;
+                         page.last.clone_from(payload);
+                     }
+                     InstanceBinding {
+                         buffer: buffer.clone(),
+                         offset: 0,
+-                        bytes: (payload.len() * 112) as u64,
++                        bytes: payload.len() as u64,
+                     }
+                 };
+                 page_index += 1;
+@@ -1896,8 +2001,8 @@ impl GltfGpu {
+         }
+         if let Some(mut s) = stream {
+             if s.last != s.scratch {
+-                queue.write_buffer(&s.buffer, 0, as_bytes(&s.scratch));
+-                let bytes = (s.scratch.len() * 112) as u64;
++                queue.write_buffer(&s.buffer, 0, &s.scratch);
++                let bytes = s.scratch.len() as u64;
+                 let mut stats = self.counters.get();
+                 stats.buffer_upload_calls += 1;
+                 stats.uniform_upload_bytes += bytes;
+@@ -1979,6 +2084,10 @@ impl GltfGpu {
+                 _ => 0,
+             } as u64
+                 * d.instances as u64;
++            if d.variant.translated {
++                stats.translated_draw_calls += 1;
++                stats.translated_instances += d.instances as u64;
++            }
+             if d.instances > 1 {
+                 stats.instanced_draw_calls += 1;
+             }
+@@ -2007,15 +2116,17 @@ impl GltfGpu {
+ }
+ // Replace sample expressions before compilation so absent maps incur no texture
+ // operation on either backend. Raw fallback texels preserve the original decoder.
+-fn material_shader_source(
+-    texture_mask: u8,
+-    shadow: bool,
+-    opaque_unclipped: bool,
+-    skinned: bool,
+-    instanced: bool,
+-    single_static_shadow: bool,
+-    light_class: crate::render_lights::LightClass,
+-) -> String {
++fn material_shader_source(key: ShaderKey) -> String {
++    let ShaderKey {
++        texture_mask,
++        shadow,
++        opaque_unclipped,
++        skinned,
++        instanced,
++        translated,
++        single_static_shadow,
++        light_class,
++    } = key;
+     let mut source = concat!(
+         include_str!("gltf_pbr.wgsl"),
+         "\n",
+@@ -2095,6 +2206,12 @@ fn material_shader_source(
+             "normal-map derivatives"
+         );
+         source = source.replace(derivatives, "");
++        // A tangent affects only the removed normal-map branch. Omit its input
++        // fetch/layout as Three does for materials without a normal map. Keep
++        // unused deformation helper outputs well-typed without altering position
++        // or normal calculations, including the skinning path.
++        source = source.replacen("@location(2) tangent:vec4<f32>, ", "", 1);
++        source = source.replace("v.tangent", "vec4<f32>(0.0,0.0,0.0,1.0)");
+     }
+     source = source.replace(
+         "fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }",
+@@ -2111,7 +2228,18 @@ fn material_shader_source(
+         source = source.replace(&format!("@location({}) uv{i}:vec2<f32>, ", i + 3), "");
+         source = source.replace(&format!("o.uv{i}=v.uv{i}; "), "");
+     }
+-    if instanced {
++    if translated {
++        source = source.replacen(
++            "@location(8) color:vec4<f32> };",
++            "@location(8) color:vec4<f32>, @location(9) translation:vec4<f32> };",
++            1,
++        );
++        let a = source
++            .find("    if(material.transform.y>0.5) {")
++            .expect("rigid transform");
++        let b = a + source[a..].find("    o.pos=").expect("vertex projection");
++        source.replace_range(a..b,"    let model=material.model;\n    let normal=mat3x3<f32>(material.normal[0].xyz,material.normal[1].xyz,material.normal[2].xyz);\n    o.world=(model*vec4(local_position,1.0)).xyz+v.translation.xyz;\n    o.normal=transform_unit(normal*local_normal);\n    o.tangent=vec4(transform_unit((model*vec4(local_tangent.xyz,0.0)).xyz),local_tangent.w*material.transform.x);\n");
++    } else if instanced {
+         source=source.replacen("@location(8) color:vec4<f32> };", "@location(8) color:vec4<f32>, @location(9) model0:vec4<f32>, @location(10) model1:vec4<f32>, @location(11) model2:vec4<f32>, @location(12) model3:vec4<f32>, @location(13) normal0:vec4<f32>, @location(14) normal1:vec4<f32>, @location(15) normal2:vec4<f32> };",1);
+         let a = source
+             .find("    if(material.transform.y>0.5) {")
+diff --git a/src/render/renderer.rs b/src/render/renderer.rs
+index f058940cd..250103760 100644
+--- a/src/render/renderer.rs
++++ b/src/render/renderer.rs
+@@ -1271,44 +1271,7 @@ impl SceneRenderer {
+         let gltf = self.gltf_gpu.stats();
+         let stats = self.render_stats();
+         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
+-        serde_json::json!({
+-            "font3d": {
+-                "runtime": self.scene.font3d_stats(),
+-                "geometryBytes": self.scene.font3d_assets().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+-                "instanceGeometryBytes": self.scene.font3d_children().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+-            },
+-            "numericFont": {
+-                "glyphMeshes": self.scene.numeric_font_stats().0,
+-                "liveGlyphs": self.scene.numeric_font_stats().1,
+-                "panels": self.scene.numeric_font_stats().2,
+-                "geometryBytes": self.scene.numeric_font_assets().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+-                "instanceGeometryBytes": self.scene.numeric_font_children().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+-            },
+-            "sharedMeshes": {
+-                "assets": self.scene.mesh_variants.len(),
+-                "liveInstances": self.scene.variant_instances.len(),
+-                "gpuMeshes": self.variant_colors.len(),
+-                "colorTableBytes": self.variant_colors.values().map(|colors| colors.bytes).sum::<usize>(),
+-                "geometryBytes": self.variant_colors.keys().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+-                "instanceGeometryBytes": self.scene.variant_instances.values().filter_map(|(id, _)| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
+-            },
+-            "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
+-                "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>() + mesh.indices as usize * 4).sum::<usize>()},
+-            "translucency": {
+-                "cachedMeshes": self.alpha_indices.len(),
+-                "indexBufferBytes": self.alpha_indices.values().map(|entry| entry.count as usize * 4).sum::<usize>(),
+-                "submittedIndices": self.translucent_indices.get(),
+-                "fullIndices": self.translucent_full_indices.get(),
+-                "draws": self.translucent_draws.get(),
+-            },
+-            "mainViewCache": {
+-                "slot": if self.last_main_cache == 0 { 0 } else { self.last_main_cache - BASE_PASS_CACHE_COUNT + 1 },
+-                "hits": self.main_cache_hits,
+-                "misses": self.main_cache_misses,
+-                "instanceUploadBytes": self.main_instance_upload_bytes,
+-                "slots": 1 + self.passes.len() - BASE_PASS_CACHE_COUNT,
+-            },
+-            "gltf": {
++        let gltf_values = serde_json::json!({
+                 "cpuDeformedVertices": gltf.cpu_deformed_vertices,
+                 "rigidUploadBytes": gltf.rigid_upload_bytes,
+                 "uniformUploadBytes": gltf.uniform_upload_bytes,
+@@ -1318,7 +1281,12 @@ impl SceneRenderer {
+                 "drawCalls": gltf.draw_calls,
+                 "primitiveTests": gltf.primitive_tests,
+                 "primitiveCulled": gltf.primitive_culled,
++                "rootBoundsTests": gltf.root_bounds_tests,
++                "rootFullyInside": gltf.root_fully_inside,
++                "activeDrawIndexBytes": self.gltf_models.values().map(|m| m.active_draw_index_bytes()).sum::<usize>(),
+                 "instancedDrawCalls": gltf.instanced_draw_calls,
++                "translatedDrawCalls": gltf.translated_draw_calls,
++                "translatedInstances": gltf.translated_instances,
+                 "instancesDrawn": gltf.instances_drawn,
+                 "trianglesDrawn": gltf.triangles_drawn,
+                 "overlapTests": gltf.overlap_tests,
+@@ -1329,6 +1297,7 @@ impl SceneRenderer {
+                     "rootBounds": gltf.root_batch_breaks[2],
+                     "rootAsset": gltf.root_batch_breaks[3],
+                     "rootOverlap": gltf.root_batch_breaks[4],
++                    "rootSpatial": gltf.root_batch_breaks[5],
+                     "drawCap": gltf.draw_batch_breaks[0],
+                     "drawOrdinal": gltf.draw_batch_breaks[1],
+                     "drawAsset": gltf.draw_batch_breaks[2],
+@@ -1354,7 +1323,45 @@ impl SceneRenderer {
+                 "geometryResources": gltf.geometry_resources,
+                 "materialResources": gltf.material_resources,
+                 "cachedAssets": gltf.cached_assets,
++        });
++        serde_json::json!({
++            "font3d": {
++                "runtime": self.scene.font3d_stats(),
++                "geometryBytes": self.scene.font3d_assets().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
++                "instanceGeometryBytes": self.scene.font3d_children().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
++            },
++            "numericFont": {
++                "glyphMeshes": self.scene.numeric_font_stats().0,
++                "liveGlyphs": self.scene.numeric_font_stats().1,
++                "panels": self.scene.numeric_font_stats().2,
++                "geometryBytes": self.scene.numeric_font_assets().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
++                "instanceGeometryBytes": self.scene.numeric_font_children().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
++            },
++            "sharedMeshes": {
++                "assets": self.scene.mesh_variants.len(),
++                "liveInstances": self.scene.variant_instances.len(),
++                "gpuMeshes": self.variant_colors.len(),
++                "colorTableBytes": self.variant_colors.values().map(|colors| colors.bytes).sum::<usize>(),
++                "geometryBytes": self.variant_colors.keys().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
++                "instanceGeometryBytes": self.scene.variant_instances.values().filter_map(|(id, _)| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
++            },
++            "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
++                "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>() + mesh.indices as usize * 4).sum::<usize>()},
++            "translucency": {
++                "cachedMeshes": self.alpha_indices.len(),
++                "indexBufferBytes": self.alpha_indices.values().map(|entry| entry.count as usize * 4).sum::<usize>(),
++                "submittedIndices": self.translucent_indices.get(),
++                "fullIndices": self.translucent_full_indices.get(),
++                "draws": self.translucent_draws.get(),
++            },
++            "mainViewCache": {
++                "slot": if self.last_main_cache == 0 { 0 } else { self.last_main_cache - BASE_PASS_CACHE_COUNT + 1 },
++                "hits": self.main_cache_hits,
++                "misses": self.main_cache_misses,
++                "instanceUploadBytes": self.main_instance_upload_bytes,
++                "slots": 1 + self.passes.len() - BASE_PASS_CACHE_COUNT,
+             },
++            "gltf": gltf_values,
+             "gltfDraws": self.gltf_gpu.draw_diagnostics(),
+             "instanceUploadPages": self.passes.iter().map(|cache| cache.imported.pages.len()).sum::<usize>(),
+             "fps": stats[6], "frameMs": stats[7], "frameP95Ms": self.frame_metrics.frame_p95_ms, "cpuMs": stats[5],
+diff --git a/src/visibility.rs b/src/visibility.rs
+index 8efc2526e..ea734cfec 100644
+--- a/src/visibility.rs
++++ b/src/visibility.rs
+@@ -95,6 +95,22 @@ impl Frustum {
+             planes,
+         }
+     }
++    /// Strict containment is a proof that every child AABB is also visible.
++    /// Touching/partial/invalid bounds must retain the individual test path.
++    #[cfg(any(test, target_arch = "wasm32"))]
++    pub(crate) fn fully_contains_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
++        center.is_finite()
++            && half_extent.is_finite()
++            && half_extent.cmpge(Vec3::ZERO).all()
++            && self
++                .planes
++                .iter()
++                .zip(self.tolerance)
++                .all(|(plane, tolerance)| {
++                    let normal = plane.truncate();
++                    normal.dot(center) + plane.w - normal.abs().dot(half_extent) > tolerance
++                })
++    }
+     pub fn intersects_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
+         self.planes
+             .iter()
+diff --git a/tests/gltf-batching.js b/tests/gltf-batching.js
+index 153a06c02..338abbfc4 100644
+--- a/tests/gltf-batching.js
++++ b/tests/gltf-batching.js
+@@ -21,11 +21,13 @@ try{
+  const reset=()=>{engine.scene.clear();engine.scene.createLight({position:[-2,3,5],color:[12,12,12]});};
+  const captures=[];const evidence=[];
+  for(const cpu of [false,true]){
+-  reset();const url=fixture({cpu}),source=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const models=[source,source.createInstance(),source.createInstance()];
++  reset();const rigidBytesBefore=engine.debugStats().gltf.rigidUploadBytes;const url=fixture({cpu}),source=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const models=[source,source.createInstance(),source.createInstance()];
+   for(const mirrored of [false,true]){
+    models.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
+    const pixels=await capturePixels(canvas);assertForeground(pixels,'three actual model instances',300);
+-   const stats=engine.debugStats();evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
++   const stats=engine.debugStats();
++   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*40+6*4,'normal-map-free shared geometry uploads40-byte vertices and original indices');
++   evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
+    assert(stats.mainDrawCalls===(cpu?3:1),`${cpu?'CPU reference':'rigid instances'} ${mirrored}: ${stats.mainDrawCalls} draws`);
+    if(cpu)assert(stats.gltf.batchBreaks.rootBounds>0&&stats.gltf.batchBreaks.drawDeformed===0,'morph fallback stops at unavailable bounds before draw-merge checks '+JSON.stringify(stats.gltf.batchBreaks));
+   }
+@@ -89,8 +91,13 @@ try{
+  let previousBytes=0;const streamEvidence=[];
+  for(const count of [2,3,9,3]){
+   streamModels.forEach((m,i)=>m.setPosition([i<count?(i-(count-1)/2)*.7:10000,0,0]).setScale([.28,.28,.28]).setRotation([0,0,0]));await frames();
++  const compactBefore=engine.debugStats().gltf;
++  streamModels[count-1].setPosition([((count-1)-(count-1)/2)*.7+.01,0,0]);await frames(1);const compactAfter=engine.debugStats().gltf;
++  assert(compactAfter.translatedDrawCalls>compactBefore.translatedDrawCalls,'actual shared-basis GPU commands required');
++  assert(compactAfter.instanceUploadBytes-compactBefore.instanceUploadBytes===count*3*16,'pure translation columns upload sixteen bytes per instance');
++  streamModels[count-1].setPosition([((count-1)-(count-1)/2)*.7,0,0]);await frames();
+   const before=engine.debugStats().gltf;streamModels[count-1].setRotation([.07,.11,0]);await frames(1);const after=engine.debugStats().gltf;
+-  assert(after.bufferUploadCalls-before.bufferUploadCalls===1,'one upload for changed rigid instance columns');
++  assert(after.bufferUploadCalls-before.bufferUploadCalls===4,'full-matrix fallback updates three material uniforms and one shared stream');
+   assert(after.instanceUploadBytes-before.instanceUploadBytes===count*3*112,'stream bytes preserve all original instance records');
+   assert(after.instanceBufferBytes>=previousBytes,'stream capacity survives shrink');previousBytes=after.instanceBufferBytes;
+   const draws=records(false);assert(draws.length===3&&draws.every(d=>d.instances===count),'stream slices preserve primitive/instance counts');streamEvidence.push({count,uploadCalls:after.bufferUploadCalls-before.bufferUploadCalls,uploadBytes:after.instanceUploadBytes-before.instanceUploadBytes,bufferBytes:after.instanceBufferBytes});
+diff --git a/tests/gltf-opaque-batching.js b/tests/gltf-opaque-batching.js
+index bfaf1f4f9..e5b99a04f 100644
+--- a/tests/gltf-opaque-batching.js
++++ b/tests/gltf-opaque-batching.js
+@@ -112,13 +112,30 @@ try{
+   const pixels=await capturePixels(canvas);assertForeground(pixels,'rigid and skin shared primitive',100);sharedCaptures.push(pixels);
+  }
+  evidence.push({sharedRigidSkinDelta:compare(sharedCaptures[0],sharedCaptures[1],'shared rigid/skin vs CPU morph oracle')});
+- // Bounded root windows retain part grouping locally instead of one global
+- // part-major pass across every depth layer. This is not just an instance cap.
++ // Nearby roots share part groups beyond the old 128-root scheduling cap.
++ // Toggling the policy retains a separately ordered root path as pixel oracle.
+  reset();e.setCameraView([0,.1,3],[0,0,0]);const windowSource=await load(fixture());
+  const windowRoots=[windowSource,...Array.from({length:128},()=>windowSource.createInstance())];
+  windowRoots.forEach((m,i)=>m.setPosition([i*.0001,0,i*.00001]).setScale([.3,.3,.3]).setRenderOptions(options(true)));
+- await frames();assert(e.debugStats().mainDrawCalls===4,'129 roots form two ordered windows of two parts');
+- windowRoots.at(-1).remove();await frames();assert(e.debugStats().mainDrawCalls===2,'128 roots share one local part group');
++ const containedBefore=e.debugStats().gltf.rootFullyInside;
++ const widePixels=await capturePixels(canvas);assert(e.debugStats().mainDrawCalls===2,'129 nearby roots share two part groups');
++ assert(e.debugStats().gltf.rootFullyInside>containedBefore,'cached root containment skips primitive frustum checks');
++ windowRoots.forEach(m=>m.setRenderOptions(options(false)));
++ const orderedPixels=await capturePixels(canvas);assert(e.debugStats().mainDrawCalls===258,'overlapping root-order oracle is unbatched');
++ evidence.push({nearby129:compare(widePixels,orderedPixels,'129-root independent-order pixels')});
++ windowRoots.forEach(m=>m.setRenderOptions(options(true)));
++ windowRoots.at(-1).remove();await frames();assert(e.debugStats().mainDrawCalls===2,'removal retains nearby grouping');
++ // A distant moved root splits by view depth, not count. Camera movement must
++ // reevaluate that decision even if every model pose/cache remains unchanged.
++ reset();e.setCameraView([0,.1,3],[0,0,0]);const depthSource=await load(fixture());
++ const depthRoots=[depthSource,depthSource.createInstance(),depthSource.createInstance()];
++ depthRoots.forEach((m,i)=>m.setPosition([0,0,-i]).setScale([.3,.3,.3]).setRenderOptions(options(true,false)));
++ await frames();assert(e.debugStats().mainDrawCalls===2,'three nearby roots share a depth window');
++ const spatialBefore=e.debugStats().gltf.batchBreaks.rootSpatial;
++ depthRoots[2].setPosition([0,0,-30]);await frames();assert(e.debugStats().mainDrawCalls===4,'far moved root starts a separate depth window');
++ assert(e.debugStats().gltf.batchBreaks.rootSpatial>spatialBefore,'spatial barrier counter records actual split');
++ e.setCameraView([0,.1,50],[0,0,0]);await frames();assert(e.debugStats().mainDrawCalls===2,'camera alone changes depth grouping');
++ e.setCameraView([0,.1,3],[0,0,0]);depthRoots[2].setPosition([0,0,-2]);await frames();assert(e.debugStats().mainDrawCalls===2,'model motion restores nearby grouping');
+  // Authored glTF cameras have negative projection determinant in this engine.
+  // PipelineKey.reflected records winding here; this is still the main color pass.
+  reset();const cameraSpec=fixture();cameraSpec.cameras=[{type:'perspective',perspective:{yfov:1,znear:.08,zfar:100}}];
+@@ -154,6 +171,6 @@ try{
+  assert(JSON.stringify(auxSnapshots[0].records)===JSON.stringify(auxSnapshots[1].records),'auxiliary pass ordering unchanged');
+  evidence.push({auxiliaryDelta:compare(auxSnapshots[0].pixels,auxSnapshots[1].pixels,'shadow/reflection image'),auxiliaryCommands:auxSnapshots[1].records.length});
+  e.setDebugOverlay(false);e.set_render_effects(false,false);
+- e.scene.clear();await frames();assert(e.debugStats().gltf.instanceBufferBytes===0,'clear releases all instance storage');
++ e.scene.clear();await frames();assert(e.debugStats().gltf.instanceBufferBytes===0,'clear releases all instance storage');assert(e.debugStats().gltf.activeDrawIndexBytes===0,'clear releases active-draw index caches');
+  result.dataset.status='pass';result.textContent='PASS: '+JSON.stringify(evidence);
+ }catch(error){console.error(error);result.dataset.status='fail';result.textContent='FAIL: '+(error.stack||error);}
+diff --git a/src/render_batch.rs b/src/render_batch.rs
+new file mode 100644
+index 000000000..0ada429d9
+--- /dev/null
++++ b/src/render_batch.rs
+@@ -0,0 +1,128 @@
++//! View-local scheduling for explicitly order-independent opaque model runs.
++//! Instance-page capacity is separate from spatial scheduling: a dense nearby
++//! group may contain many roots, while a long depth chain is split early.
++use glam::{Mat4, Vec3};
++
++type Bounds = (Vec3, Vec3);
++const MAX_DEPTH_RATIO: f32 = 2.0;
++
++pub(crate) struct DepthWindow {
++    camera: Vec3,
++    forward: Vec3,
++    near: f32,
++    far: f32,
++}
++impl DepthWindow {
++    pub fn new(view_projection: Mat4, camera: Vec3, bounds: Bounds) -> Option<Self> {
++        if !view_projection.is_finite() || !camera.is_finite() {
++            return None;
++        }
++        let rows = view_projection.transpose();
++        // Perspective clip-w is forward depth. Orthographic clip-w is constant;
++        // its clip-z normal supplies the view axis instead. No inverse per root.
++        let forward = rows
++            .w_axis
++            .truncate()
++            .try_normalize()
++            .or_else(|| rows.z_axis.truncate().try_normalize())?;
++        let mut window = Self {
++            camera,
++            forward,
++            near: 0.0,
++            far: 0.0,
++        };
++        (window.near, window.far) = window.interval(bounds)?;
++        Some(window)
++    }
++    fn interval(&self, (min, max): Bounds) -> Option<(f32, f32)> {
++        if !min.is_finite() || !max.is_finite() || !min.cmple(max).all() {
++            return None;
++        }
++        let center = (min + max) * 0.5;
++        let radius = self.forward.abs().dot((max - min) * 0.5);
++        let depth = self.forward.dot(center - self.camera);
++        let near = depth - radius;
++        let far = depth + radius;
++        (near > 0.0 && near.is_finite() && far.is_finite()).then_some((near, far))
++    }
++    /// A rejection does not mutate the accepted run. Only reorderable rigid
++    /// opaque draws may use this cost policy; it grants no ordering permission.
++    pub fn include(&mut self, bounds: Bounds) -> bool {
++        let Some((near, far)) = self.interval(bounds) else {
++            return false;
++        };
++        let near = self.near.min(near);
++        let far = self.far.max(far);
++        if far / near > MAX_DEPTH_RATIO {
++            return false;
++        }
++        self.near = near;
++        self.far = far;
++        true
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    fn bounds(z: f32) -> Bounds {
++        (Vec3::new(-0.2, -0.2, z - 0.1), Vec3::new(0.2, 0.2, z + 0.1))
++    }
++    fn projection() -> Mat4 {
++        glam::camera::rh::proj::directx::perspective(1.0, 1.5, 0.08, 200.0)
++    }
++    #[test]
++    fn dense_roots_do_not_split_at_an_arbitrary_object_count() {
++        let mut w = DepthWindow::new(projection(), Vec3::ZERO, bounds(-4.0)).unwrap();
++        for i in 0..2048 {
++            assert!(w.include(bounds(-4.0 - (i % 512) as f32 * 0.005)));
++        }
++        assert!(!w.include(bounds(-30.0)));
++        assert!(w.include(bounds(-5.0))); // Rejection did not poison the run.
++    }
++    #[test]
++    fn camera_rotation_translation_and_orthographic_depth_are_view_local() {
++        let camera = Vec3::new(8.0, 2.0, -3.0);
++        let view = glam::camera::rh::view::look_at_mat4(camera, camera + Vec3::X, Vec3::Y);
++        let local = |x: f32| {
++            (
++                camera + Vec3::new(x - 0.1, -0.2, -0.2),
++                camera + Vec3::new(x + 0.1, 0.2, 0.2),
++            )
++        };
++        for p in [
++            projection(),
++            glam::camera::rh::proj::directx::orthographic(-4.0, 4.0, -3.0, 3.0, 0.08, 200.0),
++        ] {
++            let mut w = DepthWindow::new(p * view, camera, local(4.0)).unwrap();
++            assert!(w.include(local(6.0)));
++            assert!(!w.include(local(30.0)));
++            assert!(!w.include(local(-2.0)));
++        }
++    }
++    #[test]
++    fn frustum_containment_never_accepts_partial_touching_or_invalid_bounds() {
++        let f = crate::visibility::Frustum::from_view_projection(Mat4::IDENTITY);
++        assert!(f.fully_contains_aabb(Vec3::new(0.0, 0.0, 0.5), Vec3::splat(0.2)));
++        for (c, e) in [
++            (Vec3::new(0.99, 0.0, 0.5), Vec3::splat(0.1)),
++            (Vec3::new(0.0, 0.0, 0.0), Vec3::ZERO),
++            (Vec3::new(0.0, 0.0, 0.95), Vec3::splat(0.1)),
++        ] {
++            assert!(f.intersects_aabb(c, e));
++            assert!(!f.fully_contains_aabb(c, e));
++        }
++        assert!(!f.fully_contains_aabb(Vec3::splat(f32::NAN), Vec3::ONE));
++        assert!(!f.fully_contains_aabb(Vec3::ZERO, -Vec3::ONE));
++    }
++    #[test]
++    fn invalid_and_camera_crossing_bounds_are_conservative() {
++        assert!(DepthWindow::new(Mat4::ZERO, Vec3::ZERO, bounds(-4.0)).is_none());
++        assert!(DepthWindow::new(projection(), Vec3::ZERO, bounds(0.0)).is_none());
++        assert!(DepthWindow::new(projection(), Vec3::ZERO, (Vec3::ONE, Vec3::ZERO)).is_none());
++        let mut w = DepthWindow::new(projection(), Vec3::ZERO, bounds(-4.0)).unwrap();
++        assert!(!w.include((Vec3::splat(f32::NAN), Vec3::ONE)));
++        assert!(!w.include(bounds(0.0)));
++        assert!(w.include(bounds(-5.0)));
++    }
++}

@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "backend": "webgl",
+  "family": "rim-static",
+  "order": "spatial",
+  "seed": 1337,
+  "overlap": 0,
+  "profiling": true,
+  "budget": 16.666666666666668,
+  "warmup": 1000,
+  "sample": 2500,
+  "load": 1,
+  "levels": {
+    "light": 1,
+    "near": 1,
+    "over": null
+  },
+  "loads": [
+    1
+  ],
+  "underBudget": true,
+  "incomplete": false,
+  "unsafeLoad": null,
+  "overloadConfirmation": {
+    "firstFailedLoad": null,
+    "upperBound": null,
+    "reason": "No failure observed within max-load; overload unavailable."
+  },
+  "capacityProbes": [
+    {
+      "load": 1,
+      "capacityPass": true
+    }
+  ],
+  "selectionMetric": "frame capacity: RAF median <= budget+.5ms, p95 <= 2*budget+.5ms, missed intervals <= 10%, callback CPU p95 <= budget+.5ms; RAF is not compositor presentation",
+  "baselineManifest": [
+    {
+      "url": "/assets/models/rim/blade-wraith.glb",
+      "bytes": 627520,
+      "sha256": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/collisions.json",
+      "bytes": 456101,
+      "sha256": "c20159008b11408c517a11e7f86d6dd09cd0b42dc8a17db54fad8a688dd1a662",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/core-tank.glb",
+      "bytes": 1135396,
+      "sha256": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/drone-orbiter.glb",
+      "bytes": 905200,
+      "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/gladius.glb",
+      "bytes": 11024,
+      "sha256": "47abff59ec0652fd01e46f8356830bb49d9f2bd351c39dda02a095644361cd04",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/layout.json",
+      "bytes": 8646,
+      "sha256": "477fcc53649fc4d03e174ce37cec77cb176c3c6e1ba161b7d3647bc4313c2085",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/madmechanic.glb",
+      "bytes": 191896,
+      "sha256": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/rim-city.glb",
+      "bytes": 4485124,
+      "sha256": "73197d81c48db8a043b4c967b8d10dda35234954a338f6e0d8054bfa1e088a19",
+      "source": "frozen"
+    },
+    {
+      "url": "/assets/models/rim/rim-decorations.glb",
+      "bytes": 43804,
+      "sha256": "8341e2f56268bfa98425cf79e081751f50d34a2642ed5b3cb044f1402cdc834d",
+      "source": "frozen"
+    },
+    {
+      "url": "/examples/rim/appearance.js",
+      "bytes": 852,
+      "sha256": "1f08cea530a1f60376492965a2f22585201b8d02392a5ad50807e039093f96b9",
+      "source": "frozen"
+    },
+    {
+      "url": "/examples/rim/scene.js",
+      "bytes": 5491,
+      "sha256": "2f47d1cb10bbd8702d25cba3e270050218465839f67b84ff1208ccce3a94b10c",
+      "source": "frozen"
+    },
+    {
+      "url": "/js/engine.js",
+      "bytes": 45835,
+      "sha256": "0f9a2629f2bd81280219412902356e4460f7ee9810063f8371a60f74709d1c36",
+      "source": "frozen"
+    },
+    {
+      "url": "/js/webxr.js",
+      "bytes": 31081,
+      "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+      "source": "frozen"
+    },
+    {
+      "url": "/pkg/webgpu_wasm_bg.wasm",
+      "bytes": 5802544,
+      "sha256": "c4301d8142f89cda9472095b128a458372101d646a7b9ed1980e84a5569b526a",
+      "source": "frozen"
+    },
+    {
+      "url": "/pkg/webgpu_wasm.js",
+      "bytes": 189395,
+      "sha256": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+      "source": "frozen"
+    },
+    {
+      "url": "/scripts/render-performance-order.mjs",
+      "bytes": 680,
+      "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/pixels.js",
+      "bytes": 1931,
+      "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/render-performance.html",
+      "bytes": 318,
+      "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "source": "harness"
+    },
+    {
+      "url": "/tests/render-performance.js",
+      "bytes": 10487,
+      "sha256": "5d25a5027cd16f1f439c0f736e2e6d9a7413ad8ff0d032b26ddd68e12588c73a",
+      "source": "harness"
+    }
+  ],
+  "baselineRoot": "/Users/Honza/.codex/worktrees/rim-publish/rust/output/render-performance/baseline",
+  "driverIdentity": {
+    "capturedAt": "2026-10-25T17:29:57.278Z",
+    "nodeVersion": "v24.19.0",
+    "v8Version": "13.6.233.17-node.51",
+    "files": {
+      "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+      "scripts/render-performance.mjs": "b087b241c89a22977dfe962434ceb792ac99d94ae96f8619cca150b5a1c8ad9e",
+      "scripts/render-performance-lib.mjs": "9d771d552631a3f3a17f3bc3dbd2bb8fa840ac3b3a0af1ad04058e727849cd28",
+      "scripts/render-performance-api.mjs": "d38be5226844fc40c7ec04cab0cd01dab2cc2f8ecbebe58a96af78552e844f9b",
+      "scripts/render-performance-gl-timer.mjs": "e5976b188339bcd43e0a36512fc7b6fd301a646414d3de6dbb68e8fe49fc66eb",
+      "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "tests/render-performance.js": "5d25a5027cd16f1f439c0f736e2e6d9a7413ad8ff0d032b26ddd68e12588c73a",
+      "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+    },
+    "sha256": "a5c427cc3e6126f7c7eab034fc6422bf8e148fec8d8e2b2820f1524a1056fe7c"
+  }
+}

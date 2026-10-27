@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-27T01:30:17.473587+00:00",
+  "origin": "https://192.168.0.17:8443",
+  "release": "93b31ba5f9",
+  "build": {
+    "source": "535ac6bc5010023563b42dca1688247e76b623247d0a7ebdb697e8eb1fdb1509",
+    "wasm": "dcce4c0c43ed29bf26bbdefa2830823cd3c9bffd34d1d0d47a786f1d84415b48",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "files": 260,
+  "productionBrowserCases": 3,
+  "physicalQuest": false,
+  "serverRestarted": false,
+  "payloads": [
+    {
+      "path": "examples/rim-compare/",
+      "status": 200,
+      "sha256": "ad3c57344dcf083a943b40c5cef5205173cdcc2b3f1dbd9a453833d9075c491b",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim-compare/compare.js",
+      "status": 200,
+      "sha256": "a501402e73497827948004ad0bdbb00377523fd6e48f663b23ab62b2ad4e098b",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim-compare/native-webgpu.png",
+      "status": 200,
+      "sha256": "97ae8a8f077b594f3517876925627d339b4d35fb48040f962c1c46bd35e63cb2",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim-compare/native-webgl.png",
+      "status": 200,
+      "sha256": "823f4c9c77745f4aa580ea746493132c7392fa91ace98fdb05cec03e539c3454",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim-compare/three.png",
+      "status": 200,
+      "sha256": "de0b93021412018cdc9f43b10d1a76f41865f62de264bf8a70ce249554a3ab2b",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim/?backend=webgpu",
+      "status": 200,
+      "sha256": "4733890d471898b0c02562d2501286c0804465d9c5a5bc4f21accd9a9934cf5b",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim/?backend=webgl",
+      "status": 200,
+      "sha256": "4733890d471898b0c02562d2501286c0804465d9c5a5bc4f21accd9a9934cf5b",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "examples/rim-three/",
+      "status": 200,
+      "sha256": "536d5164ae42e17036365c21eac796cc7669799a2880a507e8d6bc6d73485b95",
+      "noStore": true,
+      "tls": true
+    },
+    {
+      "path": "pkg/webgpu_wasm_bg.wasm",
+      "status": 200,
+      "sha256": "dcce4c0c43ed29bf26bbdefa2830823cd3c9bffd34d1d0d47a786f1d84415b48",
+      "noStore": true,
+      "tls": true
+    }
+  ]
+}

@@ -1,0 +1,311 @@
+{
+  "date": "2026-10-27T03:06:40.180170+00:00",
+  "origin": "https://192.168.0.17:8443",
+  "release": "ba920dd931",
+  "build": {
+    "source": "128abfe22c6ea2f7f5d07082c857aa81a9ea1aff03fc2a0e20fd0f1117816114",
+    "wasm": "c7091506871c74c5055d501dfd85b3a12d8e70dd7905003135dee7939f8109eb",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "files": 260,
+  "productionBrowserCases": 11,
+  "physicalQuest": false,
+  "serverRestarted": true,
+  "previousRelease": "93b31ba5f9",
+  "backup": "/Users/Honza/.codex/worktrees/rim-publish/rust/output/spatial-live-before-ba920dd931",
+  "payloads": [
+    {
+      "path": "examples/rim/?backend=webgpu",
+      "status": 200,
+      "sha256": "4f17014e6f655ac462ac66602d49ffb4f0a89d5d0d5d1fd2a8268755115cf638",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim/?backend=webgpu",
+      "contentType": "text/html"
+    },
+    {
+      "path": "examples/rim/?backend=webgl",
+      "status": 200,
+      "sha256": "4f17014e6f655ac462ac66602d49ffb4f0a89d5d0d5d1fd2a8268755115cf638",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim/?backend=webgl",
+      "contentType": "text/html"
+    },
+    {
+      "path": "examples/rim/main.js",
+      "status": 200,
+      "sha256": "715b8d2af773b6e55cbb4447e34110e806f5ac2517513ec5baf6c9ff2c9aa1b9",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim/main.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "examples/rim/scene.js",
+      "status": 200,
+      "sha256": "807db15ff6e430f6a98fd6d29cd4b7b5587b77198afb2968b81b3f27371c024d",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim/scene.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "pkg/webgpu_wasm_bg.wasm",
+      "status": 200,
+      "sha256": "c7091506871c74c5055d501dfd85b3a12d8e70dd7905003135dee7939f8109eb",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/pkg/webgpu_wasm_bg.wasm",
+      "contentType": "application/wasm"
+    },
+    {
+      "path": "pkg/webgpu_wasm.js",
+      "status": 200,
+      "sha256": "e64edc2b3bc9f35fb6bade2fe19509371a0fac429f559baa9f59e857d4123cf7",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/pkg/webgpu_wasm.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "js/engine.js",
+      "status": 200,
+      "sha256": "248f0cb6725a257d8ef7a997949a37b257dee6fe547b2b23ddb3e99e90fbfc76",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/js/engine.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "examples/rim-three/",
+      "status": 200,
+      "sha256": "536d5164ae42e17036365c21eac796cc7669799a2880a507e8d6bc6d73485b95",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-three/",
+      "contentType": "text/html"
+    },
+    {
+      "path": "examples/rim-three/app.js",
+      "status": 200,
+      "sha256": "0391351465bb3726fa55442d3857feda09a39f995e22961d77e5a4f09c73ed53",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-three/app.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "examples/rim-compare/",
+      "status": 200,
+      "sha256": "e3feadcf3c65e6d0762bb2280c75797dafd9bd88baf6f25edcc3946ddab9f1f7",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-compare/",
+      "contentType": "text/html"
+    },
+    {
+      "path": "examples/rim-compare/style.css",
+      "status": 200,
+      "sha256": "75db4d95fd408fbf9437eea02d24cae4c32dae39e4f85f7af60b18a67e0a75b1",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-compare/style.css",
+      "contentType": "text/css"
+    },
+    {
+      "path": "examples/rim-compare/compare.js",
+      "status": 200,
+      "sha256": "a501402e73497827948004ad0bdbb00377523fd6e48f663b23ab62b2ad4e098b",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-compare/compare.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "examples/rim-compare/native-webgpu.png",
+      "status": 200,
+      "sha256": "97ae8a8f077b594f3517876925627d339b4d35fb48040f962c1c46bd35e63cb2",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-compare/native-webgpu.png",
+      "contentType": "image/png"
+    },
+    {
+      "path": "examples/rim-compare/native-webgl.png",
+      "status": 200,
+      "sha256": "823f4c9c77745f4aa580ea746493132c7392fa91ace98fdb05cec03e539c3454",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-compare/native-webgl.png",
+      "contentType": "image/png"
+    },
+    {
+      "path": "examples/rim-compare/three.png",
+      "status": 200,
+      "sha256": "de0b93021412018cdc9f43b10d1a76f41865f62de264bf8a70ce249554a3ab2b",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/examples/rim-compare/three.png",
+      "contentType": "image/png"
+    }
+  ],
+  "neonBefore": [
+    {
+      "path": "examples/neon-arena/",
+      "status": 200,
+      "sha256": "ca63242b5c6b985855964c968b1a7d12960c49f7579b149dca7b2d92794d1027",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/examples/neon-arena/",
+      "contentType": "text/html"
+    },
+    {
+      "path": "examples/neon-arena/main.js",
+      "status": 200,
+      "sha256": "58a267152ff94ffcb3b612465d808a515682ac95e1de962211c9c032ab12ca62",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/examples/neon-arena/main.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "examples/neon-arena/scene.js",
+      "status": 200,
+      "sha256": "81f7460528e1f80d9f02b369bb8b3f2207b630443659d198f595a47e2d9b4f26",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/examples/neon-arena/scene.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "_neon/js/engine.js",
+      "status": 200,
+      "sha256": "99803708beb4035a059cdde7b1fc7664421a3188937c97857684df35c6d399e4",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/js/engine.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "_neon/pkg/webgpu_wasm_bg.wasm",
+      "status": 200,
+      "sha256": "547dc1ddf654b463ad961fe145b6555b598a29199ff6eeeeaedce346c6b3417c",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/pkg/webgpu_wasm_bg.wasm",
+      "contentType": "application/wasm"
+    }
+  ],
+  "neonAfter": [
+    {
+      "path": "examples/neon-arena/",
+      "status": 200,
+      "sha256": "ca63242b5c6b985855964c968b1a7d12960c49f7579b149dca7b2d92794d1027",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/examples/neon-arena/",
+      "contentType": "text/html"
+    },
+    {
+      "path": "examples/neon-arena/main.js",
+      "status": 200,
+      "sha256": "58a267152ff94ffcb3b612465d808a515682ac95e1de962211c9c032ab12ca62",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/examples/neon-arena/main.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "examples/neon-arena/scene.js",
+      "status": 200,
+      "sha256": "81f7460528e1f80d9f02b369bb8b3f2207b630443659d198f595a47e2d9b4f26",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/examples/neon-arena/scene.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "_neon/js/engine.js",
+      "status": 200,
+      "sha256": "99803708beb4035a059cdde7b1fc7664421a3188937c97857684df35c6d399e4",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/js/engine.js",
+      "contentType": "text/javascript"
+    },
+    {
+      "path": "_neon/pkg/webgpu_wasm_bg.wasm",
+      "status": 200,
+      "sha256": "547dc1ddf654b463ad961fe145b6555b598a29199ff6eeeeaedce346c6b3417c",
+      "noStore": true,
+      "tls": true,
+      "finalUrl": "https://192.168.0.17:8443/_neon/pkg/webgpu_wasm_bg.wasm",
+      "contentType": "application/wasm"
+    }
+  ],
+  "neonPayloadsUnchanged": true,
+  "installed": true,
+  "serverRecovery": {
+    "oldPid": 79190,
+    "oldCommand": "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python scripts/serve-quest-shared.py 8443 --host 192.168.0.17 --cert /Users/Honza/.local/share/rust-webxr/tls/server.crt --key /Users/Honza/.local/share/rust-webxr/tls/server.key --fallback-root /Users/Honza/.codex/worktrees/rim-publish/rust --arena-root /Users/Honza/WebstormProjects/rust/output/production",
+    "oldCwdInode": 41519677,
+    "currentCwdInode": 43473663,
+    "preflight": [
+      {
+        "path": "examples/rim/",
+        "status": 200,
+        "bytes": 4565
+      },
+      {
+        "path": "examples/neon-arena/",
+        "status": 200,
+        "bytes": 9444
+      },
+      {
+        "path": "_neon/js/engine.js",
+        "status": 200,
+        "bytes": 21833
+      },
+      {
+        "path": "_neon/pkg/webgpu_wasm_bg.wasm",
+        "status": 200,
+        "bytes": 5674841
+      }
+    ],
+    "args": [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/Honza/WebstormProjects/rust/scripts/serve-quest-shared.py",
+      "8443",
+      "--host",
+      "192.168.0.17",
+      "--cert",
+      "/Users/Honza/.local/share/rust-webxr/tls/server.crt",
+      "--key",
+      "/Users/Honza/.local/share/rust-webxr/tls/server.key",
+      "--fallback-root",
+      "/Users/Honza/.codex/worktrees/rim-publish/rust",
+      "--arena-root",
+      "/Users/Honza/WebstormProjects/rust/output/production"
+    ],
+    "newPid": 12350,
+    "restoredOldRelease": "93b31ba5f9",
+    "sourceEdited": false,
+    "primaryPackageEdited": false
+  },
+  "serverRestartReason": "Existing8443 closed all requests before package replacement; stale working-directory inode after archival observed. Equivalent fresh-server preflight passed; exact failure stack unavailable.",
+  "uiVerification": {
+    "url": "http://127.0.0.1:55019/examples/rim-compare/",
+    "nativeSelector": "WebGL2 then restored WebGPU",
+    "ABSlider": "0 then restored50",
+    "newTablesObserved": true,
+    "screenshot": "ui-results.png",
+    "LANCertificateWarningBypassed": false
+  }
+}

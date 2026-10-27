@@ -1,0 +1,141 @@
+{
+  "source": "/Users/Honza/Documents/Codex/2026-10-22/ude/outputs/anticke-mesto/dist",
+  "files": {
+    "characters.js": {
+      "sha256": "93feadb633d7be6ecd53a531a0d6e864fe6abc0d17aed7682333add80b6feb62",
+      "bytes": 4207
+    },
+    "city.js": {
+      "sha256": "1c8aa2e61f79a96c655481f4427388316526a8853c5c7742bdbadc8019fe55cd",
+      "bytes": 11997
+    },
+    "collision-world.js": {
+      "sha256": "50881d075344cda568c255960d7fc3a01776ecb4324cc68484472ba4cf2f5e6b",
+      "bytes": 7695
+    },
+    "combat-rules.js": {
+      "sha256": "0d1572e66890299c353b83f3e31fc3cf887e7738f03ffae9f3744c41aa1fedae",
+      "bytes": 1224
+    },
+    "combat.js": {
+      "sha256": "1c5d4605a7875fa7bb1702106e5df7f75d3e078176e202908b4ad26080e71abe",
+      "bytes": 21714
+    },
+    "cut-worker-client.js": {
+      "sha256": "1d8aa28bc71e56798011c172c91273c8296ef6ba3539c3d1a23c5b11dd4db4ab",
+      "bytes": 5108
+    },
+    "cut-worker.js": {
+      "sha256": "a180d3aed7b69b5c36a968fea5e98db7cfb894b77c2227e222b674557aaff19a",
+      "bytes": 3267
+    },
+    "dash-physics.js": {
+      "sha256": "675aa71d297c4dfaafc3ed0b06a927d25b0108f4d23572d3cbdf814fa83ef0dd",
+      "bytes": 1040
+    },
+    "index.html": {
+      "sha256": "7ab9f4e90e7d26c5cb30eac960695decf7533f8f10859a52d6706e4c28e649fd",
+      "bytes": 3461
+    },
+    "jump-physics.js": {
+      "sha256": "4b3adb21b2f213fd315c3729b154dceb9c2e1e6ecd9cc4295c35e8b7f987f42e",
+      "bytes": 3154
+    },
+    "main.js": {
+      "sha256": "81d7ebb4787cf7960391e06c94804fdead72bed96dcd88162234d08131c91283",
+      "bytes": 21993
+    },
+    "mesh-split.js": {
+      "sha256": "cbe05ff1db74ac15adcec2de354ee74e7b13aa0e3b3eb1cc1eb3d37365b96d58",
+      "bytes": 16169
+    },
+    "models/blade-wraith.glb": {
+      "sha256": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+      "bytes": 627520
+    },
+    "models/core-tank.glb": {
+      "sha256": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+      "bytes": 1135396
+    },
+    "models/drone-orbiter.glb": {
+      "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+      "bytes": 905200
+    },
+    "models/madmechanic.glb": {
+      "sha256": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+      "bytes": 191896
+    },
+    "plasma.js": {
+      "sha256": "7b7c69709a49ab8b55545c9355ea29c2a0d2074bd3bf1a4c84920ee12313ed1c",
+      "bytes": 4132
+    },
+    "player-hud.js": {
+      "sha256": "e7e4075f39a31f166630782900c430fc82b1f3dc9e3ec3d1bb801132c9720925",
+      "bytes": 5345
+    },
+    "player-stamina.js": {
+      "sha256": "785084cd8b4e66f4179e4bca3b78f6a945c92b1bd33ebcb36dec15db1017aac7",
+      "bytes": 802
+    },
+    "projectiles.js": {
+      "sha256": "703cccef3bfc3ccf60facfbf645c880cd6a8c1d9d888a4387b46644673779f05",
+      "bytes": 7982
+    },
+    "runtime-info-three.js": {
+      "sha256": "1edc8a6770f5787e8dabddabae5cb9d9c0c3035fd2677d9f16acc104f5263d6b",
+      "bytes": 1846
+    },
+    "runtime-info-ui.js": {
+      "sha256": "d9d964ebb12de88f5a2fafca6f0dfa9d37af0f1190eb80918372953fbb3d751d",
+      "bytes": 5678
+    },
+    "split-death.js": {
+      "sha256": "2aab7c8d71e97340c0603c4e08df72ec766f97cf9abd1b000ecb8e5fcce52dd8",
+      "bytes": 15644
+    },
+    "style.css": {
+      "sha256": "5b185be79ee740fcb2766242f93a8e61535c4d367c48b5adb9eed888c76677ad",
+      "bytes": 4628
+    },
+    "vendor/BufferGeometryUtils.js": {
+      "sha256": "c25b7930e570e9ec56173cd3b866ec8d2e10016630db3937efb439daf1cedbf6",
+      "bytes": 31768
+    },
+    "vendor/GLTFExporter.js": {
+      "sha256": "76526d2be01c3fdf17c8efcf7c1c67dfd1ef30ede3196865eb69fa49196f80aa",
+      "bytes": 81884
+    },
+    "vendor/GLTFLoader.js": {
+      "sha256": "8a7db5a19d1018d79fb9a7a8b8372f317682027321a67d86023002e264ea479d",
+      "bytes": 110266
+    },
+    "vendor/LICENSE-three.txt": {
+      "sha256": "4c40a1ef62450b857c3b2aaf294936304cd552d965fbcd9d32d4c5bcf4ba4454",
+      "bytes": 1081
+    },
+    "vendor/three.module.js": {
+      "sha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+      "bytes": 1314681
+    },
+    "vr-debug-panel.js": {
+      "sha256": "dda183bb3b9bd24780e01b11e4df5c35643c7ebc83c486d33c8de8cd3519e83a",
+      "bytes": 3151
+    }
+  },
+  "copiedTo": "examples/rim-three",
+  "entryRename": {
+    "main.js": "app.js"
+  },
+  "intentionalChanges": [
+    "index.html (wrapper entry/import map/stress controls)",
+    "style.css (stress control layout)",
+    "vr-debug-panel.js (load count/representation line)"
+  ],
+  "addedFiles": [
+    "main.js",
+    "stress.js",
+    "verify.js",
+    "README.md",
+    "reference-origin.json"
+  ]
+}

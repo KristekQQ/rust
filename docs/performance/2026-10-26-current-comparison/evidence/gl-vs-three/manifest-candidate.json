@@ -1,0 +1,182 @@
+[
+  {
+    "url": "/examples/rim/characters.js",
+    "bytes": 4207,
+    "sha256": "93feadb633d7be6ecd53a531a0d6e864fe6abc0d17aed7682333add80b6feb62",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/city.js",
+    "bytes": 11997,
+    "sha256": "1c8aa2e61f79a96c655481f4427388316526a8853c5c7742bdbadc8019fe55cd",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/collision-world.js",
+    "bytes": 7695,
+    "sha256": "50881d075344cda568c255960d7fc3a01776ecb4324cc68484472ba4cf2f5e6b",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/combat-rules.js",
+    "bytes": 1224,
+    "sha256": "0d1572e66890299c353b83f3e31fc3cf887e7738f03ffae9f3744c41aa1fedae",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/combat.js",
+    "bytes": 21714,
+    "sha256": "1c5d4605a7875fa7bb1702106e5df7f75d3e078176e202908b4ad26080e71abe",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/cut-worker-client.js",
+    "bytes": 5108,
+    "sha256": "1d8aa28bc71e56798011c172c91273c8296ef6ba3539c3d1a23c5b11dd4db4ab",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/cut-worker.js",
+    "bytes": 3267,
+    "sha256": "a180d3aed7b69b5c36a968fea5e98db7cfb894b77c2227e222b674557aaff19a",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/dash-physics.js",
+    "bytes": 1040,
+    "sha256": "675aa71d297c4dfaafc3ed0b06a927d25b0108f4d23572d3cbdf814fa83ef0dd",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/jump-physics.js",
+    "bytes": 3154,
+    "sha256": "4b3adb21b2f213fd315c3729b154dceb9c2e1e6ecd9cc4295c35e8b7f987f42e",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/main.js",
+    "bytes": 21993,
+    "sha256": "81d7ebb4787cf7960391e06c94804fdead72bed96dcd88162234d08131c91283",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/mesh-split.js",
+    "bytes": 16169,
+    "sha256": "cbe05ff1db74ac15adcec2de354ee74e7b13aa0e3b3eb1cc1eb3d37365b96d58",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/models/blade-wraith.glb",
+    "bytes": 627520,
+    "sha256": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/models/core-tank.glb",
+    "bytes": 1135396,
+    "sha256": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/models/drone-orbiter.glb",
+    "bytes": 905200,
+    "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/models/madmechanic.glb",
+    "bytes": 191896,
+    "sha256": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/plasma.js",
+    "bytes": 4132,
+    "sha256": "7b7c69709a49ab8b55545c9355ea29c2a0d2074bd3bf1a4c84920ee12313ed1c",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/player-hud.js",
+    "bytes": 5345,
+    "sha256": "e7e4075f39a31f166630782900c430fc82b1f3dc9e3ec3d1bb801132c9720925",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/player-stamina.js",
+    "bytes": 802,
+    "sha256": "785084cd8b4e66f4179e4bca3b78f6a945c92b1bd33ebcb36dec15db1017aac7",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/projectiles.js",
+    "bytes": 7982,
+    "sha256": "703cccef3bfc3ccf60facfbf645c880cd6a8c1d9d888a4387b46644673779f05",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/runtime-info-three.js",
+    "bytes": 1846,
+    "sha256": "1edc8a6770f5787e8dabddabae5cb9d9c0c3035fd2677d9f16acc104f5263d6b",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/runtime-info-ui.js",
+    "bytes": 5678,
+    "sha256": "d9d964ebb12de88f5a2fafca6f0dfa9d37af0f1190eb80918372953fbb3d751d",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/split-death.js",
+    "bytes": 15644,
+    "sha256": "2aab7c8d71e97340c0603c4e08df72ec766f97cf9abd1b000ecb8e5fcce52dd8",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/vendor/BufferGeometryUtils.js",
+    "bytes": 31768,
+    "sha256": "c25b7930e570e9ec56173cd3b866ec8d2e10016630db3937efb439daf1cedbf6",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/vendor/GLTFExporter.js",
+    "bytes": 81884,
+    "sha256": "76526d2be01c3fdf17c8efcf7c1c67dfd1ef30ede3196865eb69fa49196f80aa",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/vendor/GLTFLoader.js",
+    "bytes": 110266,
+    "sha256": "8a7db5a19d1018d79fb9a7a8b8372f317682027321a67d86023002e264ea479d",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/vendor/three.module.js",
+    "bytes": 1314681,
+    "sha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/vr-debug-panel.js",
+    "bytes": 3151,
+    "sha256": "dda183bb3b9bd24780e01b11e4df5c35643c7ebc83c486d33c8de8cd3519e83a",
+    "source": "frozen"
+  },
+  {
+    "url": "/tests/pixels.js",
+    "bytes": 1931,
+    "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance-three-rim.html",
+    "bytes": 3557,
+    "sha256": "0d6815e6676100795614918fc192ebea166ecd15572c0ba001c353d534a6ec4c",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance-three-rim.js",
+    "bytes": 2960,
+    "sha256": "7993c8e01f79691628f667de25a854bc222c17ac8cc2832f949327cbafb795af",
+    "source": "harness"
+  }
+]

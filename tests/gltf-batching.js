@@ -21,15 +21,18 @@ try{
  const reset=()=>{engine.scene.clear();engine.scene.createLight({position:[-2,3,5],color:[12,12,12]});};
  const captures=[];const evidence=[];
  for(const cpu of [false,true]){
-  reset();const url=fixture({cpu}),source=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const models=[source,source.createInstance(),source.createInstance()];
+  reset();const rigidBytesBefore=engine.debugStats().gltf.rigidUploadBytes;const url=fixture({cpu}),source=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const models=[source,source.createInstance(),source.createInstance()];
   for(const mirrored of [false,true]){
    models.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
    const pixels=await capturePixels(canvas);assertForeground(pixels,'three actual model instances',300);
-   const stats=engine.debugStats();evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
+   const stats=engine.debugStats();
+   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*40+6*4,'normal-map-free shared geometry uploads40-byte vertices and original indices');
+   evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
    assert(stats.mainDrawCalls===(cpu?3:1),`${cpu?'CPU reference':'rigid instances'} ${mirrored}: ${stats.mainDrawCalls} draws`);
+   if(cpu)assert(stats.gltf.batchBreaks.rootBounds>0&&stats.gltf.batchBreaks.drawDeformed===0,'morph fallback stops at unavailable bounds before draw-merge checks '+JSON.stringify(stats.gltf.batchBreaks));
   }
   if(!cpu){
-   models.forEach(m=>m.setPosition([0,0,0]));await frames();assert(engine.debugStats().mainDrawCalls===3,'overlapping roots preserve original separate draw order');
+   assert(engine.debugStats().gltf.batchBreaks.rootBlend===0,'empty blend queue is not a rejected visible primitive');const overlapBefore=engine.debugStats().gltf.batchBreaks.rootOverlap;models.forEach(m=>m.setPosition([0,0,0]));await frames();assert(engine.debugStats().mainDrawCalls===3,'overlapping roots preserve original separate draw order');assert(engine.debugStats().gltf.batchBreaks.rootOverlap>overlapBefore,'overlap barrier counter follows actual separate draws');
    models.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]));await frames();assert(engine.debugStats().gltf.instanceBufferBytes>0,'instance page allocated');
   }
  }
@@ -71,14 +74,62 @@ try{
  // Stable blend sorting must retain import order at exactly equal distances.
  reset();engine.setCameraView([0,0,5],[0,0,0]);const blendUrl=fixture({alpha:'BLEND'}),blendSource=await engine.scene.loadModel(blendUrl);URL.revokeObjectURL(blendUrl);
  const blendOther=blendSource.createInstance();blendSource.setPosition([-.9,0,0]);blendOther.setPosition([.9,0,0]);await frames();
- assert(JSON.stringify(records(true).map(d=>d.object))===JSON.stringify([blendSource.id,blendOther.id]),'equal-distance blend order is stable');
+ assert(JSON.stringify(records(true).map(d=>d.object))===JSON.stringify([blendSource.id,blendOther.id]),'equal-distance blend order is stable');assert(engine.debugStats().gltf.batchBreaks.rootBlend>0,'blend barrier is reported');
  // The root-run itself is not capped at1024: only individual draw groups are.
  reset();engine.set_frustum_culling(false);const manyUrl=fixture(),manySource=await engine.scene.loadModel(manyUrl);URL.revokeObjectURL(manyUrl);
  const many=[manySource];for(let i=1;i<1025;i++)many.push(manySource.createInstance());many.forEach((m,i)=>m.setPosition([i,0,0]));await frames(2);
  const batches=records(false);assert(JSON.stringify(batches.map(d=>d.instances))==='[1024,1]','1025 disjoint roots split at1024');
  assert(JSON.stringify(batches.flatMap(d=>d.objects))===JSON.stringify(many.map(m=>m.id)),'group cap preserves every object in order');
- evidence.push({groupBoundary:batches.map(d=>d.instances)});engine.setDebugOverlay(false);
+ assert(engine.debugStats().gltf.batchBreaks.drawCap>0,'1024 boundary reports an actual capacity barrier');evidence.push({groupBoundary:batches.map(d=>d.instances),batchBreaks:engine.debugStats().gltf.batchBreaks});engine.setDebugOverlay(false);
  engine.scene.clear();await frames();assert(engine.debugStats().gltf.instanceBufferBytes===0,'scene.clear releases instance pages');
  assert(engine.debugStats().gltf.queueScratchBytes===0,'scene.clear releases queue scratch storage');
+ // Several instanced columns use byte-offset slices of the same pass/view
+ // stream. Grow, shrink and change one root without changing draw ordering.
+ reset();engine.setDebugOverlay(true);engine.set_frustum_culling(true);engine.setCameraView([0,0,6],[0,0,0]);
+ const streamUrl=fixture({offsets:[-.65,0,.65]}),streamSource=await engine.scene.loadModel(streamUrl);URL.revokeObjectURL(streamUrl);
+ const streamModels=[streamSource];for(let i=1;i<9;i++)streamModels.push(streamSource.createInstance());
+ let previousBytes=0;const streamEvidence=[];
+ for(const count of [2,3,9,3]){
+  streamModels.forEach((m,i)=>m.setPosition([i<count?(i-(count-1)/2)*.7:10000,0,0]).setScale([.28,.28,.28]).setRotation([0,0,0]));await frames();
+  const compactBefore=engine.debugStats().gltf;
+  streamModels[count-1].setPosition([((count-1)-(count-1)/2)*.7+.01,0,0]);await frames(1);const compactAfter=engine.debugStats().gltf;
+  assert(compactAfter.translatedDrawCalls>compactBefore.translatedDrawCalls,'actual shared-basis GPU commands required');
+  assert(compactAfter.instanceUploadBytes-compactBefore.instanceUploadBytes===count*3*16,'pure translation columns upload sixteen bytes per instance');
+  streamModels[count-1].setPosition([((count-1)-(count-1)/2)*.7,0,0]);await frames();
+  const before=engine.debugStats().gltf;streamModels[count-1].setRotation([.07,.11,0]);await frames(1);const after=engine.debugStats().gltf;
+  assert(after.bufferUploadCalls-before.bufferUploadCalls===4,'full-matrix fallback updates three material uniforms and one shared stream');
+  assert(after.instanceUploadBytes-before.instanceUploadBytes===count*3*112,'stream bytes preserve all original instance records');
+  assert(after.instanceBufferBytes>=previousBytes,'stream capacity survives shrink');previousBytes=after.instanceBufferBytes;
+  const draws=records(false);assert(draws.length===3&&draws.every(d=>d.instances===count),'stream slices preserve primitive/instance counts');streamEvidence.push({count,uploadCalls:after.bufferUploadCalls-before.bufferUploadCalls,uploadBytes:after.instanceUploadBytes-before.instanceUploadBytes,bufferBytes:after.instanceBufferBytes});
+ }
+ engine.setDebugOverlay(false);await frames();const streamPixels=await capturePixels(canvas);streamModels.forEach(m=>m.setPosition([10000,0,0]));const streamReferenceUrl=fixture({cpu:true,offsets:[-.65,0,.65]}),streamReference=await engine.scene.loadModel(streamReferenceUrl);URL.revokeObjectURL(streamReferenceUrl);
+ const streamReferences=[streamReference,streamReference.createInstance(),streamReference.createInstance()];streamReferences.forEach((m,i)=>m.setPosition([(i-1)*.7,0,0]).setScale([.28,.28,.28]).setRotation(i===2?[.07,.11,0]:[0,0,0]));await frames();const streamDelta=delta(streamPixels,await capturePixels(canvas));assert(streamDelta.max<8&&streamDelta.changed<15,'stream offsets match CPU deformation reference '+JSON.stringify(streamDelta));evidence.push({instanceStream:streamEvidence,cpuReferenceDelta:streamDelta});
+ // Distinct material factors/UV sets must share identical texture resources,
+ // while a different sampler must still require its own group. Draw order and
+ // each primitive's material uniform are deliberately left unchanged.
+ function bindingsFixture(textured=false,uniqueBindings=false){
+  const bytes=new Uint8Array(172);new Float32Array(bytes.buffer,0,12).set([-.3,-.3,0,.3,-.3,0,.3,.3,0,-.3,.3,0]);
+  new Float32Array(bytes.buffer,48,12).set([0,0,1,0,0,1,0,0,1,0,0,1]);new Float32Array(bytes.buffer,96,8).set([0,0,1,0,1,1,0,1]);new Uint16Array(bytes.buffer,128,6).set([0,1,2,0,2,3]);new Float32Array(bytes.buffer,140,8).set([1,0,0,0,0,1,1,1]);
+  const count=textured?4:5,colors=[[.9,.1,.1,1],[.1,.9,.1,1],[.1,.1,.9,1],[.9,.8,.1,1],[.8,.1,.8,1]];
+  const textureCanvas=document.createElement('canvas');textureCanvas.width=textureCanvas.height=2;const context=textureCanvas.getContext('2d');context.fillStyle='#fff';context.fillRect(0,0,2,2);if(textured){context.fillStyle='#777';context.fillRect(0,0,1,1);}
+  const a={asset:{version:'2.0'},buffers:[{byteLength:bytes.length,uri:'data:application/octet-stream;base64,'+btoa(String.fromCharCode(...bytes))}],bufferViews:[{buffer:0,byteOffset:0,byteLength:48},{buffer:0,byteOffset:48,byteLength:48},{buffer:0,byteOffset:96,byteLength:32},{buffer:0,byteOffset:128,byteLength:12},{buffer:0,byteOffset:140,byteLength:32}],accessors:[{bufferView:0,componentType:5126,count:4,type:'VEC3',min:[-.3,-.3,0],max:[.3,.3,0]},{bufferView:1,componentType:5126,count:4,type:'VEC3'},{bufferView:2,componentType:5126,count:4,type:'VEC2'},{bufferView:3,componentType:5123,count:6,type:'SCALAR'},{bufferView:4,componentType:5126,count:4,type:'VEC2'}],materials:Array.from({length:count},(_,i)=>({pbrMetallicRoughness:{baseColorFactor:colors[i],metallicFactor:.1*i,roughnessFactor:.8,...(textured?{baseColorTexture:{index:i===2?1:0,texCoord:i===1?1:0}}:{})},doubleSided:true})),meshes:Array.from({length:count},(_,i)=>({primitives:[{attributes:{POSITION:0,NORMAL:1,TEXCOORD_0:2,TEXCOORD_1:4},indices:3,material:i}]})),nodes:Array.from({length:count},(_,i)=>({mesh:i,translation:[(i-(count-1)/2)*.75,0,0]})),scenes:[{nodes:Array.from({length:count},(_,i)=>i)}],scene:0};
+  if(textured){a.images=[{uri:textureCanvas.toDataURL()}];a.samplers=[{magFilter:9728,minFilter:9728},{magFilter:9729,minFilter:9729}];a.textures=[{source:0,sampler:0},{source:0,sampler:1}];}
+  if(uniqueBindings){a.images=[{uri:textureCanvas.toDataURL()}];a.samplers=[{magFilter:9728,minFilter:9728},{magFilter:9729,minFilter:9729}];a.textures=Array.from({length:count},(_,i)=>({source:0,sampler:textured&&i===2?1:0}));a.materials.forEach((m,i)=>{if(textured)m.pbrMetallicRoughness.baseColorTexture.index=i;else m.occlusionTexture={index:i};});}
+  return URL.createObjectURL(new Blob([JSON.stringify(a)],{type:'model/gltf+json'}));
+ }
+ for(const textured of [false,true]){
+  reset();engine.setCameraView([0,0,4],[0,0,0]);engine.scene.createLight({position:[0,3,5],color:[6,6,6]});
+  const url=bindingsFixture(textured),model=await engine.scene.loadModel(url);URL.revokeObjectURL(url);const materialModels=[model,model.createInstance(),model.createInstance()];materialModels.forEach((m,i)=>m.setPosition([(i-1)*1.3,0,0]).setScale([.3,.3,.3]));await frames();
+  const pixels=await capturePixels(canvas);assertForeground(pixels,'material bindings');
+  const start=engine.debugStats().gltf;await frames(3);const end=engine.debugStats().gltf;
+  const draws=end.drawCalls-start.drawCalls,bindings=end.bindGroupChanges-start.bindGroupChanges,n=textured?4:5,expected=textured?7:6;
+  assert(draws>0&&bindings*n===draws*expected,`actual texture bindings ${textured}: ${bindings}/${draws}, expected ${expected}/${n}`);
+  // Independent resource keys deliberately prevent bind-group sharing in the
+  // reference. White AO maps preserve untextured math; textured references
+  // retain the same pixels/sampler/UV while using separate texture indices.
+  const referenceUrl=bindingsFixture(textured,true),reference=await engine.scene.loadModel(referenceUrl);URL.revokeObjectURL(referenceUrl);const materialReferences=[reference,reference.createInstance(),reference.createInstance()];materialReferences.forEach((m,i)=>m.setPosition([(i-1)*1.3,0,0]).setScale([.3,.3,.3]));materialModels.forEach(m=>m.setPosition([10000,0,0]));await frames();const other=await capturePixels(canvas);
+  assert(delta(pixels,other).max===0,'shared binding factors/UV/sampler pixels');reference.remove();evidence.push({textureBindingReuse:{textured,draws,bindings,expectedBindingsPerFrame:expected,pixelsExact:true}});
+ }
+ engine.scene.clear();await frames();
  window.gltfBatchEvidence=evidence;result.textContent='PASS: '+engine.renderer_backend()+' · actual instanced draws, mirrored/nonuniform transforms, exact CPU pixel reference, overlap ordering, per-primitive culling, queue gaps/blend ties/1024 boundary and cleanup';
 }catch(e){result.textContent='FAIL: '+e.message;console.error(e);}

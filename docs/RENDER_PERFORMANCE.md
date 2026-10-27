@@ -1,139 +1,57 @@
-# SceneManager a rychlé vykreslování
+# Reproducible renderer performance
 
-Pro tento engine volíme Rust scene state → cache transformací a bounds →
-CPU frustum culling → dávky podle meshe → instancované vykreslení wgpu.
-JS/TS pouze posílá příkazy a čte diagnostiku. GPU vykonává WGSL shadery.
+Use [the project skill](../.agents/skills/wasm-render-performance/SKILL.md), then [current state](performance/STATE.md) and [experiment journal](performance/EXPERIMENTS_2026-10-25.md). The separate cut replay uses fixed simulated XR72Hz inputs and actual native combat, workers and staged publication; it is not a physical Quest measurement. Its onmessage timing is main-thread handler CPU, not internal worker compute duration. The driver is `scripts/render-performance.mjs`; `scripts/benchmark-core.mjs` keeps its old interface and forwards the new mode names. Run `node scripts/render-performance.mjs --help` for all bounds and workload families.
 
-## Co už je implementováno
+## Freeze and repeat
 
-- `SceneObject` drží cache modelové/normalové matice a world AABB. Cache se
-  obnovuje při změně transformace, včetně animací, nikoli při pohybu kamery.
-- `visibility.rs` extrahuje šest rovin z view-projection matice. Near rovina
-  používá řádek Z, protože clip depth je 0…W. AABB test je konzervativní:
-  rotovaný, plochý či částečně viditelný objekt se nesmí chybně vyřadit.
-- Culling omezuje pouze vykreslování. Animace a plánované odstranění běží dál.
-- Revize geometrického stavu a matice kamery zneplatňují cache extrakce.
-  Ve statické scéně se culling ani sestavení dávek neopakuje každý snímek.
-  Pohyb světel aktualizuje společné osvětlení bez opakování cullingu objektů.
-- Tři opakovaně používané vektory obsahují viditelné instance krychlí, rovin a
-  koulí. Každý neprázdný mesh má jeden `draw_indexed` s více instancemi.
-- Geometrie, pipeline a bind group se sdílí. Kamera a světla se zapisují
-  pro každý vykreslený pohled do společného 208B uniformu. Instance mají 144 B a využívají vertex
-  buffer s krokem Instance, takže řešení podporuje WebGPU i WebGL2.
-- GPU instance buffery rostou geometricky a používají se znovu. Nezměněná
-  dávka se nezapisuje; změna transformace nebo viditelnosti aktualizuje dávku.
-- `engine.renderer_stats()` vrací total, visible, culled, drawCalls,
-  uploadBytes a prepareMs; `engine.set_frustum_culling(bool)` umožňuje A/B
-  porovnání. Draw calls nezahrnují pomocné čáry. prepareMs měří Rust simulaci,
-  přípravu/encoding/submission všech průchodů, nikoli GPU execution.
+Use a clean owned worktree for substantial changes. Build a verified release using the repository Rust toolchain and existing development workflow. `VERIFY_WASM_PROFILE=release node scripts/freeze-render-build.mjs output/perf/baseline` refuses an existing destination, checks source/WASM/SDK identity, copies runtime/assets/source/tools and verifies copied hashes and input stability. Freeze baseline before optimization, candidate after its release build. Do not regenerate another task's live production package. Run all commands below serially, with no builds or other GPU runners in parallel.
 
-## Ověření a meze měření
+```sh
+# A short actual-render smoke. This is not performance acceptance.
+node scripts/render-performance.mjs smoke --baseline-root output/perf/baseline --family batching --backend webgpu --load 64 --warmup 500 --sample 2500 --out output/perf/smoke
+# Baseline-only bounded calibration: light/near/over, fixed camera/seed/quality.
+node scripts/render-performance.mjs calibrate --baseline-root output/perf/baseline --family batching --backend webgpu --max-load 6144 --warmup 1000 --sample 2500 --out output/perf/calibration
+# The primary comparison: three AB/BA/AB pairs; actual profiling disabled/asserted.
+node scripts/render-performance.mjs compare --baseline-root output/perf/baseline --candidate-root output/perf/candidate --config output/perf/calibration/config.json --level over --max-load 6144 --pairs 3 --no-profile --warmup 8000 --sample 25000 --out output/perf/paired-off
+# Profiled scopes and a separate API-instrumented cold page.
+node scripts/render-performance.mjs compare --baseline-root output/perf/baseline --candidate-root output/perf/candidate --config output/perf/calibration/config.json --level over --max-load 6144 --pairs 3 --warmup 4000 --sample 10000 --diagnostics --out output/perf/profiled
+# Same exact calibrated load list and criterion on both versions. Short runs are exploratory.
+node scripts/render-performance.mjs capacity --baseline-root output/perf/baseline --candidate-root output/perf/candidate --config output/perf/calibration/config.json --max-load 6144 --pairs 3 --warmup 8000 --sample 25000 --max-time 7200 --out output/perf/capacity
+# A long repeated-cut/clustering run, using its own dynamic-family calibration.
+node scripts/render-performance.mjs soak --baseline-root output/perf/candidate --config output/perf/dynamic-calibration/config.json --max-load 512 --warmup 2000 --sample 120000 --out output/perf/soak
+# Regression checks: pixel tolerance plus median cadence/CPU threshold (defaults5%).
+node scripts/render-performance.mjs regression --baseline-root output/perf/baseline --candidate-root output/perf/candidate --config output/perf/calibration/config.json --level over --max-load 6144 --pairs 3 --no-profile --out output/perf/regression
+# Independent real cut worker/prepare/installation/commit and visible-halves evidence.
+node scripts/benchmark-rim-cuts.mjs candidate-cuts output/perf/candidate/pkg webgpu
+```
 
-Původní verze `tests/render-stress.html` vytvořila 10 000 krychlí, z nichž 100 leželo v záběru.
-Na WebGPU i WebGL bylo ověřeno 100 viditelných, 9 900 vyřazených a jeden
-objektový draw call. Ve stabilním snímku bez změn se přenáší pouze 208 B.
-Po vypnutí cullingu se odešle všech 10 000 instancí; stále jde o jeden draw
-call a v dalších stabilních snímcích se instance znovu nepřenášejí.
+These are executable usage examples; they are not a claim that each example command above was executed with those paths. The versioned result archive contains the exact commands actually run. Repeat calibration with `--backend webgl`, then reuse that backend's configuration. Changing a workload/frozen baseline/harness requires new calibration. Comparing a different candidate does not. `--no-profile` is an explicit control override, recorded separately from the profiled calibration. A missing overload level means the bounded calibration never observed one; do not manufacture it.
 
-Aktuální stránka volá JS `createScene` přes SDK v `examples/culling/scene.js`: 20 × 25 × 20
-krychlí rozmístěných kolem kamery v prostoru přibližně 57 × 43 × 57 jednotek.
-Je určena pro létání a vizuální kontrolu; počet vyřazených krychlí není fixní.
-Volná kamera má Q/E pro vertikální pohyb a Shift pro čtyřnásobnou rychlost.
-Stránka nabízí i pevnou ukázku a přepínání Free/Orbit. Spouštět přes HTTP,
-např. `http://127.0.0.1:8000/tests/render-stress.html`, nikoli file://.
+## Workloads and validity
 
-FPS a průměrný interval snímku jsou počítány `FrameMetrics` v Rustu z intervalů
-RAF v půlsekundových oknech. Pauza delší než 250 ms resetuje okno, aby přepnutí
-do pozadí neznečišťovalo průměr. Jde o frekvenci browser smyčky, nikoli měření
-času GPU nebo důkaz fyzické prezentace každého snímku. Statistiku zobrazuje
-zátěžový test i hlavní ukázka; JS pouze formátuje hodnoty.
+- `rim-static`, `arena-static`: actual imported scene modules with authored appearance/settings and paused simulation; fixed authored load. `rim-active` drives native gameplay input/camera by elapsed seconds. `arena-active` enables native simulation and drives authored fruit poses by elapsed seconds. These control paths are not a complete deterministic human combat replay.
+- `batching`: actual visible generated glTF quad instances, shared asset, fixed6×4 grid and camera,1024-instance pages. `batching-heterogeneous` alternates two distinct asset/material identities. `primitives`/`heterogeneous` cover other command paths. Requested instance submission/zero culls are asserted for batching.
+- `rigid`: shared DamagedHelmet instances; `skin`: real Fox GPU skinning/seek; `morph`: actual morph fallback fixture. Counter reports distinguish submitted/culling work.
+- `fragment`, `effects`: explicit overlapping geometry/fragment stress, effects enabled only for the effects family. This diagnostic overdraw is not normal gameplay.
+- `dynamic`: elapsed clustering/dispersing changes instancing compatibility, plus real closed-mesh spawn/cut/despawn every2s with one removed target/two pieces asserted. A separate X drift (`4.5*sin(seconds*0.35)`) crosses the frustum edge. Phase boundaries and glTF primitive culls are recorded; top-level root culls can occur earlier and must be inspected separately. The current harness is freshly calibrated.
+- `--order spatial|shuffled|alternating`, `--seed`, `--overlap` change insertion/spatial organization reproducibly. They are calibration identity fields.
 
-## BVH, octree, kd-tree
+Viewport960×640 DPR1, backend/AA/quality retained. Load and timing limits are declared in the report. The memory abort measures JS heap only; total GPU/process allocation is unavailable. Startup uses DOMContentLoaded plus explicit readiness with a single deadline. Driver and actual requested bytes are hashed, and mutations during a run fail it. Page errors, fallback backend, runtime losses, unsupported workload results and extreme frame times are failures with retained diagnostics. A native test/build is not rendered-content acceptance.
 
-BVH není univerzálně nejlepší. Pro pravidelně rozmístěné podobně velké objekty,
-voxelový svět nebo statické chunky je přirozenou volbou uniform grid nebo octree.
-Pro různě velké a nepravidelně rozložené objekty je obvykle praktičtější BVH.
-Kd-tree je relevantní pro statické ray-intersection úlohy, ale není automaticky
-rychlejší při výběru celých objektů podle šesti rovin frusta. Náklady údržby,
-duplikace přes hranice buněk a rozložení dat v paměti jsou stejně důležité jako
-název stromu. Současný engine má zatím flat AABB scan s cache statického pohledu,
-nikoli BVH ani octree. Další strukturu vybrat porovnáním pohybující se kamery
-ve stejné scéně, včetně nákladů aktualizací a tvorby dávek.
+## Timing and counters
 
-Srovnání: [PBRT BVH](https://www.pbr-book.org/4ed/Primitives_and_Intersection_Acceleration/Bounding_Volume_Hierarchies),
-[Babylon.js selection octree](https://github.com/BabylonJS/Documentation/blob/master/content/features/featuresDeepDive/scene/optimizeOctrees.md).
+`report.json` contains per-run median/mean/p95/p99/max, tolerance-aware and exact overruns, missed intervals, actual backend/profile state, work deltas, gauges, hashes, cold readiness, errors and image differences. `raw.json.gz` retains actual RAF records and distinct sampled CPU/GPU snapshots. Adjacent frames are not independent experiment repetitions. CPU scopes are existing rolling profiler samples taken roughly10Hz, not per-frame phase histograms. RAF CPU includes application RAF callbacks, not timer/message/worker handlers. Cold readiness includes page/network/setup and excludes neither OS nor persistent driver caches.
 
-Předchozí renderer měl N objektových draw callů a N zápisů uniformů,
-přičemž každý snímek posílal 336 B na každý objekt, i mimo záběr. Pro 10 000
-objektů je to 3 360 000 B plus pomocná data. Toto je srovnání práce v kódu,
-nikoli změřený násobek FPS. Culling přidává CPU práci a u drobných meshů
-nemusí sám zvýšit FPS; instancing odstraňuje hlavní režii počtu GPU volání.
+WebGPU GPU values are valid asynchronous sampled named pass intervals. They do not establish whole GPU frame latency. Desktop WebGL native pass profiling is unavailable; the actual supported EXT timer records a separate application RAF GPU command interval, which can include CPU submission gaps/driver waiting, excludes compositor/between-RAF/worker commands and is not pure GPU busy time. Queries are bounded, never force completion and reject stale/nonfinite/disjoint samples. Profiler-off runs assert disabled engine profiling and no GL timer queries. `gpuAvailable`/`gpuSupported`/`gpuSamples` refer to the native named-pass profiler; WebGL EXT support/samples are separate under `glRafGpu`/`glRafGpuMs`. Missing timing is null. CPU, GPU, RAF cadence and cut-completion latency have different scopes and must never be added mechanically.
 
-Časy porovnávat v release WASM (`wasm-pack build --target web --release`),
-ve stejném prohlížeči, rozlišení a scéně, po zahřátí. Debug WASM, souběžné
-karty, throttling a hrubé browser časovače výsledky výrazně ovlivňují.
-GPU timestamp queries doplnit podle schopností zařízení pro GPU bottlenecky.
+Actual glTF cumulative event counters are differenced at measurement boundaries: uploads/calls/bytes, primitives/culls, submitted draw commands/instances/triangles, overlap tests and page/resource creations. Unsupported old-baseline fields remain null. Resource gauges and retained scratch bytes are not event counts. `instancePagesActive` sums last active counts per view/pass key. Separate API diagnostics count actual whole API calls, including successfully resolved async pipeline creation, but cover cold initialization+1s rather than warm allocations and are excluded from timing. No wrapper claims complete driver/GPU memory ownership.
 
-## Další kroky podle profilu skutečné scény
+Pixel readback occurs after timing. Same-renderer static captures gate regressions; active gameplay has no deterministic reset and explicitly reports an unavailable pixel gate. Maintained browser tests supply independent unbatched pixels, overlap/ordering and simulated-XR/cut correctness. Synthetic benchmark capture alone is insufficient.
 
-1. **Velká CPU režie extrakce:** husté úložiště objektů a ID → index mapa,
-   se zachováním stabilních veřejných ID. BTreeMap se zatím zachovává kvůli
-   jednoduchosti a deterministickému pořadí. Současný culling je O(N).
-2. **Rozlehlá převážně statická scéna:** BVH nad world bounds nebo prostorové
-   chunky; nejprve testovat uzly, pak jejich objekty. Aktualizovat pouze
-   změněné bounds. Strom není automaticky výhodný u malé či silně dynamické scény.
-3. **Časté změny několika instancí:** stabilní sloty a zápis změněných rozsahů;
-   dnešní kompaktní dávky při změně přenášejí celou příslušnou dávku.
-4. **GPU čas při mnoha viditelných meshech:** LOD podle velikosti v pixelech,
-   batch klíč mesh + material + pipeline, případně řazení opaque zepředu dozadu.
-   Transparentní objekty vyžadují vlastní pořadí; zrcadlené transformace vlastní
-   variantu orientace/cullingu. Tyto obecné material/LOD větve ještě nejsou API.
-5. **CPU culling je skutečně bottleneck:** WebGPU compute nad storage bounds,
-   kompakce viditelných ID a nepřímé instance draws. Bez čtení seznamu zpět na
-   CPU každý snímek; pro WebGL zachovat CPU cestu. Nezavádět compute pouze
-   kvůli názvu: dispatch, buffery a synchronizace mají vlastní režii.
-6. **GPU overdraw a zakryté objekty:** Hi-Z occlusion culling až s depth
-   pyramidou, časovou konzervativností a profilem, který ospravedlní další passy.
+## Three.js and XR
 
-## Zdroje
+A local r170 module is frozen under a separate reference root. `compare --three-root ROOT` requires `batching`, `webgl`, and `--no-profile`; it uses the exact visible quad geometry/load/camera/grid/elapsed poses and verifies actual calls/triangles. `--three-representation instanced` uses pre-established 1024-instance groups; `objects` creates independent root/mesh pairs and normally issues one draw per root. Both modes assert actual commands/triangles. Shading/lighting and engine/SDK responsibilities differ; Three pixel differences are diagnostic, not a false parity PASS. This does not prove equivalent full Rome gameplay or a universal20% renderer gap.
 
-- [WebGPU Fundamentals: Speed and Optimization](https://webgpufundamentals.org/webgpu/lessons/webgpu-optimization.html)
-  vysvětluje omezení zápisů, bind groups, draw calls a vhodnost instancingu.
-- [Learn Wgpu: Instancing](https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/)
-  ukazuje instanční vertex buffer a více instancí jednoho meshe.
-- [wgpu 30 RenderPass](https://docs.rs/wgpu/30.0.1/wgpu/struct.RenderPass.html)
-  popisuje instanční rozsahy, nepřímé draws a požadavky jejich API.
-- [glam DirectX/WebGPU projekce](https://docs.rs/glam/latest/glam/camera/lh/proj/directx/index.html)
-  dokumentuje projekce pro používané clip-space konvence.
+Desktop and simulated XR are separate from physical Quest. Record actual eye sizes, Hz, AA, foveation, layer and intermediate targets before any matched headset comparison. WebGL second-context canvas upload/per-eye blit and WebGPU owned-eye staging remain separate investigations; do not discard correctness fixes or mix their effects into a desktop batching result.
 
-## Renderovací cíl oddělený od canvasu
-
-`renderer.rs` obsahuje SceneRenderer, GPU zdroje scény, culling, instance buffery
-a cache pipeline podle formátů barevné/hloubkové přílohy. Nepracuje s HTML,
-canvasem ani surface. `RenderView` předává view-projection a pozici kamery;
-`RenderTarget` předává TextureView pro barvu a hloubku, formáty, rozměry,
-viewport a operace Clear/Load. Podporovány jsou single-sample 2D přílohy.
-Rozměry viewportu se kontrolují před zahájením render passu, kompatibilitu
-GPU příloh kontroluje wgpu. Clear vymaže celou přílohu; při dalším pohledu do
-stejné přílohy musí volající zvolit Load pro zachování předchozího obrazu.
-
-`prepare_view` a `render_view` neposouvají simulaci. Host ji aktualizuje jednou
-za snímek, pak může připravit/renderovat jednotlivé pohledy. `render_view`
-submittuje každý pohled před přípravou dalšího, aby zápisy do sdílených
-uniformů a instance bufferů nebyly všechny použity s daty poslední kamery.
-Instancing a cache extrakce zůstávají zachovány; pipeline se nevytváří každý
-snímek. Plná VR integrace a WebXR binding zatím nejsou implementovány.
-
-`output.rs` je adaptér pro canvas: získá surface frame, řeší resize/ztrátu
-surface a prezentuje snímek. `state.rs` propojuje tento adaptér s rendererem.
-SDK `engine.set_output_mode("canvas" | "texture")` dovoluje ověřit dva výstupy:
-přímo do surface, nebo do samostatné textury s hloubkou a následnou prezentací
-fullscreen trojúhelníkem. Druhý režim přidává prezentovací pass a paměť textur;
-není automaticky rychlejší. Výchozí režim zůstává přímý. Textury se vytvářejí
-při prvním použití a znovu po resize, nikoliv každý snímek.
-
-`tests/render-target.html` testuje přepínání, odmítnutí neplatného režimu,
-resize a přítomnost scény. Viditelný obraz a konzoli je nutné ověřit i v
-prohlížeči, včetně `?backend=webgl`.
-
-Stíny a odrazy: [aktuální architektura průchodů](RENDER_PASSES.md). InstanceData nyní obsahuje také 16 B materiálu a má 144 B.
+Historical assumptions and earlier timings remain in [the dated legacy note](history/RENDER_PERFORMANCE-2026-10-25-legacy.md).

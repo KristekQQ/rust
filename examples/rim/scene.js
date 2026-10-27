@@ -21,7 +21,7 @@ export async function createScene(scene){
         const model=await scene.loadModel(new URL(spec.file,base));
         const position=/** @type {Vec3} */(spec.holder.position.map((v,i)=>v+spec.root.position[i]));
         model.setPosition(position).setScale(spec.root.scale).playAnimation('Idle',{loop:true});
-        model.setRenderOptions({isStatic:false,castsShadow:false,receivesShadow:true});
+        model.setRenderOptions({isStatic:false,castsShadow:false,receivesShadow:true,opaqueReorderable:true});
         characters.push({model,spec});
     }
     // Authored sun. The explicit appearance profile supplies sky/ground diffuse fill.
@@ -43,7 +43,7 @@ export async function createGameplay(engine,content){
   const count=kind==='drone-orbiter'?8:3;
   for(let i=0;i<count;i++){
    const model=i===0?source.model:source.model.createInstance();
-   model.setRenderOptions({castsShadow:false,receivesShadow:true});
+   model.setRenderOptions({castsShadow:false,receivesShadow:true,opaqueReorderable:true});
    enemies.push({model,kind,height:source.spec.height,offset:source.spec.root.position,scale:source.spec.root.scale});
   }
  }
@@ -58,9 +58,19 @@ export async function createGameplay(engine,content){
  const indices=[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5];
  const bar=(/** @type {Vec3} */color)=>scene.createMesh({positions,indices,color}).setPosition([0,-10000,0]).setEmission(1).setRenderOptions({castsShadow:false,receivesShadow:false});
  const healthBars=enemies.map(()=>/** @type {[import('../../js/engine.js').SceneObject,import('../../js/engine.js').SceneObject]} */([bar([.025,.035,.05]),bar([.12,.9,.3])]));
+ // Shared thin closed disk: the mesh pool validates closed solids. Flattened
+ // geometry gives the same ground circle; two alpha faces compose to ~.16.
+ const diskPositions=[0,0,0],diskIndices=[],segments=32,bottom=segments+1;
+ for(let i=0;i<segments;i++){const a=i*Math.PI*2/segments;diskPositions.push(Math.cos(a),0,Math.sin(a));}
+ diskPositions.push(0,-.001,0);
+ for(let i=0;i<segments;i++){const a=i*Math.PI*2/segments;diskPositions.push(Math.cos(a),-.001,Math.sin(a));}
+ for(let i=0;i<segments;i++){const t=i+1,n=(i+1)%segments+1,b=bottom+t,bn=bottom+n;diskIndices.push(0,n,t,bottom,b,bn,t,n,b,n,bn,b);}
+ const disk=scene.createMeshVariants({positions:diskPositions,indices:diskIndices,variants:[new Array(diskIndices.length).fill(0)]});
+ const blobShadows=enemies.map(()=>disk.createInstance(0).setPosition([0,-10000,0]).setOpacity(.08).setRenderOptions({isStatic:false,castsShadow:false,receivesShadow:false}));
+ disk.remove();
  const hud=Array.from({length:5},()=>scene.createCube([0,-10000,0]).setEmission(1).setRenderOptions({castsShadow:false,receivesShadow:false}));
  const marker=scene.createSphere([0,-10000,0]).setScale([.3,.025,.3]).setEmission(1).setRenderOptions({castsShadow:false,receivesShadow:false});
- scene.configureRim({enemies,swords,bolts,beams,charges,healthBars,hud,marker,shapes:collision.shapes,obstacles:collision.obstacles.map((/** @type {{minX:number,maxX:number,minZ:number,maxZ:number}} */r)=>[r.minX,r.maxX,r.minZ,r.maxZ])});
+ scene.configureRim({enemies,swords,bolts,beams,charges,healthBars,blobShadows,hud,marker,shapes:collision.shapes,obstacles:collision.obstacles.map((/** @type {{minX:number,maxX:number,minZ:number,maxZ:number}} */r)=>[r.minX,r.maxX,r.minZ,r.maxZ])});
  for(const [i,hand] of /** @type {const} */(['left','right']).entries())engine.xr.player.equip(hand,swords[i],{requireTrigger:false});
- return {enemies,swords,bolts,beams,charges,healthBars,hud,marker,collision};
+ return {enemies,swords,bolts,beams,charges,healthBars,blobShadows,hud,marker,collision};
 }

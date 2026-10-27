@@ -2,6 +2,8 @@
 
 Reply in Czech. Rust owns scene state, calculations, simulation and rendering; JS/TS is a thin command SDK holding IDs. Runtime examples live in separate `examples/<name>/main.js` and `scene.js` modules with explicit imports. Optional DOM tools stay outside the SDK. No hardcoded runtime scenes or automatic spawning; `src/test_scenes.rs` is native fixtures only.
 
+Project direction: build a world-leading reusable renderer and engine for different games, including static, dynamic and partially changing scenes. For general renderer architecture, scene preparation and optimization policy use [renderer-strategy](.agents/skills/renderer-strategy/SKILL.md). Comparative superiority must be demonstrated at matched quality and workload; it is not assumed from the language, API or draw count.
+
 Project-owned skills live in versioned `.agents/skills/`, not personal `~/.codex/skills`. Use [rust-webgpu-project](.agents/skills/rust-webgpu-project/SKILL.md) for engine/SDK/example work; keep its links portable. Generic personal/tool skills stay outside the project.
 
 At Honza's request, [honza-intent](.agents/skills/honza-intent/SKILL.md) is also project-owned so other instances share his intent-clarification workflow. Use it for unresolved ambiguity or corrections after misunderstanding, not typos alone.
@@ -35,3 +37,5 @@ During iteration run only the smallest affected check; do not automatically run 
 Before a requested commit/push run `npm run verify:push` once: full native/WASM/SDK/browser checks and source dump. Commit the dump with the change. The installed pre-push hook reuses the content-bound PASS receipt, not the tests; changed inputs/options/toolchain or WASM invalidate it. Never run `cargo test`, full verify and the hook separately on the same inputs. `VERIFY_FORCE=1 npm run verify` explicitly refreshes evidence. Preserve unrelated staging.
 
 Use targeted `cargo test <filter>`, `test:sdk`, `test:harness` or `verify:browser -- --backend <affected> --page <affected>` during development only when useful. Full both-backend coverage belongs to the final push gate. Browser verification rejects stale `pkg/`, backend fallback and console errors. Install hook: `git config --local core.hooksPath scripts`. CI software WebGL remains independent of local WebGPU; disabling Chromium sandbox is opt-in only on disposable Linux GitHub runners, never automatic on ordinary user sessions.
+
+For renderer performance, WASM/WebGPU/WebGL bottlenecks, Three.js comparisons and refresh-capped load tests, use [wasm-render-performance](.agents/skills/wasm-render-performance/SKILL.md). Freeze release inputs, calibrate on the baseline and compare identical workloads; keep current evidence in [performance state](docs/performance/STATE.md).

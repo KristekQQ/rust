@@ -1,0 +1,389 @@
+{
+  "scope": "Actual staticRome4096x2730, noEXT/internalprofiler. Feature ablations localize work; no-fxaa/no-shadows reduce quality and are NOT candidates for retention. One3s/8s run per mode; no speedup/parity acceptance.",
+  "before": {
+    "scripts/diagnose-rim-resolution.mjs": "a6d3b3a14d9936f7966ef4e0d40931cda9380f0c3ad42df072cda1122e465d23",
+    "scripts/render-performance-lib.mjs": "42ea424a7e4f8502f5ec3f27b5595491dfeaa707cbe9b66e4736f89481b2dc88",
+    "scripts/browser-options.mjs": "6296107871ea9d6f75a52cfc1b5398bcdc83c00437a5fdba1f40e124dbd428fb",
+    "tests/render-performance.js": "77268dbb4aedea23ff92194520879a6b8d4a5a26ec92238a040c2625e4662029",
+    "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe"
+  },
+  "after": {
+    "scripts/diagnose-rim-resolution.mjs": "a6d3b3a14d9936f7966ef4e0d40931cda9380f0c3ad42df072cda1122e465d23",
+    "scripts/render-performance-lib.mjs": "42ea424a7e4f8502f5ec3f27b5595491dfeaa707cbe9b66e4736f89481b2dc88",
+    "scripts/browser-options.mjs": "6296107871ea9d6f75a52cfc1b5398bcdc83c00437a5fdba1f40e124dbd428fb",
+    "tests/render-performance.js": "77268dbb4aedea23ff92194520879a6b8d4a5a26ec92238a040c2625e4662029",
+    "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe"
+  },
+  "changed": [],
+  "errors": [],
+  "serverErrors": [],
+  "results": [
+    {
+      "mode": "full",
+      "raf": {
+        "count": 309,
+        "median": 33.29999999999927,
+        "mean": 25.88899676375405,
+        "p95": 33.400000000000546,
+        "p99": 33.400000000001455,
+        "max": 33.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 254,
+        "rawExactOverrunDurationMs": 2853.466666666667,
+        "overruns": 171,
+        "overrunDurationMs": 2849.599999999998
+      },
+      "cpu": {
+        "count": 310,
+        "median": 1.1999999284744263,
+        "mean": 1.1816129038410803,
+        "p95": 1.600000023841858,
+        "p99": 1.8000000715255737,
+        "max": 2.0999999046325684,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "elapsedMs": 8008.5,
+      "work": {
+        "total": 119,
+        "visible": 2,
+        "culled": 117,
+        "drawCalls": 39,
+        "uploadBytes": 352,
+        "prepareMs": 1.100000023841858,
+        "fps": 38.78223749956436,
+        "frameMs": 25.785000156611204
+      },
+      "graph": {
+        "active": true,
+        "packedDepth": false,
+        "passes": [
+          "fxaa.compose"
+        ],
+        "prunedPassCount": 0,
+        "resources": [
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "scene.color",
+            "slot": null
+          },
+          {
+            "firstUse": null,
+            "lastUse": null,
+            "lifetime": "External",
+            "name": "scene.depth",
+            "slot": null
+          },
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "view.completed.color",
+            "slot": null
+          },
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "fxaa.uniform.current-view",
+            "slot": null
+          }
+        ],
+        "sceneColorAttachments": 1,
+        "slots": [],
+        "transientBuffers": 0,
+        "transientBytesEstimate": 0,
+        "transientTextures": 0
+      },
+      "quality": {
+        "width": 4096,
+        "height": 2730,
+        "context": {
+          "alpha": true,
+          "antialias": false,
+          "depth": true,
+          "desynchronized": false,
+          "failIfMajorPerformanceCaveat": false,
+          "powerPreference": "default",
+          "premultipliedAlpha": true,
+          "preserveDrawingBuffer": false,
+          "stencil": false,
+          "xrCompatible": false
+        }
+      }
+    },
+    {
+      "mode": "no-fxaa",
+      "raf": {
+        "count": 318,
+        "median": 33.20000000000073,
+        "mean": 25.104088050314463,
+        "p95": 33.400000000000546,
+        "p99": 33.400000000001455,
+        "max": 33.400000000001455,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 250,
+        "rawExactOverrunDurationMs": 2687.833333333342,
+        "overruns": 161,
+        "overrunDurationMs": 2684.4666666666867
+      },
+      "cpu": {
+        "count": 319,
+        "median": 1,
+        "mean": 0.9373040771035939,
+        "p95": 1.4000000953674316,
+        "p99": 1.6999999284744263,
+        "max": 1.8000000715255737,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "elapsedMs": 8003.399999976158,
+      "work": {
+        "total": 119,
+        "visible": 2,
+        "culled": 117,
+        "drawCalls": 39,
+        "uploadBytes": 352,
+        "prepareMs": 1.5,
+        "fps": 39.10068404668618,
+        "frameMs": 25.575000140815973
+      },
+      "graph": {
+        "active": false,
+        "passes": [],
+        "transientBuffers": 0,
+        "transientTextures": 0
+      },
+      "quality": {
+        "width": 4096,
+        "height": 2730,
+        "context": {
+          "alpha": true,
+          "antialias": false,
+          "depth": true,
+          "desynchronized": false,
+          "failIfMajorPerformanceCaveat": false,
+          "powerPreference": "default",
+          "premultipliedAlpha": true,
+          "preserveDrawingBuffer": false,
+          "stencil": false,
+          "xrCompatible": false
+        }
+      }
+    },
+    {
+      "mode": "no-shadows",
+      "raf": {
+        "count": 437,
+        "median": 16.699999999999818,
+        "mean": 18.267505720823806,
+        "p95": 33.30000000000018,
+        "p99": 33.399999999999636,
+        "max": 33.400000000001455,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 287,
+        "rawExactOverrunDurationMs": 709.7666666666742,
+        "overruns": 42,
+        "overrunDurationMs": 700.1000000000024
+      },
+      "cpu": {
+        "count": 438,
+        "median": 1.100000023841858,
+        "mean": 1.0691780818107466,
+        "p95": 1.5,
+        "p99": 1.6999999284744263,
+        "max": 2,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "elapsedMs": 8005.199999928474,
+      "work": {
+        "total": 119,
+        "visible": 2,
+        "culled": 117,
+        "drawCalls": 39,
+        "uploadBytes": 352,
+        "prepareMs": 1.2999999523162842,
+        "fps": 55.17241416569576,
+        "frameMs": 18.124999877597606
+      },
+      "graph": {
+        "active": true,
+        "packedDepth": false,
+        "passes": [
+          "fxaa.compose"
+        ],
+        "prunedPassCount": 0,
+        "resources": [
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "scene.color",
+            "slot": null
+          },
+          {
+            "firstUse": null,
+            "lastUse": null,
+            "lifetime": "External",
+            "name": "scene.depth",
+            "slot": null
+          },
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "view.completed.color",
+            "slot": null
+          },
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "fxaa.uniform.current-view",
+            "slot": null
+          }
+        ],
+        "sceneColorAttachments": 1,
+        "slots": [],
+        "transientBuffers": 0,
+        "transientBytesEstimate": 0,
+        "transientTextures": 0
+      },
+      "quality": {
+        "width": 4096,
+        "height": 2730,
+        "context": {
+          "alpha": true,
+          "antialias": false,
+          "depth": true,
+          "desynchronized": false,
+          "failIfMajorPerformanceCaveat": false,
+          "powerPreference": "default",
+          "premultipliedAlpha": true,
+          "preserveDrawingBuffer": false,
+          "stencil": false,
+          "xrCompatible": false
+        }
+      }
+    },
+    {
+      "mode": "high-power",
+      "raf": {
+        "count": 309,
+        "median": 33.29999999999927,
+        "mean": 25.943042071197407,
+        "p95": 33.400000000000546,
+        "p99": 33.400000000001455,
+        "max": 33.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 257,
+        "rawExactOverrunDurationMs": 2869.9666666666703,
+        "overruns": 172,
+        "overrunDurationMs": 2866.933333333337
+      },
+      "cpu": {
+        "count": 310,
+        "median": 1.100000023841858,
+        "mean": 1.1390322519886877,
+        "p95": 1.5999999046325684,
+        "p99": 1.7000000476837158,
+        "max": 2.100000023841858,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "elapsedMs": 8016.800000071526,
+      "work": {
+        "total": 119,
+        "visible": 2,
+        "culled": 117,
+        "drawCalls": 39,
+        "uploadBytes": 352,
+        "prepareMs": 1.100000023841858,
+        "fps": 38.67723852809782,
+        "frameMs": 25.85499994456768
+      },
+      "graph": {
+        "active": true,
+        "packedDepth": false,
+        "passes": [
+          "fxaa.compose"
+        ],
+        "prunedPassCount": 0,
+        "resources": [
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "scene.color",
+            "slot": null
+          },
+          {
+            "firstUse": null,
+            "lastUse": null,
+            "lifetime": "External",
+            "name": "scene.depth",
+            "slot": null
+          },
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "view.completed.color",
+            "slot": null
+          },
+          {
+            "firstUse": 0,
+            "lastUse": 0,
+            "lifetime": "External",
+            "name": "fxaa.uniform.current-view",
+            "slot": null
+          }
+        ],
+        "sceneColorAttachments": 1,
+        "slots": [],
+        "transientBuffers": 0,
+        "transientBytesEstimate": 0,
+        "transientTextures": 0
+      },
+      "quality": {
+        "width": 4096,
+        "height": 2730,
+        "context": {
+          "alpha": true,
+          "antialias": false,
+          "depth": true,
+          "desynchronized": false,
+          "failIfMajorPerformanceCaveat": false,
+          "powerPreference": "high-performance",
+          "premultipliedAlpha": true,
+          "preserveDrawingBuffer": false,
+          "stencil": false,
+          "xrCompatible": false
+        }
+      }
+    }
+  ]
+}

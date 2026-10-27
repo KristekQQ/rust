@@ -99,9 +99,10 @@ export class SceneObject {
     /** Vertex-color mesh alpha; brighter facets can stay opaque (neon seams).
      * @param {number} opacity @param {{opaqueAbove?:number,variation?:number,coverage?:number}} [options] */
     setOpacity(opacity, {opaqueAbove=8,variation=0,coverage=-1} = {}) { accepted(this.#wasm.set_object_opacity(this.id,opacity,opaqueAbove,variation,coverage)); return this; }
-    /** @param {{isStatic?: boolean, castsShadow?: boolean, receivesShadow?: boolean, reflectivity?: number}} [options] */
-    setRenderOptions({isStatic=false, castsShadow=true, receivesShadow=true, reflectivity=0} = {}) {
-        accepted(this.#wasm.set_object_render_options(this.id,isStatic,castsShadow,receivesShadow,reflectivity)); return this;
+    /** Opaque reordering is opt-in: no inter-root coplanar/order dependency. Skin, morph and blend retain their fallback.
+     * @param {{isStatic?: boolean, castsShadow?: boolean, receivesShadow?: boolean, reflectivity?: number, opaqueReorderable?: boolean}} [options] */
+    setRenderOptions({isStatic=false, castsShadow=true, receivesShadow=true, reflectivity=0, opaqueReorderable=false} = {}) {
+        accepted(this.#wasm.set_object_render_options(this.id,isStatic,castsShadow,receivesShadow,reflectivity,opaqueReorderable)); return this;
     }
     /** @param {Vector3} radiansPerSecond */
     spin(radiansPerSecond) { accepted(this.#wasm.set_object_spin(this.id,...radiansPerSecond)); return this; }
@@ -221,10 +222,11 @@ export class Scene {
     /** @param {import('./engine.d.ts').RimOptions|null} options */
     configureRim(options){
         if(options===null){this.#wasm.configure_rim('null');return;}
-        const {enemies,swords,bolts,beams,charges,healthBars=[],hud,marker,shapes,obstacles}=options;
-        const handles=[...enemies.map(e=>e.model),...swords,...bolts,...beams,...charges,...healthBars.flat(),...hud,marker];
+        const {enemies,swords,bolts,beams,charges,healthBars=[],blobShadows=null,hud,marker,shapes,obstacles}=options;
+        const shadows=blobShadows??[];
+        const handles=[...enemies.map(e=>e.model),...swords,...bolts,...beams,...charges,...healthBars.flat(),...shadows,...hud,marker];
         if(handles.some(o=>handleBindings.get(o)!==this.#wasm))throw new Error('Objekty Říma musí patřit této scéně.');
-        this.#wasm.configure_rim(JSON.stringify({enemies:enemies.map(({model,...spec})=>({...spec,id:model.id})),swords:swords.map(o=>o.id),bolts:bolts.map(o=>o.id),beams:beams.map(o=>o.id),charges:charges.map(o=>o.id),healthBars:healthBars.map(pair=>pair.map(o=>o.id)),hud:hud.map(o=>o.id),marker:marker.id,shapes,obstacles}));
+        this.#wasm.configure_rim(JSON.stringify({enemies:enemies.map(({model,...spec})=>({...spec,id:model.id})),swords:swords.map(o=>o.id),bolts:bolts.map(o=>o.id),beams:beams.map(o=>o.id),charges:charges.map(o=>o.id),healthBars:healthBars.map(pair=>pair.map(o=>o.id)),blobShadows:shadows.map(o=>o.id),hud:hud.map(o=>o.id),marker:marker.id,shapes,obstacles}));
     }
     /** @param {import('./engine.d.ts').RimInput} input */
     rimInput(input){this.#wasm.rim_input(JSON.stringify(input));}

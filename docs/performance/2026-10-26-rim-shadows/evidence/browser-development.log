@@ -1,0 +1,17 @@
+FAIL rim-gameplay webgpu: Error: Rust engine odmítl příkaz: neplatný objekt nebo parametry.
+    at accepted (http://127.0.0.1:58285/js/engine.js:10:20)
+    at Scene.createMeshVariants (http://127.0.0.1:58285/js/engine.js:309:9)
+    at createGameplay (http://127.0.0.1:58285/examples/rim/scene.js:64:19)
+    at async http://127.0.0.1:58285/tests/rim-gameplay.js:24:59
+    at async XRTestRun.execute (http://127.0.0.1:58285/tests/xr/testkit.js:17:15)
+    at async http://127.0.0.1:58285/tests/rim-gameplay.js:20:1
+PASS shadow-cache webgpu
+FAIL rim-gameplay webgl: Error: Rust engine odmítl příkaz: neplatný objekt nebo parametry.
+    at accepted (http://127.0.0.1:58285/js/engine.js:10:20)
+    at Scene.createMeshVariants (http://127.0.0.1:58285/js/engine.js:309:9)
+    at createGameplay (http://127.0.0.1:58285/examples/rim/scene.js:64:19)
+    at async http://127.0.0.1:58285/tests/rim-gameplay.js:24:59
+    at async XRTestRun.execute (http://127.0.0.1:58285/tests/xr/testkit.js:17:15)
+    at async http://127.0.0.1:58285/tests/rim-gameplay.js:20:1
+PASS shadow-cache webgl
+Report: /Users/Honza/.codex/worktrees/rim-publish/rust/output/verification/browser-report.json

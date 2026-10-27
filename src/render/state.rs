@@ -460,6 +460,9 @@ impl State {
                 .update_info_panels(PanelKind::Scene, &rows);
             let mut diagnostics = self.renderer.info_diagnostic_rows();
             diagnostics.insert(0, ("RENDER", format!("RUST {}", self.backend)));
+            if let Some(count) = crate::web::rim_stress_count() {
+                diagnostics.insert(1, ("ZATEZ NAVIC", count.to_string()));
+            }
             self.renderer
                 .scene
                 .update_info_panels(PanelKind::Diagnostics, &diagnostics);

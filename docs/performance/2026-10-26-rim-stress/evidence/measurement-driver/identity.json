@@ -1,0 +1,21 @@
+{
+  "capturedAt": "2026-10-26T16:40:25.178Z",
+  "nodeVersion": "v24.19.0",
+  "v8Version": "13.6.233.17-node.51",
+  "files": {
+    "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+    "scripts/render-performance.mjs": "5953eafecafdcd7559acf4f78015979b5011b9b64575b1fba2fc77121d56b2ff",
+    "scripts/render-performance-lib.mjs": "9e0ba7ffdf0df373bba63bb117dffe32ce9f8b28e7adb1a0901dcfb3358dc111",
+    "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+    "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+    "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+    "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+    "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "tests/render-performance-three.html": "cb35b6c7cce32d957b01f2e6cbfcbcda1a84b71655106a6c978b84d903830bbf",
+    "tests/render-performance-three.js": "73432000070a87f1820fd470796fe1784aa0d29e57aa2948ccd3741e0ae1f478",
+    "tests/render-performance-three-rim.html": "0d6815e6676100795614918fc192ebea166ecd15572c0ba001c353d534a6ec4c",
+    "tests/render-performance-three-rim.js": "8be4280efb3092305092a1cbaef9d2f482bb305a0578b8a8974a1ee571818dcf"
+  },
+  "sha256": "69349df890c868adfcff771b06e2b86371be4452ae4db2077703b1b7545c8517"
+}

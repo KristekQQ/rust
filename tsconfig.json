@@ -18,5 +18,8 @@
     "examples/*.ts",
     "examples/*/scene.js",
     "examples/*/main.js"
+  ],
+  "exclude": [
+    "examples/rim-three"
   ]
 }

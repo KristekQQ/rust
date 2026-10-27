@@ -1,0 +1,307 @@
+{
+  "scope": "Apple M1 desktop 2880x1920, same static authored GLBs/count/positions; AA/shader/culling policies remain unmatched; no physical Quest evidence",
+  "load": 512,
+  "records": [
+    {
+      "directory": "gl-three-512",
+      "id": "baseline-rim-stress-512-pair0",
+      "renderer": "native webgl",
+      "fps": 20.682191671008884,
+      "cpuMedianMs": 47.89999985694885,
+      "actualCalls": 5266,
+      "triangles": 10553756,
+      "stress": null,
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "gl-three-512",
+      "id": "candidate-rim-stress-512-pair0",
+      "renderer": "Three.js InstancedMesh WebGL2",
+      "fps": 34.86468419641093,
+      "cpuMedianMs": 3.3999998569488525,
+      "actualCalls": 108,
+      "triangles": 10554110,
+      "stress": {
+        "count": 512,
+        "representation": "instanced",
+        "partsPerModel": 67,
+        "staticPose": "Idle@0",
+        "castsShadow": false
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "gl-three-512",
+      "id": "candidate-rim-stress-512-pair1",
+      "renderer": "Three.js InstancedMesh WebGL2",
+      "fps": 35.0814032561301,
+      "cpuMedianMs": 3.4000000953674316,
+      "actualCalls": 108,
+      "triangles": 10554110,
+      "stress": {
+        "count": 512,
+        "representation": "instanced",
+        "partsPerModel": 67,
+        "staticPose": "Idle@0",
+        "castsShadow": false
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "gl-three-512",
+      "id": "baseline-rim-stress-512-pair1",
+      "renderer": "native webgl",
+      "fps": 20.64074306675042,
+      "cpuMedianMs": 48.30000019073486,
+      "actualCalls": 5266,
+      "triangles": 10553756,
+      "stress": null,
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "gl-three-512",
+      "id": "baseline-rim-stress-512-pair2",
+      "renderer": "native webgl",
+      "fps": 20.680827233089342,
+      "cpuMedianMs": 48,
+      "actualCalls": 5266,
+      "triangles": 10553756,
+      "stress": null,
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "gl-three-512",
+      "id": "candidate-rim-stress-512-pair2",
+      "renderer": "Three.js InstancedMesh WebGL2",
+      "fps": 34.601384055362075,
+      "cpuMedianMs": 3.5,
+      "actualCalls": 108,
+      "triangles": 10554110,
+      "stress": {
+        "count": 512,
+        "representation": "instanced",
+        "partsPerModel": 67,
+        "staticPose": "Idle@0",
+        "castsShadow": false
+      },
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "wg-512-0",
+      "id": "baseline-rim-stress-512-pair0",
+      "renderer": "native webgpu",
+      "fps": 49.48892095763846,
+      "cpuMedianMs": 19.199999809265137,
+      "actualCalls": 5266,
+      "triangles": 10553756,
+      "stress": null,
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "wg-512-1",
+      "id": "baseline-rim-stress-512-pair0",
+      "renderer": "native webgpu",
+      "fps": 45.96183847353877,
+      "cpuMedianMs": 20.99999976158142,
+      "actualCalls": 5266,
+      "triangles": 10553756,
+      "stress": null,
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    },
+    {
+      "directory": "wg-512-2",
+      "id": "baseline-rim-stress-512-pair0",
+      "renderer": "native webgpu",
+      "fps": 44.73172954692617,
+      "cpuMedianMs": 21.5,
+      "actualCalls": 5266,
+      "triangles": 10553756,
+      "stress": null,
+      "warmupMs": 8000,
+      "sampleMs": 25000
+    }
+  ],
+  "medians": {
+    "Three.js InstancedMesh WebGL2": 34.86468419641093,
+    "native webgl": 20.680827233089342,
+    "native webgpu": 45.96183847353877
+  },
+  "appRelease": "613216e02e",
+  "build": {
+    "source": "eae9f0a3d0b60d131a4031465d86d7006cdc5ab816fa83912967a023cfab48e0",
+    "wasm": "36cabbf4ac596d867181c8278a848b99fc3197910f344835b02a3aba519c7ea2",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "verification": [
+    {
+      "suite": "rim-refresh",
+      "backend": "webgpu",
+      "status": "PASS"
+    },
+    {
+      "suite": "rim-stress-xr",
+      "backend": "webgpu",
+      "status": "PASS"
+    },
+    {
+      "suite": "rim",
+      "backend": "webgpu",
+      "status": "PASS"
+    },
+    {
+      "suite": "shadow-cache",
+      "backend": "webgpu",
+      "status": "PASS"
+    },
+    {
+      "suite": "rim-three-stress",
+      "backend": "webgl",
+      "status": "PASS"
+    },
+    {
+      "suite": "rim-refresh",
+      "backend": "webgl",
+      "status": "PASS"
+    },
+    {
+      "suite": "rim-stress-xr",
+      "backend": "webgl",
+      "status": "PASS"
+    },
+    {
+      "suite": "rim",
+      "backend": "webgl",
+      "status": "PASS"
+    },
+    {
+      "suite": "shadow-cache",
+      "backend": "webgl",
+      "status": "PASS"
+    }
+  ],
+  "threeOracle": {
+    "pass": true,
+    "scope": "Three clone/InstancedMesh oracle at static poses; eye-offset cameras, not an XR session",
+    "liveSourceAdvancedSeconds": 0.75,
+    "evidence": [
+      {
+        "load": 32,
+        "camera": "gate",
+        "objectsCalls": 2185,
+        "instancedCalls": 108,
+        "objectsTriangles": 722750,
+        "instancedTriangles": 722750,
+        "maxChannelError": 63,
+        "meanChannelError": 0.0025526258680555556,
+        "changedPixels": 203,
+        "fractionAbove8": 8.7890625e-05,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 32,
+        "camera": "left-eye",
+        "objectsCalls": 2185,
+        "instancedCalls": 108,
+        "objectsTriangles": 722750,
+        "instancedTriangles": 722750,
+        "maxChannelError": 63,
+        "meanChannelError": 0.0021533203125,
+        "changedPixels": 247,
+        "fractionAbove8": 6.998697916666667e-05,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 32,
+        "camera": "right-eye",
+        "objectsCalls": 2185,
+        "instancedCalls": 108,
+        "objectsTriangles": 722750,
+        "instancedTriangles": 722750,
+        "maxChannelError": 64,
+        "meanChannelError": 0.0024522569444444444,
+        "changedPixels": 260,
+        "fractionAbove8": 9.27734375e-05,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 32,
+        "camera": "oblique",
+        "objectsCalls": 1002,
+        "instancedCalls": 108,
+        "objectsTriangles": 406782,
+        "instancedTriangles": 722750,
+        "maxChannelError": 64,
+        "meanChannelError": 0.0027577039930555556,
+        "changedPixels": 551,
+        "fractionAbove8": 7.8125e-05,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 512,
+        "camera": "gate",
+        "objectsCalls": 34345,
+        "instancedCalls": 108,
+        "objectsTriangles": 10554110,
+        "instancedTriangles": 10554110,
+        "maxChannelError": 64,
+        "meanChannelError": 0.005869683159722222,
+        "changedPixels": 610,
+        "fractionAbove8": 0.0002001953125,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 512,
+        "camera": "left-eye",
+        "objectsCalls": 34345,
+        "instancedCalls": 108,
+        "objectsTriangles": 10554110,
+        "instancedTriangles": 10554110,
+        "maxChannelError": 64,
+        "meanChannelError": 0.0048649088541666665,
+        "changedPixels": 640,
+        "fractionAbove8": 0.00015950520833333333,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 512,
+        "camera": "right-eye",
+        "objectsCalls": 34345,
+        "instancedCalls": 108,
+        "objectsTriangles": 10554110,
+        "instancedTriangles": 10554110,
+        "maxChannelError": 64,
+        "meanChannelError": 0.005736219618055555,
+        "changedPixels": 714,
+        "fractionAbove8": 0.00020833333333333335,
+        "actualInstancedMeshes": 67
+      },
+      {
+        "load": 512,
+        "camera": "oblique",
+        "objectsCalls": 24146,
+        "instancedCalls": 108,
+        "objectsTriangles": 7769220,
+        "instancedTriangles": 10554110,
+        "maxChannelError": 64,
+        "meanChannelError": 0.007973090277777779,
+        "changedPixels": 1693,
+        "fractionAbove8": 0.00024576822916666665,
+        "actualInstancedMeshes": 67
+      }
+    ]
+  }
+}

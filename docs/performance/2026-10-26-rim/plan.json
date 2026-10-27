@@ -1,0 +1,67 @@
+{
+  "clientDate": "2026-10-26",
+  "scope": "Actual authored examples/rim, original versus retained renderer; desktop headless, no physical Quest",
+  "baselineRoot": "output/render-performance/baseline",
+  "candidateRoot": "output/render-performance/candidate-cache",
+  "baselineWasm": "c4301d8142f89cda9472095b128a458372101d646a7b9ed1980e84a5569b526a",
+  "candidateWasm": "292f27c12e7d7283526f5a607d85a4ace8cd0616b7623307b300af4efa4cc70b",
+  "sameRuntimeFiles": {
+    "examples/rim/scene.js": "2f47d1cb10bbd8702d25cba3e270050218465839f67b84ff1208ccce3a94b10c",
+    "examples/rim/appearance.js": "1f08cea530a1f60376492965a2f22585201b8d02392a5ad50807e039093f96b9",
+    "examples/rim/cut-transport.js": "c637f5236e103e01897f21a112cf268ee967989bef6d47e0fd78b777eedf95fb",
+    "js/engine.js": "0f9a2629f2bd81280219412902356e4460f7ee9810063f8371a60f74709d1c36",
+    "assets/models/rim/layout.json": "477fcc53649fc4d03e174ce37cec77cb176c3c6e1ba161b7d3647bc4313c2085",
+    "assets/models/rim/blade-wraith.glb": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+    "assets/models/rim/collisions.json": "c20159008b11408c517a11e7f86d6dd09cd0b42dc8a17db54fad8a688dd1a662",
+    "assets/models/rim/core-tank.glb": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+    "assets/models/rim/drone-orbiter.glb": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+    "assets/models/rim/gladius.glb": "47abff59ec0652fd01e46f8356830bb49d9f2bd351c39dda02a095644361cd04",
+    "assets/models/rim/madmechanic.glb": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+    "assets/models/rim/rim-city.glb": "73197d81c48db8a043b4c967b8d10dda35234954a338f6e0d8054bfa1e088a19",
+    "assets/models/rim/rim-decorations.glb": "8341e2f56268bfa98425cf79e081751f50d34a2642ed5b3cb044f1402cdc834d",
+    "assets/models/rim/source-gate.png": "6af02a4b7f4818da62bb2d5906485a27cf4571ecedc851cdaf33cb6a80581d96",
+    "assets/models/rim/source-manifest.json": "e6d43b59b5359116e58e07640f2ae9b9cce1994eff74c301b76c55118afa6771"
+  },
+  "sameNativeGameplaySourceSha256": "5a38a991d579f19e52041a1b069ce490025319a8ef4fa991f57291059a48eecd",
+  "families": [
+    "rim-static",
+    "rim-active"
+  ],
+  "backends": [
+    "webgpu",
+    "webgl"
+  ],
+  "viewport": {
+    "width": 960,
+    "height": 640,
+    "deviceScaleFactor": 1
+  },
+  "quality": "unchanged authored examples/rim/appearance.js; actual effects/shadows/FXAA same",
+  "primaryProtocol": {
+    "pairs": 3,
+    "order": "AB/BA/AB",
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "profiling": false
+  },
+  "profileProtocol": {
+    "separate": true,
+    "warmupMs": 2000,
+    "sampleMs": 8000,
+    "profiling": true,
+    "apiDiagnostics": "separate cold init +1s instrumented page"
+  },
+  "acceptance": "Report actual paired CPU ratios and per-run tails. Describe meaningful progress only when >=5percent AND >=0.2ms CPU median reduction, direction consistent in all3 pairs; otherwise small/mixed/unchanged. Whole frame cadence60Hz cap not throughput proof. Preserve same static image tolerance8/fraction0.001, active native game capture parity unavailable; native state is recorded for actual work.",
+  "activeScenario": "fixed elapsed-time camera/movement inputs; native enemies move/fire and deaths auto-recover; not an exact simulation replay or a sword/cut scenario",
+  "limits": {
+    "maxLoad": 1,
+    "maxTimePerCliSeconds": 600,
+    "jsHeapMB": 512,
+    "slowFrameMs": 250,
+    "maxSlowFrames": 20
+  },
+  "deployment": "No live8443/8878 changes or push",
+  "observationsSoFar": [
+    "Actual first active WebGPU pair has6 moving enemies and advancing native simulation/visual frames, but projectile.fired remains0. Do not describe this trace as a measured firefight; beam activity is not separately instrumented. Preserve this as a movement/animation scenario, with no sword/cut claims."
+  ]
+}

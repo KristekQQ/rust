@@ -382,6 +382,7 @@ fn build_uniform(
 
 struct PassCache {
     camera_position: Vec3,
+    light_class: crate::render_lights::LightClass,
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
@@ -393,6 +394,7 @@ impl PassCache {
         Self {
             queue: RenderQueue::default(),
             camera_position: Vec3::ZERO,
+            light_class: Default::default(),
             key: None,
             batches: std::array::from_fn(|_| {
                 InstanceBatch::new(device, 1, "primitive instance buffer")
@@ -747,6 +749,9 @@ impl SceneRenderer {
                 (self.scene.model(*id), self.scene.objects().get(id))
             {
                 let options = object.render_options;
+                // Semantic queue policy is not shader data and must update even
+                // when pose/root uniforms remain unchanged.
+                gpu.opaque_reorderable = options.opaque_reorderable;
                 match self.gltf_gpu.update(
                     &self.queue,
                     gpu,
@@ -754,7 +759,7 @@ impl SceneRenderer {
                     &model.render_bounds_cache,
                     &model.pose,
                     model.revision,
-                    object.transform.model(),
+                    object.render_data.model(),
                     [
                         options.reflectivity,
                         if options.receives_shadow { 1.0 } else { 0.0 },
@@ -1046,6 +1051,10 @@ impl SceneRenderer {
         }
         let mut grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
         grid_uniform.appearance = self.appearance;
+        cache.light_class = crate::render_lights::LightClass::from_colors(
+            lights.map(|light| light.color),
+            self.appearance.enabled(),
+        );
         // Reflection textures contain linear lighting; display transform belongs
         // to the final visible surface, not both the reflected and main draw.
         if pass == RenderPassKind::Reflection {
@@ -1262,6 +1271,59 @@ impl SceneRenderer {
         let gltf = self.gltf_gpu.stats();
         let stats = self.render_stats();
         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
+        let gltf_values = serde_json::json!({
+                "cpuDeformedVertices": gltf.cpu_deformed_vertices,
+                "rigidUploadBytes": gltf.rigid_upload_bytes,
+                "uniformUploadBytes": gltf.uniform_upload_bytes,
+                "bufferUploadCalls": gltf.buffer_upload_calls,
+                "skinUploadBytes": gltf.skin_upload_bytes,
+                "skinPaletteUploadBytes": gltf.skin_palette_upload_bytes,
+                "drawCalls": gltf.draw_calls,
+                "primitiveTests": gltf.primitive_tests,
+                "primitiveCulled": gltf.primitive_culled,
+                "rootBoundsTests": gltf.root_bounds_tests,
+                "rootFullyInside": gltf.root_fully_inside,
+                "activeDrawIndexBytes": self.gltf_models.values().map(|m| m.active_draw_index_bytes()).sum::<usize>(),
+                "instancedDrawCalls": gltf.instanced_draw_calls,
+                "translatedDrawCalls": gltf.translated_draw_calls,
+                "translatedInstances": gltf.translated_instances,
+                "instancesDrawn": gltf.instances_drawn,
+                "trianglesDrawn": gltf.triangles_drawn,
+                "overlapTests": gltf.overlap_tests,
+                "overlapNodeTests": gltf.overlap_node_tests,
+                "batchBreaks": {
+                    "rootBlend": gltf.root_batch_breaks[0],
+                    "rootUnsupported": gltf.root_batch_breaks[1],
+                    "rootBounds": gltf.root_batch_breaks[2],
+                    "rootAsset": gltf.root_batch_breaks[3],
+                    "rootOverlap": gltf.root_batch_breaks[4],
+                    "rootSpatial": gltf.root_batch_breaks[5],
+                    "drawCap": gltf.draw_batch_breaks[0],
+                    "drawOrdinal": gltf.draw_batch_breaks[1],
+                    "drawAsset": gltf.draw_batch_breaks[2],
+                    "drawDeformed": gltf.draw_batch_breaks[3],
+                    "drawMirror": gltf.draw_batch_breaks[4],
+                    "drawMaterial": gltf.draw_batch_breaks[5],
+                    "drawPrimitive": gltf.draw_batch_breaks[6],
+                    "drawOptions": gltf.draw_batch_breaks[7],
+                },
+                "instancePagesCreated": gltf.instance_pages_created,
+                "instanceBuffersCreated": gltf.instance_buffers_created,
+                "instanceBindGroupsCreated": gltf.instance_bind_groups_created,
+                "instancePagesActive": gltf.instance_pages_active,
+                "instancePagesRetained": gltf.instance_pages_retained,
+                "instanceUploadBytes": gltf.instance_upload_bytes,
+                "instanceBufferBytes": gltf.instance_buffer_bytes,
+                "queueScratchGrowths": gltf.queue_scratch_growths,
+                "queueScratchBytes": gltf.queue_scratch_bytes,
+                "pipelineChanges": gltf.pipeline_changes,
+                "bindGroupChanges": gltf.bind_group_changes,
+                "geometryCacheHits": gltf.geometry_cache_hits,
+                "materialCacheHits": gltf.material_cache_hits,
+                "geometryResources": gltf.geometry_resources,
+                "materialResources": gltf.material_resources,
+                "cachedAssets": gltf.cached_assets,
+        });
         serde_json::json!({
             "font3d": {
                 "runtime": self.scene.font3d_stats(),
@@ -1299,30 +1361,7 @@ impl SceneRenderer {
                 "instanceUploadBytes": self.main_instance_upload_bytes,
                 "slots": 1 + self.passes.len() - BASE_PASS_CACHE_COUNT,
             },
-            "gltf": {
-                "cpuDeformedVertices": gltf.cpu_deformed_vertices,
-                "rigidUploadBytes": gltf.rigid_upload_bytes,
-                "uniformUploadBytes": gltf.uniform_upload_bytes,
-                "bufferUploadCalls": gltf.buffer_upload_calls,
-                "skinUploadBytes": gltf.skin_upload_bytes,
-                "skinPaletteUploadBytes": gltf.skin_palette_upload_bytes,
-                "drawCalls": gltf.draw_calls,
-                "primitiveTests": gltf.primitive_tests,
-                "primitiveCulled": gltf.primitive_culled,
-                "instancedDrawCalls": gltf.instanced_draw_calls,
-                "instancesDrawn": gltf.instances_drawn,
-                "instanceUploadBytes": gltf.instance_upload_bytes,
-                "instanceBufferBytes": gltf.instance_buffer_bytes,
-                "queueScratchGrowths": gltf.queue_scratch_growths,
-                "queueScratchBytes": gltf.queue_scratch_bytes,
-                "pipelineChanges": gltf.pipeline_changes,
-                "bindGroupChanges": gltf.bind_group_changes,
-                "geometryCacheHits": gltf.geometry_cache_hits,
-                "materialCacheHits": gltf.material_cache_hits,
-                "geometryResources": gltf.geometry_resources,
-                "materialResources": gltf.material_resources,
-                "cachedAssets": gltf.cached_assets,
-            },
+            "gltf": gltf_values,
             "gltfDraws": self.gltf_gpu.draw_diagnostics(),
             "instanceUploadPages": self.passes.iter().map(|cache| cache.imported.pages.len()).sum::<usize>(),
             "fps": stats[6], "frameMs": stats[7], "frameP95Ms": self.frame_metrics.frame_p95_ms, "cpuMs": stats[5],
@@ -1521,6 +1560,8 @@ impl SceneRenderer {
             material_mask: false,
             packed_depth: false,
             shadow: true,
+            single_static_shadow: false,
+            light_class: Default::default(),
         };
         let cache = &self.passes[self.active_cache];
         let gltf_opaque = self.gltf_gpu.prepare_draws(
@@ -1709,6 +1750,8 @@ impl SceneRenderer {
             material_mask: target.material_mask,
             packed_depth: target.auxiliary.is_some(),
             shadow: false,
+            single_static_shadow: !reflected && effects.single_static_shadow(),
+            light_class: self.passes[self.active_cache].light_class,
         };
         let cache = &self.passes[self.active_cache];
         let gltf_opaque = self.gltf_gpu.prepare_draws(
@@ -2330,6 +2373,8 @@ impl SceneRenderer {
             material_mask: false,
             packed_depth: false,
             shadow: false,
+            single_static_shadow: false,
+            light_class: cache.light_class,
         };
         let gltf_transparent = if has_transparent {
             let p = self.gltf_gpu.prepare_draws(

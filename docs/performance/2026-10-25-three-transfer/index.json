@@ -1,0 +1,137 @@
+[
+  {
+    "name": "cal-wg",
+    "exitCode": 0,
+    "results": 18
+  },
+  {
+    "name": "pilot-wg",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "cal-gl",
+    "exitCode": 0,
+    "results": 18
+  },
+  {
+    "name": "pilot-gl",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "pilot-cache-wg",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "pilot-cache-gl",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "paired-wg",
+    "exitCode": 0,
+    "results": 6
+  },
+  {
+    "name": "paired-gl",
+    "exitCode": 0,
+    "results": 6
+  },
+  {
+    "name": "cal-three-gl",
+    "exitCode": 0,
+    "results": 18
+  },
+  {
+    "name": "three-objects",
+    "exitCode": 0,
+    "results": 6
+  },
+  {
+    "name": "three-instanced",
+    "exitCode": 0,
+    "results": 6
+  },
+  {
+    "name": "profile-before-wg",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "profile-after-wg",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "profile-before-gl",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "profile-after-gl",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "cal-dynamic-wg",
+    "exitCode": 0,
+    "results": 10
+  },
+  {
+    "name": "paired-dynamic-wg",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "cal-rim-static-wg",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "paired-rim-static-wg",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "cal-arena-static-wg",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "paired-arena-static-wg",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "cal-dynamic-gl",
+    "exitCode": 0,
+    "results": 10
+  },
+  {
+    "name": "paired-dynamic-gl",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "cal-rim-static-gl",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "paired-rim-static-gl",
+    "exitCode": 0,
+    "results": 2
+  },
+  {
+    "name": "cal-arena-static-gl",
+    "exitCode": 0,
+    "results": 1
+  },
+  {
+    "name": "paired-arena-static-gl",
+    "exitCode": 0,
+    "results": 2
+  }
+]

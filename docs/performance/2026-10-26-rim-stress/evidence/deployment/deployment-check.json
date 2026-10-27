@@ -1,0 +1,77 @@
+{
+  "pass": true,
+  "date": "2026-10-26T17:02:24.498Z",
+  "base": "https://192.168.11.134:8443",
+  "releaseId": "6082380ab4",
+  "build": {
+    "source": "eae9f0a3d0b60d131a4031465d86d7006cdc5ab816fa83912967a023cfab48e0",
+    "wasm": "36cabbf4ac596d867181c8278a848b99fc3197910f344835b02a3aba519c7ea2",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "files": [
+    {
+      "path": "examples/rim/index.html",
+      "sha256": "488ce56df58216435780dc6afd37a9fdd3a5a676090c13b64ae93fb44c219352",
+      "bytes": 4565,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/main.js",
+      "sha256": "0d5fa66492bcf3d9904618ccb898a7edc71821fc60ff22b853054b202d9dce6d",
+      "bytes": 8502,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/scene.js",
+      "sha256": "a56f7f32e5c59506d9fac2c6e313e9c5ab804680c893ae9d604df9b71cf24d7c",
+      "bytes": 3838,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/stress.js",
+      "sha256": "ce729a328552d98bba129d3d136bb373ac2d4a32e0866f1e6b04fdd4b93f1b72",
+      "bytes": 1718,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "examples/rim/diagnostics.js",
+      "sha256": "8c5a3bebd53ede3d07fe0495475209e472cdda8d64a351e4d9d4904d36f86a4b",
+      "bytes": 3680,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "js/engine.js",
+      "sha256": "2903f132b2c4ff7175a1a2e9fbd2fee398486a15de7d42acde4e7e1f7c83d2d4",
+      "bytes": 21485,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "pkg/webgpu_wasm.js",
+      "sha256": "4954bb7a8114383835769f3327ce263654524a67c26d4a9e09ce0e34da376fc5",
+      "bytes": 86451,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    },
+    {
+      "path": "pkg/webgpu_wasm_bg.wasm",
+      "sha256": "36cabbf4ac596d867181c8278a848b99fc3197910f344835b02a3aba519c7ea2",
+      "bytes": 5834944,
+      "cacheControlNoStore": true,
+      "tlsVerified": true
+    }
+  ],
+  "trust": "Existing local development CA explicitly supplied; system/Quest trust not established by this check.",
+  "scope": "Verified HTTPS certificate chain and hostname, actual served decoded payload bytes and no-store headers matched the same production package tested on WebGPU/WebGL. This does not verify physical Quest performance or CI."
+}

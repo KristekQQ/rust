@@ -1,0 +1,44 @@
+✔ statistics retain tails and budget overruns; absent measurements null (0.988042ms)
+✔ bounded geometric loads and option validation (0.341625ms)
+✔ GPU unavailable is not zero timing (0.205334ms)
+✔ server manifest hashes actual bytes, rejects changed files and symlink escapes (27.848958ms)
+✔ frame capacity accepts rounding jitter but rejects missed-frame cadence (0.216167ms)
+✔ work counters use exact boundaries and unsupported metrics remain null (0.204917ms)
+✔ pixel tolerance distinguishes exact parity, rounding and changed geometry (0.142ms)
+✔ insertion permutations preserve logical identities and reproducible seed (0.617ms)
+✔ diagnostic context metadata reads extension without issuing queries; loss observers report events (0.822125ms)
+✔ primitive WASM exception strings and Error stacks remain informative (0.277125ms)
+✔ GL queries start before command interval, end at sampler and only read available results on later frames (0.467375ms)
+✔ GL query inflight bound and stop cleanup preserve incomplete evidence (0.174125ms)
+✔ GL disjoint results are discarded and other query owners remain untouched (0.097833ms)
+✔ profiler-off GL helper issues no queries and does not wrap getContext (0.060083ms)
+✔ Three reference root is an explicit parsed option (0.677833ms)
+✔ GL nonfinite and stale results are not published as durations (0.234708ms)
+✔ unsafe overload startup retains valid near/over probes without inventing a sample (0.290458ms)
+✔ protocol deadline includes long samples, startup allowance and bounded margin (0.080833ms)
+✔ nested batch rejection deltas retain missing fields and reset counters as null (0.083792ms)
+✔ dynamic culling evidence comes from native boundary counters, not requested drift (0.140417ms)
+✔ API diagnostics count real pass/submit/state calls and only successful asynchronous pipeline creations (0.322625ms)
+✔ Three representation is explicit and bounded (0.073833ms)
+✔ dimensionless ratios do not carry millisecond budgets (0.064833ms)
+✔ calibrated soak rejects absent loads and stale common harness while permitting candidate runtime (4.556833ms)
+✔ completed measurements cannot hang forever during owned cleanup (11.944292ms)
+✔ a query spanning a missing sampler is discarded rather than published as frame timing (0.199875ms)
+✔ render dimensions are explicit bounded calibration inputs (0.190041ms)
+✔ four bilinear fetches preserve all65536 underlying4x4 comparison patterns (231.402375ms)
+ℹ {"patterns":65536,"phasePairs":8,"cases":524288,"maxAbsoluteError":3.3306690738754696e-16}
+✔ clamp edges, corners, tiny maps, arbitrary depth fields and subtexel boundaries (14.212208ms)
+ℹ {"cases":12480,"maxAbsoluteError":2.9976021664879227e-15}
+✔ static/dynamic per-tap minimum must retain the original nine-tap path (0.158417ms)
+✔ four disjoint support samples only bypass the original kernel for uniform comparison texels (68.909375ms)
+ℹ {"checks":524288,"earlyouts":16,"maxAbsoluteError":0}
+✔ f32 boundary guard retains every texel addressed by the original three taps (42.089333ms)
+ℹ {"checkedHardwareAddressCases":10542,"boundaryFallbacks":5609,"maxMapSize":16384}
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 401.91275

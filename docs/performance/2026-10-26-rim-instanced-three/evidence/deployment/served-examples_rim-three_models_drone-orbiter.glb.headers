@@ -1,0 +1,10 @@
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.14.7
+Date: Mon, 26 Oct 2026 17:30:54 GMT
+Content-type: model/gltf-binary
+Content-Length: 905200
+Last-Modified: Mon, 26 Oct 2026 17:29:41 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Expires: 0
+

@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-26T16:11:48.282Z",
+  "build": {
+    "source": "fd8bbe73edfdc4922ae41eb8c66870e0e6c7751d6b3666098b8df3ade7ef113f",
+    "wasm": "6c4bc5dd9e4e98c0ad42ebbc52aec25034511fb7ba75068c07fcc414b597219e",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "productionApp": "de4fef8a1a",
+  "scope": "Apple M1 desktop headless real Rust renderer and original Three r170; static actual Rome gate view. Native release WASM equals deployed production. Benchmark runtime source is unminified; production minifies those same source modules. Not active combat or Quest evidence.",
+  "fpsDefinition": "Per-run FPS = 1000 / mean RAF interval; table uses median of those per-run FPS. Observed ~60Hz ceiling does not reveal additional throughput headroom.",
+  "protocol": {
+    "high": "3 GL/Three AB/BA/AB pairs,8s warmup/25s samples,profiler off;3 separate native WebGPU runs with same8s/25s protocol; WebGPU is sequential after GL/Three, not a three-way interleaving.",
+    "normal": "1 short control per implementation,3s warmup/8s sample; capped, not a ranking."
+  },
+  "high": {
+    "width": 4096,
+    "height": 2730,
+    "rustWebGL": {
+      "runs": 3,
+      "fpsEach": [
+        38.68154726189026,
+        38.7356739967299,
+        38.52169495457785
+      ],
+      "medianFps": 38.68154726189026,
+      "minFps": 38.52169495457785,
+      "maxFps": 38.7356739967299,
+      "cpuMedianMs": 1.2000000476837158,
+      "frameP95EachMs": [
+        33.400000000001455,
+        33.400000000001455,
+        33.400000000001455
+      ]
+    },
+    "threeWebGL": {
+      "runs": 3,
+      "fpsEach": [
+        60.00240009600379,
+        60.00240009600379,
+        60.00264011616504
+      ],
+      "medianFps": 60.00240009600379,
+      "minFps": 60.00240009600379,
+      "maxFps": 60.00264011616504,
+      "cpuMedianMs": 3.200000047683716,
+      "frameP95EachMs": [
+        16.700000000004366,
+        16.700000000004366,
+        16.799999999999272
+      ]
+    },
+    "rustWebGPU": {
+      "runs": 3,
+      "fpsEach": [
+        60.002558403556144,
+        60.00216007776277,
+        60.00240009600379
+      ],
+      "medianFps": 60.00240009600379,
+      "minFps": 60.00216007776277,
+      "maxFps": 60.002558403556144,
+      "cpuMedianMs": 0.7000000476837158,
+      "frameP95EachMs": [
+        16.700000000000728,
+        16.799999999999272,
+        16.700000000000728
+      ]
+    },
+    "webGLFpsDeficitPercent": 35.53333333333364
+  },
+  "normal": {
+    "width": 2880,
+    "height": 1920,
+    "rustWebGL": {
+      "runs": 1,
+      "fpsEach": [
+        60.00274440826815
+      ],
+      "medianFps": 60.00274440826815,
+      "minFps": 60.00274440826815,
+      "maxFps": 60.00274440826815,
+      "cpuMedianMs": 1.0999999046325684,
+      "frameP95EachMs": [
+        16.799999999999272
+      ]
+    },
+    "threeWebGL": {
+      "runs": 1,
+      "fpsEach": [
+        60.003000150007466
+      ],
+      "medianFps": 60.003000150007466,
+      "minFps": 60.003000150007466,
+      "maxFps": 60.003000150007466,
+      "cpuMedianMs": 2.700000047683716,
+      "frameP95EachMs": [
+        16.799999999999272
+      ]
+    },
+    "rustWebGPU": {
+      "runs": 1,
+      "fpsEach": [
+        60.00225008437813
+      ],
+      "medianFps": 60.00225008437813,
+      "minFps": 60.00225008437813,
+      "maxFps": 60.00225008437813,
+      "cpuMedianMs": 0.7999999523162842,
+      "frameP95EachMs": [
+        16.700000000000728
+      ]
+    }
+  },
+  "limits": [
+    "Same authored city/camera/resolution, but image equivalence is not established: Three MSAA4 vs native FXAA, PBR/shadow policies and runtime differ.",
+    "Static gate-view diagnostic does not exercise current moving NPCs, their new blobs, combat or cuts.",
+    "Desktop RAF cadence is not physical Quest or compositor presentation measurement.",
+    "Native lower callback CPU does not identify a specific GPU bottleneck.",
+    "No new source optimization was introduced during this measurement; do not attribute run-to-run changes against older a54 results to NPC blobs."
+  ]
+}

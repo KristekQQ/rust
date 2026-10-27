@@ -1,0 +1,3703 @@
+{
+  "scope": "headless desktop Apple M1 application RAF cadence, with pre-existing headless Neon Arena GPU workload left running pending user approval; not compositor or physical Quest FPS",
+  "quality": "Unchanged native geometry/effects/resolution; WebGL exact and WebGPU1972pixels over channel tolerance8 (0.0356626%, max103) pass predeclared0.1% fraction gate. Cross-Three AA/PBR/shadow differences remain.",
+  "experiments": {
+    "calibrate-dynamic-webgl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00300015000738,
+          "rafMeanMs": 16.665833333333367,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 2.700000047683716,
+          "callbackP95Ms": 3.9000000953674316,
+          "actualDrawCalls": 1,
+          "mainGltfDrawCalls": 1,
+          "trianglesPerRaf": 466.9861495844875,
+          "gltfInstancesPerRaf": 233.49307479224376,
+          "rigidUploadBytes": 408,
+          "retainedInstanceBytes": 28912,
+          "queueScratchBytes": 60480,
+          "warmInstanceUploads": 8822912,
+          "warmInstanceBufferCreations": 31,
+          "coldReadyMs": 341,
+          "commands": {
+            "transforms": 184832,
+            "spawns": 4,
+            "removes": 12,
+            "cuts": 4,
+            "cutAttempts": 4,
+            "clusteredRootUpdates": 19456,
+            "separatedRootUpdates": 40192,
+            "frustumDriftUpdates": 92416
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 0,
+              "width": 0,
+              "height": 0,
+              "targets": 0,
+              "frames": 0,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": false,
+              "passes": [],
+              "transientBuffers": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.00300015000738,
+          "fpsRange": [
+            60.00300015000738,
+            60.00300015000738
+          ],
+          "callbackMedianMs": 2.700000047683716,
+          "drawCalls": [
+            1
+          ],
+          "mainGltfDrawCalls": [
+            1
+          ]
+        }
+      },
+      "pairs": [],
+      "medianPairedFpsRatio": null,
+      "pixelChecks": [],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:18:59.307Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 6000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "calibrate-dynamic-webgpu": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00200006666879,
+          "rafMeanMs": 16.66611111111114,
+          "rafP95Ms": 16.799999999999272,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 2.299999952316284,
+          "callbackP95Ms": 3.0999999046325684,
+          "actualDrawCalls": 1,
+          "mainGltfDrawCalls": 1,
+          "trianglesPerRaf": 467.0360110803324,
+          "gltfInstancesPerRaf": 233.5180055401662,
+          "rigidUploadBytes": 408,
+          "retainedInstanceBytes": 28912,
+          "queueScratchBytes": 60480,
+          "warmInstanceUploads": 8832544,
+          "warmInstanceBufferCreations": 28,
+          "coldReadyMs": 216,
+          "commands": {
+            "transforms": 184832,
+            "spawns": 4,
+            "removes": 12,
+            "cuts": 4,
+            "cutAttempts": 4,
+            "clusteredRootUpdates": 19456,
+            "separatedRootUpdates": 40192,
+            "frustumDriftUpdates": 92416
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 0,
+              "width": 0,
+              "height": 0,
+              "targets": 0,
+              "frames": 0,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": false,
+              "passes": [],
+              "transientBuffers": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.00200006666879,
+          "fpsRange": [
+            60.00200006666879,
+            60.00200006666879
+          ],
+          "callbackMedianMs": 2.299999952316284,
+          "drawCalls": [
+            1
+          ],
+          "mainGltfDrawCalls": [
+            1
+          ]
+        }
+      },
+      "pairs": [],
+      "medianPairedFpsRatio": null,
+      "pixelChecks": [],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:18:28.421Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 6000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "calibrate-gl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 18.625931296564826,
+          "rafMeanMs": 53.68859060402685,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 83.30000000000018,
+          "callbackMedianMs": 52,
+          "callbackP95Ms": 68.5,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1569,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 224,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 18.625931296564826,
+          "fpsRange": [
+            18.625931296564826,
+            18.625931296564826
+          ],
+          "callbackMedianMs": 52,
+          "drawCalls": [
+            5266
+          ],
+          "mainGltfDrawCalls": [
+            5265
+          ]
+        }
+      },
+      "pairs": [],
+      "medianPairedFpsRatio": null,
+      "pixelChecks": [],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:10:45.748Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 3000,
+        "sample": 8000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "calibrate-rim-static-webgl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00200006666883,
+          "rafMeanMs": 16.666111111111128,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 1.2999999523162842,
+          "callbackP95Ms": 1.8999998569488525,
+          "actualDrawCalls": 40,
+          "mainGltfDrawCalls": 39,
+          "trianglesPerRaf": 67292,
+          "gltfInstancesPerRaf": 39,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 44752,
+          "queueScratchBytes": 25312,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 709,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 960,
+              "height": 640,
+              "targets": 1,
+              "frames": 494,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.00200006666883,
+          "fpsRange": [
+            60.00200006666883,
+            60.00200006666883
+          ],
+          "callbackMedianMs": 1.2999999523162842,
+          "drawCalls": [
+            40
+          ],
+          "mainGltfDrawCalls": [
+            39
+          ]
+        }
+      },
+      "pairs": [],
+      "medianPairedFpsRatio": null,
+      "pixelChecks": [],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:20:01.435Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 6000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "calibrate-rim-static-webgpu": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00200006666878,
+          "rafMeanMs": 16.666111111111142,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 0.7999999523162842,
+          "callbackP95Ms": 1.2999999523162842,
+          "actualDrawCalls": 40,
+          "mainGltfDrawCalls": 39,
+          "trianglesPerRaf": 67292,
+          "gltfInstancesPerRaf": 39,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 44752,
+          "queueScratchBytes": 25312,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 364,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 960,
+              "height": 640,
+              "targets": 1,
+              "frames": 492,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.00200006666878,
+          "fpsRange": [
+            60.00200006666878,
+            60.00200006666878
+          ],
+          "callbackMedianMs": 0.7999999523162842,
+          "drawCalls": [
+            40
+          ],
+          "mainGltfDrawCalls": [
+            39
+          ]
+        }
+      },
+      "pairs": [],
+      "medianPairedFpsRatio": null,
+      "pixelChecks": [],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:19:30.218Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 6000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "calibrate-v2-gl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 18.250684400665023,
+          "rafMeanMs": 54.792465753424665,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 66.79999999999927,
+          "callbackMedianMs": 20.600000143051147,
+          "callbackP95Ms": 48.200000047683716,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1660,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 224,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 18.250684400665023,
+          "fpsRange": [
+            18.250684400665023,
+            18.250684400665023
+          ],
+          "callbackMedianMs": 20.600000143051147,
+          "drawCalls": [
+            308
+          ],
+          "mainGltfDrawCalls": [
+            307
+          ]
+        }
+      },
+      "pairs": [],
+      "medianPairedFpsRatio": null,
+      "pixelChecks": [],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:14:39.161Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 3000,
+        "sample": 8000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "control-dynamic-webgl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.0027444082681,
+          "rafMeanMs": 16.66590436590438,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 2.5999999046325684,
+          "callbackP95Ms": 3.9000000953674316,
+          "actualDrawCalls": 226,
+          "mainGltfDrawCalls": 226,
+          "trianglesPerRaf": 478.2863070539419,
+          "gltfInstancesPerRaf": 239.14315352697096,
+          "rigidUploadBytes": 408,
+          "retainedInstanceBytes": 10768,
+          "queueScratchBytes": 60480,
+          "warmInstanceUploads": 11373040,
+          "warmInstanceBufferCreations": 69,
+          "coldReadyMs": 322,
+          "commands": {
+            "transforms": 246784,
+            "spawns": 5,
+            "removes": 15,
+            "cuts": 5,
+            "cutAttempts": 5,
+            "clusteredRootUpdates": 43008,
+            "separatedRootUpdates": 40192,
+            "frustumDriftUpdates": 123392
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 0,
+              "width": 0,
+              "height": 0,
+              "targets": 0,
+              "frames": 0,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": false,
+              "passes": [],
+              "transientBuffers": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.0030001500074,
+          "rafMeanMs": 16.66583333333336,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 2.6000001430511475,
+          "callbackP95Ms": 4.3999998569488525,
+          "actualDrawCalls": 240,
+          "mainGltfDrawCalls": 240,
+          "trianglesPerRaf": 478.2162162162162,
+          "gltfInstancesPerRaf": 239.1081081081081,
+          "rigidUploadBytes": 248,
+          "retainedInstanceBytes": 5504,
+          "queueScratchBytes": 60480,
+          "warmInstanceUploads": 11368112,
+          "warmInstanceBufferCreations": 71,
+          "coldReadyMs": 327,
+          "commands": {
+            "transforms": 246272,
+            "spawns": 5,
+            "removes": 15,
+            "cuts": 5,
+            "cutAttempts": 5,
+            "clusteredRootUpdates": 42496,
+            "separatedRootUpdates": 40192,
+            "frustumDriftUpdates": 123136
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 0,
+              "width": 0,
+              "height": 0,
+              "targets": 0,
+              "frames": 0,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": false,
+              "passes": [],
+              "transientBuffers": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.0027444082681,
+          "fpsRange": [
+            60.0027444082681,
+            60.0027444082681
+          ],
+          "callbackMedianMs": 2.5999999046325684,
+          "drawCalls": [
+            226
+          ],
+          "mainGltfDrawCalls": [
+            226
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 60.0030001500074,
+          "fpsRange": [
+            60.0030001500074,
+            60.0030001500074
+          ],
+          "callbackMedianMs": 2.6000001430511475,
+          "drawCalls": [
+            240
+          ],
+          "mainGltfDrawCalls": [
+            240
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 1.0000042621673695,
+          "callbackRatio": 1.000000091699457
+        }
+      ],
+      "medianPairedFpsRatio": 1.0000042621673695,
+      "pixelChecks": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 960,
+          "height": 640,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:19:08.489Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 8000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "control-dynamic-webgpu": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.003000150007416,
+          "rafMeanMs": 16.665833333333357,
+          "rafP95Ms": 16.799999999999272,
+          "rafP99Ms": 16.80000000000109,
+          "callbackMedianMs": 2.3000001907348633,
+          "callbackP95Ms": 3.299999952316284,
+          "actualDrawCalls": 226,
+          "mainGltfDrawCalls": 226,
+          "trianglesPerRaf": 478.25363825363826,
+          "gltfInstancesPerRaf": 239.12681912681913,
+          "rigidUploadBytes": 408,
+          "retainedInstanceBytes": 10768,
+          "queueScratchBytes": 60480,
+          "warmInstanceUploads": 11370128,
+          "warmInstanceBufferCreations": 69,
+          "coldReadyMs": 158,
+          "commands": {
+            "transforms": 246272,
+            "spawns": 5,
+            "removes": 15,
+            "cuts": 5,
+            "cutAttempts": 5,
+            "clusteredRootUpdates": 42752,
+            "separatedRootUpdates": 40192,
+            "frustumDriftUpdates": 123136
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 0,
+              "width": 0,
+              "height": 0,
+              "targets": 0,
+              "frames": 0,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": false,
+              "passes": [],
+              "transientBuffers": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00300015000739,
+          "rafMeanMs": 16.665833333333364,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 2.1999998092651367,
+          "callbackP95Ms": 3.0999999046325684,
+          "actualDrawCalls": 246,
+          "mainGltfDrawCalls": 246,
+          "trianglesPerRaf": 478.26611226611226,
+          "gltfInstancesPerRaf": 239.13305613305613,
+          "rigidUploadBytes": 248,
+          "retainedInstanceBytes": 2992,
+          "queueScratchBytes": 60480,
+          "warmInstanceUploads": 11371472,
+          "warmInstanceBufferCreations": 70,
+          "coldReadyMs": 140,
+          "commands": {
+            "transforms": 246272,
+            "spawns": 5,
+            "removes": 15,
+            "cuts": 5,
+            "cutAttempts": 5,
+            "clusteredRootUpdates": 42752,
+            "separatedRootUpdates": 40192,
+            "frustumDriftUpdates": 123136
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 0,
+              "width": 0,
+              "height": 0,
+              "targets": 0,
+              "frames": 0,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": false,
+              "passes": [],
+              "transientBuffers": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.003000150007416,
+          "fpsRange": [
+            60.003000150007416,
+            60.003000150007416
+          ],
+          "callbackMedianMs": 2.3000001907348633,
+          "drawCalls": [
+            226
+          ],
+          "mainGltfDrawCalls": [
+            226
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 60.00300015000739,
+          "fpsRange": [
+            60.00300015000739,
+            60.00300015000739
+          ],
+          "callbackMedianMs": 2.1999998092651367,
+          "drawCalls": [
+            246
+          ],
+          "mainGltfDrawCalls": [
+            246
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 0.9999999999999996,
+          "callbackRatio": 0.9565215768796194
+        }
+      ],
+      "medianPairedFpsRatio": 0.9999999999999996,
+      "pixelChecks": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 960,
+          "height": 640,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:18:37.858Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 8000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "control-rim-static-webgl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00150003750087,
+          "rafMeanMs": 16.66625000000002,
+          "rafP95Ms": 16.799999999999272,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 1.2999999523162842,
+          "callbackP95Ms": 1.7999999523162842,
+          "actualDrawCalls": 40,
+          "mainGltfDrawCalls": 39,
+          "trianglesPerRaf": 67292,
+          "gltfInstancesPerRaf": 39,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 44752,
+          "queueScratchBytes": 25312,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 708,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 960,
+              "height": 640,
+              "targets": 1,
+              "frames": 613,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.002744408268086,
+          "rafMeanMs": 16.665904365904385,
+          "rafP95Ms": 16.800000000000182,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 1.2000000476837158,
+          "callbackP95Ms": 1.8999998569488525,
+          "actualDrawCalls": 40,
+          "mainGltfDrawCalls": 39,
+          "trianglesPerRaf": 67292,
+          "gltfInstancesPerRaf": 39,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 164368,
+          "queueScratchBytes": 21664,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 700,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 960,
+              "height": 640,
+              "targets": 1,
+              "frames": 616,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.00150003750087,
+          "fpsRange": [
+            60.00150003750087,
+            60.00150003750087
+          ],
+          "callbackMedianMs": 1.2999999523162842,
+          "drawCalls": [
+            40
+          ],
+          "mainGltfDrawCalls": [
+            39
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 60.002744408268086,
+          "fpsRange": [
+            60.002744408268086,
+            60.002744408268086
+          ],
+          "callbackMedianMs": 1.2000000476837158,
+          "drawCalls": [
+            40
+          ],
+          "mainGltfDrawCalls": [
+            39
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 1.0000207389942992,
+          "callbackRatio": 0.9230769936149669
+        }
+      ],
+      "medianPairedFpsRatio": 1.0000207389942992,
+      "pixelChecks": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 960,
+          "height": 640,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:20:11.019Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 8000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "control-rim-static-webgpu": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.00225008437809,
+          "rafMeanMs": 16.666041666666686,
+          "rafP95Ms": 16.799999999999272,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 0.7999999523162842,
+          "callbackP95Ms": 1.2000000476837158,
+          "actualDrawCalls": 40,
+          "mainGltfDrawCalls": 39,
+          "trianglesPerRaf": 67292,
+          "gltfInstancesPerRaf": 39,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 44752,
+          "queueScratchBytes": 25312,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 442,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 960,
+              "height": 640,
+              "targets": 1,
+              "frames": 616,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 60.002250084378105,
+          "rafMeanMs": 16.666041666666683,
+          "rafP95Ms": 16.700000000000728,
+          "rafP99Ms": 16.800000000000182,
+          "callbackMedianMs": 0.7999999523162842,
+          "callbackP95Ms": 1.1999998092651367,
+          "actualDrawCalls": 40,
+          "mainGltfDrawCalls": 39,
+          "trianglesPerRaf": 67292,
+          "gltfInstancesPerRaf": 39,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 164368,
+          "queueScratchBytes": 21664,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 348,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 960,
+              "height": 640
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 960,
+              "height": 640,
+              "targets": 1,
+              "frames": 612,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 60.00225008437809,
+          "fpsRange": [
+            60.00225008437809,
+            60.00225008437809
+          ],
+          "callbackMedianMs": 0.7999999523162842,
+          "drawCalls": [
+            40
+          ],
+          "mainGltfDrawCalls": [
+            39
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 60.002250084378105,
+          "fpsRange": [
+            60.002250084378105,
+            60.002250084378105
+          ],
+          "callbackMedianMs": 0.7999999523162842,
+          "drawCalls": [
+            40
+          ],
+          "mainGltfDrawCalls": [
+            39
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 1.0000000000000002,
+          "callbackRatio": 1.0
+        }
+      ],
+      "medianPairedFpsRatio": 1.0000000000000002,
+      "pixelChecks": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 960,
+          "height": 640,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:19:39.514Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 2000,
+        "sample": 8000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "pairs-gl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 15.381102873141945,
+          "rafMeanMs": 65.01484375000003,
+          "rafP95Ms": 83.40000000000146,
+          "rafP99Ms": 100.09999999999854,
+          "callbackMedianMs": 62.69999980926514,
+          "callbackP95Ms": 88.70000004768372,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1572,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 554,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 19.05348987082857,
+          "rafMeanMs": 52.483823529411694,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 66.79999999999927,
+          "callbackMedianMs": 17.700000047683716,
+          "callbackP95Ms": 39.299999952316284,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1781,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 651,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 1,
+          "fpsFromMeanRaf": 19.068025280124115,
+          "rafMeanMs": 52.443815513626745,
+          "rafP95Ms": 66.69999999999891,
+          "rafP99Ms": 66.70000000000073,
+          "callbackMedianMs": 18.700000047683716,
+          "callbackP95Ms": 33.09999990463257,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 2034,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 650,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "baseline",
+          "pair": 1,
+          "fpsFromMeanRaf": 16.229807680776478,
+          "rafMeanMs": 61.615024630541846,
+          "rafP95Ms": 83.30000000000291,
+          "rafP99Ms": 99.89999999999964,
+          "callbackMedianMs": 59.69999980926514,
+          "callbackP95Ms": 84.5,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1799,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 552,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "baseline",
+          "pair": 2,
+          "fpsFromMeanRaf": 16.400590421255156,
+          "rafMeanMs": 60.97341463414637,
+          "rafP95Ms": 83.30000000000291,
+          "rafP99Ms": 83.40000000000146,
+          "callbackMedianMs": 59.09999990463257,
+          "callbackP95Ms": 82,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1908,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 575,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 2,
+          "fpsFromMeanRaf": 18.815614963007963,
+          "rafMeanMs": 53.14734607218678,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 66.79999999999927,
+          "callbackMedianMs": 27.799999952316284,
+          "callbackP95Ms": 50.5,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 2328,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 659,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 16.229807680776478,
+          "fpsRange": [
+            15.381102873141945,
+            16.400590421255156
+          ],
+          "callbackMedianMs": 59.69999980926514,
+          "drawCalls": [
+            5266
+          ],
+          "mainGltfDrawCalls": [
+            5265
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 19.05348987082857,
+          "fpsRange": [
+            18.815614963007963,
+            19.068025280124115
+          ],
+          "callbackMedianMs": 18.700000047683716,
+          "drawCalls": [
+            308
+          ],
+          "mainGltfDrawCalls": [
+            307
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 1.2387596668441276,
+          "callbackRatio": 0.28229665233696216
+        },
+        {
+          "pair": 1,
+          "fpsRatio": 1.174876847290642,
+          "callbackRatio": 0.3132328326202368
+        },
+        {
+          "pair": 2,
+          "fpsRatio": 1.1472522927359332,
+          "callbackRatio": 0.4703891708490032
+        }
+      ],
+      "medianPairedFpsRatio": 1.174876847290642,
+      "pixelChecks": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:11:00.626Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 8000,
+        "sample": 25000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "pairs-wg": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 48.08173094231384,
+          "rafMeanMs": 20.797920133111518,
+          "rafP95Ms": 33.400000000001455,
+          "rafP99Ms": 33.400000000001455,
+          "callbackMedianMs": 19.09999990463257,
+          "callbackP95Ms": 28.200000047683716,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1413,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 1639,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 55.08220328813146,
+          "rafMeanMs": 18.15468409586059,
+          "rafP95Ms": 33.29999999999927,
+          "rafP99Ms": 33.400000000001455,
+          "callbackMedianMs": 12.599999904632568,
+          "callbackP95Ms": 16.899999856948853,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1470,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 1849,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 1,
+          "fpsFromMeanRaf": 55.55911361598559,
+          "rafMeanMs": 17.99884726224786,
+          "rafP95Ms": 33.29999999999927,
+          "rafP99Ms": 33.400000000001455,
+          "callbackMedianMs": 12.700000047683716,
+          "callbackP95Ms": 16.299999952316284,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1842,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 1847,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "baseline",
+          "pair": 1,
+          "fpsFromMeanRaf": 43.0418938433289,
+          "rafMeanMs": 23.23317843866182,
+          "rafP95Ms": 33.400000000001455,
+          "rafP99Ms": 33.400000000001455,
+          "callbackMedianMs": 22,
+          "callbackP95Ms": 29.700000047683716,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1695,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 1459,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "baseline",
+          "pair": 2,
+          "fpsFromMeanRaf": 41.48165926637051,
+          "rafMeanMs": 24.10703953712641,
+          "rafP95Ms": 33.400000000001455,
+          "rafP99Ms": 33.400000000001455,
+          "callbackMedianMs": 22.700000047683716,
+          "callbackP95Ms": 30.799999952316284,
+          "actualDrawCalls": 5266,
+          "mainGltfDrawCalls": 5265,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 24081912,
+          "retainedInstanceBytes": 4181088,
+          "queueScratchBytes": 1201088,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1643,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 1384,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 2,
+          "fpsFromMeanRaf": 51.92759717935996,
+          "rafMeanMs": 19.257582755966173,
+          "rafP95Ms": 33.39999999999418,
+          "rafP99Ms": 33.400000000001455,
+          "callbackMedianMs": 17.299999952316284,
+          "callbackP95Ms": 28.40000009536743,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1985,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 1732,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 43.0418938433289,
+          "fpsRange": [
+            41.48165926637051,
+            48.08173094231384
+          ],
+          "callbackMedianMs": 22,
+          "drawCalls": [
+            5266
+          ],
+          "mainGltfDrawCalls": [
+            5265
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 55.08220328813146,
+          "fpsRange": [
+            51.92759717935996,
+            55.55911361598559
+          ],
+          "callbackMedianMs": 12.700000047683716,
+          "drawCalls": [
+            308
+          ],
+          "mainGltfDrawCalls": [
+            307
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 1.1455952647423706,
+          "callbackRatio": 0.6596858621751369
+        },
+        {
+          "pair": 1,
+          "fpsRatio": 1.2908148005340787,
+          "callbackRatio": 0.5772727294401689
+        },
+        {
+          "pair": 2,
+          "fpsRatio": 1.2518206382708044,
+          "callbackRatio": 0.7621145337434287
+        }
+      ],
+      "medianPairedFpsRatio": 1.2518206382708044,
+      "pixelChecks": [
+        {
+          "pass": true,
+          "exact": false,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 103,
+          "meanAbsoluteChannelDelta": 0.008232286241319444,
+          "changedPixels": 1972,
+          "changedFraction": 0.0003566261574074074,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        },
+        {
+          "pass": true,
+          "exact": false,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 103,
+          "meanAbsoluteChannelDelta": 0.008232286241319444,
+          "changedPixels": 1972,
+          "changedFraction": 0.0003566261574074074,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        },
+        {
+          "pass": true,
+          "exact": false,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 103,
+          "meanAbsoluteChannelDelta": 0.008232286241319444,
+          "changedPixels": 1972,
+          "changedFraction": 0.0003566261574074074,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:07:10.202Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+        },
+        "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+      },
+      "measurementProtocol": {
+        "warmup": 8000,
+        "sample": 25000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    },
+    "three-gl": {
+      "rows": [
+        {
+          "label": "baseline",
+          "pair": 0,
+          "fpsFromMeanRaf": 18.080723228929166,
+          "rafMeanMs": 55.307522123893776,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 66.79999999999927,
+          "callbackMedianMs": 18.600000143051147,
+          "callbackP95Ms": 42.60000014305115,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1894,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 626,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 0,
+          "fpsFromMeanRaf": 32.139816195429134,
+          "rafMeanMs": 31.11405472636829,
+          "rafP95Ms": 33.400000000001455,
+          "rafP99Ms": 50,
+          "callbackMedianMs": 3.5999999046325684,
+          "callbackP95Ms": 4.3999998569488525,
+          "actualDrawCalls": 108,
+          "mainGltfDrawCalls": 108,
+          "trianglesPerRaf": null,
+          "gltfInstancesPerRaf": null,
+          "rigidUploadBytes": null,
+          "retainedInstanceBytes": null,
+          "queueScratchBytes": null,
+          "warmInstanceUploads": null,
+          "warmInstanceBufferCreations": null,
+          "coldReadyMs": 820,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "enabled": false,
+              "antialias": true,
+              "samples": 4
+            },
+            "graph": {
+              "passes": []
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 1,
+          "fpsFromMeanRaf": 31.622388651164897,
+          "rafMeanMs": 31.623164556962152,
+          "rafP95Ms": 33.400000000001455,
+          "rafP99Ms": 50,
+          "callbackMedianMs": 4,
+          "callbackP95Ms": 4.8999998569488525,
+          "actualDrawCalls": 108,
+          "mainGltfDrawCalls": 108,
+          "trianglesPerRaf": null,
+          "gltfInstancesPerRaf": null,
+          "rigidUploadBytes": null,
+          "retainedInstanceBytes": null,
+          "queueScratchBytes": null,
+          "warmInstanceUploads": null,
+          "warmInstanceBufferCreations": null,
+          "coldReadyMs": 796,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "enabled": false,
+              "antialias": true,
+              "samples": 4
+            },
+            "graph": {
+              "passes": []
+            }
+          }
+        },
+        {
+          "label": "baseline",
+          "pair": 1,
+          "fpsFromMeanRaf": 16.966812913940338,
+          "rafMeanMs": 58.9385882352941,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 66.79999999999927,
+          "callbackMedianMs": 19.90000009536743,
+          "callbackP95Ms": 42.5,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1731,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 598,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "baseline",
+          "pair": 2,
+          "fpsFromMeanRaf": 18.120797315081887,
+          "rafMeanMs": 55.18520971302421,
+          "rafP95Ms": 66.70000000000073,
+          "rafP99Ms": 66.79999999999927,
+          "callbackMedianMs": 17.5,
+          "callbackP95Ms": 38,
+          "actualDrawCalls": 308,
+          "mainGltfDrawCalls": 307,
+          "trianglesPerRaf": 10553756,
+          "gltfInstancesPerRaf": 34335,
+          "rigidUploadBytes": 14664320,
+          "retainedInstanceBytes": 7568720,
+          "queueScratchBytes": 1079392,
+          "warmInstanceUploads": 0,
+          "warmInstanceBufferCreations": 0,
+          "coldReadyMs": 1797,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0,
+            "cutAttempts": 0,
+            "clusteredRootUpdates": 0,
+            "separatedRootUpdates": 0,
+            "frustumDriftUpdates": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "passes": 1,
+              "width": 2880,
+              "height": 1920,
+              "targets": 1,
+              "frames": 625,
+              "ssrWidth": 0,
+              "ssrHeight": 0,
+              "ssrPixels": 0,
+              "ssrTracePixels": 0,
+              "ssrViewportPixels": 0
+            },
+            "graph": {
+              "active": true,
+              "packedDepth": false,
+              "passes": [
+                "fxaa.compose"
+              ],
+              "prunedPassCount": 0,
+              "resources": [
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "scene.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": null,
+                  "lastUse": null,
+                  "lifetime": "External",
+                  "name": "scene.depth",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "view.completed.color",
+                  "slot": null
+                },
+                {
+                  "firstUse": 0,
+                  "lastUse": 0,
+                  "lifetime": "External",
+                  "name": "fxaa.uniform.current-view",
+                  "slot": null
+                }
+              ],
+              "sceneColorAttachments": 1,
+              "slots": [],
+              "transientBuffers": 0,
+              "transientBytesEstimate": 0,
+              "transientTextures": 0
+            }
+          }
+        },
+        {
+          "label": "candidate",
+          "pair": 2,
+          "fpsFromMeanRaf": 30.081323578237317,
+          "rafMeanMs": 33.24321808510652,
+          "rafP95Ms": 50,
+          "rafP99Ms": 50,
+          "callbackMedianMs": 4,
+          "callbackP95Ms": 4.8999998569488525,
+          "actualDrawCalls": 108,
+          "mainGltfDrawCalls": 108,
+          "trianglesPerRaf": null,
+          "gltfInstancesPerRaf": null,
+          "rigidUploadBytes": null,
+          "retainedInstanceBytes": null,
+          "queueScratchBytes": null,
+          "warmInstanceUploads": null,
+          "warmInstanceBufferCreations": null,
+          "coldReadyMs": 766,
+          "commands": {
+            "transforms": 0,
+            "spawns": 0,
+            "removes": 0,
+            "cuts": 0
+          },
+          "qualityState": {
+            "canvas": {
+              "width": 2880,
+              "height": 1920
+            },
+            "postprocessing": {
+              "enabled": false,
+              "antialias": true,
+              "samples": 4
+            },
+            "graph": {
+              "passes": []
+            }
+          }
+        }
+      ],
+      "medians": {
+        "baseline": {
+          "fpsMedian": 18.080723228929166,
+          "fpsRange": [
+            16.966812913940338,
+            18.120797315081887
+          ],
+          "callbackMedianMs": 18.600000143051147,
+          "drawCalls": [
+            308
+          ],
+          "mainGltfDrawCalls": [
+            307
+          ]
+        },
+        "candidate": {
+          "fpsMedian": 31.622388651164897,
+          "fpsRange": [
+            30.081323578237317,
+            32.139816195429134
+          ],
+          "callbackMedianMs": 4,
+          "drawCalls": [
+            108
+          ],
+          "mainGltfDrawCalls": [
+            108
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "fpsRatio": 1.7775735952865763,
+          "callbackRatio": 0.19354838048092746
+        },
+        {
+          "pair": 1,
+          "fpsRatio": 1.863778943727445,
+          "callbackRatio": 0.2010050241623451
+        },
+        {
+          "pair": 2,
+          "fpsRatio": 1.6600441501103662,
+          "callbackRatio": 0.22857142857142856
+        }
+      ],
+      "medianPairedFpsRatio": 1.7775735952865763,
+      "pixelChecks": [
+        {
+          "pass": null,
+          "exact": false,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 210,
+          "meanAbsoluteChannelDelta": 4.543615270543982,
+          "changedPixels": 1081742,
+          "changedFraction": 0.1956275318287037,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001,
+          "withinDiagnosticTolerance": false,
+          "gateDisabled": true,
+          "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+        },
+        {
+          "pass": null,
+          "exact": false,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 210,
+          "meanAbsoluteChannelDelta": 4.543615270543982,
+          "changedPixels": 1081742,
+          "changedFraction": 0.1956275318287037,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001,
+          "withinDiagnosticTolerance": false,
+          "gateDisabled": true,
+          "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+        },
+        {
+          "pass": null,
+          "exact": false,
+          "width": 2880,
+          "height": 1920,
+          "maxChannelDelta": 210,
+          "meanAbsoluteChannelDelta": 4.543615270543982,
+          "changedPixels": 1081742,
+          "changedFraction": 0.1956275318287037,
+          "channelTolerance": 8,
+          "pixelFractionTolerance": 0.001,
+          "withinDiagnosticTolerance": false,
+          "gateDisabled": true,
+          "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+        }
+      ],
+      "cleanup": [
+        {
+          "label": "owned browser",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "baseline server",
+          "complete": true,
+          "forced": false
+        },
+        {
+          "label": "candidate server",
+          "complete": true,
+          "forced": false
+        }
+      ],
+      "driverIdentity": {
+        "capturedAt": "2026-10-26T21:14:54.432Z",
+        "nodeVersion": "v24.19.0",
+        "v8Version": "13.6.233.17-node.51",
+        "files": {
+          "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+          "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+          "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+          "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+          "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+          "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+          "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+          "tests/render-performance-three.html": "cb35b6c7cce32d957b01f2e6cbfcbcda1a84b71655106a6c978b84d903830bbf",
+          "tests/render-performance-three.js": "73432000070a87f1820fd470796fe1784aa0d29e57aa2948ccd3741e0ae1f478",
+          "tests/render-performance-three-rim.html": "0d6815e6676100795614918fc192ebea166ecd15572c0ba001c353d534a6ec4c",
+          "tests/render-performance-three-rim.js": "c22814f059e13e4e09acaca9a24a6ab8ef38d7bc86c9fefa13520e848beee9f0",
+          "examples/rim-three/stress.js": "374a88c334418295aecb19c9135e9a97cc7d43a8672f1b61cfdc9baecc63254e"
+        },
+        "sha256": "4f75e1e7880a6bf5a7f301068964b637855873b2de1a08708be823d72ed41e38"
+      },
+      "measurementProtocol": {
+        "warmup": 8000,
+        "sample": 25000,
+        "profiling": false,
+        "protocolTimeoutMs": 120000
+      }
+    }
+  },
+  "baselineBuild": {
+    "source": "eae9f0a3d0b60d131a4031465d86d7006cdc5ab816fa83912967a023cfab48e0",
+    "wasm": "36cabbf4ac596d867181c8278a848b99fc3197910f344835b02a3aba519c7ea2",
+    "bindings": "b8441b03bd9bc670cb183beec6ec786653fe3ed7127da25092bb1ff5258cbe16",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "candidateBuild": {
+    "source": "a1efeeb002b1f9109e20e3320653b6aa3b5b6b67df7d18138f79633e2e01e2a4",
+    "wasm": "547da17e984617d00d63d681e36401b1d77da7c5cdd1aabc902eb5f61cc23356",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "head": "64bfda680483e71f6aeb6bf902e63b29b3e90791",
+  "branch": "codex/wasm-render-performance"
+}

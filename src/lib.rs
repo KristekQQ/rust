@@ -22,7 +22,13 @@ mod projectile;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod render_appearance;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod render_batch;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod render_lights;
 pub mod render_math;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod render_overlap;
 pub mod rim_cut;
 pub mod rim_game;
 pub mod rim_movement;

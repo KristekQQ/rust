@@ -1,0 +1,176 @@
+[
+  {
+    "url": "/assets/fonts/cynatar/glyphs.json",
+    "bytes": 948459,
+    "sha256": "8c67af382d384f3b6432f231740a575ca732488d3587a56991f5b8d159ee255a",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/damaged-helmet/DamagedHelmet.glb",
+    "bytes": 3773916,
+    "sha256": "a1e3b04de97b11de564ce6e53b95f02954a297f0008183ac63a4f5974f6b32d8",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/fox/Fox.glb",
+    "bytes": 162852,
+    "sha256": "d97044e701822bac5a62696459b27d7b375aada5de8574ed4362edbba94771f7",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/blade-wraith.glb",
+    "bytes": 627520,
+    "sha256": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/collisions.json",
+    "bytes": 456101,
+    "sha256": "c20159008b11408c517a11e7f86d6dd09cd0b42dc8a17db54fad8a688dd1a662",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/core-tank.glb",
+    "bytes": 1135396,
+    "sha256": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/drone-orbiter.glb",
+    "bytes": 905200,
+    "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/gladius.glb",
+    "bytes": 11024,
+    "sha256": "47abff59ec0652fd01e46f8356830bb49d9f2bd351c39dda02a095644361cd04",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/layout.json",
+    "bytes": 8646,
+    "sha256": "477fcc53649fc4d03e174ce37cec77cb176c3c6e1ba161b7d3647bc4313c2085",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/madmechanic.glb",
+    "bytes": 191896,
+    "sha256": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/rim-city.glb",
+    "bytes": 4485124,
+    "sha256": "73197d81c48db8a043b4c967b8d10dda35234954a338f6e0d8054bfa1e088a19",
+    "source": "frozen"
+  },
+  {
+    "url": "/assets/models/rim/rim-decorations.glb",
+    "bytes": 43804,
+    "sha256": "8341e2f56268bfa98425cf79e081751f50d34a2642ed5b3cb044f1402cdc834d",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/neon-arena/assets/score-display.gltf",
+    "bytes": 42835,
+    "sha256": "f2920f8c1fc28678b96f838e9c833be32055648e559712d3de8dffef7a080990",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/neon-arena/geometry.js",
+    "bytes": 27320,
+    "sha256": "c53f8647adfb123d482cbb3472c5ef48d6ec770eaa88575b0cfeb04a7ec84c1b",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/neon-arena/scene.js",
+    "bytes": 18871,
+    "sha256": "ad16f2ecfc1eb7724c40bac98b37018ae551eb8ca0641b6963ade95741778f5a",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/appearance.js",
+    "bytes": 852,
+    "sha256": "1f08cea530a1f60376492965a2f22585201b8d02392a5ad50807e039093f96b9",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/rim/scene.js",
+    "bytes": 5491,
+    "sha256": "2f47d1cb10bbd8702d25cba3e270050218465839f67b84ff1208ccce3a94b10c",
+    "source": "frozen"
+  },
+  {
+    "url": "/examples/shared/vr-debug-panel.js",
+    "bytes": 359,
+    "sha256": "3e09b52136710257122a6b0af4a142f959910bbb9efa1e50bf845d68d4eeceed",
+    "source": "frozen"
+  },
+  {
+    "url": "/js/engine.js",
+    "bytes": 45835,
+    "sha256": "0f9a2629f2bd81280219412902356e4460f7ee9810063f8371a60f74709d1c36",
+    "source": "frozen"
+  },
+  {
+    "url": "/js/webxr.js",
+    "bytes": 31081,
+    "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+    "source": "frozen"
+  },
+  {
+    "url": "/pkg/webgpu_wasm_bg.wasm",
+    "bytes": 5810112,
+    "sha256": "6f9a3bba80c0681fbf4908ac4dbda7fd5088ed72aa6c4f8523b3a2d5a68518b9",
+    "source": "frozen"
+  },
+  {
+    "url": "/pkg/webgpu_wasm.js",
+    "bytes": 189395,
+    "sha256": "9a7af3dafaa277344a551b958ec8ff63acc5b978b280e530f47e7465bcd94b5a",
+    "source": "frozen"
+  },
+  {
+    "url": "/scripts/render-performance-order.mjs",
+    "bytes": 680,
+    "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/fixtures/gltf/full/checker.png",
+    "bytes": 91,
+    "sha256": "cf58dd119209787f34cf026512940f2e412f91786a47e930363635c9cbf24be6",
+    "source": "frozen"
+  },
+  {
+    "url": "/tests/fixtures/gltf/full/full.bin",
+    "bytes": 212,
+    "sha256": "1295b8004d3841e47d766410861359c48f1ce762b67be90d02cb9a302415321b",
+    "source": "frozen"
+  },
+  {
+    "url": "/tests/fixtures/gltf/full/full.gltf",
+    "bytes": 5667,
+    "sha256": "80db171cee18ee28ea11f46f5e27fc873782dd2eb68d74c46f62f33b9e83d2a9",
+    "source": "frozen"
+  },
+  {
+    "url": "/tests/pixels.js",
+    "bytes": 1931,
+    "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance.html",
+    "bytes": 318,
+    "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+    "source": "harness"
+  },
+  {
+    "url": "/tests/render-performance.js",
+    "bytes": 11646,
+    "sha256": "5dc21b2dd4e18ac919381f0e1ddfa8d504d430965b812363a690161f3c1f726c",
+    "source": "harness"
+  }
+]

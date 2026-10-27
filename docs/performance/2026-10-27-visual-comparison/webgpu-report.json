@@ -1,0 +1,966 @@
+{
+  "version": 1,
+  "driverIdentity": {
+    "capturedAt": "2026-10-27T01:27:31.165Z",
+    "nodeVersion": "v24.22.1",
+    "v8Version": "13.6.233.17-node.58",
+    "files": {
+      "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+      "scripts/render-performance.mjs": "1e87b57813336f55856747402de979ff9d31091cbbbf36d75d3718d38b266e87",
+      "scripts/render-performance-lib.mjs": "ce9615646b6beae8b7b867e932d8672132bda076ac42e73f9e0e4f6cafce2a14",
+      "scripts/render-performance-api.mjs": "3fc9fde2a10fa9b6dbe15705afce8e3da793dc387a0076ede7cd77ff6fadce48",
+      "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+      "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "tests/render-performance.js": "2e5b74c2f4023ea91bd60069fc655833c19074d8f1c2d3abb607df8ed081f2c3",
+      "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+    },
+    "sha256": "eb488f9638b4f8c5b4c2d03cbed6235750dea3ba17e9fbae8b9c31c4930b6fcd"
+  },
+  "comparisonKind": "sameRendererRevisionPair",
+  "threeReference": null,
+  "command": "smoke",
+  "date": "2026-10-27T01:27:31.261Z",
+  "settings": {
+    "command": "smoke",
+    "backend": "webgpu",
+    "family": "rim-static",
+    "width": 1280,
+    "height": 720,
+    "warmup": 1000,
+    "sample": 1000,
+    "pairs": 3,
+    "order": "spatial",
+    "seed": 1337,
+    "overlap": 0,
+    "level": "near",
+    "load": 1,
+    "maxLoad": 1024,
+    "maxMemory": 512,
+    "maxTime": 1800,
+    "startupTimeout": 60000,
+    "slowFrame": 250,
+    "maxSlowFrames": 20,
+    "budget": 16.666666666666668,
+    "threeRoot": null,
+    "threeRepresentation": "instanced",
+    "profiling": false,
+    "diagnostics": false,
+    "smokeMatrix": false,
+    "pixelChannel": 8,
+    "pixelFraction": 0.001,
+    "out": "output/visual-20261027/webgpu",
+    "baselineRoot": "output/production"
+  },
+  "viewport": {
+    "width": 1280,
+    "height": 720,
+    "deviceScaleFactor": 1
+  },
+  "baselineRoot": "/Users/Honza/.codex/worktrees/rim-publish/rust/output/production",
+  "candidateRoot": null,
+  "calibration": null,
+  "measurementProtocol": {
+    "warmup": 1000,
+    "sample": 1000,
+    "profiling": false,
+    "protocolTimeoutMs": 120000
+  },
+  "calibrationProtocol": null,
+  "profilerOffControl": false,
+  "results": [
+    {
+      "id": "baseline-rim-static-1-pair0",
+      "label": "baseline",
+      "load": 1,
+      "pair": 0,
+      "apiOperations": null,
+      "actualQualityState": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 1,
+          "width": 1280,
+          "height": 720,
+          "targets": 1,
+          "frames": 103,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": true,
+          "packedDepth": false,
+          "passes": [
+            "fxaa.compose"
+          ],
+          "prunedPassCount": 0,
+          "resources": [
+            {
+              "firstUse": 0,
+              "lastUse": 0,
+              "lifetime": "External",
+              "name": "scene.color",
+              "slot": null
+            },
+            {
+              "firstUse": null,
+              "lastUse": null,
+              "lifetime": "External",
+              "name": "scene.depth",
+              "slot": null
+            },
+            {
+              "firstUse": 0,
+              "lastUse": 0,
+              "lifetime": "External",
+              "name": "view.completed.color",
+              "slot": null
+            },
+            {
+              "firstUse": 0,
+              "lastUse": 0,
+              "lifetime": "External",
+              "name": "fxaa.uniform.current-view",
+              "slot": null
+            }
+          ],
+          "sceneColorAttachments": 1,
+          "slots": [],
+          "transientBuffers": 0,
+          "transientBytesEstimate": 0,
+          "transientTextures": 0
+        }
+      },
+      "coldReadyMs": 497,
+      "coldTimingScope": "page creation + navigation DOMContentLoaded + explicit bench readiness; not isolated shader compilation",
+      "metadata": {
+        "family": "rim-static",
+        "load": 1,
+        "quality": {
+          "profile": "examples/rim/appearance.js unchanged",
+          "renderEffects": [
+            true,
+            false
+          ],
+          "fxaa": {
+            "enabled": true,
+            "strength": 0.6
+          },
+          "sceneAppearance": "shared configureAppearance commands",
+          "camera": {
+            "authoredLayoutIndex": 0
+          },
+          "staticPose": "explicit Idle clip time0 for every original/encounter model; loading time excluded"
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": false,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "actual Rome scene and native gameplay",
+        "unmatchedThreeReference": false,
+        "loadUnit": "fixed authored scene (load does not replicate it)"
+      },
+      "startupProgress": {
+        "phase": "ready",
+        "requestedObjects": 1,
+        "createdObjects": 0,
+        "createdModels": 0,
+        "lastLogicalId": null,
+        "elapsedMs": 367.59999990463257,
+        "yieldEveryObjects": 128
+      },
+      "glRafGpu": {
+        "enabled": false,
+        "supported": null,
+        "scope": "application RAF GPU commands: first callback -> measurement sampler; excludes compositor/worker/between-RAF work",
+        "units": "milliseconds (TIME_ELAPSED_EXT nanoseconds / 1e6)",
+        "sampleEveryFrames": 30,
+        "maxInflight": 3,
+        "maxAgeFrames": 240,
+        "frames": 0,
+        "queriesCreated": 0,
+        "queriesBegun": 0,
+        "queriesEnded": 0,
+        "queriesDeleted": 0,
+        "skippedBusy": 0,
+        "skippedInflight": 0,
+        "skippedDisjoint": 0,
+        "disjointDiscarded": 0,
+        "invalid": [],
+        "incomplete": [],
+        "pendingQueries": 0,
+        "activeQuery": false
+      },
+      "glRafGpuMs": null,
+      "work": {
+        "boundary": "immediately before activation and after deactivation of measured RAF window",
+        "profilerFrames": null,
+        "applicationRafFrames": 62,
+        "elapsedMs": 1015.2000000476837,
+        "gltf": {
+          "cpuDeformedVertices": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "rigidUploadBytes": {
+            "start": 14664320,
+            "end": 14664320,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "uniformUploadBytes": {
+            "start": 534608,
+            "end": 534608,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "bufferUploadCalls": {
+            "start": 868,
+            "end": 868,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "skinUploadBytes": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "skinPaletteUploadBytes": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "drawCalls": {
+            "start": 2221,
+            "end": 4639,
+            "delta": 2418,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 39,
+            "perSecond": 2381.796690195456
+          },
+          "primitiveTests": {
+            "start": 2783,
+            "end": 5201,
+            "delta": 2418,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 39,
+            "perSecond": 2381.796690195456
+          },
+          "primitiveCulled": {
+            "start": 20,
+            "end": 20,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "instancedDrawCalls": {
+            "start": 207,
+            "end": 207,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "instancesDrawn": {
+            "start": 2763,
+            "end": 5181,
+            "delta": 2418,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 39,
+            "perSecond": 2381.796690195456
+          },
+          "trianglesDrawn": {
+            "start": 2956954,
+            "end": 7129058,
+            "delta": 4172104,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 67292,
+            "perSecond": 4109637.509657247
+          },
+          "overlapTests": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "overlapNodeTests": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "instancePagesCreated": {
+            "start": 207,
+            "end": 207,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "instanceBuffersCreated": {
+            "start": 208,
+            "end": 208,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "instanceBindGroupsCreated": {
+            "start": 207,
+            "end": 207,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "instanceUploadBytes": {
+            "start": 83888,
+            "end": 83888,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "queueScratchGrowths": {
+            "start": 20,
+            "end": 20,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "pipelineChanges": {
+            "start": 84,
+            "end": 208,
+            "delta": 124,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 2,
+            "perSecond": 122.14342001002339
+          },
+          "bindGroupChanges": {
+            "start": 2331,
+            "end": 4873,
+            "delta": 2542,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 41,
+            "perSecond": 2503.9401102054794
+          },
+          "geometryCacheHits": {
+            "start": 753,
+            "end": 753,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "materialCacheHits": {
+            "start": 112,
+            "end": 112,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.rootBlend": {
+            "start": 5,
+            "end": 5,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.rootUnsupported": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.rootBounds": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.rootAsset": {
+            "start": 49,
+            "end": 111,
+            "delta": 62,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 1,
+            "perSecond": 61.071710005011695
+          },
+          "batchBreaks.rootOverlap": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawCap": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawOrdinal": {
+            "start": 207,
+            "end": 207,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawAsset": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawDeformed": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawMirror": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawMaterial": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawPrimitive": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          },
+          "batchBreaks.drawOptions": {
+            "start": 0,
+            "end": 0,
+            "delta": 0,
+            "perProfilerFrame": null,
+            "perApplicationRaf": 0,
+            "perSecond": 0
+          }
+        },
+        "scope": "glTF counters only; not whole-renderer allocation totals",
+        "gauges": {
+          "start": {
+            "batchBreaks": {
+              "drawAsset": 0,
+              "drawCap": 0,
+              "drawDeformed": 0,
+              "drawMaterial": 0,
+              "drawMirror": 0,
+              "drawOptions": 0,
+              "drawOrdinal": 207,
+              "drawPrimitive": 0,
+              "rootAsset": 49,
+              "rootBlend": 5,
+              "rootBounds": 0,
+              "rootOverlap": 0,
+              "rootUnsupported": 0
+            },
+            "bindGroupChanges": 2331,
+            "bufferUploadCalls": 868,
+            "cachedAssets": 7,
+            "cpuDeformedVertices": 0,
+            "drawCalls": 2221,
+            "geometryCacheHits": 753,
+            "geometryResources": 258,
+            "instanceBindGroupsCreated": 207,
+            "instanceBufferBytes": 164368,
+            "instanceBuffersCreated": 208,
+            "instancePagesActive": 207,
+            "instancePagesCreated": 207,
+            "instancePagesRetained": 207,
+            "instanceUploadBytes": 83888,
+            "instancedDrawCalls": 207,
+            "instancesDrawn": 2763,
+            "materialCacheHits": 112,
+            "materialResources": 74,
+            "overlapNodeTests": 0,
+            "overlapTests": 0,
+            "pipelineChanges": 84,
+            "primitiveCulled": 20,
+            "primitiveTests": 2783,
+            "queueScratchBytes": 21552,
+            "queueScratchGrowths": 20,
+            "rigidUploadBytes": 14664320,
+            "skinPaletteUploadBytes": 0,
+            "skinUploadBytes": 0,
+            "trianglesDrawn": 2956954,
+            "uniformUploadBytes": 534608
+          },
+          "end": {
+            "batchBreaks": {
+              "drawAsset": 0,
+              "drawCap": 0,
+              "drawDeformed": 0,
+              "drawMaterial": 0,
+              "drawMirror": 0,
+              "drawOptions": 0,
+              "drawOrdinal": 207,
+              "drawPrimitive": 0,
+              "rootAsset": 111,
+              "rootBlend": 5,
+              "rootBounds": 0,
+              "rootOverlap": 0,
+              "rootUnsupported": 0
+            },
+            "bindGroupChanges": 4873,
+            "bufferUploadCalls": 868,
+            "cachedAssets": 7,
+            "cpuDeformedVertices": 0,
+            "drawCalls": 4639,
+            "geometryCacheHits": 753,
+            "geometryResources": 258,
+            "instanceBindGroupsCreated": 207,
+            "instanceBufferBytes": 164368,
+            "instanceBuffersCreated": 208,
+            "instancePagesActive": 207,
+            "instancePagesCreated": 207,
+            "instancePagesRetained": 207,
+            "instanceUploadBytes": 83888,
+            "instancedDrawCalls": 207,
+            "instancesDrawn": 5181,
+            "materialCacheHits": 112,
+            "materialResources": 74,
+            "overlapNodeTests": 0,
+            "overlapTests": 0,
+            "pipelineChanges": 208,
+            "primitiveCulled": 20,
+            "primitiveTests": 5201,
+            "queueScratchBytes": 21552,
+            "queueScratchGrowths": 20,
+            "rigidUploadBytes": 14664320,
+            "skinPaletteUploadBytes": 0,
+            "skinUploadBytes": 0,
+            "trianglesDrawn": 7129058,
+            "uniformUploadBytes": 534608
+          }
+        }
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 0.9868000001430512,
+          "native": {
+            "stressModels": 0,
+            "active": false,
+            "paused": true,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 0,
+              "visual": 0
+            },
+            "playerPosition": {
+              "x": 0,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 2.020100000143051,
+          "native": {
+            "stressModels": 0,
+            "active": false,
+            "paused": true,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 0,
+              "visual": 0
+            },
+            "playerPosition": {
+              "x": 0,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 0,
+        "cullingObserved": false,
+        "cullingRequiredForShortSmoke": false
+      },
+      "missedFrameFraction": 0,
+      "rafInterval": {
+        "count": 61,
+        "median": 16.699999999999818,
+        "mean": 16.6655737704918,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 1.533333333333335,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "rafCallbackCpu": {
+        "count": 62,
+        "median": 0.6000001430511475,
+        "mean": 0.7064516275159775,
+        "p95": 1.0999999046325684,
+        "p99": 3.700000047683716,
+        "max": 3.700000047683716,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuPassMs": null,
+      "gpuSamples": 0,
+      "gpuAvailable": false,
+      "cpuScopes": {},
+      "sampledCpuScopeMs": {},
+      "gpuSupported": false,
+      "gpuError": null,
+      "renderer": {
+        "total": 133,
+        "visible": 2,
+        "culled": 131,
+        "drawCalls": 39,
+        "uploadBytes": 352,
+        "prepareMs": 0.7000000476837158,
+        "fps": 60.01936044526977,
+        "frameMs": 16.661290499952532
+      },
+      "debug": {
+        "bvhNodes": 0,
+        "cpuMs": 0.7000000476837158,
+        "cullCached": true,
+        "cullMs": 0,
+        "culled": 131,
+        "drawCalls": 40,
+        "dynamicRebuilds": 0,
+        "enabled": false,
+        "font3d": {
+          "geometryBytes": 0,
+          "instanceGeometryBytes": 0,
+          "runtime": {
+            "cachedGlyphs": 0,
+            "fonts": 0,
+            "layoutRebuilds": 0,
+            "liveGlyphs": 0,
+            "syncUpdates": 0,
+            "texts": 0
+          }
+        },
+        "fps": 60.01936044526977,
+        "frameMs": 16.661290499952532,
+        "frameP95Ms": 28.599999845027924,
+        "gltf": {
+          "batchBreaks": {
+            "drawAsset": 0,
+            "drawCap": 0,
+            "drawDeformed": 0,
+            "drawMaterial": 0,
+            "drawMirror": 0,
+            "drawOptions": 0,
+            "drawOrdinal": 207,
+            "drawPrimitive": 0,
+            "rootAsset": 109,
+            "rootBlend": 5,
+            "rootBounds": 0,
+            "rootOverlap": 0,
+            "rootUnsupported": 0
+          },
+          "bindGroupChanges": 4791,
+          "bufferUploadCalls": 868,
+          "cachedAssets": 7,
+          "cpuDeformedVertices": 0,
+          "drawCalls": 4561,
+          "geometryCacheHits": 753,
+          "geometryResources": 258,
+          "instanceBindGroupsCreated": 207,
+          "instanceBufferBytes": 164368,
+          "instanceBuffersCreated": 208,
+          "instancePagesActive": 207,
+          "instancePagesCreated": 207,
+          "instancePagesRetained": 207,
+          "instanceUploadBytes": 83888,
+          "instancedDrawCalls": 207,
+          "instancesDrawn": 5103,
+          "materialCacheHits": 112,
+          "materialResources": 74,
+          "overlapNodeTests": 0,
+          "overlapTests": 0,
+          "pipelineChanges": 204,
+          "primitiveCulled": 20,
+          "primitiveTests": 5123,
+          "queueScratchBytes": 21552,
+          "queueScratchGrowths": 20,
+          "rigidUploadBytes": 14664320,
+          "skinPaletteUploadBytes": 0,
+          "skinUploadBytes": 0,
+          "trianglesDrawn": 6994474,
+          "uniformUploadBytes": 534608
+        },
+        "gltfDraws": {
+          "draws": [],
+          "enabled": false,
+          "limit": 20000
+        },
+        "hudFrames": 0,
+        "hudRefreshes": 0,
+        "instanceUploadPages": 0,
+        "mainDrawCalls": 39,
+        "mainViewCache": {
+          "hits": 93,
+          "instanceUploadBytes": 0,
+          "misses": 8,
+          "slot": 0,
+          "slots": 1
+        },
+        "neonGlow": {
+          "bufferBytes": 0,
+          "cachedMeshes": 0,
+          "draws": 0,
+          "enabled": false,
+          "segments": 0
+        },
+        "numericFont": {
+          "geometryBytes": 0,
+          "glyphMeshes": 0,
+          "instanceGeometryBytes": 0,
+          "liveGlyphs": 0,
+          "panels": 0
+        },
+        "objectTests": 0,
+        "sharedMeshes": {
+          "assets": 1,
+          "colorTableBytes": 16,
+          "geometryBytes": 15360,
+          "gpuMeshes": 1,
+          "instanceGeometryBytes": 215040,
+          "liveInstances": 14
+        },
+        "staticRebuilds": 0,
+        "total": 133,
+        "translucency": {
+          "cachedMeshes": 0,
+          "draws": 0,
+          "fullIndices": 0,
+          "indexBufferBytes": 0,
+          "submittedIndices": 0
+        },
+        "visible": 2,
+        "xrCuts": 0,
+        "xrRoundRemaining": null
+      },
+      "heapBytes": 10857989,
+      "backend": "BrowserWebGpu",
+      "profiling": false,
+      "frames": 62,
+      "commands": {
+        "transforms": 0,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0
+      },
+      "capture": {
+        "file": "baseline-rim-static-1-pair0.png",
+        "sha256": "97ae8a8f077b594f3517876925627d339b4d35fb48040f962c1c46bd35e63cb2"
+      },
+      "elapsedMs": 1015.2000000476837
+    }
+  ],
+  "limits": {
+    "maxTimeSeconds": 1800,
+    "maxMemoryMB": 512,
+    "memoryScope": "performance.memory JS heap only; GPU/process memory unavailable",
+    "maxLoad": 1024,
+    "slowFrameMs": 250,
+    "maxSlowFrames": 20
+  },
+  "evidence": "desktop headless; no physical headset acceptance; no Three equivalence",
+  "browser": "Chrome/156.0.8078.48",
+  "baselineBuildFingerprint": null,
+  "hardware": {
+    "devices": [
+      {
+        "vendorId": 4203,
+        "deviceId": 0,
+        "vendorString": "Google Inc. (Apple)",
+        "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+        "driverVendor": "Apple",
+        "driverVersion": "26.6.1"
+      }
+    ],
+    "auxAttributes": {
+      "amdSwitchable": false,
+      "canSupportThreadedTextureMailbox": false,
+      "directRenderingVersion": "",
+      "displayType": "ANGLE_METAL",
+      "glExtensions": "GL_AMD_performance_monitor GL_ANGLE_base_vertex_base_instance_shader_builtin GL_ANGLE_blob_cache GL_ANGLE_client_arrays GL_ANGLE_clip_cull_distance GL_ANGLE_compressed_texture_etc GL_ANGLE_depth_texture GL_ANGLE_framebuffer_blit GL_ANGLE_framebuffer_multisample GL_ANGLE_get_serialized_context_string GL_ANGLE_get_tex_level_parameter GL_ANGLE_instanced_arrays GL_ANGLE_memory_size GL_ANGLE_pack_reverse_row_order GL_ANGLE_polygon_mode GL_ANGLE_program_binary_readiness_query GL_ANGLE_program_cache_control GL_ANGLE_provoking_vertex GL_ANGLE_renderability_validation GL_ANGLE_request_extension GL_ANGLE_rgbx_internal_format GL_ANGLE_robust_client_memory GL_ANGLE_shader_pixel_local_storage GL_ANGLE_shader_pixel_local_storage_coherent GL_ANGLE_stencil_texturing GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_ANGLE_texture_multisample GL_ANGLE_translated_shader_source GL_APPLE_clip_distance GL_ARM_rgba8 GL_CHROMIUM_bind_generates_resource GL_CHROMIUM_bind_uniform_location GL_CHROMIUM_copy_texture GL_CHROMIUM_lose_context GL_EXT_base_instance GL_EXT_blend_func_extended GL_EXT_blend_minmax GL_EXT_clip_control GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_conservative_depth GL_EXT_debug_label GL_EXT_debug_marker GL_EXT_depth_clamp GL_EXT_discard_framebuffer GL_EXT_disjoint_timer_query GL_EXT_draw_buffers GL_EXT_draw_buffers_indexed GL_EXT_draw_elements_base_vertex GL_EXT_float_blend GL_EXT_frag_depth GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_multisampled_render_to_texture GL_EXT_occlusion_query_boolean GL_EXT_polygon_offset_clamp GL_EXT_pvrtc_sRGB GL_EXT_read_format_bgra GL_EXT_render_snorm GL_EXT_robustness GL_EXT_sRGB GL_EXT_shader_texture_lod GL_EXT_texture_compression_bptc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_compression_s3tc_srgb GL_EXT_texture_filter_anisotropic GL_EXT_texture_format_BGRA8888 GL_EXT_texture_mirror_clamp_to_edge GL_EXT_texture_norm16 GL_EXT_texture_rg GL_EXT_texture_sRGB_R8 GL_EXT_texture_sRGB_RG8 GL_EXT_texture_shadow_lod GL_EXT_texture_storage GL_IMG_texture_compression_pvrtc GL_KHR_debug GL_KHR_parallel_shader_compile GL_KHR_robustness GL_KHR_texture_compression_astc_hdr GL_KHR_texture_compression_astc_ldr GL_KHR_texture_compression_astc_sliced_3d GL_MESA_framebuffer_flip_y GL_NV_fence GL_NV_framebuffer_blit GL_NV_pixel_buffer_object GL_NV_shader_noperspective_interpolation GL_OES_EGL_image GL_OES_EGL_sync GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_depth32 GL_OES_depth_texture GL_OES_draw_buffers_indexed GL_OES_draw_elements_base_vertex GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_get_program_binary GL_OES_mapbuffer GL_OES_packed_depth_stencil GL_OES_required_internalformat GL_OES_rgb8_rgba8 GL_OES_sample_variables GL_OES_shader_multisample_interpolation GL_OES_standard_derivatives GL_OES_surfaceless_context GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_texture_stencil8 GL_OES_vertex_array_object GL_QCOM_render_shared_exponent ",
+      "glImplementationParts": "(gl=egl-angle,angle=metal)",
+      "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+      "glResetNotificationStrategy": 33362,
+      "glVendor": "Google Inc. (Apple)",
+      "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28973 git hash: 3b89d84e9d59)",
+      "glWsExtensions": "",
+      "glWsVendor": "",
+      "glWsVersion": "",
+      "inProcessGpu": false,
+      "initializationTime": 0.074873,
+      "isAsan": false,
+      "isClangCoverage": false,
+      "jpegDecodeAcceleratorSupported": false,
+      "maxMsaaSamples": "4",
+      "optimus": false,
+      "passthroughCmdDecoder": true,
+      "pixelShaderVersion": "3.00",
+      "processCrashCount": 0,
+      "sandboxed": true,
+      "skiaBackendType": "GraphiteDawnMetal",
+      "subpixelFontRendering": true,
+      "targetCpuBits": 64,
+      "vertexShaderVersion": "3.00",
+      "visibilityCallbackCallCount": 0
+    },
+    "featureStatus": {
+      "2d_canvas": "enabled",
+      "direct_rendering_display_compositor": "disabled_off_ok",
+      "gpu_compositing": "enabled",
+      "multiple_raster_threads": "enabled_on",
+      "opengl": "enabled_on",
+      "rasterization": "enabled",
+      "raw_draw": "disabled_off_ok",
+      "skia_graphite": "enabled_on",
+      "trees_in_viz": "disabled_off",
+      "video_decode": "enabled",
+      "video_encode": "enabled",
+      "webgl": "enabled",
+      "webgpu": "enabled",
+      "webnn": "disabled_off"
+    },
+    "driverBugWorkarounds": [
+      "disable_2d_canvas_auto_flush",
+      "enable_webgl_timer_query_extensions",
+      "disabled_extension_GL_KHR_blend_equation_advanced",
+      "disabled_extension_GL_KHR_blend_equation_advanced_coherent"
+    ],
+    "videoDecoding": [],
+    "videoEncoding": []
+  },
+  "driverInputsChangedDuringRun": [],
+  "serverErrors": {
+    "baseline": [],
+    "candidate": null
+  },
+  "durationSeconds": 3.918,
+  "cleanup": [
+    {
+      "label": "owned browser",
+      "complete": true,
+      "forced": false
+    },
+    {
+      "label": "baseline server",
+      "complete": true,
+      "forced": false
+    }
+  ]
+}

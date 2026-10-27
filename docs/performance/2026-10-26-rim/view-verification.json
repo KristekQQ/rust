@@ -1,0 +1,131 @@
+{
+  "checks": [
+    {
+      "id": "rim-static-wg",
+      "rows": 3,
+      "pixel": "Pixelová kontrola prošla. Přesné pixely: ano; max. odchylka kanálu: 0",
+      "caption": "Skutečné město, modely, materiály a nativní logika examples/rim. Stejná kamera a vizuální profil v obou buildech.",
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1352.921875,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1352.921875,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "rim-active-wg",
+      "rows": 3,
+      "pixel": "Pixelová shoda není vyhodnocená. · Běžící nativní hra nemá resetovaný identický capture stav. Snímky ilustrují tutéž scénu; pixelovou regresi ověřuje klidový režim.",
+      "caption": "Nativní hra se šesti pohybujícími se nepřáteli a shodnými časovanými vstupy. Záznam počtu projektilů je níže; tento scénář neověřuje šerm ani řezy a snímky nejsou přesně synchronní.",
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1376.921875,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1376.921875,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "rim-static-gl",
+      "rows": 3,
+      "pixel": "Pixelová kontrola prošla. Přesné pixely: ne; max. odchylka kanálu: 1",
+      "caption": "Skutečné město, modely, materiály a nativní logika examples/rim. Stejná kamera a vizuální profil v obou buildech.",
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1352.921875,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1352.921875,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    },
+    {
+      "id": "rim-active-gl",
+      "rows": 3,
+      "pixel": "Pixelová shoda není vyhodnocená. · Běžící nativní hra nemá resetovaný identický capture stav. Snímky ilustrují tutéž scénu; pixelovou regresi ověřuje klidový režim.",
+      "caption": "Nativní hra se šesti pohybujícími se nepřáteli a shodnými časovanými vstupy. Záznam počtu projektilů je níže; tento scénář neověřuje šerm ani řezy a snímky nejsou přesně synchronní.",
+      "images": [
+        [
+          960,
+          640
+        ],
+        [
+          960,
+          640
+        ]
+      ],
+      "bounds": [
+        [
+          117,
+          1376.921875,
+          1046,
+          697.328125
+        ],
+        [
+          117,
+          1376.921875,
+          1046,
+          697.328125
+        ]
+      ],
+      "sliderChanged": true
+    }
+  ],
+  "mobileOverflow": false,
+  "pageErrors": [],
+  "scope": "actual standalone results UI, not renderer/headset performance"
+}

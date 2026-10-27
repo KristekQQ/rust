@@ -1,0 +1,547 @@
+{
+  "pairs-webgl": {
+    "labels": {
+      "baseline": {
+        "fps": [
+          15.409796798275377,
+          15.220944018970098,
+          15.120665309273601
+        ],
+        "fpsMedian": 15.220944018970098,
+        "callbackMedian": 21.09999990463257,
+        "drawCalls": [
+          308
+        ]
+      },
+      "candidate": {
+        "fps": [
+          20.080722906024647,
+          20.16080643225733,
+          19.389122941401773
+        ],
+        "fpsMedian": 20.080722906024647,
+        "callbackMedian": 19.200000047683716,
+        "drawCalls": [
+          308
+        ]
+      }
+    },
+    "fpsPairedRatios": [
+      1.3031140623653146,
+      1.3245437606977994,
+      1.2822929775127223
+    ],
+    "medianPairedRatio": 1.3031140623653146,
+    "ratioOfMedians": 1.3192823573227608,
+    "pixels": [
+      {
+        "pass": true,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 1,
+        "meanAbsoluteChannelDelta": 9.042245370370371e-07,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      {
+        "pass": true,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 1,
+        "meanAbsoluteChannelDelta": 9.042245370370371e-07,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      {
+        "pass": true,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 1,
+        "meanAbsoluteChannelDelta": 9.042245370370371e-07,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      }
+    ],
+    "error": null,
+    "cleanup": [
+      {
+        "label": "owned browser",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "baseline server",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "candidate server",
+        "complete": true,
+        "forced": false
+      }
+    ],
+    "driverInputsChanged": []
+  },
+  "pairs-webgpu": {
+    "labels": {
+      "baseline": {
+        "fps": [
+          36.28145125805026,
+          38.8815552622104,
+          37.20148805952231
+        ],
+        "fpsMedian": 37.20148805952231,
+        "callbackMedian": 22.5,
+        "drawCalls": [
+          308
+        ]
+      },
+      "candidate": {
+        "fps": [
+          38.93554847555725,
+          38.6817019948877,
+          38.90739080312525
+        ],
+        "fpsMedian": 38.90739080312525,
+        "callbackMedian": 22.299999952316284,
+        "drawCalls": [
+          308
+        ]
+      }
+    },
+    "fpsPairedRatios": [
+      1.0731530058880454,
+      0.9948599466771604,
+      1.0458557663304622
+    ],
+    "medianPairedRatio": 1.0458557663304622,
+    "ratioOfMedians": 1.0458557663304624,
+    "pixels": [
+      {
+        "pass": true,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 5,
+        "meanAbsoluteChannelDelta": 4.159432870370371e-06,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      {
+        "pass": true,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 60,
+        "meanAbsoluteChannelDelta": 6.496853298611112e-05,
+        "changedPixels": 22,
+        "changedFraction": 3.978587962962963e-06,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      {
+        "pass": true,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 17,
+        "meanAbsoluteChannelDelta": 6.1939380787037035e-06,
+        "changedPixels": 2,
+        "changedFraction": 3.616898148148148e-07,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      }
+    ],
+    "error": null,
+    "cleanup": [
+      {
+        "label": "owned browser",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "baseline server",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "candidate server",
+        "complete": true,
+        "forced": false
+      }
+    ],
+    "driverInputsChanged": []
+  },
+  "three-gl": {
+    "labels": {
+      "baseline": {
+        "fps": [
+          15.931279345776819,
+          13.378355103201578,
+          16.000576020736744
+        ],
+        "fpsMedian": 15.931279345776819,
+        "callbackMedian": 17.600000143051147,
+        "drawCalls": [
+          308
+        ]
+      },
+      "candidate": {
+        "fps": [
+          26.023657143314008,
+          24.040961638465554,
+          24.754061588746133
+        ],
+        "fpsMedian": 24.754061588746133,
+        "callbackMedian": 1.7999999523162842,
+        "drawCalls": [
+          108
+        ]
+      }
+    },
+    "fpsPairedRatios": [
+      1.6334944971141037,
+      1.797004299333653,
+      1.5470731526580588
+    ],
+    "medianPairedRatio": 1.6334944971141037,
+    "ratioOfMedians": 1.5538024945440507,
+    "pixels": [
+      {
+        "pass": null,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 210,
+        "meanAbsoluteChannelDelta": 4.543614908854167,
+        "changedPixels": 1081742,
+        "changedFraction": 0.1956275318287037,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+      },
+      {
+        "pass": null,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 210,
+        "meanAbsoluteChannelDelta": 4.543614908854167,
+        "changedPixels": 1081742,
+        "changedFraction": 0.1956275318287037,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+      },
+      {
+        "pass": null,
+        "exact": false,
+        "width": 2880,
+        "height": 1920,
+        "maxChannelDelta": 210,
+        "meanAbsoluteChannelDelta": 4.543614908854167,
+        "changedPixels": 1081742,
+        "changedFraction": 0.1956275318287037,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+      }
+    ],
+    "error": null,
+    "cleanup": [
+      {
+        "label": "owned browser",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "baseline server",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "candidate server",
+        "complete": true,
+        "forced": false
+      }
+    ],
+    "driverInputsChanged": []
+  },
+  "control-webgl": {
+    "labels": {
+      "baseline": {
+        "fps": [
+          60.0015000375009
+        ],
+        "fpsMedian": 60.0015000375009,
+        "callbackMedian": 1.1000001430511475,
+        "drawCalls": [
+          40
+        ]
+      },
+      "candidate": {
+        "fps": [
+          60.003000150007416
+        ],
+        "fpsMedian": 60.003000150007416,
+        "callbackMedian": 1.1000001430511475,
+        "drawCalls": [
+          40
+        ]
+      }
+    },
+    "fpsPairedRatios": [
+      1.0000250012500618
+    ],
+    "medianPairedRatio": 1.0000250012500618,
+    "ratioOfMedians": 1.0000250012500618,
+    "pixels": [
+      {
+        "pass": true,
+        "exact": false,
+        "width": 960,
+        "height": 640,
+        "maxChannelDelta": 1,
+        "meanAbsoluteChannelDelta": 4.069010416666667e-07,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      }
+    ],
+    "error": null,
+    "cleanup": [
+      {
+        "label": "owned browser",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "baseline server",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "candidate server",
+        "complete": true,
+        "forced": false
+      }
+    ],
+    "driverInputsChanged": []
+  },
+  "control-webgpu": {
+    "labels": {
+      "baseline": {
+        "fps": [
+          60.002744408268086
+        ],
+        "fpsMedian": 60.002744408268086,
+        "callbackMedian": 0.5999999046325684,
+        "drawCalls": [
+          40
+        ]
+      },
+      "candidate": {
+        "fps": [
+          60.002250084378105
+        ],
+        "fpsMedian": 60.002250084378105,
+        "callbackMedian": 0.5999999046325684,
+        "drawCalls": [
+          40
+        ]
+      }
+    },
+    "fpsPairedRatios": [
+      0.9999917616453239
+    ],
+    "medianPairedRatio": 0.9999917616453239,
+    "ratioOfMedians": 0.9999917616453238,
+    "pixels": [
+      {
+        "pass": true,
+        "exact": false,
+        "width": 960,
+        "height": 640,
+        "maxChannelDelta": 1,
+        "meanAbsoluteChannelDelta": 4.069010416666667e-07,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      }
+    ],
+    "error": null,
+    "cleanup": [
+      {
+        "label": "owned browser",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "baseline server",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "candidate server",
+        "complete": true,
+        "forced": false
+      }
+    ],
+    "driverInputsChanged": []
+  },
+  "deployment": {
+    "time": "2026-10-26T22:44:42.886225+00:00",
+    "origin": "https://192.168.0.17:8443",
+    "releaseId": "3064e3f3ea",
+    "build": {
+      "source": "535ac6bc5010023563b42dca1688247e76b623247d0a7ebdb697e8eb1fdb1509",
+      "wasm": "dcce4c0c43ed29bf26bbdefa2830823cd3c9bffd34d1d0d47a786f1d84415b48",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "payloads": [
+      {
+        "url": "examples/rim/?backend=webgpu",
+        "status": 200,
+        "sha256": "98886f8aa8553668df4b55022bd948ab423cc42ac918fda612f0a6087e55e4f2",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim/?backend=webgl",
+        "status": 200,
+        "sha256": "98886f8aa8553668df4b55022bd948ab423cc42ac918fda612f0a6087e55e4f2",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim-three/",
+        "status": 200,
+        "sha256": "536d5164ae42e17036365c21eac796cc7669799a2880a507e8d6bc6d73485b95",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim/main.js",
+        "status": 200,
+        "sha256": "0d5fa66492bcf3d9904618ccb898a7edc71821fc60ff22b853054b202d9dce6d",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim/scene.js",
+        "status": 200,
+        "sha256": "807db15ff6e430f6a98fd6d29cd4b7b5587b77198afb2968b81b3f27371c024d",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim/stress.js",
+        "status": 200,
+        "sha256": "fff2b9ea8e8bd0f1720c78507306e7720fce09b0b479387f10d7f05a49f0bea8",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "js/engine.js",
+        "status": 200,
+        "sha256": "248f0cb6725a257d8ef7a997949a37b257dee6fe547b2b23ddb3e99e90fbfc76",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "js/webxr.js",
+        "status": 200,
+        "sha256": "fc95f2f24650c693b0c2c8ce7265b3e707150cc2a41478f8b60a7a06b57cbc07",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "pkg/webgpu_wasm.js",
+        "status": 200,
+        "sha256": "e64edc2b3bc9f35fb6bade2fe19509371a0fac429f559baa9f59e857d4123cf7",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "pkg/webgpu_wasm_bg.wasm",
+        "status": 200,
+        "sha256": "dcce4c0c43ed29bf26bbdefa2830823cd3c9bffd34d1d0d47a786f1d84415b48",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim-three/stress.js",
+        "status": 200,
+        "sha256": "f77a693910adddc8067a51e61c25618390aa2880a698acbe87b93db5b25db531",
+        "noStore": true,
+        "tls": true
+      },
+      {
+        "url": "examples/rim-three/vendor/three.module.js",
+        "status": 200,
+        "sha256": "009c124ea8ed0beb9fe3166002295fb8dbe1bfb1a2c1cac3600a601ea7017e05",
+        "noStore": true,
+        "tls": true
+      }
+    ],
+    "preservedNeon": [
+      {
+        "file": "examples/neon-arena/index.html",
+        "sha256": "c0be15a7f58de4537ae18228fbbe9d4490cace33948934ad3b9c6796d1416c72",
+        "unchanged": true
+      },
+      {
+        "file": "examples/neon-arena/main.js",
+        "sha256": "5eb38b06d69c478b13bb97e10dd3b4b011659b10341fa478d1765ca857bdc74e",
+        "unchanged": true
+      },
+      {
+        "file": "js/engine.js",
+        "sha256": "99803708beb4035a059cdde7b1fc7664421a3188937c97857684df35c6d399e4",
+        "unchanged": true
+      },
+      {
+        "file": "pkg/webgpu_wasm.js",
+        "sha256": "79b9437a7d7114a290d3211758a2f74bf18b758e44380d6c0a974ae61a979ec3",
+        "unchanged": true
+      },
+      {
+        "file": "pkg/webgpu_wasm_bg.wasm",
+        "sha256": "547dc1ddf654b463ad961fe145b6555b598a29199ff6eeeeaedce346c6b3417c",
+        "unchanged": true
+      }
+    ],
+    "files": 254,
+    "backup": "output/production-before-light-classes-20261026",
+    "install": "verified package directory swap through existing shared serve:quest server; no restart or modification of primary watcher/arena",
+    "serverPID": 76565,
+    "productionBrowserCases": 10,
+    "physicalQuestCandidate": false,
+    "commitPushCI": false
+  }
+}

@@ -1,0 +1,10 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {stats,pixelDifference} from '../../scripts/render-performance-lib.mjs';
+const {PNG}=createRequire(import.meta.url)('pngjs'),b='output/render-performance';
+const meta=JSON.parse(await fs.readFile(b+'/extra-series.json','utf8')),groups=[...new Set(meta.flatMap(m=>m.role?[m.role.group]:[]))],summary=[];
+for(const group of groups){const entries=meta.filter(m=>m.role?.group===group&&m.exitCode===0);if(entries.length!==6)continue;const pairs=[];for(let pair=0;pair<3;pair++){const reports={};for(const role of ['before','after']){const e=entries.find(e=>e.role.pair===pair&&e.role.role===role),report=JSON.parse(await fs.readFile(b+'/'+e.name+'/report.json','utf8'));reports[role]={entry:e,result:report.results[0]};}
+const a=reports.before,c=reports.after,pixel=pixelDifference(PNG.sync.read(await fs.readFile(path.join(b,a.entry.name,a.result.capture.file))),PNG.sync.read(await fs.readFile(path.join(b,c.entry.name,c.result.capture.file))));pairs.push({pair,cpuBefore:a.result.rafCallbackCpu.median,cpuAfter:c.result.rafCallbackCpu.median,cpuRatio:c.result.rafCallbackCpu.median/a.result.rafCallbackCpu.median,rafRatio:c.result.rafInterval.median/a.result.rafInterval.median,pixel});}
+const ratio=stats(pairs.map(p=>p.cpuRatio),1),regression=ratio.median>1.05&&pairs.every(p=>p.cpuRatio>1.03),pixelRegression=pairs.some(p=>!p.pixel.pass);summary.push({group,pairs,ratio,regression,pixelRegression,protocol:'three AB/BA/AB fixed-load secondary controls;1s warmup/5s measured; medianCPU>5% and allpairs>3% flags investigation, not statistical confidence'});if(regression||pixelRegression)await fs.writeFile(b+'/hold-final-series',group+' requires inspection');}
+await fs.writeFile(b+'/adversarial-summary.json',JSON.stringify(summary,null,2));console.log(JSON.stringify(summary.map(({group,ratio,regression,pixelRegression})=>({group,cpuRatio:ratio.median,regression,pixelRegression}))));

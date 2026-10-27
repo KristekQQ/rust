@@ -15858,7 +15858,13 @@ mod projectile;
 #[cfg(target_arch = "wasm32")]
 pub mod render;
 pub mod render_appearance;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod render_batch;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod render_lights;
 pub mod render_math;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod render_overlap;
 pub mod rim_cut;
 pub mod rim_game;
 pub mod rim_movement;
@@ -19495,6 +19501,10 @@ pub struct Effects {
     pub stats: EffectStats,
 }
 impl Effects {
+    // Select from the exact uploaded uniform, including auxiliary-view changes.
+    pub(super) fn single_static_shadow(&self) -> bool {
+        self.last_uniform.params[0] == 1.0 && self.last_uniform.shadow_layers == [1, 0, 0, 0]
+    }
     pub fn new(device: &wgpu::Device) -> Self {
         let mut entries = vec![];
         for binding in [6, 7, 8, 9, 10, 11] {
@@ -20056,20 +20066,51 @@ struct Vertex {
     color: [f32; 4],
 }
 impl Vertex {
-    fn attributes(texture_mask: u8) -> Vec<wgpu::VertexAttribute> {
+    fn attributes(texture_mask: u8, compact: bool) -> Vec<wgpu::VertexAttribute> {
         const A: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![0=>Float32x3,1=>Float32x3,2=>Float32x4,3=>Float32x2,4=>Float32x2,5=>Float32x2,6=>Float32x2,7=>Float32x2,8=>Float32x4];
+        let mut offset = 0;
         A.into_iter()
             .filter(|a| {
-                a.shader_location < 3
+                a.shader_location < 2
+                    || (a.shader_location == 2 && texture_mask & (1 << 2) != 0)
                     || a.shader_location == 8
-                    || a.shader_location == 5
-                    || texture_mask & (1 << (a.shader_location - 3)) != 0
+                    || (a.shader_location >= 3
+                        && texture_mask & (1 << (a.shader_location - 3)) != 0)
+            })
+            .map(|mut a| {
+                if compact {
+                    a.offset = offset;
+                    offset += a.format.size();
+                }
+                a
             })
             .collect()
     }
-    fn layout(attributes: &[wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'_> {
+    /// Lossless immutable GPU storage: omit only attributes the material's
+    /// existing pipeline already omits. CPU query/deformation vertices stay 96B.
+    fn compact(vertices: &[Self], texture_mask: u8) -> Vec<u8> {
+        let attributes = Self::attributes(texture_mask, false);
+        let stride = attributes
+            .iter()
+            .map(|a| a.format.size() as usize)
+            .sum::<usize>();
+        let mut packed = Vec::with_capacity(vertices.len() * stride);
+        for vertex in vertices {
+            let bytes = as_bytes(std::slice::from_ref(vertex));
+            for a in &attributes {
+                let start = a.offset as usize;
+                packed.extend_from_slice(&bytes[start..start + a.format.size() as usize]);
+            }
+        }
+        packed
+    }
+    fn layout(attributes: &[wgpu::VertexAttribute], compact: bool) -> wgpu::VertexBufferLayout<'_> {
         wgpu::VertexBufferLayout {
-            array_stride: 96,
+            array_stride: if compact {
+                attributes.iter().map(|a| a.format.size()).sum()
+            } else {
+                96
+            },
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes,
         }
@@ -20101,22 +20142,35 @@ impl RigidInstance {
     }
 }
 struct InstancePage {
-    buffer: wgpu::Buffer,
+    buffer: Option<wgpu::Buffer>,
     material_buffer: wgpu::Buffer,
     bind: wgpu::BindGroup,
     material: Option<Uniform>,
     capacity: usize,
-    last: Vec<RigidInstance>,
+    last: Vec<u8>,
+}
+// Bounded pass/view-owned stream. Material uniforms remain per draw group;
+// only the existing rigid instance records share one contiguous upload.
+struct InstanceStream {
+    buffer: wgpu::Buffer,
+    // Bytes, because groups can mix 16B translation and 112B affine records.
+    capacity: usize,
+    last: Vec<u8>,
+    scratch: Vec<u8>,
+}
+struct InstanceBinding {
+    buffer: wgpu::Buffer,
+    offset: u64,
+    bytes: u64,
 }
 struct PreparedDraw {
     variant: Variant,
-    material_identity: usize,
-    textures: wgpu::BindGroup,
+    textures: Rc<wgpu::BindGroup>,
     bind: wgpu::BindGroup,
     vertex: wgpu::Buffer,
     index: wgpu::Buffer,
     skin: Option<wgpu::Buffer>,
-    instance: Option<wgpu::Buffer>,
+    instance: Option<InstanceBinding>,
     count: u32,
     instances: u32,
     records: Vec<(u32, usize, usize)>,
@@ -20140,8 +20194,9 @@ struct QueueScratch {
     cursors: Vec<usize>,
     ordered: Vec<QueueItem>,
     groups: Vec<std::ops::Range<usize>>,
-    occupied: Vec<(Vec3, Vec3)>,
-    payload: Vec<RigidInstance>,
+    occupied: crate::render_overlap::OrderedBounds,
+    payload: Vec<u8>,
+    translated: Vec<bool>,
 }
 impl QueueScratch {
     fn clear(&mut self) {
@@ -20152,8 +20207,9 @@ impl QueueScratch {
         self.groups.clear();
         self.occupied.clear();
         self.payload.clear();
+        self.translated.clear();
     }
-    fn capacities(&self) -> [usize; 7] {
+    fn capacities(&self) -> [usize; 8] {
         [
             self.eligible.capacity(),
             self.model_ranges.capacity(),
@@ -20162,6 +20218,7 @@ impl QueueScratch {
             self.groups.capacity(),
             self.occupied.capacity(),
             self.payload.capacity(),
+            self.translated.capacity(),
         ]
     }
     fn bytes(&self) -> usize {
@@ -20171,43 +20228,58 @@ impl QueueScratch {
             std::mem::size_of::<usize>(),
             std::mem::size_of::<QueueItem>(),
             std::mem::size_of::<std::ops::Range<usize>>(),
-            std::mem::size_of::<(Vec3, Vec3)>(),
-            std::mem::size_of::<RigidInstance>(),
+            0,
+            1,
+            std::mem::size_of::<bool>(),
         ];
         self.capacities()
             .into_iter()
             .zip(sizes)
             .map(|(n, size)| n * size)
-            .sum()
+            .sum::<usize>()
+            + self.occupied.bytes()
     }
     fn singleton(&mut self, item: QueueItem) {
         let start = self.ordered.len();
         self.ordered.push(item);
         self.groups.push(start..start + 1);
     }
-    fn append_compatible(&mut self, item: QueueItem, models: &[(u32, &GpuModel)]) {
+    fn append_compatible(&mut self, item: QueueItem, models: &[(u32, &GpuModel)]) -> Option<usize> {
         let model = models[item.model].1;
         let draw = &model.draws[item.draw];
-        let compatible = self.groups.last().is_some_and(|range| {
+        // First failed condition, in the original short-circuit order. A first
+        // group is not a rejected merge; no counter is emitted for that case.
+        let rejection = self.groups.last().map(|range| {
             let previous = self.ordered[range.start];
             let other_model = models[previous.model].1;
             let other = &other_model.draws[previous.draw];
-            range.len() < 1024
-                && previous.draw == item.draw
-                && Rc::ptr_eq(&other_model._shared, &model._shared)
-                && draw.rigid
-                && other.rigid
-                && draw.negative == other.negative
-                && draw.material == other.material
-                && draw.primitive == other.primitive
-                && draw.last_uniform.options == other.last_uniform.options
+            if range.len() >= 1024 {
+                Some(0)
+            } else if previous.draw != item.draw {
+                Some(1)
+            } else if !Rc::ptr_eq(&other_model._shared, &model._shared) {
+                Some(2)
+            } else if !draw.rigid || !other.rigid {
+                Some(3)
+            } else if draw.negative != other.negative {
+                Some(4)
+            } else if draw.material != other.material {
+                Some(5)
+            } else if draw.primitive != other.primitive {
+                Some(6)
+            } else if draw.last_uniform.options != other.last_uniform.options {
+                Some(7)
+            } else {
+                None
+            }
         });
-        if compatible {
+        if rejection == Some(None) {
             self.ordered.push(item);
             self.groups.last_mut().unwrap().end += 1;
         } else {
             self.singleton(item);
         }
+        rejection.flatten()
     }
 }
 
@@ -20224,8 +20296,39 @@ struct Uniform {
     normal: [[f32; 4]; 4],
     transform: [f32; 4],
 }
+impl Uniform {
+    fn affine_basis(&self) -> bool {
+        self.model[0][3] == 0.0
+            && self.model[1][3] == 0.0
+            && self.model[2][3] == 0.0
+            && self.model[3][3] == 1.0
+            && self.model.iter().flatten().all(|x| x.is_finite())
+            && self.normal[..3]
+                .iter()
+                .all(|n| n[..3].iter().all(|x| x.is_finite()))
+    }
+    fn same_basis(&self, other: &Self) -> bool {
+        other.model[3][3] == 1.0
+            && other.model[3][..3].iter().all(|x| x.is_finite())
+            && self.model[..3] == other.model[..3]
+            && (0..3).all(|i| self.normal[i][..3] == other.normal[i][..3])
+            && self.transform[..2] == other.transform[..2]
+    }
+}
+struct TranslationInstance;
+impl TranslationInstance {
+    fn layout() -> wgpu::VertexBufferLayout<'static> {
+        const A: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![9=>Float32x4];
+        wgpu::VertexBufferLayout {
+            array_stride: 16,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &A,
+        }
+    }
+}
+
 struct Material {
-    textures: wgpu::BindGroup,
+    textures: Rc<wgpu::BindGroup>,
     texture_mask: u8,
     uniform: Uniform,
     alpha: AlphaMode,
@@ -20302,8 +20405,24 @@ pub struct GltfGpuStats {
     pub cached_assets: usize,
     pub primitive_tests: u64,
     pub primitive_culled: u64,
+    pub root_bounds_tests: u64,
+    pub root_fully_inside: u64,
     pub instanced_draw_calls: u64,
+    pub translated_draw_calls: u64,
+    pub translated_instances: u64,
     pub instances_drawn: u64,
+    pub triangles_drawn: u64,
+    pub overlap_tests: u64,
+    pub overlap_node_tests: u64,
+    /// Root-run barriers with an eligible draw: blend, unsupported, bounds, asset, overlap, spatial.
+    pub root_batch_breaks: [u64; 6],
+    /// First failed merge condition: cap, ordinal, asset, rigid, mirror, material, primitive, options.
+    pub draw_batch_breaks: [u64; 8],
+    pub instance_pages_created: u64,
+    pub instance_buffers_created: u64,
+    pub instance_bind_groups_created: u64,
+    pub instance_pages_active: usize,
+    pub instance_pages_retained: usize,
     pub instance_upload_bytes: u64,
     pub instance_buffer_bytes: usize,
     pub queue_scratch_growths: u64,
@@ -20336,6 +20455,20 @@ pub struct GpuModel {
     palettes: HashMap<usize, SkinPalette>,
     last_pose: Option<(u64, Mat4, [f32; 4])>,
     active: HashSet<usize>,
+    pub opaque_reorderable: bool,
+    reorderable_draws: bool,
+    // Union of all active draw bounds, invalidated by the existing pose stamp.
+    bounds: Option<(Vec3, Vec3)>,
+    // Per-pose draw classification; not rebuilt for each eye/pass/frame.
+    active_draws: [Vec<usize>; 2],
+}
+impl GpuModel {
+    pub(crate) fn active_draw_index_bytes(&self) -> usize {
+        self.active_draws
+            .iter()
+            .map(|v| v.capacity() * std::mem::size_of::<usize>())
+            .sum()
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PipelineKey {
@@ -20347,6 +20480,8 @@ pub struct PipelineKey {
     pub material_mask: bool,
     pub packed_depth: bool,
     pub shadow: bool,
+    pub single_static_shadow: bool,
+    pub(crate) light_class: crate::render_lights::LightClass,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Variant {
@@ -20359,6 +20494,19 @@ struct Variant {
     negative: bool,
     skinned: bool,
     instanced: bool,
+    translated: bool,
+    compact_vertex: bool,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct ShaderKey {
+    texture_mask: u8,
+    shadow: bool,
+    opaque_unclipped: bool,
+    skinned: bool,
+    instanced: bool,
+    translated: bool,
+    single_static_shadow: bool,
+    light_class: crate::render_lights::LightClass,
 }
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20382,7 +20530,7 @@ pub struct GltfGpu {
     material: wgpu::BindGroupLayout,
     skin_material: Option<wgpu::BindGroupLayout>,
     // 32 map classes x (generic color, opaque unclipped color, shadow).
-    shaders: HashMap<(u8, bool, bool, bool, bool), wgpu::ShaderModule>,
+    shaders: HashMap<ShaderKey, wgpu::ShaderModule>,
     empty_layout: wgpu::BindGroupLayout,
     empty_bind: wgpu::BindGroup,
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
@@ -20391,6 +20539,8 @@ pub struct GltfGpu {
     diagnostics: Cell<bool>,
     draw_records: RefCell<Vec<DrawRecord>>,
     instance_pages: HashMap<(PipelineKey, usize), Vec<InstancePage>>,
+    instance_streams: HashMap<(PipelineKey, usize), InstanceStream>,
+    active_instance_pages: HashMap<(PipelineKey, usize), usize>,
     instancing_supported: bool,
     queue_scratch: QueueScratch,
 }
@@ -20493,6 +20643,8 @@ impl GltfGpu {
             diagnostics: Cell::new(false),
             draw_records: RefCell::new(Vec::new()),
             instance_pages: HashMap::new(),
+            instance_streams: HashMap::new(),
+            active_instance_pages: HashMap::new(),
             queue_scratch: QueueScratch::default(),
             instancing_supported: limits.max_vertex_attributes >= 16
                 && limits.max_vertex_buffers >= 2,
@@ -20614,6 +20766,7 @@ impl GltfGpu {
         let mut materials = Vec::new();
         let mut texture_cache: HashMap<(usize, bool), (wgpu::TextureView, wgpu::Sampler)> =
             HashMap::new();
+        let mut binding_cache: HashMap<[(usize, bool); 5], Rc<wgpu::BindGroup>> = HashMap::new();
         if asset
             .images
             .iter()
@@ -20643,15 +20796,21 @@ impl GltfGpu {
             let texture_mask = slots.iter().enumerate().fold(0u8, |mask, (i, slot)| {
                 mask | if slot.is_some() { 1 << i } else { 0 }
             });
+            // Only texture/sampler resources identify group 2. Colors, factors,
+            // UV sets and alpha coverage remain independent material uniforms.
+            let binding_keys: [(usize, bool); 5] = std::array::from_fn(|i| {
+                (
+                    slots[i]
+                        .map(|v| v.texture)
+                        .unwrap_or(usize::MAX - usize::from(i == 2)),
+                    i == 0 || i == 4,
+                )
+            });
             let mut views = Vec::new();
             let mut samplers = Vec::new();
             for (i, slot) in slots.iter().enumerate() {
-                let srgb = i == 0 || i == 4;
-                let cache_key = (
-                    slot.map(|v| v.texture)
-                        .unwrap_or(usize::MAX - if i == 2 { 1 } else { 0 }),
-                    srgb,
-                );
+                let (texture_identity, srgb) = binding_keys[i];
+                let cache_key = (texture_identity, srgb);
                 if let Some((view, sampler)) = texture_cache.get(&cache_key) {
                     views.push(view.clone());
                     samplers.push(sampler.clone());
@@ -20829,11 +20988,16 @@ impl GltfGpu {
                     resource: wgpu::BindingResource::Sampler(&samplers[i as usize]),
                 });
             }
-            let textures = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("glTF maps"),
-                layout: &self.textures,
-                entries: &entries,
-            });
+            let textures = binding_cache
+                .entry(binding_keys)
+                .or_insert_with(|| {
+                    Rc::new(device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("glTF maps"),
+                        layout: &self.textures,
+                        entries: &entries,
+                    }))
+                })
+                .clone();
             let alpha = source.map(|m| m.alpha_mode).unwrap_or(AlphaMode::Opaque);
             let double_sided = source.is_some_and(|m| m.double_sided);
             let uniform = Uniform {
@@ -20914,11 +21078,14 @@ impl GltfGpu {
                     })
                     .collect();
                 center /= vertices.len().max(1) as f32;
-                stats.rigid_upload_bytes += (vertices.len() * 96 + indices.len() * 4) as u64;
+                let texture_mask =
+                    materials[p.material.unwrap_or(asset.materials.len())].texture_mask;
+                let packed = Vertex::compact(&vertices, texture_mask);
+                stats.rigid_upload_bytes += (packed.len() + indices.len() * 4) as u64;
                 Some(
                     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("glTF shared rigid vertices"),
-                        contents: as_bytes(&vertices),
+                        contents: &packed,
                         usage: wgpu::BufferUsages::VERTEX,
                     }),
                 )
@@ -21000,12 +21167,19 @@ impl GltfGpu {
             stats.material_resources += shared.materials.len();
         }
         stats.queue_scratch_bytes = self.queue_scratch.bytes();
+        stats.instance_pages_active = self.active_instance_pages.values().sum();
+        stats.instance_pages_retained = self.instance_pages.values().map(Vec::len).sum();
         stats.instance_buffer_bytes = self
             .instance_pages
             .values()
             .flatten()
-            .map(|p| p.capacity * 112 + std::mem::size_of::<Uniform>())
-            .sum();
+            .map(|p| p.buffer.as_ref().map_or(0, |_| p.capacity) + std::mem::size_of::<Uniform>())
+            .sum::<usize>()
+            + self
+                .instance_streams
+                .values()
+                .map(|s| s.capacity)
+                .sum::<usize>();
         stats
     }
     fn create_model(&self, device: &wgpu::Device, shared: Rc<SharedAsset>) -> GpuModel {
@@ -21110,13 +21284,28 @@ impl GltfGpu {
             + palettes.len() as u64 * PALETTE_BYTES;
         stats.skin_palette_upload_bytes += palettes.len() as u64 * PALETTE_BYTES;
         self.counters.set(stats);
+        let reorderable_draws = draws
+            .iter()
+            .all(|d| d.rigid && materials[d.material].alpha != AlphaMode::Blend);
+        let active_draws = std::array::from_fn(|index| {
+            Vec::with_capacity(
+                draws
+                    .iter()
+                    .filter(|d| (materials[d.material].alpha == AlphaMode::Blend) == (index == 1))
+                    .count(),
+            )
+        });
         GpuModel {
+            active_draws,
+            opaque_reorderable: false,
+            reorderable_draws,
             draws,
             materials,
             _shared: shared,
             palettes,
             last_pose: None,
             active: HashSet::new(),
+            bounds: None,
         }
     }
     #[allow(clippy::too_many_arguments)] // Explicit GPU/FFI parameter layout.
@@ -21253,6 +21442,22 @@ impl GltfGpu {
             }
         }
         self.counters.set(stats);
+        for list in &mut model.active_draws {
+            list.clear();
+        }
+        for (ordinal, d) in model.draws.iter().enumerate() {
+            if model.active.contains(&d.node) {
+                let blend = model.materials[d.material].alpha == AlphaMode::Blend;
+                model.active_draws[usize::from(blend)].push(ordinal);
+            }
+        }
+        model.bounds = crate::render_overlap::union_bounds(
+            model
+                .active_draws
+                .iter()
+                .flatten()
+                .map(|&i| model.draws[i].bounds),
+        );
         model.last_pose = Some(stamp);
         Ok(bytes)
     }
@@ -21278,30 +21483,22 @@ impl GltfGpu {
             ],
             immediate_size: 0,
         });
-        let shader = self
-            .shaders
-            .entry((
-                variant.texture_mask,
-                variant.key.shadow,
-                variant.opaque_unclipped,
-                variant.skinned,
-                variant.instanced,
-            ))
-            .or_insert_with(|| {
-                device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: Some("glTF material-class shader"),
-                    source: wgpu::ShaderSource::Wgsl(
-                        material_shader_source(
-                            variant.texture_mask,
-                            variant.key.shadow,
-                            variant.opaque_unclipped,
-                            variant.skinned,
-                            variant.instanced,
-                        )
-                        .into(),
-                    ),
-                })
-            });
+        let shader_key = ShaderKey {
+            texture_mask: variant.texture_mask,
+            shadow: variant.key.shadow,
+            opaque_unclipped: variant.opaque_unclipped,
+            skinned: variant.skinned,
+            instanced: variant.instanced,
+            translated: variant.translated,
+            single_static_shadow: variant.key.single_static_shadow,
+            light_class: variant.key.light_class,
+        };
+        let shader = self.shaders.entry(shader_key).or_insert_with(|| {
+            device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("glTF material-class shader"),
+                source: wgpu::ShaderSource::Wgsl(material_shader_source(shader_key).into()),
+            })
+        });
         let mut targets = Vec::new();
         if !variant.key.shadow {
             targets.push(Some(wgpu::ColorTargetState {
@@ -21321,10 +21518,12 @@ impl GltfGpu {
                 }));
             }
         }
-        let attributes = Vertex::attributes(variant.texture_mask);
+        let attributes = Vertex::attributes(variant.texture_mask, variant.compact_vertex);
         let vertex_buffers = [
-            Some(Vertex::layout(&attributes)),
-            Some(if variant.instanced {
+            Some(Vertex::layout(&attributes, variant.compact_vertex)),
+            Some(if variant.translated {
+                TranslationInstance::layout()
+            } else if variant.instanced {
                 RigidInstance::layout()
             } else {
                 SkinInfluences::layout()
@@ -21414,6 +21613,8 @@ impl GltfGpu {
     /// Pages contain transforms only. Drop cached pages as soon as all models disappear.
     pub fn clear_instance_pages(&mut self) {
         self.instance_pages.clear();
+        self.instance_streams.clear();
+        self.active_instance_pages.clear();
         self.queue_scratch = QueueScratch::default();
     }
     #[allow(clippy::too_many_arguments)]
@@ -21431,6 +21632,12 @@ impl GltfGpu {
     ) -> PreparedDraws {
         let _scope = super::profiler::cpu_scope("gltf.queue");
         let upload_before = self.counters.get().uniform_upload_bytes;
+        // Lighting changes the program, never the instance payload or material
+        // layout. Keep one stream/page set across all light program classes.
+        let storage_key = PipelineKey {
+            light_class: Default::default(),
+            ..key
+        };
         let models: Vec<_> = models.collect();
         let frustum = crate::visibility::Frustum::from_view_projection(view_projection);
         let mut stats = self.counters.get();
@@ -21439,14 +21646,19 @@ impl GltfGpu {
         scratch.clear();
         for (model_index, &(_, model)) in models.iter().enumerate() {
             let start = scratch.eligible.len();
-            for (ordinal, d) in model.draws.iter().enumerate() {
-                if model.last_pose.is_none()
-                    || !model.active.contains(&d.node)
-                    || (model.materials[d.material].alpha == AlphaMode::Blend) != blend
-                {
-                    continue;
-                }
-                if culling {
+            let fully_inside = culling
+                && model.bounds.is_some_and(|(min, max)| {
+                    stats.root_bounds_tests += 1;
+                    if frustum.fully_contains_aabb((min + max) * 0.5, (max - min) * 0.5) {
+                        stats.root_fully_inside += 1;
+                        true
+                    } else {
+                        false
+                    }
+                });
+            for &ordinal in &model.active_draws[usize::from(blend)] {
+                let d = &model.draws[ordinal];
+                if culling && !fully_inside {
                     if let Some((min, max)) = d.bounds {
                         stats.primitive_tests += 1;
                         if !frustum.intersects_aabb((min + max) * 0.5, (max - min) * 0.5) {
@@ -21464,41 +21676,75 @@ impl GltfGpu {
             scratch.cursors.push(start);
         }
         self.counters.set(stats);
-        let model_bounds = |m: &GpuModel| -> Option<(Vec3, Vec3)> {
-            let mut min = Vec3::splat(f32::INFINITY);
-            let mut max = Vec3::splat(f32::NEG_INFINITY);
-            let mut any = false;
-            for d in &m.draws {
-                if !m.active.contains(&d.node) {
-                    continue;
-                }
-                let (a, b) = d.bounds?;
-                min = min.min(a);
-                max = max.max(b);
-                any = true;
-            }
-            any.then_some((min, max))
+        // `reflected` is a winding flag (also set by authored cameras), not
+        // the pass identity. Real planar reflection uses `clipped`.
+        // Keep auxiliary passes on their existing ordering path. The authored
+        // policy permits overlapping opaque roots in the color pass; it does
+        // not make blend, skin/morph or coplanar content automatically safe.
+        let reorderable = |m: &GpuModel| {
+            !blend && !key.shadow && !key.clipped && m.opaque_reorderable && m.reorderable_draws
         };
-        let disjoint = |a: (Vec3, Vec3), b: (Vec3, Vec3)| (a.1.cmplt(b.0) | b.1.cmplt(a.0)).any();
+        let mut overlap_tests = 0;
+        let mut overlap_node_tests = 0;
+        let mut root_batch_breaks = [0; 6];
+        let mut draw_batch_breaks = [0; 8];
         let mut start = 0;
         while start < models.len() {
             let mut end = start + 1;
-            let bounds = model_bounds(models[start].1);
+            let may_reorder = reorderable(models[start].1);
+            let bounds = models[start].1.bounds;
+            let mut depth_window = bounds
+                .and_then(|b| crate::render_batch::DepthWindow::new(view_projection, camera, b));
+            let mut run_has_draws = !scratch.model_ranges[start].is_empty();
             scratch.occupied.clear();
             if let Some(b) = bounds {
                 scratch.occupied.push(b);
             }
-            if !blend && self.instancing_supported && bounds.is_some() {
-                while end < models.len()
-                    && Rc::ptr_eq(&models[start].1._shared, &models[end].1._shared)
-                {
-                    let Some(b) = model_bounds(models[end].1) else {
+            if blend {
+                root_batch_breaks[0] += u64::from(run_has_draws);
+            } else if !self.instancing_supported {
+                root_batch_breaks[1] += u64::from(run_has_draws);
+            } else if bounds.is_none() {
+                root_batch_breaks[2] += u64::from(run_has_draws);
+            } else {
+                while end < models.len() {
+                    if !Rc::ptr_eq(&models[start].1._shared, &models[end].1._shared) {
+                        root_batch_breaks[3] += u64::from(run_has_draws);
+                        break;
+                    }
+                    // An order-sensitive root is a barrier, never jumped over.
+                    if reorderable(models[end].1) != may_reorder {
+                        break;
+                    }
+                    if may_reorder {
+                        // A nearby compatible run is not split by root count.
+                        // Limit its camera-relative depth span instead, so part-
+                        // major submission cannot span an arbitrarily deep scene.
+                        if !models[end]
+                            .1
+                            .bounds
+                            .is_some_and(|b| depth_window.as_mut().is_some_and(|w| w.include(b)))
+                        {
+                            root_batch_breaks[5] += u64::from(run_has_draws);
+                            break;
+                        }
+                        run_has_draws |= !scratch.model_ranges[end].is_empty();
+                        end += 1;
+                        continue;
+                    }
+                    let Some(b) = models[end].1.bounds else {
+                        root_batch_breaks[2] += u64::from(run_has_draws);
                         break;
                     };
-                    if !scratch.occupied.iter().all(|&a| disjoint(a, b)) {
+                    let probe = scratch.occupied.probe(b);
+                    overlap_tests += probe.leaf_tests;
+                    overlap_node_tests += probe.node_tests;
+                    if probe.overlap {
+                        root_batch_breaks[4] += u64::from(run_has_draws);
                         break;
                     }
                     scratch.occupied.push(b);
+                    run_has_draws |= !scratch.model_ranges[end].is_empty();
                     end += 1;
                 }
             }
@@ -21514,7 +21760,9 @@ impl GltfGpu {
                         if cursor < scratch.model_ranges[model].end {
                             let item = scratch.eligible[cursor];
                             if item.draw == ordinal {
-                                scratch.append_compatible(item, &models);
+                                if let Some(reason) = scratch.append_compatible(item, &models) {
+                                    draw_batch_breaks[reason] += 1;
+                                }
                                 scratch.cursors[model] += 1;
                             }
                             let cursor = scratch.cursors[model];
@@ -21549,12 +21797,83 @@ impl GltfGpu {
                     )
             });
         }
+        let mut stats = self.counters.get();
+        stats.overlap_tests += overlap_tests;
+        stats.overlap_node_tests += overlap_node_tests;
+        for (total, count) in stats.root_batch_breaks.iter_mut().zip(root_batch_breaks) {
+            *total += count;
+        }
+        for (total, count) in stats.draw_batch_breaks.iter_mut().zip(draw_batch_breaks) {
+            *total += count;
+        }
+        self.counters.set(stats);
         let mut prepared = PreparedDraws {
             draws: Vec::with_capacity(scratch.groups.len()),
             upload_bytes: 0,
         };
-        let mut page_index = 0;
+        // Blend preparation shares this key with the opaque preparation and
+        // occurs before its submission. It must never overwrite/drop its stream.
+        let mut records = 0usize;
+        let mut required_bytes = 0usize;
         for group in &scratch.groups {
+            let item = scratch.ordered[group.start];
+            let first = &models[item.model].1.draws[item.draw].last_uniform;
+            let translated = group.len() > 1
+                && !blend
+                && !key.shadow
+                && !key.clipped
+                && first.affine_basis()
+                && scratch.ordered[group.clone()].iter().all(|item| {
+                    first.same_basis(&models[item.model].1.draws[item.draw].last_uniform)
+                });
+            scratch.translated.push(translated);
+            if group.len() > 1 {
+                records = records.saturating_add(group.len());
+                required_bytes =
+                    required_bytes.saturating_add(group.len().saturating_mul(if translated {
+                        16
+                    } else {
+                        112
+                    }));
+            }
+        }
+        let stream_limit = device.limits().max_buffer_size.min(16 * 1024 * 1024);
+        let stream_bytes = (required_bytes as u64 <= stream_limit).then_some(required_bytes);
+        let mut stream = if !blend && records > 0 && stream_bytes.is_some() {
+            let capacity = required_bytes
+                .next_power_of_two()
+                .min(stream_limit as usize);
+            let mut existing = self.instance_streams.remove(&(storage_key, view_slot));
+            if existing
+                .as_ref()
+                .is_none_or(|s| s.capacity < required_bytes)
+            {
+                let mut stats = self.counters.get();
+                stats.instance_buffers_created += 1;
+                self.counters.set(stats);
+                existing = Some(InstanceStream {
+                    buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("glTF pass-view instance stream"),
+                        size: capacity as u64,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    }),
+                    capacity,
+                    last: Vec::new(),
+                    scratch: Vec::new(),
+                });
+            }
+            existing.as_mut().unwrap().scratch.clear();
+            existing
+        } else {
+            if !blend {
+                self.instance_streams.remove(&(storage_key, view_slot));
+            }
+            None
+        };
+        let mut page_index = 0;
+        for (group_index, group) in scratch.groups.iter().enumerate() {
+            let translated = scratch.translated[group_index];
             let first = scratch.ordered[group.start];
             let model = models[first.model].1;
             let d = &model.draws[first.draw];
@@ -21572,6 +21891,8 @@ impl GltfGpu {
                 negative: d.negative,
                 skinned: d.skin.is_some(),
                 instanced,
+                translated,
+                compact_vertex: d.rigid,
             };
             self.ensure_pipeline(device, variant);
             self.ensure_pipeline(
@@ -21591,17 +21912,30 @@ impl GltfGpu {
             let mut draw_bind = d.bind.clone();
             let instance = if instanced {
                 scratch.payload.clear();
-                scratch
-                    .payload
-                    .extend(scratch.ordered[group.clone()].iter().map(|item| {
-                        RigidInstance::from_uniform(
-                            &models[item.model].1.draws[item.draw].last_uniform,
-                        )
-                    }));
+                for item in &scratch.ordered[group.clone()] {
+                    let u = &models[item.model].1.draws[item.draw].last_uniform;
+                    if translated {
+                        scratch.payload.extend_from_slice(as_bytes(&[u.model[3]]));
+                    } else {
+                        scratch
+                            .payload
+                            .extend_from_slice(as_bytes(&[RigidInstance::from_uniform(u)]));
+                    }
+                }
                 let payload = &scratch.payload;
-                let pages = self.instance_pages.entry((key, view_slot)).or_default();
+                let pages = self
+                    .instance_pages
+                    .entry((storage_key, view_slot))
+                    .or_default();
                 let capacity = payload.len().next_power_of_two();
-                if pages.len() <= page_index || pages[page_index].capacity < capacity {
+                if pages.len() <= page_index
+                    || (stream.is_none()
+                        && (pages[page_index].buffer.is_none()
+                            || pages[page_index].capacity < capacity))
+                {
+                    stats.instance_pages_created += 1;
+                    stats.instance_buffers_created += if stream.is_some() { 1 } else { 2 };
+                    stats.instance_bind_groups_created += 1;
                     let material_buffer = device.create_buffer(&wgpu::BufferDescriptor {
                         label: Some("glTF instanced material"),
                         size: std::mem::size_of::<Uniform>() as u64,
@@ -21620,11 +21954,13 @@ impl GltfGpu {
                         material_buffer,
                         bind,
                         material: None,
-                        buffer: device.create_buffer(&wgpu::BufferDescriptor {
-                            label: Some("glTF rigid instances"),
-                            size: (capacity * 112) as u64,
-                            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                            mapped_at_creation: false,
+                        buffer: stream.is_none().then(|| {
+                            device.create_buffer(&wgpu::BufferDescriptor {
+                                label: Some("glTF rigid instances"),
+                                size: capacity as u64,
+                                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                                mapped_at_creation: false,
+                            })
                         }),
                         capacity,
                         last: Vec::new(),
@@ -21637,9 +21973,17 @@ impl GltfGpu {
                 }
                 let page = &mut pages[page_index];
                 let mut material = d.last_uniform;
-                material.model = Mat4::IDENTITY.to_cols_array_2d();
-                material.normal = Mat4::IDENTITY.to_cols_array_2d();
-                material.transform = [1., 1., 0., 0.];
+                if translated {
+                    material.model[3] = [0., 0., 0., 1.];
+                    for n in &mut material.normal[..3] {
+                        n[3] = 0.;
+                    }
+                    material.normal[3] = [0., 0., 0., 1.];
+                } else {
+                    material.model = Mat4::IDENTITY.to_cols_array_2d();
+                    material.normal = Mat4::IDENTITY.to_cols_array_2d();
+                    material.transform = [1., 1., 0., 0.];
+                }
                 if page.material != Some(material) {
                     queue.write_buffer(&page.material_buffer, 0, as_bytes(&[material]));
                     page.material = Some(material);
@@ -21647,22 +21991,39 @@ impl GltfGpu {
                     stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
                 }
                 draw_bind = page.bind.clone();
-                if page.last != *payload {
-                    queue.write_buffer(&page.buffer, 0, as_bytes(payload));
-                    stats.buffer_upload_calls += 1;
-                    stats.uniform_upload_bytes += (payload.len() * 112) as u64;
-                    stats.instance_upload_bytes += (payload.len() * 112) as u64;
-                    page.last.clone_from(payload);
-                }
+                let binding = if let Some(s) = stream.as_mut() {
+                    let offset = s.scratch.len() as u64;
+                    s.scratch.extend_from_slice(payload);
+                    page.buffer = None;
+                    page.last.clear();
+                    InstanceBinding {
+                        buffer: s.buffer.clone(),
+                        offset,
+                        bytes: payload.len() as u64,
+                    }
+                } else {
+                    let buffer = page.buffer.as_ref().expect("standalone instance buffer");
+                    if page.last != *payload {
+                        queue.write_buffer(buffer, 0, payload);
+                        stats.buffer_upload_calls += 1;
+                        stats.uniform_upload_bytes += payload.len() as u64;
+                        stats.instance_upload_bytes += payload.len() as u64;
+                        page.last.clone_from(payload);
+                    }
+                    InstanceBinding {
+                        buffer: buffer.clone(),
+                        offset: 0,
+                        bytes: payload.len() as u64,
+                    }
+                };
                 page_index += 1;
-                Some(page.buffer.clone())
+                Some(binding)
             } else {
                 None
             };
             self.counters.set(stats);
             prepared.draws.push(PreparedDraw {
                 variant,
-                material_identity: material as *const Material as usize,
                 textures: material.textures.clone(),
                 bind: draw_bind,
                 vertex: d.vertex.clone(),
@@ -21685,8 +22046,23 @@ impl GltfGpu {
                 },
             });
         }
+        if let Some(mut s) = stream {
+            if s.last != s.scratch {
+                queue.write_buffer(&s.buffer, 0, &s.scratch);
+                let bytes = s.scratch.len() as u64;
+                let mut stats = self.counters.get();
+                stats.buffer_upload_calls += 1;
+                stats.uniform_upload_bytes += bytes;
+                stats.instance_upload_bytes += bytes;
+                self.counters.set(stats);
+                std::mem::swap(&mut s.last, &mut s.scratch);
+            }
+            self.instance_streams.insert((storage_key, view_slot), s);
+        }
         if !blend {
-            if let Some(pages) = self.instance_pages.get_mut(&(key, view_slot)) {
+            self.active_instance_pages
+                .insert((storage_key, view_slot), page_index);
+            if let Some(pages) = self.instance_pages.get_mut(&(storage_key, view_slot)) {
                 pages.truncate(page_index);
             }
         }
@@ -21714,7 +22090,7 @@ impl GltfGpu {
             stats.bind_group_changes += 1;
         }
         let mut last_variant = None;
-        let mut last_material = None;
+        let mut last_textures = None;
         for d in &prepared.draws {
             let Some(pipeline) = self.pipelines.get(&d.variant) else {
                 continue;
@@ -21724,21 +22100,41 @@ impl GltfGpu {
                 stats.pipeline_changes += 1;
                 last_variant = Some(d.variant);
             }
-            if last_material != Some(d.material_identity) {
-                pass.set_bind_group(2, &d.textures, &[]);
+            // Track the canonical Rust owner; preparation clones only an Rc,
+            // rather than a backend BindGroup handle for every prepared draw.
+            let texture_identity = Rc::as_ptr(&d.textures);
+            if last_textures != Some(texture_identity) {
+                pass.set_bind_group(2, d.textures.as_ref(), &[]);
                 stats.bind_group_changes += 1;
-                last_material = Some(d.material_identity);
+                last_textures = Some(texture_identity);
             }
             pass.set_bind_group(3, &d.bind, &[]);
             stats.bind_group_changes += 1;
             pass.set_vertex_buffer(0, d.vertex.slice(..));
-            if let Some(buffer) = d.instance.as_ref().or(d.skin.as_ref()) {
+            if let Some(binding) = &d.instance {
+                pass.set_vertex_buffer(
+                    1,
+                    binding
+                        .buffer
+                        .slice(binding.offset..binding.offset + binding.bytes),
+                );
+            } else if let Some(buffer) = &d.skin {
                 pass.set_vertex_buffer(1, buffer.slice(..));
             }
             pass.set_index_buffer(d.index.slice(..), wgpu::IndexFormat::Uint32);
             pass.draw_indexed(0..d.count, 0, 0..d.instances);
             stats.draw_calls += 1;
             stats.instances_drawn += d.instances as u64;
+            stats.triangles_drawn += match d.variant.topology {
+                wgpu::PrimitiveTopology::TriangleList => d.count / 3,
+                wgpu::PrimitiveTopology::TriangleStrip => d.count.saturating_sub(2),
+                _ => 0,
+            } as u64
+                * d.instances as u64;
+            if d.variant.translated {
+                stats.translated_draw_calls += 1;
+                stats.translated_instances += d.instances as u64;
+            }
             if d.instances > 1 {
                 stats.instanced_draw_calls += 1;
             }
@@ -21767,19 +22163,51 @@ impl GltfGpu {
 }
 // Replace sample expressions before compilation so absent maps incur no texture
 // operation on either backend. Raw fallback texels preserve the original decoder.
-fn material_shader_source(
-    texture_mask: u8,
-    shadow: bool,
-    opaque_unclipped: bool,
-    skinned: bool,
-    instanced: bool,
-) -> String {
+fn material_shader_source(key: ShaderKey) -> String {
+    let ShaderKey {
+        texture_mask,
+        shadow,
+        opaque_unclipped,
+        skinned,
+        instanced,
+        translated,
+        single_static_shadow,
+        light_class,
+    } = key;
     let mut source = concat!(
         include_str!("gltf_pbr.wgsl"),
         "\n",
         include_str!("appearance.wgsl")
     )
     .to_owned();
+    if single_static_shadow && !shadow {
+        // Like Three's light/shadow program parameters, specialize only a proven
+        // uniform state. Keep the same ordered 3x3 bilinear PCF kernel and bias.
+        let start = source.find("fn shadow_visibility(").expect("shadow helper");
+        let end = start + source[start..].find("struct Material").expect("material");
+        source.replace_range(start..end, r#"fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
+    if(index!=0u) { return 1.0; }
+    let shadow_world=world+normal*scene.appearance_ground.w;
+    let clip=effects.shadow_matrices[0]*vec4(shadow_world,1.0);
+    let ndc=clip.xyz/clip.w;
+    if (clip.w<=0.0 || ndc.z<=0.0 || ndc.z>=1.0 || any(abs(ndc.xy)>vec2(1.0))) {return 1.0;}
+    let uv=ndc.xy*vec2(0.5,-0.5)+vec2(0.5);
+    let bias=effects.params.w*(1.0+2.0*(1.0-max(dot(normal,light_direction),0.0)));
+    let depth=ndc.z-bias;
+    let texel=1.0/vec2<f32>(textureDimensions(static_shadow));
+    var visibility=0.0;
+    for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+        let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+        visibility+=textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth);
+    }}
+    return visibility/9.0;
+}
+
+"#);
+    }
+    if !shadow {
+        light_class.specialize(&mut source);
+    }
     if skinned {
         source = source.replacen("@location(8) color:vec4<f32> };", "@location(8) color:vec4<f32>, @location(9) joints0:vec4<u32>, @location(10) joints1:vec4<u32>, @location(11) weights0:vec4<f32>, @location(12) weights1:vec4<f32> };", 1);
         source = source.replace("    // GPU_SKIN_VERTEX", "    let deformed=skin_vertex(v); local_position=deformed.position; local_normal=deformed.normal; local_tangent=deformed.tangent;");
@@ -21810,7 +22238,28 @@ fn material_shader_source(
             source = source.replace(sample, fallback);
         }
     }
-    // Keep normal-map UV derivatives even for the non-neutral fallback normal.
+    if texture_mask & (1 << 2) == 0 {
+        // glTF without normalTexture uses the authored shading normal. Do not
+        // decode an artificial 128/255 normal or construct an unused tangent frame.
+        let start = source
+            .find("    let mapped=sample_normal(v.uv2)")
+            .expect("normal-map start");
+        let end = start + source[start..].find("    let mr=").expect("normal-map end");
+        source.replace_range(start..end, "");
+        let derivatives = " let u1=dpdx(v.uv2); let u2=dpdy(v.uv2);";
+        assert_eq!(
+            source.matches(derivatives).count(),
+            1,
+            "normal-map derivatives"
+        );
+        source = source.replace(derivatives, "");
+        // A tangent affects only the removed normal-map branch. Omit its input
+        // fetch/layout as Three does for materials without a normal map. Keep
+        // unused deformation helper outputs well-typed without altering position
+        // or normal calculations, including the skinning path.
+        source = source.replacen("@location(2) tangent:vec4<f32>, ", "", 1);
+        source = source.replace("v.tangent", "vec4<f32>(0.0,0.0,0.0,1.0)");
+    }
     source = source.replace(
         "fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }",
         "",
@@ -21819,14 +22268,25 @@ fn material_shader_source(
         .iter()
         .enumerate()
     {
-        if i == 2 || texture_mask & (1 << i) != 0 {
+        if texture_mask & (1 << i) != 0 {
             continue;
         }
         source = source.replace(&format!("sample_{name}(v.uv{i})"), "vec4<f32>(1.0)");
         source = source.replace(&format!("@location({}) uv{i}:vec2<f32>, ", i + 3), "");
         source = source.replace(&format!("o.uv{i}=v.uv{i}; "), "");
     }
-    if instanced {
+    if translated {
+        source = source.replacen(
+            "@location(8) color:vec4<f32> };",
+            "@location(8) color:vec4<f32>, @location(9) translation:vec4<f32> };",
+            1,
+        );
+        let a = source
+            .find("    if(material.transform.y>0.5) {")
+            .expect("rigid transform");
+        let b = a + source[a..].find("    o.pos=").expect("vertex projection");
+        source.replace_range(a..b,"    let model=material.model;\n    let normal=mat3x3<f32>(material.normal[0].xyz,material.normal[1].xyz,material.normal[2].xyz);\n    o.world=(model*vec4(local_position,1.0)).xyz+v.translation.xyz;\n    o.normal=transform_unit(normal*local_normal);\n    o.tangent=vec4(transform_unit((model*vec4(local_tangent.xyz,0.0)).xyz),local_tangent.w*material.transform.x);\n");
+    } else if instanced {
         source=source.replacen("@location(8) color:vec4<f32> };", "@location(8) color:vec4<f32>, @location(9) model0:vec4<f32>, @location(10) model1:vec4<f32>, @location(11) model2:vec4<f32>, @location(12) model3:vec4<f32>, @location(13) normal0:vec4<f32>, @location(14) normal1:vec4<f32>, @location(15) normal2:vec4<f32> };",1);
         let a = source
             .find("    if(material.transform.y>0.5) {")
@@ -22068,31 +22528,120 @@ struct EffectsUniforms {
 @group(1) @binding(9) var dynamic_shadow_2:texture_depth_2d;
 @group(1) @binding(10) var static_shadow_3:texture_depth_2d;
 @group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
-fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
-    let layers=effects.shadow_layers[index];
-    var visibility=1.0;
-    // Uniform branches skip only maps known to contain no casters. Preserve
-    // per-texel min(static,dynamic) before the unchanged 3x3 PCF filter.
-    switch index {
-        case 0u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
-        }
-        case 1u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
-        }
-        case 2u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
-        }
-        case 3u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
-        }
-        default: {}
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_0(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
     }
-    return visibility;
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_1(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_1,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_2(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_2,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_3(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_3,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
     if(effects.shadow_layers[index]==0u) { return 1.0; }
@@ -22105,13 +22654,14 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
     let bias=effects.params.w*(1.0+2.0*(1.0-max(dot(normal,light_direction),0.0)));
     let depth=ndc.z-bias;
     let texel=1.0/vec2<f32>(textureDimensions(static_shadow));
-    var visibility=0.0;
-    // Combine static and dynamic visibility per texel, then apply 3x3 PCF.
-    for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
-        let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
-        visibility+=compare_shadow(index,sample_uv,depth);
-    }}
-    return visibility/9.0;
+    let layers=effects.shadow_layers[index];
+    switch index {
+        case 0u: { return filter_shadow_0(uv,depth,texel,layers); }
+        case 1u: { return filter_shadow_1(uv,depth,texel,layers); }
+        case 2u: { return filter_shadow_2(uv,depth,texel,layers); }
+        case 3u: { return filter_shadow_3(uv,depth,texel,layers); }
+        default: { return 1.0; }
+    }
 }
 
 
@@ -22208,7 +22758,7 @@ fn surface(v:Output,front:bool)->vec4<f32> {
         let d=a2/(3.14159265*pow(nh*nh*(a2-1.0)+1.0,2.0));
         let gv=2.0*nv/(nv+sqrt(a2+(1.0-a2)*nv*nv)); let gl=2.0*nl/max(nl+sqrt(a2+(1.0-a2)*nl*nl),0.0001);
         let f=f0+(vec3(1.0)-f0)*pow(1.0-vh,5.0); let spec=d*gv*gl*f/max(4.0*nv*nl,0.0001);
-        var visibility=1.0; if(i<u32(effects.params.x) && material.options.y>0.5) { visibility=shadow_visibility(i,v.world,n,l); }
+        var visibility=1.0; if(nl>0.0 && i<u32(effects.params.x) && material.options.y>0.5) { visibility=shadow_visibility(i,v.world,n,l); }
         color+=((vec3(1.0)-f)*(1.0-metallic)*base.rgb/3.14159265+spec)*scene.lights[i].color*nl*visibility;
     }
     color+=emission;
@@ -26580,6 +27130,7 @@ fn build_uniform(
 
 struct PassCache {
     camera_position: Vec3,
+    light_class: crate::render_lights::LightClass,
     queue: RenderQueue,
     key: Option<(Mat4, u64, bool)>,
     batches: [InstanceBatch; 3],
@@ -26591,6 +27142,7 @@ impl PassCache {
         Self {
             queue: RenderQueue::default(),
             camera_position: Vec3::ZERO,
+            light_class: Default::default(),
             key: None,
             batches: std::array::from_fn(|_| {
                 InstanceBatch::new(device, 1, "primitive instance buffer")
@@ -26945,6 +27497,9 @@ impl SceneRenderer {
                 (self.scene.model(*id), self.scene.objects().get(id))
             {
                 let options = object.render_options;
+                // Semantic queue policy is not shader data and must update even
+                // when pose/root uniforms remain unchanged.
+                gpu.opaque_reorderable = options.opaque_reorderable;
                 match self.gltf_gpu.update(
                     &self.queue,
                     gpu,
@@ -26952,7 +27507,7 @@ impl SceneRenderer {
                     &model.render_bounds_cache,
                     &model.pose,
                     model.revision,
-                    object.transform.model(),
+                    object.render_data.model(),
                     [
                         options.reflectivity,
                         if options.receives_shadow { 1.0 } else { 0.0 },
@@ -27244,6 +27799,10 @@ impl SceneRenderer {
         }
         let mut grid_uniform = build_uniform(camera_matrix, camera_pos, lights);
         grid_uniform.appearance = self.appearance;
+        cache.light_class = crate::render_lights::LightClass::from_colors(
+            lights.map(|light| light.color),
+            self.appearance.enabled(),
+        );
         // Reflection textures contain linear lighting; display transform belongs
         // to the final visible surface, not both the reflected and main draw.
         if pass == RenderPassKind::Reflection {
@@ -27460,6 +28019,59 @@ impl SceneRenderer {
         let gltf = self.gltf_gpu.stats();
         let stats = self.render_stats();
         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
+        let gltf_values = serde_json::json!({
+                "cpuDeformedVertices": gltf.cpu_deformed_vertices,
+                "rigidUploadBytes": gltf.rigid_upload_bytes,
+                "uniformUploadBytes": gltf.uniform_upload_bytes,
+                "bufferUploadCalls": gltf.buffer_upload_calls,
+                "skinUploadBytes": gltf.skin_upload_bytes,
+                "skinPaletteUploadBytes": gltf.skin_palette_upload_bytes,
+                "drawCalls": gltf.draw_calls,
+                "primitiveTests": gltf.primitive_tests,
+                "primitiveCulled": gltf.primitive_culled,
+                "rootBoundsTests": gltf.root_bounds_tests,
+                "rootFullyInside": gltf.root_fully_inside,
+                "activeDrawIndexBytes": self.gltf_models.values().map(|m| m.active_draw_index_bytes()).sum::<usize>(),
+                "instancedDrawCalls": gltf.instanced_draw_calls,
+                "translatedDrawCalls": gltf.translated_draw_calls,
+                "translatedInstances": gltf.translated_instances,
+                "instancesDrawn": gltf.instances_drawn,
+                "trianglesDrawn": gltf.triangles_drawn,
+                "overlapTests": gltf.overlap_tests,
+                "overlapNodeTests": gltf.overlap_node_tests,
+                "batchBreaks": {
+                    "rootBlend": gltf.root_batch_breaks[0],
+                    "rootUnsupported": gltf.root_batch_breaks[1],
+                    "rootBounds": gltf.root_batch_breaks[2],
+                    "rootAsset": gltf.root_batch_breaks[3],
+                    "rootOverlap": gltf.root_batch_breaks[4],
+                    "rootSpatial": gltf.root_batch_breaks[5],
+                    "drawCap": gltf.draw_batch_breaks[0],
+                    "drawOrdinal": gltf.draw_batch_breaks[1],
+                    "drawAsset": gltf.draw_batch_breaks[2],
+                    "drawDeformed": gltf.draw_batch_breaks[3],
+                    "drawMirror": gltf.draw_batch_breaks[4],
+                    "drawMaterial": gltf.draw_batch_breaks[5],
+                    "drawPrimitive": gltf.draw_batch_breaks[6],
+                    "drawOptions": gltf.draw_batch_breaks[7],
+                },
+                "instancePagesCreated": gltf.instance_pages_created,
+                "instanceBuffersCreated": gltf.instance_buffers_created,
+                "instanceBindGroupsCreated": gltf.instance_bind_groups_created,
+                "instancePagesActive": gltf.instance_pages_active,
+                "instancePagesRetained": gltf.instance_pages_retained,
+                "instanceUploadBytes": gltf.instance_upload_bytes,
+                "instanceBufferBytes": gltf.instance_buffer_bytes,
+                "queueScratchGrowths": gltf.queue_scratch_growths,
+                "queueScratchBytes": gltf.queue_scratch_bytes,
+                "pipelineChanges": gltf.pipeline_changes,
+                "bindGroupChanges": gltf.bind_group_changes,
+                "geometryCacheHits": gltf.geometry_cache_hits,
+                "materialCacheHits": gltf.material_cache_hits,
+                "geometryResources": gltf.geometry_resources,
+                "materialResources": gltf.material_resources,
+                "cachedAssets": gltf.cached_assets,
+        });
         serde_json::json!({
             "font3d": {
                 "runtime": self.scene.font3d_stats(),
@@ -27497,30 +28109,7 @@ impl SceneRenderer {
                 "instanceUploadBytes": self.main_instance_upload_bytes,
                 "slots": 1 + self.passes.len() - BASE_PASS_CACHE_COUNT,
             },
-            "gltf": {
-                "cpuDeformedVertices": gltf.cpu_deformed_vertices,
-                "rigidUploadBytes": gltf.rigid_upload_bytes,
-                "uniformUploadBytes": gltf.uniform_upload_bytes,
-                "bufferUploadCalls": gltf.buffer_upload_calls,
-                "skinUploadBytes": gltf.skin_upload_bytes,
-                "skinPaletteUploadBytes": gltf.skin_palette_upload_bytes,
-                "drawCalls": gltf.draw_calls,
-                "primitiveTests": gltf.primitive_tests,
-                "primitiveCulled": gltf.primitive_culled,
-                "instancedDrawCalls": gltf.instanced_draw_calls,
-                "instancesDrawn": gltf.instances_drawn,
-                "instanceUploadBytes": gltf.instance_upload_bytes,
-                "instanceBufferBytes": gltf.instance_buffer_bytes,
-                "queueScratchGrowths": gltf.queue_scratch_growths,
-                "queueScratchBytes": gltf.queue_scratch_bytes,
-                "pipelineChanges": gltf.pipeline_changes,
-                "bindGroupChanges": gltf.bind_group_changes,
-                "geometryCacheHits": gltf.geometry_cache_hits,
-                "materialCacheHits": gltf.material_cache_hits,
-                "geometryResources": gltf.geometry_resources,
-                "materialResources": gltf.material_resources,
-                "cachedAssets": gltf.cached_assets,
-            },
+            "gltf": gltf_values,
             "gltfDraws": self.gltf_gpu.draw_diagnostics(),
             "instanceUploadPages": self.passes.iter().map(|cache| cache.imported.pages.len()).sum::<usize>(),
             "fps": stats[6], "frameMs": stats[7], "frameP95Ms": self.frame_metrics.frame_p95_ms, "cpuMs": stats[5],
@@ -27719,6 +28308,8 @@ impl SceneRenderer {
             material_mask: false,
             packed_depth: false,
             shadow: true,
+            single_static_shadow: false,
+            light_class: Default::default(),
         };
         let cache = &self.passes[self.active_cache];
         let gltf_opaque = self.gltf_gpu.prepare_draws(
@@ -27907,6 +28498,8 @@ impl SceneRenderer {
             material_mask: target.material_mask,
             packed_depth: target.auxiliary.is_some(),
             shadow: false,
+            single_static_shadow: !reflected && effects.single_static_shadow(),
+            light_class: self.passes[self.active_cache].light_class,
         };
         let cache = &self.passes[self.active_cache];
         let gltf_opaque = self.gltf_gpu.prepare_draws(
@@ -28528,6 +29121,8 @@ impl SceneRenderer {
             material_mask: false,
             packed_depth: false,
             shadow: false,
+            single_static_shadow: false,
+            light_class: cache.light_class,
         };
         let gltf_transparent = if has_transparent {
             let p = self.gltf_gpu.prepare_draws(
@@ -29149,6 +29744,9 @@ impl State {
                 .update_info_panels(PanelKind::Scene, &rows);
             let mut diagnostics = self.renderer.info_diagnostic_rows();
             diagnostics.insert(0, ("RENDER", format!("RUST {}", self.backend)));
+            if let Some(count) = crate::web::rim_stress_count() {
+                diagnostics.insert(1, ("ZATEZ NAVIC", count.to_string()));
+            }
             self.renderer
                 .scene
                 .update_info_panels(PanelKind::Diagnostics, &diagnostics);
@@ -30762,6 +31360,252 @@ mod tests {
 }
 
 
+# File: src/render_batch.rs
+//! View-local scheduling for explicitly order-independent opaque model runs.
+//! Instance-page capacity is separate from spatial scheduling: a dense nearby
+//! group may contain many roots, while a long depth chain is split early.
+use glam::{Mat4, Vec3};
+
+type Bounds = (Vec3, Vec3);
+const MAX_DEPTH_RATIO: f32 = 2.0;
+
+pub(crate) struct DepthWindow {
+    camera: Vec3,
+    forward: Vec3,
+    near: f32,
+    far: f32,
+}
+impl DepthWindow {
+    pub fn new(view_projection: Mat4, camera: Vec3, bounds: Bounds) -> Option<Self> {
+        if !view_projection.is_finite() || !camera.is_finite() {
+            return None;
+        }
+        let rows = view_projection.transpose();
+        // Perspective clip-w is forward depth. Orthographic clip-w is constant;
+        // its clip-z normal supplies the view axis instead. No inverse per root.
+        let forward = rows
+            .w_axis
+            .truncate()
+            .try_normalize()
+            .or_else(|| rows.z_axis.truncate().try_normalize())?;
+        let mut window = Self {
+            camera,
+            forward,
+            near: 0.0,
+            far: 0.0,
+        };
+        (window.near, window.far) = window.interval(bounds)?;
+        Some(window)
+    }
+    fn interval(&self, (min, max): Bounds) -> Option<(f32, f32)> {
+        if !min.is_finite() || !max.is_finite() || !min.cmple(max).all() {
+            return None;
+        }
+        let center = (min + max) * 0.5;
+        let radius = self.forward.abs().dot((max - min) * 0.5);
+        let depth = self.forward.dot(center - self.camera);
+        let near = depth - radius;
+        let far = depth + radius;
+        (near > 0.0 && near.is_finite() && far.is_finite()).then_some((near, far))
+    }
+    /// A rejection does not mutate the accepted run. Only reorderable rigid
+    /// opaque draws may use this cost policy; it grants no ordering permission.
+    pub fn include(&mut self, bounds: Bounds) -> bool {
+        let Some((near, far)) = self.interval(bounds) else {
+            return false;
+        };
+        let near = self.near.min(near);
+        let far = self.far.max(far);
+        if far / near > MAX_DEPTH_RATIO {
+            return false;
+        }
+        self.near = near;
+        self.far = far;
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn bounds(z: f32) -> Bounds {
+        (Vec3::new(-0.2, -0.2, z - 0.1), Vec3::new(0.2, 0.2, z + 0.1))
+    }
+    fn projection() -> Mat4 {
+        glam::camera::rh::proj::directx::perspective(1.0, 1.5, 0.08, 200.0)
+    }
+    #[test]
+    fn dense_roots_do_not_split_at_an_arbitrary_object_count() {
+        let mut w = DepthWindow::new(projection(), Vec3::ZERO, bounds(-4.0)).unwrap();
+        for i in 0..2048 {
+            assert!(w.include(bounds(-4.0 - (i % 512) as f32 * 0.005)));
+        }
+        assert!(!w.include(bounds(-30.0)));
+        assert!(w.include(bounds(-5.0))); // Rejection did not poison the run.
+    }
+    #[test]
+    fn camera_rotation_translation_and_orthographic_depth_are_view_local() {
+        let camera = Vec3::new(8.0, 2.0, -3.0);
+        let view = glam::camera::rh::view::look_at_mat4(camera, camera + Vec3::X, Vec3::Y);
+        let local = |x: f32| {
+            (
+                camera + Vec3::new(x - 0.1, -0.2, -0.2),
+                camera + Vec3::new(x + 0.1, 0.2, 0.2),
+            )
+        };
+        for p in [
+            projection(),
+            glam::camera::rh::proj::directx::orthographic(-4.0, 4.0, -3.0, 3.0, 0.08, 200.0),
+        ] {
+            let mut w = DepthWindow::new(p * view, camera, local(4.0)).unwrap();
+            assert!(w.include(local(6.0)));
+            assert!(!w.include(local(30.0)));
+            assert!(!w.include(local(-2.0)));
+        }
+    }
+    #[test]
+    fn frustum_containment_never_accepts_partial_touching_or_invalid_bounds() {
+        let f = crate::visibility::Frustum::from_view_projection(Mat4::IDENTITY);
+        assert!(f.fully_contains_aabb(Vec3::new(0.0, 0.0, 0.5), Vec3::splat(0.2)));
+        for (c, e) in [
+            (Vec3::new(0.99, 0.0, 0.5), Vec3::splat(0.1)),
+            (Vec3::new(0.0, 0.0, 0.0), Vec3::ZERO),
+            (Vec3::new(0.0, 0.0, 0.95), Vec3::splat(0.1)),
+        ] {
+            assert!(f.intersects_aabb(c, e));
+            assert!(!f.fully_contains_aabb(c, e));
+        }
+        assert!(!f.fully_contains_aabb(Vec3::splat(f32::NAN), Vec3::ONE));
+        assert!(!f.fully_contains_aabb(Vec3::ZERO, -Vec3::ONE));
+    }
+    #[test]
+    fn invalid_and_camera_crossing_bounds_are_conservative() {
+        assert!(DepthWindow::new(Mat4::ZERO, Vec3::ZERO, bounds(-4.0)).is_none());
+        assert!(DepthWindow::new(projection(), Vec3::ZERO, bounds(0.0)).is_none());
+        assert!(DepthWindow::new(projection(), Vec3::ZERO, (Vec3::ONE, Vec3::ZERO)).is_none());
+        let mut w = DepthWindow::new(projection(), Vec3::ZERO, bounds(-4.0)).unwrap();
+        assert!(!w.include((Vec3::splat(f32::NAN), Vec3::ONE)));
+        assert!(!w.include(bounds(0.0)));
+        assert!(w.include(bounds(-5.0)));
+    }
+}
+
+
+# File: src/render_lights.rs
+//! Shader program identity derived from the exact uploaded light uniforms.
+//! Slot order is retained: shadow maps refer to the original light index.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub(crate) struct LightClass {
+    active: u8,
+    directional_first: bool,
+}
+impl LightClass {
+    pub(crate) fn from_colors(colors: [[f32; 3]; 4], appearance: bool) -> Self {
+        let active = colors.iter().enumerate().fold(0, |mask, (i, color)| {
+            mask | (u8::from(color.iter().any(|&v| v != 0.0)) << i)
+        });
+        Self {
+            active,
+            directional_first: appearance && active & 1 != 0,
+        }
+    }
+    pub(crate) fn specialize(self, source: &mut String) {
+        let start = source
+            .find("    for(var i=0u;i<LIGHT_COUNT;i++) {")
+            .expect("light loop");
+        let end = source[start..]
+            .find("    color+=emission;")
+            .expect("light loop end")
+            + start;
+        let loop_source = &source[start..end];
+        let body_start = loop_source.find("        let delta=").expect("light body");
+        let body_end = loop_source.rfind("    }").expect("light loop close");
+        let body = &loop_source[body_start..body_end];
+        let mut specialized = String::new();
+        for i in 0..4 {
+            if self.active & (1 << i) == 0 {
+                continue;
+            }
+            // Separate lexical scope preserves the original per-light locals.
+            specialized.push_str("    {\n");
+            let direction = if i == 0 && self.directional_first {
+                "let l=scene.appearance_sun.xyz;"
+            } else {
+                "let delta=scene.lights[i].position-v.world; let l=unit(delta);"
+            };
+            let body = body.replace("let delta=scene.lights[i].position-v.world; let l=select(unit(delta),scene.appearance_sun.xyz,scene.appearance_sky.w>0.5 && i==0u);", direction)
+                // Naga suffixes repeated locals. `gl_1` is reserved in GLSL;
+                // rename this original short local before emitting scoped copies.
+                .replace("let gl=", "let geometry_light=")
+                .replace("d*gv*gl*f", "d*gv*geometry_light*f")
+                .replace("scene.lights[i]", &format!("scene.lights[{i}]"))
+                .replace("i<u32(effects.params.x)", &format!("{i}u<u32(effects.params.x)"))
+                .replace("shadow_visibility(i,", &format!("shadow_visibility({i}u,"));
+            specialized.push_str(&body);
+            specialized.push_str("    }\n");
+        }
+        source.replace_range(start..end, &specialized);
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn light_class_uses_exact_nonzero_slots_and_preserves_order() {
+        for mask in 0..16u8 {
+            for appearance in [false, true] {
+                let colors = std::array::from_fn(|i| {
+                    if mask & (1 << i) != 0 {
+                        [0.0, 0.2, 0.0]
+                    } else {
+                        [-0.0, 0.0, 0.0]
+                    }
+                });
+                let class = LightClass::from_colors(colors, appearance);
+                assert_eq!(class.active, mask);
+                assert_eq!(class.directional_first, appearance && mask & 1 != 0);
+                let mut source = include_str!("render/gltf_pbr.wgsl").to_owned();
+                class.specialize(&mut source);
+                assert!(!source.contains("scene.lights[i]"));
+                assert!(!source.contains("let gl="));
+                assert!(!source.contains("i<u32(effects.params.x)"));
+                assert!(!source.contains("for(var i=0u;i<LIGHT_COUNT"));
+                let body = source.split("fn surface(v:").nth(1).unwrap();
+                let mut previous = 0;
+                for i in 0..4 {
+                    let needle = format!("shadow_visibility({i}u,");
+                    assert_eq!(body.contains(&needle), mask & (1 << i) != 0);
+                    if let Some(index) = body.find(&needle) {
+                        assert!(index >= previous);
+                        previous = index;
+                    }
+                }
+                assert_eq!(
+                    body.contains("let l=scene.appearance_sun.xyz;"),
+                    class.directional_first
+                );
+            }
+        }
+    }
+    #[test]
+    fn light_class_color_changes_reuse_program_but_zero_and_type_changes_do_not() {
+        let mut colors = [[0.0; 3]; 4];
+        colors[2] = [1.0, 0.0, 0.0];
+        let a = LightClass::from_colors(colors, false);
+        colors[2] = [0.0, 1e-30, 0.0];
+        assert_eq!(a, LightClass::from_colors(colors, true));
+        colors[0] = [1.0; 3];
+        assert_ne!(a, LightClass::from_colors(colors, true));
+        assert_ne!(
+            LightClass::from_colors(colors, false),
+            LightClass::from_colors(colors, true)
+        );
+        colors[2] = [0.0; 3];
+        assert_ne!(a, LightClass::from_colors(colors, false));
+    }
+}
+
+
 # File: src/render_math.rs
 //! View math shared by shadow/mirror passes and native tests.
 use glam::{Mat4, Vec3, Vec4};
@@ -30947,6 +31791,426 @@ mod xr_tests {
 }
 
 
+# File: src/render_overlap.rs
+//! Append-only exact overlap queries for one ordered, disjoint batching run.
+//! Tree topology follows insertion order; it never reorders scene objects.
+use glam::Vec3;
+
+type Bounds = (Vec3, Vec3);
+const LEAF: u32 = u32::MAX;
+const LINEAR_LIMIT: usize = 16;
+const TREE_LIMIT: usize = 8192;
+const QUERY_LIMIT: u64 = 64;
+const EXHAUSTION_LIMIT: u8 = 8;
+
+#[derive(Clone, Copy)]
+struct Node {
+    bounds: Bounds,
+    left: u32,
+    right: u32,
+}
+#[derive(Clone, Copy)]
+struct Root {
+    node: u32,
+    height: u8,
+}
+#[derive(Default)]
+pub(crate) struct OrderedBounds {
+    leaves: Vec<Bounds>,
+    nodes: Vec<Node>,
+    roots: Vec<Root>,
+    invalid: bool,
+    budget_exhaustions: u8,
+    linear_only: bool,
+}
+#[derive(Default)]
+pub(crate) struct Probe {
+    pub overlap: bool,
+    pub leaf_tests: u64,
+    pub node_tests: u64,
+    pub fallback: bool,
+}
+fn valid((min, max): Bounds) -> bool {
+    min.is_finite() && max.is_finite() && min.cmple(max).all()
+}
+fn disjoint(a: Bounds, b: Bounds) -> bool {
+    (a.1.cmplt(b.0) | b.1.cmplt(a.0)).any()
+}
+/// Reject an unknown or malformed primitive before combining it with valid ones.
+pub(crate) fn union_bounds(bounds: impl Iterator<Item = Option<Bounds>>) -> Option<Bounds> {
+    let mut result: Option<Bounds> = None;
+    for next in bounds {
+        let next = next?;
+        if !valid(next) {
+            return None;
+        }
+        result = Some(match result {
+            Some(prior) => (prior.0.min(next.0), prior.1.max(next.1)),
+            None => next,
+        });
+    }
+    result
+}
+impl OrderedBounds {
+    pub fn clear(&mut self) {
+        self.leaves.clear();
+        self.nodes.clear();
+        self.roots.clear();
+        self.invalid = false;
+        self.budget_exhaustions = 0;
+        self.linear_only = false;
+    }
+    pub fn capacity(&self) -> usize {
+        self.leaves.capacity() + self.nodes.capacity() + self.roots.capacity()
+    }
+    pub fn bytes(&self) -> usize {
+        self.leaves.capacity() * std::mem::size_of::<Bounds>()
+            + self.nodes.capacity() * std::mem::size_of::<Node>()
+            + self.roots.capacity() * std::mem::size_of::<Root>()
+    }
+    pub fn push(&mut self, bounds: Bounds) {
+        if !valid(bounds) || self.nodes.len() >= LEAF as usize - 64 {
+            self.invalid = true;
+            return;
+        }
+        self.leaves.push(bounds);
+        if self.linear_only || self.leaves.len() <= LINEAR_LIMIT || self.leaves.len() > TREE_LIMIT {
+            return;
+        }
+        if self.nodes.is_empty() {
+            for index in 0..self.leaves.len() {
+                self.insert_node(self.leaves[index]);
+            }
+        } else {
+            self.insert_node(bounds);
+        }
+    }
+    fn insert_node(&mut self, bounds: Bounds) {
+        let mut root = Root {
+            node: self.nodes.len() as u32,
+            height: 0,
+        };
+        self.nodes.push(Node {
+            bounds,
+            left: LEAF,
+            right: LEAF,
+        });
+        while self
+            .roots
+            .last()
+            .is_some_and(|prior| prior.height == root.height)
+        {
+            let prior = self.roots.pop().unwrap();
+            let a = self.nodes[prior.node as usize].bounds;
+            let b = self.nodes[root.node as usize].bounds;
+            let parent = self.nodes.len() as u32;
+            self.nodes.push(Node {
+                bounds: (a.0.min(b.0), a.1.max(b.1)),
+                left: prior.node,
+                right: root.node,
+            });
+            root = Root {
+                node: parent,
+                height: root.height + 1,
+            };
+        }
+        self.roots.push(root);
+    }
+    pub fn probe(&mut self, bounds: Bounds) -> Probe {
+        let mut result = Probe::default();
+        if self.invalid || !valid(bounds) {
+            result.overlap = true;
+            return result;
+        }
+        if self.linear_only || self.leaves.len() <= LINEAR_LIMIT || self.leaves.len() > TREE_LIMIT {
+            result.overlap = self.linear_probe(bounds, &mut result);
+            return result;
+        }
+        for root in &self.roots {
+            match self.visit(root.node, bounds, &mut result) {
+                Some(true) => {
+                    result.overlap = true;
+                    break;
+                }
+                Some(false) => {}
+                None => {
+                    result.fallback = true;
+                    result.overlap = self.linear_probe(bounds, &mut result);
+                    // Poor spatial locality can make every query traverse the
+                    // full budget. Stop paying for an unhelpful index in this
+                    // run only; all leaves remain available to the exact scan.
+                    self.budget_exhaustions += 1;
+                    self.linear_only = self.budget_exhaustions >= EXHAUSTION_LIMIT;
+                    break;
+                }
+            }
+        }
+        result
+    }
+    fn linear_probe(&self, bounds: Bounds, result: &mut Probe) -> bool {
+        // Keep counter/index writes out of the hot predicate. any consumes the
+        // first hit too, so the remaining length gives the exact examined count.
+        let mut remaining = self.leaves.iter();
+        let overlap = remaining.any(|&prior| !disjoint(prior, bounds));
+        let tested = (self.leaves.len() - remaining.len()) as u64;
+        result.leaf_tests += tested;
+        result.node_tests += tested;
+        overlap
+    }
+    fn visit(&self, index: u32, bounds: Bounds, result: &mut Probe) -> Option<bool> {
+        if result.node_tests >= QUERY_LIMIT {
+            return None;
+        }
+        let node = self.nodes[index as usize];
+        result.node_tests += 1;
+        if node.left == LEAF {
+            result.leaf_tests += 1;
+        }
+        if disjoint(node.bounds, bounds) {
+            return Some(false);
+        }
+        if node.left == LEAF {
+            return Some(true);
+        }
+        if self.visit(node.left, bounds, result)? {
+            return Some(true);
+        }
+        self.visit(node.right, bounds, result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn bounds(x: f32, y: f32, z: f32, extent: f32) -> Bounds {
+        let p = Vec3::new(x, y, z);
+        (p - Vec3::splat(extent), p + Vec3::splat(extent))
+    }
+    fn grouping(boxes: &[Bounds], accelerated: bool) -> Vec<std::ops::Range<usize>> {
+        let mut result = Vec::new();
+        let mut tree = OrderedBounds::default();
+        let mut start = 0;
+        while start < boxes.len() {
+            tree.clear();
+            tree.push(boxes[start]);
+            let mut end = start + 1;
+            while end < boxes.len() {
+                let conflict = if accelerated {
+                    tree.probe(boxes[end]).overlap
+                } else {
+                    boxes[start..end].iter().any(|&a| !disjoint(a, boxes[end]))
+                };
+                if conflict {
+                    break;
+                }
+                tree.push(boxes[end]);
+                end += 1;
+            }
+            result.push(start..end);
+            start = end;
+        }
+        result
+    }
+    #[test]
+    fn linear_fallback_counts_first_last_miss_and_prior_tree_work_exactly() {
+        let mut tree = OrderedBounds::default();
+        let check = |tree: &OrderedBounds, query, expected_hit, expected_tests: u64| {
+            let mut probe = Probe {
+                leaf_tests: 7,
+                node_tests: 9,
+                ..Probe::default()
+            };
+            assert_eq!(tree.linear_probe(query, &mut probe), expected_hit);
+            assert_eq!(probe.leaf_tests, 7 + expected_tests);
+            assert_eq!(probe.node_tests, 9 + expected_tests);
+        };
+        check(&tree, bounds(9., 0., 0., 0.1), false, 0);
+        for x in [0., 2., 4.] {
+            tree.push(bounds(x, 0., 0., 0.1));
+        }
+        check(&tree, bounds(0., 0., 0., 0.1), true, 1);
+        check(&tree, bounds(4., 0., 0., 0.1), true, 3);
+        check(&tree, bounds(9., 0., 0., 0.1), false, 3);
+        tree.clear();
+        let count = 4096usize;
+        for i in 0..count {
+            let logical = if i % 2 == 0 { i / 2 } else { count - 1 - i / 2 };
+            tree.push(bounds(logical as f32 * 2., 0., 0., 0.1));
+        }
+        let probe = tree.probe(bounds(count as f32 - 0.5, 0., 0., 0.1));
+        assert!(probe.fallback && !probe.overlap);
+        assert!(probe.leaf_tests >= count as u64 && probe.leaf_tests <= count as u64 + QUERY_LIMIT);
+        assert_eq!(probe.node_tests, count as u64 + QUERY_LIMIT);
+    }
+    #[test]
+    fn repeated_budget_exhaustion_uses_exact_scan_until_clear_and_keeps_late_leaves() {
+        let mut tree = OrderedBounds::default();
+        let count = 4096usize;
+        for i in 0..count {
+            let logical = if i % 2 == 0 { i / 2 } else { count - 1 - i / 2 };
+            tree.push(bounds(logical as f32 * 2., 0., 0., 0.1));
+        }
+        for _ in 0..EXHAUSTION_LIMIT {
+            let probe = tree.probe(bounds(count as f32 - 0.5, 0., 0., 0.1));
+            assert!(probe.fallback && !probe.overlap);
+        }
+        assert!(tree.linear_only);
+        let nodes = tree.nodes.len();
+        tree.push(bounds(10000., 0., 0., 0.1));
+        assert_eq!(
+            tree.nodes.len(),
+            nodes,
+            "disabled index stops constructing nodes"
+        );
+        let probe = tree.probe(bounds(10000., 0., 0., 0.1));
+        assert!(probe.overlap && !probe.fallback);
+        assert_eq!(probe.leaf_tests, count as u64 + 1);
+        tree.clear();
+        assert!(!tree.linear_only && tree.budget_exhaustions == 0);
+        for i in 0..count {
+            tree.push(bounds(i as f32 * 2., 0., 0., 0.1));
+        }
+        let probe = tree.probe(bounds(10000., 0., 0., 0.1));
+        assert!(!probe.overlap && !probe.fallback);
+        assert_eq!(probe.leaf_tests, 0);
+        assert_eq!(probe.node_tests, 1);
+    }
+    #[test]
+    fn ordered_bounds_preserves_every_greedy_group_against_independent_pairs() {
+        let mut seed = 0x6a09e667u32;
+        let mut rand = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            seed as f64 / u32::MAX as f64
+        };
+        for count in [1, 2, 3, 31, 128, 1025] {
+            for mode in 0..12 {
+                let boxes: Vec<_> = (0..count)
+                    .map(|i| {
+                        let x = if mode % 3 == 0 {
+                            i as f32 * 0.4
+                        } else {
+                            (rand() * 12.) as f32
+                        };
+                        bounds(
+                            x,
+                            (rand() * 12.) as f32,
+                            (rand() * 3.) as f32,
+                            if mode % 4 == 0 { 1.2 } else { 0.1 },
+                        )
+                    })
+                    .collect();
+                assert_eq!(
+                    grouping(&boxes, true),
+                    grouping(&boxes, false),
+                    "count{count} mode{mode}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn ordered_bounds_keeps_touching_overlap_and_conservative_invalid_inputs() {
+        let mut tree = OrderedBounds::default();
+        tree.push(bounds(0., 0., 0., 1.));
+        assert!(tree.probe(bounds(2., 0., 0., 1.)).overlap);
+        assert!(
+            !tree
+                .probe(bounds(f32::from_bits(2f32.to_bits() + 1), 0., 0., 1.))
+                .overlap
+        );
+        assert!(tree.probe((Vec3::splat(f32::NAN), Vec3::ONE)).overlap);
+        assert!(tree.probe((Vec3::ONE, Vec3::ZERO)).overlap);
+        tree.push((Vec3::ZERO, Vec3::splat(f32::INFINITY)));
+        assert!(tree.probe(bounds(100., 0., 0., 0.1)).overlap);
+        tree.clear();
+        assert!(!tree.probe(bounds(100., 0., 0., 0.1)).overlap);
+    }
+    #[test]
+    fn union_rejects_invalid_primitive_before_nan_can_be_hidden() {
+        let good = bounds(0., 0., 0., 1.);
+        for bad in [
+            None,
+            Some((Vec3::splat(f32::NAN), Vec3::ONE)),
+            Some((Vec3::ONE, Vec3::ZERO)),
+            Some((Vec3::ZERO, Vec3::splat(f32::INFINITY))),
+        ] {
+            assert!(union_bounds([Some(good), bad].into_iter()).is_none());
+        }
+        assert_eq!(
+            union_bounds([Some(good), Some(bounds(4., 0., 0., 1.))].into_iter()),
+            Some((Vec3::new(-1., -1., -1.), Vec3::new(5., 1., 1.)))
+        );
+        assert!(union_bounds(std::iter::empty()).is_none());
+    }
+    #[test]
+    fn ordered_bounds_past_tree_limit_keeps_every_leaf_and_reuses_after_clear() {
+        let mut tree = OrderedBounds::default();
+        for i in 0..TREE_LIMIT + 2 {
+            tree.push(bounds(i as f32 * 2., 0., 0., 0.1));
+        }
+        assert!(
+            tree.probe(bounds((TREE_LIMIT + 1) as f32 * 2., 0., 0., 0.1))
+                .overlap
+        );
+        assert!(!tree.probe(bounds(-10., 0., 0., 0.1)).overlap);
+        tree.clear();
+        tree.push(bounds(0., 0., 0., 0.1));
+        assert!(tree.probe(bounds(0., 0., 0., 0.1)).overlap);
+        assert!(!tree.probe(bounds(5., 0., 0., 0.1)).overlap);
+    }
+    #[test]
+    fn ordered_bounds_grid_prunes_real_work_and_reuses_storage() {
+        let mut tree = OrderedBounds::default();
+        let mut nodes = 0;
+        let mut leaves = 0;
+        let boxes: Vec<_> = (0..4096)
+            .map(|i| bounds((i % 64) as f32, (i / 64) as f32, 0., 0.1))
+            .collect();
+        for &b in &boxes {
+            let p = tree.probe(b);
+            assert!(!p.overlap);
+            nodes += p.node_tests;
+            leaves += p.leaf_tests;
+            tree.push(b);
+        }
+        assert!(nodes < (4096 * 4095 / 2) / 20, "node tests{nodes}");
+        assert!(leaves < 8192, "leaf tests{leaves}");
+        let mut shuffled = boxes.clone();
+        let mut seed = 0x9e3779b9u32;
+        for i in (1..shuffled.len()).rev() {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            let j = seed as usize % (i + 1);
+            shuffled.swap(i, j);
+        }
+        assert_eq!(grouping(&shuffled, true), grouping(&shuffled, false));
+        let alternating: Vec<_> = (0..boxes.len())
+            .map(|i| {
+                boxes[if i % 2 == 0 {
+                    i / 2
+                } else {
+                    boxes.len() - 1 - i / 2
+                }]
+            })
+            .collect();
+        assert_eq!(grouping(&alternating, true), grouping(&alternating, false));
+        let dense = vec![bounds(0., 0., 0., 0.2); 4096];
+        assert_eq!(grouping(&dense, true), grouping(&dense, false));
+        let bytes = tree.bytes();
+        tree.clear();
+        for b in boxes {
+            tree.push(b);
+        }
+        assert_eq!(bytes, tree.bytes());
+        assert!(tree.capacity() > 0);
+        tree = OrderedBounds::default();
+        assert_eq!(tree.bytes(), 0);
+    }
+}
+
+
 # File: src/rim_cut.rs
 //! Binary, worker-safe clipping of the actual posed GLB triangles. No scene/GPU access.
 use glam::Vec3;
@@ -31093,6 +32357,7 @@ use glam::{Mat4, Quat, Vec2, Vec3};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+pub const MAX_STRESS_MODELS: u32 = 2048;
 const HIDDEN: Vec3 = Vec3::new(0., -10000., 0.);
 #[derive(Deserialize)]
 pub struct EnemySpec {
@@ -31111,6 +32376,8 @@ pub struct Config {
     pub charges: Vec<u32>,
     #[serde(default, rename = "healthBars")]
     pub health_bars: Vec<[u32; 2]>,
+    #[serde(default, rename = "blobShadows")]
+    pub blob_shadows: Vec<u32>,
     pub hud: Vec<u32>,
     pub marker: u32,
     pub shapes: Vec<Shape>,
@@ -31130,6 +32397,7 @@ pub struct Input {
     pub look: Option<[f32; 2]>,
     pub teleport: Option<[f32; 3]>,
     pub death_mode: Option<String>,
+    pub stress_count: Option<u32>,
 }
 struct Enemy {
     spec: EnemySpec,
@@ -31209,6 +32477,8 @@ pub struct Game {
     config_ids: ConfigIds,
     enemies: Vec<Enemy>,
     health_bars: Vec<[u32; 2]>,
+    blob_shadows: Vec<u32>,
+    shadow_options: Vec<(u32, crate::scene::RenderOptions)>,
     obstacles: Vec<[f32; 4]>,
     corners: Vec<Vec2>,
     edges: Vec<Vec<f32>>,
@@ -31236,6 +32506,7 @@ pub struct Game {
     frame: u64,
     visual_frame: u64,
     death_mode: String,
+    stress_count: u32,
     tasks: VecDeque<CutTask>,
     pending: BTreeMap<u32, Pending>,
     completed: VecDeque<CompletedCut>,
@@ -31270,6 +32541,8 @@ impl Game {
             || config.charges.len() != 14
             || config.hud.len() != 5
             || (!config.health_bars.is_empty() && config.health_bars.len() != config.enemies.len())
+            || (!config.blob_shadows.is_empty()
+                && config.blob_shadows.len() != config.enemies.len())
             || [("drone-orbiter", 8), ("core-tank", 3), ("blade-wraith", 3)]
                 .iter()
                 .any(|(kind, count)| {
@@ -31277,7 +32550,7 @@ impl Game {
                 })
         {
             return Err(
-                "Aurelia needs 8/3/3 enemies, 32 bolts, 14 beams/charges, five HUD parts and paired optional health bars"
+                "Aurelia needs 8/3/3 enemies, 32 bolts, 14 beams/charges, five HUD parts and paired optional health bars/blob shadows"
                     .into(),
             );
         }
@@ -31292,6 +32565,7 @@ impl Game {
             .chain(config.charges.iter().copied())
             .chain(config.hud.iter().copied())
             .chain(config.health_bars.iter().flatten().copied())
+            .chain(config.blob_shadows.iter().copied())
             .chain([config.marker])
         {
             if ids.contains(&id) || !scene.object_exists(id) {
@@ -31389,6 +32663,8 @@ impl Game {
             ),
             enemies,
             health_bars: config.health_bars,
+            blob_shadows: config.blob_shadows,
+            shadow_options: Vec::new(),
             obstacles,
             corners,
             edges,
@@ -31416,6 +32692,7 @@ impl Game {
             frame: 0,
             visual_frame: 0,
             death_mode: "cut".into(),
+            stress_count: 0,
             tasks: VecDeque::new(),
             pending: BTreeMap::new(),
             completed: VecDeque::new(),
@@ -31442,6 +32719,31 @@ impl Game {
             turn_latched: false,
             sim_dt: 0.,
         };
+        // Blob mode is local to this encounter. Other dynamic scene casters retain
+        // their independent shadow-map layer.
+        if !g.blob_shadows.is_empty() {
+            for e in &g.enemies {
+                let mut options = scene.objects()[&e.spec.id].render_options;
+                g.shadow_options.push((e.spec.id, options));
+                options.is_static = false;
+                options.casts_shadow = false;
+                scene.set_render_options(e.spec.id, options);
+            }
+            for &id in &g.blob_shadows {
+                g.shadow_options
+                    .push((id, scene.objects()[&id].render_options));
+                scene.set_render_options(
+                    id,
+                    crate::scene::RenderOptions {
+                        is_static: false,
+                        casts_shadow: false,
+                        receives_shadow: false,
+                        reflectivity: 0.,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
         for id in ids {
             scene.set_object_position(id, HIDDEN);
         }
@@ -31454,6 +32756,7 @@ impl Game {
     /// Release pooled visuals and asynchronous work before removing this encounter.
     pub fn teardown(&mut self, scene: &mut SceneManager) {
         self.active = false;
+        self.stress_count = 0;
         self.tasks.clear();
         self.pending.clear();
         self.completed.clear();
@@ -31474,7 +32777,7 @@ impl Game {
             e.last_strikes = [0; 2];
             hide_enemy(scene, e.spec.id);
         }
-        for id in self.health_bars.iter().flatten() {
+        for id in self.health_bars.iter().flatten().chain(&self.blob_shadows) {
             scene.set_object_position(*id, HIDDEN);
         }
         for id in self
@@ -31489,6 +32792,9 @@ impl Game {
         {
             scene.set_object_position(*id, HIDDEN);
         }
+        for (id, options) in self.shadow_options.drain(..) {
+            scene.set_render_options(id, options);
+        }
     }
     pub fn input(&mut self, input: Input, scene: &mut SceneManager) -> Result<(), String> {
         if input
@@ -31501,6 +32807,9 @@ impl Game {
                 .teleport
                 .is_some_and(|a| a.iter().any(|v| !v.is_finite()))
             || input.slash.is_some_and(|h| h > 1)
+            || input
+                .stress_count
+                .is_some_and(|count| count > MAX_STRESS_MODELS)
             || input
                 .death_mode
                 .as_ref()
@@ -31532,6 +32841,9 @@ impl Game {
         if let Some([x, y]) = input.look {
             self.player.yaw -= x * 0.003;
             self.player.pitch = (self.player.pitch - y * 0.003).clamp(-1.35, 1.35);
+        }
+        if let Some(count) = input.stress_count {
+            self.stress_count = count;
         }
         if let Some(mode) = input.death_mode {
             self.death_mode = mode;
@@ -32683,6 +33995,21 @@ impl Game {
                 }
             }
         }
+        for (e, &id) in self.enemies.iter().zip(&self.blob_shadows) {
+            if !self.playing() || self.health <= 0. || !matches!(e.phase, 1 | 2) {
+                scene.set_object_position(id, HIDDEN);
+                continue;
+            }
+            // Rim's authored pavement is flat; no per-frame raycast or shadow pass.
+            // Match the original Three exhibition's ground-shadow height/radius.
+            let radius = (e.spec.height * 0.65).clamp(0.3, 0.9);
+            scene.set_object_transform(
+                id,
+                Vec3::new(e.position.x, 0.136, e.position.z),
+                Vec3::ZERO,
+                Vec3::new(radius, 1., radius),
+            );
+        }
         let head = head.unwrap_or_else(|| {
             Mat4::from_rotation_translation(
                 Quat::from_rotation_y(self.player.yaw) * Quat::from_rotation_x(self.player.pitch),
@@ -32757,8 +34084,11 @@ impl Game {
             },
         );
     }
+    pub fn stress_count(&self) -> u32 {
+        self.stress_count
+    }
     pub fn state(&self) -> Value {
-        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
+        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"stressModels":self.stress_count,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
     }
 }
 fn max_hp(kind: &str) -> f32 {
@@ -32989,6 +34319,9 @@ fn fixture() -> (Game, SceneManager) {
     fixture_with_playing_pool(false)
 }
 fn fixture_with_playing_pool(playing: bool) -> (Game, SceneManager) {
+    fixture_with_shadow_pool(playing, false)
+}
+fn fixture_with_shadow_pool(playing: bool, blobs: bool) -> (Game, SceneManager) {
     static ASSETS: OnceLock<Vec<Arc<crate::gltf_model::ModelAsset>>> = OnceLock::new();
     let assets = ASSETS.get_or_init(|| {
         [
@@ -33080,6 +34413,11 @@ fn fixture_with_playing_pool(playing: bool) -> (Game, SceneManager) {
             beams,
             charges,
             health_bars,
+            blob_shadows: if blobs {
+                (0..14).map(|_| scene.add_cube(HIDDEN)).collect()
+            } else {
+                Vec::new()
+            },
             hud,
             marker,
             shapes,
@@ -34122,6 +35460,110 @@ fn same_physical_vr_swings_hit_at_72_90_and_120_hz() {
             "HP zero queues actual worker geometry at {hz} Hz"
         );
     }
+}
+
+#[test]
+fn blob_shadows_follow_living_npcs_without_invalidating_shadow_maps() {
+    let (mut game, mut scene) = fixture_with_shadow_pool(false, true);
+    assert!(game
+        .enemies
+        .iter()
+        .all(|e| !scene.objects()[&e.spec.id].render_options.casts_shadow));
+    // Match the authored encounter's non-casters; retain one unrelated caster in
+    // each layer to catch accidental broad invalidation during NPC movement.
+    let ids: Vec<_> = scene.objects().keys().copied().collect();
+    for id in ids {
+        scene.set_render_options(
+            id,
+            crate::scene::RenderOptions {
+                casts_shadow: false,
+                ..Default::default()
+            },
+        );
+    }
+    let city = scene.add_cube(Vec3::new(5., 0., 5.));
+    scene.set_render_options(
+        city,
+        crate::scene::RenderOptions {
+            is_static: true,
+            ..Default::default()
+        },
+    );
+    let dynamic = scene.add_cube(Vec3::new(-5., 0., 5.));
+    start(&mut game, &mut scene);
+    let revisions = (scene.shadow_revision(true), scene.shadow_revision(false));
+    game.enemies[0].position = Vec3::new(3., 2., -7.);
+    game.sync(&mut scene, None);
+    let id = game.blob_shadows[0];
+    let t = &scene.objects()[&id].transform;
+    assert_eq!(t.position, Vec3::new(3., 0.136, -7.));
+    assert!(t.scale.x > 0. && t.scale.x <= 0.9);
+    assert_eq!(
+        revisions,
+        (scene.shadow_revision(true), scene.shadow_revision(false))
+    );
+    game.hurt_enemy(&mut scene, 0, 50., Vec3::Y);
+    game.sync(&mut scene, None);
+    assert_ne!(scene.objects()[&id].transform.position, HIDDEN);
+    game.hurt_enemy(&mut scene, 0, 50., Vec3::Y);
+    game.sync(&mut scene, None);
+    assert_eq!(scene.objects()[&id].transform.position, HIDDEN);
+    game.teardown(&mut scene);
+    assert!(game
+        .blob_shadows
+        .iter()
+        .all(|id| scene.objects()[id].transform.position == HIDDEN));
+    assert!(game
+        .enemies
+        .iter()
+        .all(|e| scene.objects()[&e.spec.id].render_options.casts_shadow));
+    assert!(game
+        .blob_shadows
+        .iter()
+        .all(|id| scene.objects()[id].render_options.casts_shadow));
+    // The generic dynamic shadow path still invalidates independently.
+    let revisions = (scene.shadow_revision(true), scene.shadow_revision(false));
+    scene.set_object_position(dynamic, Vec3::new(-4., 0., 5.));
+    assert_eq!(scene.shadow_revision(true), revisions.0);
+    assert!(scene.shadow_revision(false) > revisions.1);
+}
+
+#[test]
+fn stress_count_is_bounded_preserves_combat_reset_and_clears_on_teardown() {
+    let (mut game, mut scene) = fixture();
+    assert_eq!(game.state()["stressModels"], 0);
+    game.input(
+        Input {
+            stress_count: Some(128),
+            ..Default::default()
+        },
+        &mut scene,
+    )
+    .unwrap();
+    assert_eq!(game.stress_count(), 128);
+    assert!(game
+        .input(
+            Input {
+                stress_count: Some(MAX_STRESS_MODELS + 1),
+                reset: true,
+                ..Default::default()
+            },
+            &mut scene
+        )
+        .is_err());
+    assert_eq!(game.stress_count(), 128);
+    start(&mut game, &mut scene);
+    game.input(
+        Input {
+            reset: true,
+            ..Default::default()
+        },
+        &mut scene,
+    )
+    .unwrap();
+    assert_eq!(game.stress_count(), 128);
+    game.teardown(&mut scene);
+    assert_eq!(game.stress_count(), 0);
 }
 
 
@@ -35200,11 +36642,20 @@ impl Transform {
         }
     }
     pub fn model(&self) -> Mat4 {
-        Mat4::from_translation(self.position)
-            * Mat4::from_rotation_y(self.rotation.y)
-            * Mat4::from_rotation_x(self.rotation.x)
-            * Mat4::from_rotation_z(self.rotation.z)
-            * Mat4::from_scale(self.scale)
+        // Compose the affine columns directly, as in Three's Matrix4.compose,
+        // while preserving our Euler convention T * Ry * Rx * Rz * S.
+        // Keep the products grouped like the original rotation matrices.
+        let (sx, cx) = self.rotation.x.sin_cos();
+        let (sy, cy) = self.rotation.y.sin_cos();
+        let (sz, cz) = self.rotation.z.sin_cos();
+        let ys = sy * sx;
+        let yc = cy * sx;
+        Mat4::from_cols(
+            (Vec3::new(cy * cz + ys * sz, cx * sz, -sy * cz + yc * sz) * self.scale.x).extend(0.0),
+            (Vec3::new(-cy * sz + ys * cz, cx * cz, sy * sz + yc * cz) * self.scale.y).extend(0.0),
+            (Vec3::new(sy * cx, -sx, cy * cx) * self.scale.z).extend(0.0),
+            self.position.extend(1.0),
+        )
     }
     fn is_valid(&self) -> bool {
         self.position.is_finite()
@@ -35242,6 +36693,9 @@ pub struct RenderOptions {
     pub casts_shadow: bool,
     pub receives_shadow: bool,
     pub reflectivity: f32,
+    /// Author guarantees opaque parts have no inter-root coplanar/order dependency.
+    /// Independent of mobility: moving instances can share immutable geometry.
+    pub opaque_reorderable: bool,
 }
 impl Default for RenderOptions {
     fn default() -> Self {
@@ -35250,6 +36704,7 @@ impl Default for RenderOptions {
             casts_shadow: true,
             receives_shadow: true,
             reflectivity: 0.0,
+            opaque_reorderable: false,
         }
     }
 }
@@ -38549,6 +40004,34 @@ mod tests {
         }
     }
     #[test]
+    fn opaque_reorderable_invalidates_static_and_dynamic_render_plans() {
+        let mut scene = SceneManager::default();
+        let id = scene.add_cube(Vec3::ZERO);
+        for is_static in [false, true] {
+            let mut options = RenderOptions {
+                is_static,
+                ..Default::default()
+            };
+            scene.set_render_options(id, options);
+            for enabled in [true, false] {
+                let before = (scene.render_revision(), scene.static_revision());
+                options.opaque_reorderable = enabled;
+                assert!(scene.set_render_options(id, options));
+                assert!(scene.render_revision() > before.0);
+                assert_eq!(scene.static_revision() > before.1, is_static);
+                assert_eq!(
+                    scene.objects[&id].render_options.opaque_reorderable,
+                    enabled
+                );
+                let after = (scene.render_revision(), scene.static_revision());
+                assert!(scene.set_render_options(id, options));
+                assert_eq!((scene.render_revision(), scene.static_revision()), after);
+            }
+        }
+        scene.remove_object(id);
+        assert!(!scene.set_render_options(id, RenderOptions::default()));
+    }
+    #[test]
     fn shadow_revisions_follow_casters_and_category_transitions() {
         let mut scene = SceneManager::default();
         let id = scene.add_object(
@@ -38631,6 +40114,52 @@ mod tests {
         scene.remove_object(id);
         assert!(scene.mirror_plane().is_none());
     }
+    #[test]
+    fn direct_transform_composition_matches_independent_matrix_chain() {
+        // Independent old path: cover Euler order, mirrors, nonuniform and
+        // singular scales, translations and the actual transformed geometry.
+        let mut seed = 0x5c31_2a9du32;
+        let mut random = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / 16_777_215.0 * 2.0 - 1.0
+        };
+        for index in 0..4096 {
+            let position = Vec3::new(random(), random(), random()) * 1000.0;
+            let rotation = Vec3::new(random(), random(), random()) * 100.0;
+            let mut scale = Vec3::new(random(), random(), random()) * 10.0;
+            if index % 11 == 0 {
+                scale[index % 3] = 0.0;
+            }
+            let transform = Transform::new(position, rotation, scale);
+            let legacy = Mat4::from_translation(position)
+                * Mat4::from_rotation_y(rotation.y)
+                * Mat4::from_rotation_x(rotation.x)
+                * Mat4::from_rotation_z(rotation.z)
+                * Mat4::from_scale(scale);
+            let actual = transform.model();
+            for (a, b) in actual.to_cols_array().iter().zip(legacy.to_cols_array()) {
+                assert!(
+                    (a - b).abs() <= 2e-6 * b.abs().max(1.0),
+                    "case {index}: {a} != {b}"
+                );
+            }
+            for point in [
+                Vec3::ZERO,
+                Vec3::X,
+                Vec3::Y,
+                Vec3::Z,
+                Vec3::new(-2.3, 4.1, -0.7),
+            ] {
+                assert!(
+                    actual
+                        .transform_point3(point)
+                        .abs_diff_eq(legacy.transform_point3(point), 0.0002),
+                    "case {index}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn normal_transform_preserves_perpendicularity_under_nonuniform_scale() {
         let transform = super::Transform::new(
@@ -39179,31 +40708,120 @@ struct EffectsUniforms {
 @group(1) @binding(9) var dynamic_shadow_2:texture_depth_2d;
 @group(1) @binding(10) var static_shadow_3:texture_depth_2d;
 @group(1) @binding(11) var dynamic_shadow_3:texture_depth_2d;
-fn compare_shadow(index:u32,uv:vec2<f32>,depth:f32)->f32 {
-    let layers=effects.shadow_layers[index];
-    var visibility=1.0;
-    // Uniform branches skip only maps known to contain no casters. Preserve
-    // per-texel min(static,dynamic) before the unchanged 3x3 PCF filter.
-    switch index {
-        case 0u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,uv,depth)); }
-        }
-        case 1u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_1,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,uv,depth)); }
-        }
-        case 2u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_2,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,uv,depth)); }
-        }
-        case 3u: {
-            if((layers&1u)!=0u) { visibility=textureSampleCompareLevel(static_shadow_3,shadow_sampler,uv,depth); }
-            if((layers&2u)!=0u) { visibility=min(visibility,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,uv,depth)); }
-        }
-        default: {}
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_0(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
     }
-    return visibility;
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_1(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_1,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_1,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_1,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_2(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_2,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_2,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_2,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
+}
+
+// Select resources and occupied layers once; preserve all nine ordered PCF taps.
+fn filter_shadow_3(uv:vec2<f32>,depth:f32,texel:vec2<f32>,layers:u32)->f32 {
+    if(layers==1u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=textureSampleCompareLevel(static_shadow_3,shadow_sampler,sample_uv,depth);
+        }}
+        return visibility/9.0;
+    }
+    if(layers==2u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(1.0,textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    if(layers==3u) {
+        var visibility=0.0;
+        for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
+            let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
+            visibility+=min(textureSampleCompareLevel(static_shadow_3,shadow_sampler,sample_uv,depth),textureSampleCompareLevel(dynamic_shadow_3,shadow_sampler,sample_uv,depth));
+        }}
+        return visibility/9.0;
+    }
+    return 1.0;
 }
 fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:vec3<f32>)->f32 {
     if(effects.shadow_layers[index]==0u) { return 1.0; }
@@ -39216,13 +40834,14 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
     let bias=effects.params.w*(1.0+2.0*(1.0-max(dot(normal,light_direction),0.0)));
     let depth=ndc.z-bias;
     let texel=1.0/vec2<f32>(textureDimensions(static_shadow));
-    var visibility=0.0;
-    // Combine static and dynamic visibility per texel, then apply 3x3 PCF.
-    for(var y=-1;y<=1;y++) {for(var x=-1;x<=1;x++) {
-        let sample_uv=uv+vec2<f32>(f32(x),f32(y))*texel;
-        visibility+=compare_shadow(index,sample_uv,depth);
-    }}
-    return visibility/9.0;
+    let layers=effects.shadow_layers[index];
+    switch index {
+        case 0u: { return filter_shadow_0(uv,depth,texel,layers); }
+        case 1u: { return filter_shadow_1(uv,depth,texel,layers); }
+        case 2u: { return filter_shadow_2(uv,depth,texel,layers); }
+        case 3u: { return filter_shadow_3(uv,depth,texel,layers); }
+        default: { return 1.0; }
+    }
 }
 
 // Keep identical in the surface and edge-glow shaders. Mesh-local cells stay
@@ -39322,7 +40941,7 @@ fn shade_surface_base(input: VertexOutput) -> vec4<f32> {
             spec = pow(max(dot(normal, halfway), 0.0), 32.0);
         }
         var visibility=1.0;
-        if(i<u32(effects.params.x) && input.material.y>0.5) {
+        if(diff>0.0 && i<u32(effects.params.x) && input.material.y>0.5) {
             visibility=shadow_visibility(i,input.world_pos,normal,l_dir);
         }
         result += (diff * input.color + spec) * light.color * visibility;
@@ -40988,6 +42607,11 @@ pub(crate) struct ObjectRenderData {
     half_extent: Vec3,
 }
 impl ObjectRenderData {
+    /// Reuse the same published root transform for glTF and primitive rendering.
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn model(&self) -> Mat4 {
+        Mat4::from_cols_array_2d(&self.instance.model)
+    }
     pub(crate) fn plane_normal(&self) -> Vec3 {
         Mat4::from_cols_array_2d(&self.instance.normal_matrix)
             .transform_vector3(Vec3::Y)
@@ -41038,6 +42662,22 @@ impl Frustum {
             tolerance: planes.map(|p| 1e-5 * p.truncate().length()),
             planes,
         }
+    }
+    /// Strict containment is a proof that every child AABB is also visible.
+    /// Touching/partial/invalid bounds must retain the individual test path.
+    #[cfg(any(test, target_arch = "wasm32"))]
+    pub(crate) fn fully_contains_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
+        center.is_finite()
+            && half_extent.is_finite()
+            && half_extent.cmpge(Vec3::ZERO).all()
+            && self
+                .planes
+                .iter()
+                .zip(self.tolerance)
+                .all(|(plane, tolerance)| {
+                    let normal = plane.truncate();
+                    normal.dot(center) + plane.w - normal.abs().dot(half_extent) > tolerance
+                })
     }
     pub fn intersects_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
         self.planes
@@ -41498,6 +43138,7 @@ mod tests {
                     casts_shadow: i % 5 != 0,
                     receives_shadow: i % 3 == 0,
                     reflectivity: 0.25,
+                    ..Default::default()
                 },
             );
         }
@@ -41532,6 +43173,7 @@ mod tests {
                 casts_shadow: false,
                 receives_shadow: false,
                 reflectivity: 0.6,
+                ..Default::default()
             },
         );
         compare_passes(&scene);
@@ -41777,6 +43419,43 @@ mod tests {
             instance.normal_matrix,
             crate::scene::normal_matrix(scene.objects()[&id].transform.model()).to_cols_array_2d()
         );
+    }
+
+    #[test]
+    fn cached_gltf_root_model_tracks_commands_motion_and_pose_updates() {
+        let asset = crate::gltf_loader::parse_model(
+            include_bytes!("../assets/models/fox/Fox.glb"),
+            &[],
+            &[],
+        )
+        .unwrap();
+        let mut scene = SceneManager::default();
+        let clip = asset
+            .animations
+            .iter()
+            .position(|clip| clip.name.as_deref() == Some("Walk"))
+            .unwrap();
+        let id = scene.add_model(std::sync::Arc::new(asset)).unwrap();
+        let check = |scene: &SceneManager| {
+            let object = &scene.objects()[&id];
+            assert_eq!(object.render_data.model(), object.transform.model());
+        };
+        check(&scene);
+        assert!(scene.set_object_position(id, Vec3::new(1.0, 3.0, -2.0)));
+        check(&scene);
+        assert!(scene.set_object_rotation(id, Vec3::new(0.4, -0.7, 1.2)));
+        check(&scene);
+        assert!(scene.set_object_scale(id, Vec3::new(-0.5, 0.2, 1.5)));
+        check(&scene);
+        assert!(scene.set_object_spin(id, Vec3::new(0.2, 0.3, -0.4)));
+        assert!(scene.set_projectile(id, Vec3::new(0.5, 0.1, 0.2), 0.0, 0.0));
+        scene.play_model_animation(id, clip, true, 1.0).unwrap();
+        let old = scene.objects()[&id].render_data.model();
+        scene.update(1.0 / 72.0);
+        check(&scene);
+        assert_ne!(old, scene.objects()[&id].render_data.model());
+        scene.seek_model_animation(id, 0.25).unwrap();
+        check(&scene);
     }
 
     #[test]
@@ -42588,6 +44267,7 @@ pub fn set_object_render_options(
     casts_shadow: bool,
     receives_shadow: bool,
     reflectivity: f32,
+    opaque_reorderable: bool,
 ) -> bool {
     STATE.with(|state| {
         state.borrow().as_ref().is_some_and(|state| {
@@ -42598,6 +44278,7 @@ pub fn set_object_render_options(
                     casts_shadow,
                     receives_shadow,
                     reflectivity,
+                    opaque_reorderable,
                 },
             )
         })
@@ -45004,6 +46685,13 @@ pub fn rim_input(input: &str) -> Result<(), JsValue> {
                 .ok_or("Aurelia is not configured")?
                 .input(input, scene)
         })
+    })
+}
+pub(crate) fn rim_stress_count() -> Option<u32> {
+    RIM.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .map(crate::rim_game::Game::stress_count)
     })
 }
 #[wasm_bindgen]
