@@ -130,8 +130,154 @@ struct PreparedDraw {
 }
 #[derive(Default)]
 pub struct PreparedDraws {
-    draws: Vec<PreparedDraw>,
+    draws: Rc<Vec<PreparedDraw>>,
     pub upload_bytes: usize,
+}
+
+// One entry per logical pass/view, never one entry per camera matrix. The
+// content epoch covers every mutable glTF buffer write, including writes made
+// through a different pipeline/light variant sharing the same storage.
+const PLAN_SLOTS: usize = 64;
+const PLAN_BYTES: usize = 16 * 1024 * 1024;
+#[derive(Clone, PartialEq, Eq)]
+struct PlanKey {
+    pipeline: PipelineKey,
+    camera: [u32; 3],
+    view_projection: [u32; 16],
+    scene: u64,
+    inputs: u64,
+    content: u64,
+    culling: bool,
+    diagnostics: bool,
+}
+struct CachedPlan {
+    key: PlanKey,
+    models: Vec<(u32, u64, bool)>,
+    draws: Rc<Vec<PreparedDraw>>,
+    bytes: usize,
+}
+struct PlanCache {
+    enabled: bool,
+    slots: [Option<CachedPlan>; PLAN_SLOTS],
+    hits: u64,
+    misses: u64,
+    // cold, scene, inputs, membership, view, pipeline, content, diagnostics,
+    // lifecycle, toggle, budget eviction/rejection, unsupported slot.
+    reasons: [u64; 12],
+    bytes: usize,
+}
+impl Default for PlanCache {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            slots: std::array::from_fn(|_| None),
+            hits: 0,
+            misses: 0,
+            reasons: [0; 12],
+            bytes: 0,
+        }
+    }
+}
+impl PlanCache {
+    fn clear(&mut self, reason: usize) {
+        if self.bytes != 0 {
+            self.slots.fill_with(|| None);
+            self.bytes = 0;
+        }
+        self.reasons[reason] += 1;
+    }
+    fn lookup(
+        &mut self,
+        slot: usize,
+        key: &PlanKey,
+        models: &[(u32, &GpuModel)],
+    ) -> Option<Rc<Vec<PreparedDraw>>> {
+        let reason = match self.slots.get(slot) {
+            None => 11,
+            Some(None) => 0,
+            Some(Some(p)) => {
+                if p.key.scene != key.scene {
+                    1
+                } else if p.key.inputs != key.inputs {
+                    2
+                } else if p.models.len() != models.len()
+                    || !p
+                        .models
+                        .iter()
+                        .zip(models)
+                        .all(|(a, (id, m))| *a == (*id, m.generation, m.opaque_reorderable))
+                {
+                    3
+                } else if p.key.camera != key.camera
+                    || p.key.view_projection != key.view_projection
+                    || p.key.culling != key.culling
+                {
+                    4
+                } else if p.key.pipeline != key.pipeline {
+                    5
+                } else if p.key.content != key.content {
+                    6
+                } else if p.key.diagnostics != key.diagnostics {
+                    7
+                } else {
+                    self.hits += 1;
+                    return Some(p.draws.clone());
+                }
+            }
+        };
+        self.misses += 1;
+        self.reasons[reason] += 1;
+        // Drop invalid entries immediately; no stale resource ownership across
+        // misses or lifecycle transitions, even when the next plan is too big.
+        if let Some(entry) = self.slots.get_mut(slot) {
+            if let Some(old) = entry.take() {
+                self.bytes -= old.bytes;
+            }
+        }
+        None
+    }
+    fn store(
+        &mut self,
+        slot: usize,
+        key: PlanKey,
+        models: &[(u32, &GpuModel)],
+        draws: Rc<Vec<PreparedDraw>>,
+    ) {
+        if slot >= PLAN_SLOTS {
+            return;
+        }
+        let models: Vec<_> = models
+            .iter()
+            .map(|(id, m)| (*id, m.generation, m.opaque_reorderable))
+            .collect();
+        let bytes = draws.capacity() * std::mem::size_of::<PreparedDraw>()
+            + draws
+                .iter()
+                .map(|d| d.records.capacity() * std::mem::size_of::<(u32, usize, usize)>())
+                .sum::<usize>()
+            + models.capacity() * std::mem::size_of::<(u32, u64, bool)>()
+            + std::mem::size_of::<CachedPlan>();
+        if bytes > PLAN_BYTES {
+            self.reasons[10] += 1;
+            return;
+        }
+        for entry in &mut self.slots {
+            if self.bytes + bytes <= PLAN_BYTES {
+                break;
+            }
+            if let Some(old) = entry.take() {
+                self.bytes -= old.bytes;
+                self.reasons[10] += 1;
+            }
+        }
+        self.bytes += bytes;
+        self.slots[slot] = Some(CachedPlan {
+            key,
+            models,
+            draws,
+            bytes,
+        });
+    }
 }
 
 /// Frame-local indices only: no references or GPU resources survive a preparation call.
@@ -380,6 +526,13 @@ pub struct GltfGpuStats {
     pub instance_buffer_bytes: usize,
     pub queue_scratch_growths: u64,
     pub queue_scratch_bytes: usize,
+    pub prepare_eligible_rebuilds: u64,
+    pub prepare_group_rebuilds: u64,
+    pub prepare_opaque_group_rebuilds: u64,
+    pub prepare_payload_rebuilds: u64,
+    pub prepare_record_rebuilds: u64,
+    pub prepare_timed_calls: u64,
+    pub prepare_stage_ms: [f64; 6],
 }
 struct Draw {
     node: usize,
@@ -402,6 +555,7 @@ struct Draw {
     scratch: Vec<Vertex>,
 }
 pub struct GpuModel {
+    generation: u64,
     draws: Vec<Draw>,
     materials: Rc<Vec<Material>>,
     _shared: Rc<SharedAsset>,
@@ -496,6 +650,9 @@ pub struct GltfGpu {
     active_instance_pages: HashMap<(PipelineKey, usize), usize>,
     instancing_supported: bool,
     queue_scratch: QueueScratch,
+    plan_cache: RefCell<PlanCache>,
+    input_epoch: Cell<u64>,
+    content_epoch: Cell<u64>,
 }
 impl GltfGpu {
     pub fn new(
@@ -599,6 +756,9 @@ impl GltfGpu {
             instance_streams: HashMap::new(),
             active_instance_pages: HashMap::new(),
             queue_scratch: QueueScratch::default(),
+            plan_cache: RefCell::new(PlanCache::default()),
+            input_epoch: Cell::new(0),
+            content_epoch: Cell::new(0),
             instancing_supported: limits.max_vertex_attributes >= 16
                 && limits.max_vertex_buffers >= 2,
         }
@@ -1135,7 +1295,33 @@ impl GltfGpu {
                 .sum::<usize>();
         stats
     }
+    fn invalidate_plan_inputs(&self) {
+        self.input_epoch.set(
+            self.input_epoch
+                .get()
+                .checked_add(1)
+                .expect("glTF input epoch exhausted"),
+        );
+        self.plan_cache.borrow_mut().clear(2);
+    }
+    pub fn set_plan_cache_enabled(&self, enabled: bool) {
+        let mut cache = self.plan_cache.borrow_mut();
+        if cache.enabled != enabled {
+            cache.clear(9);
+            cache.enabled = enabled;
+        }
+    }
+    pub fn plan_cache_stats(&self) -> serde_json::Value {
+        let c = self.plan_cache.borrow();
+        serde_json::json!({"enabled":c.enabled,"hits":c.hits,"misses":c.misses,
+            "reasons":c.reasons,"reasonNames":["cold","scene","inputs","membership","view","pipeline","content","diagnostics","lifecycle","toggle","budget","unsupportedSlot"],
+            "retainedBytes":c.bytes,"byteLimit":PLAN_BYTES,"slotLimit":PLAN_SLOTS,
+            "retainedSlots":c.slots.iter().filter(|s|s.is_some()).count(),
+            "inputEpoch":self.input_epoch.get(),"contentEpoch":self.content_epoch.get(),
+            "memoryScope":"CPU plan element storage; existing referenced GPU allocations reported separately"})
+    }
     fn create_model(&self, device: &wgpu::Device, shared: Rc<SharedAsset>) -> GpuModel {
+        self.invalidate_plan_inputs();
         let asset = &shared.asset;
         let materials = shared.materials.clone();
         let mut palettes: HashMap<usize, SkinPalette> = HashMap::new();
@@ -1249,6 +1435,7 @@ impl GltfGpu {
             )
         });
         GpuModel {
+            generation: self.input_epoch.get(),
             active_draws,
             opaque_reorderable: false,
             reorderable_draws,
@@ -1278,6 +1465,7 @@ impl GltfGpu {
         if model.last_pose.as_ref() == Some(&stamp) {
             return Ok(0);
         }
+        self.invalidate_plan_inputs();
         model.active.clear();
         model.active.extend(pose.active_nodes.iter().copied());
         let mut stats = self.counters.get();
@@ -1306,6 +1494,12 @@ impl GltfGpu {
                     .extend(matrices.iter().map(|matrix| matrix.to_cols_array_2d()));
                 if !palette.last.is_empty() {
                     queue.write_buffer(&palette.buffer, 0, as_bytes(&palette.last));
+                    self.content_epoch.set(
+                        self.content_epoch
+                            .get()
+                            .checked_add(1)
+                            .expect("glTF content epoch exhausted"),
+                    );
                     stats.buffer_upload_calls += 1;
                     let uploaded = palette.last.len() * 64;
                     bytes += uploaded;
@@ -1368,6 +1562,12 @@ impl GltfGpu {
                 }
                 draw.center = center / draw.scratch.len().max(1) as f32;
                 queue.write_buffer(&draw.vertex, 0, as_bytes(&draw.scratch));
+                self.content_epoch.set(
+                    self.content_epoch
+                        .get()
+                        .checked_add(1)
+                        .expect("glTF content epoch exhausted"),
+                );
                 stats.buffer_upload_calls += 1;
                 bytes += draw.scratch.len() * 96;
                 stats.cpu_deformed_vertices += draw.scratch.len() as u64;
@@ -1555,6 +1755,9 @@ impl GltfGpu {
         self.draw_records.borrow_mut().clear();
     }
     pub fn set_diagnostics(&self, enabled: bool) {
+        if self.diagnostics.get() != enabled {
+            self.plan_cache.borrow_mut().clear(7);
+        }
         self.diagnostics.set(enabled);
         if !enabled {
             self.draw_records.borrow_mut().clear();
@@ -1565,6 +1768,13 @@ impl GltfGpu {
     }
     /// Pages contain transforms only. Drop cached pages as soon as all models disappear.
     pub fn clear_instance_pages(&mut self) {
+        self.plan_cache.borrow_mut().clear(8);
+        self.content_epoch.set(
+            self.content_epoch
+                .get()
+                .checked_add(1)
+                .expect("glTF content epoch exhausted"),
+        );
         self.instance_pages.clear();
         self.instance_streams.clear();
         self.active_instance_pages.clear();
@@ -1582,8 +1792,17 @@ impl GltfGpu {
         view_slot: usize,
         view_projection: Mat4,
         culling: bool,
+        scene_revision: u64,
     ) -> PreparedDraws {
         let _scope = super::profiler::cpu_scope("gltf.queue");
+        let mut stages = super::profiler::CpuStages::new([
+            "gltf.prepare.eligible",
+            "gltf.prepare.groups",
+            "gltf.prepare.basis",
+            "gltf.prepare.payload",
+            "gltf.prepare.records",
+            "gltf.prepare.resources",
+        ]);
         let upload_before = self.counters.get().uniform_upload_bytes;
         // Lighting changes the program, never the instance payload or material
         // layout. Keep one stream/page set across all light program classes.
@@ -1592,6 +1811,33 @@ impl GltfGpu {
             ..key
         };
         let models: Vec<_> = models.collect();
+        let mut plan_key = PlanKey {
+            pipeline: key,
+            camera: camera.to_array().map(f32::to_bits),
+            view_projection: view_projection.to_cols_array().map(f32::to_bits),
+            scene: scene_revision,
+            inputs: self.input_epoch.get(),
+            content: self.content_epoch.get(),
+            culling,
+            diagnostics: self.diagnostics.get(),
+        };
+        let cache_enabled = !blend && !models.is_empty() && self.plan_cache.borrow().enabled;
+        if cache_enabled {
+            let hit = self
+                .plan_cache
+                .borrow_mut()
+                .lookup(view_slot, &plan_key, &models);
+            if let Some(draws) = hit {
+                // Do not attribute lookup/model-list validation to rebuild stages.
+                // These are cumulative work counters, not the parent queue scope.
+                stages.finish();
+                return PreparedDraws {
+                    draws,
+                    upload_bytes: 0,
+                };
+            }
+        }
+        stages.switch(Some(0));
         let frustum = crate::visibility::Frustum::from_view_projection(view_projection);
         let mut stats = self.counters.get();
         let mut scratch = std::mem::take(&mut self.queue_scratch);
@@ -1628,7 +1874,11 @@ impl GltfGpu {
             scratch.model_ranges.push(start..scratch.eligible.len());
             scratch.cursors.push(start);
         }
+        stats.prepare_eligible_rebuilds += 1;
+        stats.prepare_group_rebuilds += 1;
+        stats.prepare_opaque_group_rebuilds += u64::from(!blend);
         self.counters.set(stats);
+        stages.switch(Some(1));
         // `reflected` is a winding flag (also set by authored cameras), not
         // the pass identity. Real planar reflection uses `clipped`.
         // Keep auxiliary passes on their existing ordering path. The authored
@@ -1760,14 +2010,13 @@ impl GltfGpu {
             *total += count;
         }
         self.counters.set(stats);
-        let mut prepared = PreparedDraws {
-            draws: Vec::with_capacity(scratch.groups.len()),
-            upload_bytes: 0,
-        };
+        stages.switch(Some(4));
+        let mut prepared_draws = Vec::with_capacity(scratch.groups.len());
         // Blend preparation shares this key with the opaque preparation and
         // occurs before its submission. It must never overwrite/drop its stream.
         let mut records = 0usize;
         let mut required_bytes = 0usize;
+        stages.switch(Some(2));
         for group in &scratch.groups {
             let item = scratch.ordered[group.start];
             let first = &models[item.model].1.draws[item.draw].last_uniform;
@@ -1790,6 +2039,7 @@ impl GltfGpu {
                     }));
             }
         }
+        stages.switch(Some(5));
         let stream_limit = device.limits().max_buffer_size.min(16 * 1024 * 1024);
         let stream_bytes = (required_bytes as u64 <= stream_limit).then_some(required_bytes);
         let mut stream = if !blend && records > 0 && stream_bytes.is_some() {
@@ -1858,12 +2108,20 @@ impl GltfGpu {
             let mut stats = self.counters.get();
             if !instanced && d.uploaded_uniform.get() != d.last_uniform {
                 queue.write_buffer(&d.uniform, 0, as_bytes(&[d.last_uniform]));
+                self.content_epoch.set(
+                    self.content_epoch
+                        .get()
+                        .checked_add(1)
+                        .expect("glTF content epoch exhausted"),
+                );
                 d.uploaded_uniform.set(d.last_uniform);
                 stats.buffer_upload_calls += 1;
                 stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
             }
             let mut draw_bind = d.bind.clone();
             let instance = if instanced {
+                stages.switch(Some(3));
+                stats.prepare_payload_rebuilds += 1;
                 scratch.payload.clear();
                 for item in &scratch.ordered[group.clone()] {
                     let u = &models[item.model].1.draws[item.draw].last_uniform;
@@ -1875,6 +2133,7 @@ impl GltfGpu {
                             .extend_from_slice(as_bytes(&[RigidInstance::from_uniform(u)]));
                     }
                 }
+                stages.switch(Some(5));
                 let payload = &scratch.payload;
                 let pages = self
                     .instance_pages
@@ -1939,6 +2198,12 @@ impl GltfGpu {
                 }
                 if page.material != Some(material) {
                     queue.write_buffer(&page.material_buffer, 0, as_bytes(&[material]));
+                    self.content_epoch.set(
+                        self.content_epoch
+                            .get()
+                            .checked_add(1)
+                            .expect("glTF content epoch exhausted"),
+                    );
                     page.material = Some(material);
                     stats.buffer_upload_calls += 1;
                     stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
@@ -1946,7 +2211,9 @@ impl GltfGpu {
                 draw_bind = page.bind.clone();
                 let binding = if let Some(s) = stream.as_mut() {
                     let offset = s.scratch.len() as u64;
+                    stages.switch(Some(3));
                     s.scratch.extend_from_slice(payload);
+                    stages.switch(Some(5));
                     page.buffer = None;
                     page.last.clear();
                     InstanceBinding {
@@ -1958,6 +2225,12 @@ impl GltfGpu {
                     let buffer = page.buffer.as_ref().expect("standalone instance buffer");
                     if page.last != *payload {
                         queue.write_buffer(buffer, 0, payload);
+                        self.content_epoch.set(
+                            self.content_epoch
+                                .get()
+                                .checked_add(1)
+                                .expect("glTF content epoch exhausted"),
+                        );
                         stats.buffer_upload_calls += 1;
                         stats.uniform_upload_bytes += payload.len() as u64;
                         stats.instance_upload_bytes += payload.len() as u64;
@@ -1974,8 +2247,10 @@ impl GltfGpu {
             } else {
                 None
             };
+            stats.prepare_record_rebuilds += 1;
             self.counters.set(stats);
-            prepared.draws.push(PreparedDraw {
+            stages.switch(Some(4));
+            prepared_draws.push(PreparedDraw {
                 variant,
                 textures: material.textures.clone(),
                 bind: draw_bind,
@@ -1998,10 +2273,17 @@ impl GltfGpu {
                     Vec::new()
                 },
             });
+            stages.switch(Some(5));
         }
         if let Some(mut s) = stream {
             if s.last != s.scratch {
                 queue.write_buffer(&s.buffer, 0, &s.scratch);
+                self.content_epoch.set(
+                    self.content_epoch
+                        .get()
+                        .checked_add(1)
+                        .expect("glTF content epoch exhausted"),
+                );
                 let bytes = s.scratch.len() as u64;
                 let mut stats = self.counters.get();
                 stats.buffer_upload_calls += 1;
@@ -2019,6 +2301,7 @@ impl GltfGpu {
                 pages.truncate(page_index);
             }
         }
+        stages.switch(Some(4));
         let mut stats = self.counters.get();
         stats.queue_scratch_growths += capacities_before
             .into_iter()
@@ -2027,7 +2310,27 @@ impl GltfGpu {
             .count() as u64;
         self.counters.set(stats);
         self.queue_scratch = scratch;
-        prepared.upload_bytes = (self.counters.get().uniform_upload_bytes - upload_before) as usize;
+        let prepared = PreparedDraws {
+            draws: Rc::new(prepared_draws),
+            upload_bytes: (self.counters.get().uniform_upload_bytes - upload_before) as usize,
+        };
+        if cache_enabled {
+            plan_key.content = self.content_epoch.get();
+            self.plan_cache.borrow_mut().store(
+                view_slot,
+                plan_key,
+                &models,
+                prepared.draws.clone(),
+            );
+        }
+        if let Some(times) = stages.finish() {
+            let mut stats = self.counters.get();
+            stats.prepare_timed_calls += 1;
+            for (total, elapsed) in stats.prepare_stage_ms.iter_mut().zip(times) {
+                *total += elapsed;
+            }
+            self.counters.set(stats);
+        }
         prepared
     }
     pub fn draw_prepared(
@@ -2044,7 +2347,7 @@ impl GltfGpu {
         }
         let mut last_variant = None;
         let mut last_textures = None;
-        for d in &prepared.draws {
+        for d in prepared.draws.iter() {
             let Some(pipeline) = self.pipelines.get(&d.variant) else {
                 continue;
             };

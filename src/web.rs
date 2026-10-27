@@ -642,6 +642,16 @@ pub fn set_frustum_culling(enabled: bool) {
     });
 }
 
+/// Independent uncached preparation path for correctness/performance controls.
+#[wasm_bindgen]
+pub fn set_prepared_plan_cache_enabled(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow().set_prepared_plan_cache_enabled(enabled);
+        }
+    });
+}
+
 #[wasm_bindgen]
 pub fn renderer_stats() -> js_sys::Float64Array {
     let values = STATE.with(|state| {

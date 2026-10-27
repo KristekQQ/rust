@@ -1,12 +1,12 @@
 # Next renderer cycle
 
-Only batch 1 is authorized. Each subsequent batch requires a separate user request.
+Batches 1 and 2 have been separately authorized. Batch2 is complete locally; batches3–9 require separate requests.
 Base source is the live GitHub main observed at start, not the historical commit in the task description. See MANIFEST.json and STATE.md.
 
 ## Nine batches
 
 1. Verified baseline, measurement coverage and optimization plan — complete; report, verified evidence and local checkpoint.
-2. Cache prepared batches for immutable scenes — not started.
+2. Cache prepared batches for immutable scenes — complete locally; see [report](batch-2/REPORT.md) and [design](batch-2/DESIGN.md).
 3. Fine-grained invalidation during motion and VR — not started.
 4. Bounded GPU resource pools — not started.
 5. Omit exactly white vertex colors losslessly — not started.

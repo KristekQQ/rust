@@ -249,6 +249,61 @@ pub fn cpu_scope(label: &'static str) -> CpuScope {
         frame,
     }
 }
+/// Exclusive stage totals with one collector lookup/record per preparation.
+/// Disabled profiling performs no clock reads, including inner-loop switches.
+pub struct CpuStages<const N: usize> {
+    collector: Option<Rc<RefCell<Collector>>>,
+    labels: [&'static str; N],
+    frame: u64,
+    totals: [f64; N],
+    active: Option<usize>,
+    last: Option<f64>,
+}
+impl<const N: usize> CpuStages<N> {
+    pub fn new(labels: [&'static str; N]) -> Self {
+        let collector = CURRENT.with(|current| current.borrow().as_ref().cloned());
+        let frame = collector.as_ref().map_or(0, |c| c.borrow().frame);
+        Self {
+            collector,
+            labels,
+            frame,
+            totals: [0.; N],
+            active: None,
+            last: None,
+        }
+    }
+    pub fn switch(&mut self, active: Option<usize>) {
+        if self.collector.is_none() {
+            return;
+        }
+        let end = now();
+        if let (Some(stage), Some(start), Some(end)) = (self.active, self.last, end) {
+            self.totals[stage] += (end - start).max(0.);
+        }
+        self.active = active;
+        self.last = end;
+    }
+    pub fn finish(mut self) -> Option<[f64; N]> {
+        self.switch(None);
+        let collector = self.collector.as_ref()?;
+        let mut c = collector.borrow_mut();
+        if c.frame != self.frame {
+            return None;
+        }
+        for (label, elapsed) in self.labels.into_iter().zip(self.totals) {
+            if c.cpu.contains_key(label) || c.cpu.len() < MAX_LABELS {
+                let history = c.cpu.entry(label).or_insert_with(|| CpuHistory {
+                    pending_ms: 0.,
+                    touched: false,
+                    samples: VecDeque::with_capacity(WINDOW),
+                });
+                history.pending_ms += elapsed;
+                history.touched = true;
+            }
+        }
+        Some(self.totals)
+    }
+}
 impl Drop for CpuScope {
     fn drop(&mut self) {
         let Some(collector) = &self.collector else {

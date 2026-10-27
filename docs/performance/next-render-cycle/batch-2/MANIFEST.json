@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "batch": 2,
+  "status": "complete-local-checkpoint",
+  "baseCheckpoint": "40b2a4ccc07ba1ff611db84f6a62d77384f5f02b",
+  "branch": "codex/next-render-cycle-2",
+  "checkout": "/private/tmp/rust-next-render-cycle-2",
+  "baseline": {
+    "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+    "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "instrumentedBaseline": {
+    "source": "c66c1cbd6ac932620212eb2077d575013b7a691dc8b514e04897b3c2eaf38f36",
+    "wasm": "dc66b1a88efe062a1785a550c56db19b2697b38a179946c917e46bc83d5e70a5",
+    "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "candidate": {
+    "source": "1452a9f7ca544a1490773130f92719d223511b5feaa6c5b819bd3a9d325a0358",
+    "wasm": "af2905cc7d71af63b731c586198bd201917d63375821e80d1a70e7a99f1ea088",
+    "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "frozenRoots": {
+    "baseline": "output/next-render-cycle-2/baseline",
+    "instrumented-baseline": "output/next-render-cycle-2/instrumented-baseline",
+    "candidate": "output/next-render-cycle-2/candidate"
+  },
+  "fixedProtocol": {
+    "backend": [
+      "webgpu",
+      "webgl"
+    ],
+    "family": "rim-stress",
+    "load": 2048,
+    "width": 1280,
+    "height": 720,
+    "deviceScaleFactor": 1,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "pairs": 3,
+    "order": "AB/BA/AB",
+    "profiling": false,
+    "artificialWaitOrBusyWork": false,
+    "unchangedQuality": true
+  },
+  "diagnosticProtocol": {
+    "family": "rim-stress",
+    "load": 1024,
+    "warmupMs": 4000,
+    "sampleMs": 10000,
+    "profiling": true,
+    "scope": "separate single-run stage diagnostics; not primary throughput"
+  },
+  "physicalQuest": false,
+  "threeComparison": false,
+  "sourceReview": "existing active-draw, instance stream/page and pose caches reused; exact plan cache is new",
+  "verification": "VERIFICATION.json",
+  "evidenceArchive": {
+    "path": "evidence.tar.gz",
+    "sha256": "3c976ba99f00d039765a5a95e53f9fe1a16658b99865230c5a2b2a85a3d8d529",
+    "bytes": 13135263,
+    "files": 218,
+    "originalBytes": 56186762,
+    "hardlinkedExactContentFiles": 18,
+    "inventoryPath": "evidence/INVENTORY.json",
+    "inventorySha256": "231ba8e06d0a6f5b6e71017daf6e3c1b1c04c94bf12cc9f942601ab20fd27b86",
+    "allPayloadsAndHardlinkTargetsReverified": true,
+    "frozenRuntimeBinaries": "Kept intact locally at the three frozenRoots; archive contains full manifests/build identities, not duplicate319MB runtime trees"
+  },
+  "acceptance": {
+    "primaryRunsAccepted": 12,
+    "acceptedIDs": [
+      "baseline-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair2",
+      "candidate-rim-stress-2048-pair2",
+      "baseline-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair2",
+      "candidate-rim-stress-2048-pair2"
+    ],
+    "frameRecords": 7807,
+    "rawFullDistributionRecalculation": true,
+    "profilingOffIncludingNativeBoundaryAndGlTimerAssertions": true,
+    "allSixPairsExactPixels": true,
+    "identicalActualGltfWorkPerRaf": {
+      "drawCommands": 307,
+      "instances": 126823,
+      "triangles": 39067116,
+      "uploadCalls": 0,
+      "instanceUploadBytes": 0
+    },
+    "candidateWarmRebuilds": 0,
+    "candidateHitsPerRaf": 1,
+    "candidateRetainedAccountedBytes": 102520,
+    "byteLimit": 16777216,
+    "slotLimit": 64,
+    "GPUtimesInPrimary": null,
+    "GPUtimesReason": "profiling intentionally disabled; separate diagnostics carry scoped samples",
+    "servedPayloadAndCommonHarnessHashesRechecked": true,
+    "warmInstanceResourceCreations": 0
+  },
+  "hardware": [
+    {
+      "vendorId": 4203,
+      "deviceId": 0,
+      "vendorString": "Google Inc. (Apple)",
+      "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+      "driverVendor": "Apple",
+      "driverVersion": "26.6.1"
+    }
+  ],
+  "browser": "Chrome/156.0.8078.48",
+  "resultsSha256": "58a357710bb2ef2d21d503822687150be7af739d067743404b4ab825989eae28",
+  "verificationSha256": "11e29a865fce85d9074b4904dd0ba8573570df3aae7b26af78cd9bb850cc340d",
+  "next": "STOP; batch3 requires separate user request",
+  "sharedServerChangedByThisTask": false,
+  "servedShared8443BytesReauditedInBatch2": false
+}

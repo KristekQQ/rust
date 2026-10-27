@@ -38,6 +38,21 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
     test.assert(warm.every((image, eye) => pixelDifference(first[eye], image, 0)===0),
         'identical frozen glTF instance frame reproduces exact stereo pixels');
 
+    // Real eye attachments are the oracle; retaining handles alone cannot prove
+    // that a different view has not overwritten their mutable GPU contents.
+    frame();frame();
+    const planBefore=engine.debugStats().gltf;
+    frame();frame();
+    const planAfter=engine.debugStats().gltf;
+    test.assert(planAfter.preparedPlanCache.hits>=planBefore.preparedPlanCache.hits+4,
+        'both frozen XR eye plans hit', {planBefore:planBefore.preparedPlanCache,planAfter:planAfter.preparedPlanCache});
+    test.assert(planAfter.prepareOpaqueGroupRebuilds===planBefore.prepareOpaqueGroupRebuilds && planAfter.preparePayloadRebuilds===planBefore.preparePayloadRebuilds,
+        'frozen XR eyes skip opaque groups and payload packing');
+    engine.setPreparedPlanCacheEnabled(false);frame();
+    const uncached=await readEyes();
+    test.assert(uncached.every((image,eye)=>pixelDifference(warm[eye],image,0)===0),'cache-off oracle preserves exact stereo pixels');
+    engine.setPreparedPlanCacheEnabled(true);frame();frame();
+
     instances[2].setPosition([.9,1.6,-2]);
     frame();
     const moved = await readEyes();

@@ -1267,11 +1267,28 @@ impl SceneRenderer {
         }
         stats
     }
+    pub fn set_prepared_plan_cache_enabled(&self, enabled: bool) {
+        self.gltf_gpu.set_plan_cache_enabled(enabled);
+    }
     pub fn debug_values(&self) -> serde_json::Value {
         let gltf = self.gltf_gpu.stats();
         let stats = self.render_stats();
         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
-        let gltf_values = serde_json::json!({
+        let prepare_values = serde_json::json!({
+                "preparedPlanCache": self.gltf_gpu.plan_cache_stats(),
+                "prepareEligibleRebuilds": gltf.prepare_eligible_rebuilds,
+                "prepareGroupRebuilds": gltf.prepare_group_rebuilds,
+                "prepareOpaqueGroupRebuilds": gltf.prepare_opaque_group_rebuilds,
+                "preparePayloadRebuilds": gltf.prepare_payload_rebuilds,
+                "prepareRecordRebuilds": gltf.prepare_record_rebuilds,
+                "prepareTimedCalls": gltf.prepare_timed_calls,
+                "prepareStageMs": (gltf.prepare_timed_calls > 0).then_some(serde_json::json!({
+                    "eligible":gltf.prepare_stage_ms[0], "groups":gltf.prepare_stage_ms[1],
+                    "basis":gltf.prepare_stage_ms[2], "payload":gltf.prepare_stage_ms[3],
+                    "records":gltf.prepare_stage_ms[4], "resources":gltf.prepare_stage_ms[5],
+                })),
+        });
+        let mut gltf_values = serde_json::json!({
                 "cpuDeformedVertices": gltf.cpu_deformed_vertices,
                 "rigidUploadBytes": gltf.rigid_upload_bytes,
                 "uniformUploadBytes": gltf.uniform_upload_bytes,
@@ -1324,6 +1341,9 @@ impl SceneRenderer {
                 "materialResources": gltf.material_resources,
                 "cachedAssets": gltf.cached_assets,
         });
+        if let serde_json::Value::Object(values) = prepare_values {
+            gltf_values.as_object_mut().unwrap().extend(values);
+        }
         serde_json::json!({
             "font3d": {
                 "runtime": self.scene.font3d_stats(),
@@ -1577,6 +1597,7 @@ impl SceneRenderer {
             self.active_cache,
             cache.key.expect("prepared view").0,
             self.frustum_culling,
+            self.scene.render_revision(),
         );
         self.upload_bytes += gltf_opaque.upload_bytes;
         let pipeline = &self.shadow_pipelines[&target.format];
@@ -1767,6 +1788,7 @@ impl SceneRenderer {
             self.active_cache,
             cache.key.expect("prepared view").0,
             self.frustum_culling,
+            self.scene.render_revision(),
         );
         self.upload_bytes += gltf_opaque.upload_bytes;
         let gltf_blend = if reflected || !target.material_mask {
@@ -1784,6 +1806,7 @@ impl SceneRenderer {
                 self.active_cache,
                 cache.key.expect("prepared view").0,
                 self.frustum_culling,
+                self.scene.render_revision(),
             );
             self.upload_bytes += p.upload_bytes;
             Some(p)
@@ -2390,6 +2413,7 @@ impl SceneRenderer {
                 self.last_main_cache,
                 cache.key.expect("prepared view").0,
                 self.frustum_culling,
+                self.scene.render_revision(),
             );
             self.upload_bytes += p.upload_bytes;
             p

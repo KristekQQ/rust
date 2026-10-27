@@ -1,0 +1,1333 @@
+{
+  "version": 1,
+  "scope": "batch2 static exact-plan cache; desktop, no physical Quest or fresh Three comparison",
+  "protocol": {
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "pairs": 3,
+    "order": "AB/BA/AB",
+    "width": 1280,
+    "height": 720,
+    "DPR": 1,
+    "family": "rim-stress",
+    "load": 2048,
+    "profiling": false
+  },
+  "acceptance": {
+    "primaryRunsAccepted": 12,
+    "acceptedIDs": [
+      "baseline-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair2",
+      "candidate-rim-stress-2048-pair2",
+      "baseline-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair0",
+      "candidate-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair1",
+      "baseline-rim-stress-2048-pair2",
+      "candidate-rim-stress-2048-pair2"
+    ],
+    "frameRecords": 7807,
+    "rawFullDistributionRecalculation": true,
+    "profilingOffIncludingNativeBoundaryAndGlTimerAssertions": true,
+    "allSixPairsExactPixels": true,
+    "identicalActualGltfWorkPerRaf": {
+      "drawCommands": 307,
+      "instances": 126823,
+      "triangles": 39067116,
+      "uploadCalls": 0,
+      "instanceUploadBytes": 0
+    },
+    "candidateWarmRebuilds": 0,
+    "candidateHitsPerRaf": 1,
+    "candidateRetainedAccountedBytes": 102520,
+    "byteLimit": 16777216,
+    "slotLimit": 64,
+    "GPUtimesInPrimary": null,
+    "GPUtimesReason": "profiling intentionally disabled; separate diagnostics carry scoped samples",
+    "servedPayloadAndCommonHarnessHashesRechecked": true,
+    "warmInstanceResourceCreations": 0
+  },
+  "frozenSnapshots": {
+    "baseline": {
+      "filesVerified": 2461,
+      "manifestSha256": "455087bbf96443701aba9abaf6ddd4e15d2532b9a25dcc9bd693d1c785a88c5f",
+      "build": {
+        "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+        "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+        "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "instrumented-baseline": {
+      "filesVerified": 2473,
+      "manifestSha256": "bfb9d9a69fabfb65744288e450f4c5b7efa3e4d717f77490e4aaf25dd64878c3",
+      "build": {
+        "source": "c66c1cbd6ac932620212eb2077d575013b7a691dc8b514e04897b3c2eaf38f36",
+        "wasm": "dc66b1a88efe062a1785a550c56db19b2697b38a179946c917e46bc83d5e70a5",
+        "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "candidate": {
+      "filesVerified": 2475,
+      "manifestSha256": "c293e54043da035902f35e260bf8f542f5480e0ac02668afb6f7ea41f58a2d0c",
+      "build": {
+        "source": "1452a9f7ca544a1490773130f92719d223511b5feaa6c5b819bd3a9d325a0358",
+        "wasm": "af2905cc7d71af63b731c586198bd201917d63375821e80d1a70e7a99f1ea088",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    }
+  },
+  "completedAt": "2026-10-27T19:06:19.309256+00:00",
+  "backends": {
+    "webgpu": {
+      "groups": {
+        "baseline": {
+          "medianRunMeanCpuMs": 43.24045139344202,
+          "medianRunMeanRafMs": 43.476695652173895,
+          "medianRunFps": 23.00082802980908,
+          "fpsRange": [
+            18.803145834165047,
+            23.665232894673732
+          ],
+          "meanCpuRange": [
+            41.98516019922485,
+            52.83029661390741
+          ]
+        },
+        "candidate": {
+          "medianRunMeanCpuMs": 17.362415348164923,
+          "medianRunMeanRafMs": 28.285197740113023,
+          "medianRunFps": 35.35418098144801,
+          "fpsRange": [
+            35.23433630015495,
+            35.377924175314575
+          ],
+          "meanCpuRange": [
+            16.935891647102064,
+            17.55515288928627
+          ]
+        }
+      },
+      "pairedMeanRatios": [
+        {
+          "pair": 0,
+          "cpuMeanRatio": 0.3205715798052844,
+          "rafMeanRatio": 0.5314937569820786,
+          "fpsRatio": 1.8814896447292024
+        },
+        {
+          "pair": 1,
+          "cpuMeanRatio": 0.4181275671209748,
+          "rafMeanRatio": 0.671652580399809,
+          "fpsRatio": 1.4888649715374254
+        },
+        {
+          "pair": 2,
+          "cpuMeanRatio": 0.40153177843092913,
+          "rafMeanRatio": 0.6505829690094842,
+          "fpsRatio": 1.5370829665622898
+        }
+      ],
+      "medianPairedCpuReduction": 0.5984682215690709,
+      "medianPairedFpsGain": 0.5370829665622898,
+      "driverFrameMedianRatios": [
+        {
+          "load": 2048,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 1280,
+                "height": 720,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6646706586825912,
+              "cpuRatio": 0.23400000206947327
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 1280,
+                "height": 720,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.9970059880238868,
+              "cpuRatio": 0.3305785128309425
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 1280,
+                "height": 720,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.9970059880238868,
+              "cpuRatio": 0.3216216177553744
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.9970059880238868,
+            "mean": 0.8862275449101217,
+            "p95": 0.9970059880238868,
+            "p99": 0.9970059880238868,
+            "max": 0.9970059880238868
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.3216216177553744,
+            "mean": 0.2954000442185967,
+            "p95": 0.3305785128309425,
+            "p99": 0.3305785128309425,
+            "max": 0.3305785128309425
+          }
+        }
+      ],
+      "report": "output/next-render-cycle-2/pairs-webgpu/report.json",
+      "browser": "Chrome/156.0.8078.48",
+      "rows": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "label": "baseline",
+          "pair": 0,
+          "frames": 472,
+          "rafInterval": {
+            "count": 471,
+            "median": 50.10000000000218,
+            "mean": 53.18259023354562,
+            "p95": 66.70000000000437,
+            "p99": 83.39999999999964,
+            "max": 100,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 471,
+            "rawExactOverrunDurationMs": 17199.00000000007,
+            "overruns": 471,
+            "overrunDurationMs": 17199.00000000007
+          },
+          "rafCallbackCpu": {
+            "count": 472,
+            "median": 49.99999976158142,
+            "mean": 52.83029661390741,
+            "p95": 69.20000004768372,
+            "p99": 70.5,
+            "max": 71.79999995231628,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 472,
+            "rawExactOverrunDurationMs": 17069.23333509769,
+            "overruns": 472,
+            "overrunDurationMs": 17069.23333509769
+          },
+          "heapBytes": 15943529,
+          "profiling": false,
+          "capture": {
+            "file": "baseline-rim-stress-2048-pair0.png",
+            "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f"
+          },
+          "fpsFromMeanInterval": 18.803145834165047
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair0",
+          "label": "candidate",
+          "pair": 0,
+          "frames": 886,
+          "rafInterval": {
+            "count": 885,
+            "median": 33.29999999999927,
+            "mean": 28.26621468926556,
+            "p95": 33.400000000001455,
+            "p99": 50,
+            "max": 50.099999999998545,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 780,
+            "rawExactOverrunDurationMs": 10272.699999999995,
+            "overruns": 589,
+            "overrunDurationMs": 10264.533333333358
+          },
+          "rafCallbackCpu": {
+            "count": 886,
+            "median": 11.700000047683716,
+            "mean": 16.935891647102064,
+            "p95": 37.10000014305115,
+            "p99": 40,
+            "max": 42.200000047683716,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 223,
+            "rawExactOverrunDurationMs": 3984.333334525437,
+            "overruns": 223,
+            "overrunDurationMs": 3984.333334525437
+          },
+          "heapBytes": 16070242,
+          "profiling": false,
+          "capture": {
+            "file": "candidate-rim-stress-2048-pair0.png",
+            "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f"
+          },
+          "fpsFromMeanInterval": 35.377924175314575
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair1",
+          "label": "candidate",
+          "pair": 1,
+          "frames": 883,
+          "rafInterval": {
+            "count": 882,
+            "median": 33.29999999999927,
+            "mean": 28.38140589569165,
+            "p95": 49.900000000001455,
+            "p99": 50,
+            "max": 50.10000000000582,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 771,
+            "rawExactOverrunDurationMs": 10340.099999999997,
+            "overruns": 574,
+            "overrunDurationMs": 10332.333333333361
+          },
+          "rafCallbackCpu": {
+            "count": 883,
+            "median": 12,
+            "mean": 17.55515288928627,
+            "p95": 39.09999990463257,
+            "p99": 44.200000047683716,
+            "max": 47.09999990463257,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 221,
+            "rawExactOverrunDurationMs": 4292.966667334247,
+            "overruns": 221,
+            "overrunDurationMs": 4292.966667334247
+          },
+          "heapBytes": 16617599,
+          "profiling": false,
+          "capture": {
+            "file": "candidate-rim-stress-2048-pair1.png",
+            "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f"
+          },
+          "fpsFromMeanInterval": 35.23433630015495
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair1",
+          "label": "baseline",
+          "pair": 1,
+          "frames": 593,
+          "rafInterval": {
+            "count": 592,
+            "median": 33.400000000001455,
+            "mean": 42.256081081081064,
+            "p95": 66.70000000000073,
+            "p99": 66.79999999999563,
+            "max": 83.39999999999964,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 583,
+            "rawExactOverrunDurationMs": 15149.533333333393,
+            "overruns": 573,
+            "overrunDurationMs": 15149.100000000057
+          },
+          "rafCallbackCpu": {
+            "count": 593,
+            "median": 36.299999952316284,
+            "mean": 41.98516019922485,
+            "p95": 63.299999952316284,
+            "p99": 65.59999990463257,
+            "max": 70.40000009536743,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 593,
+            "rawExactOverrunDurationMs": 15013.866664807061,
+            "overruns": 593,
+            "overrunDurationMs": 15013.866664807061
+          },
+          "heapBytes": 16281373,
+          "profiling": false,
+          "capture": {
+            "file": "baseline-rim-stress-2048-pair1.png",
+            "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f"
+          },
+          "fpsFromMeanInterval": 23.665232894673732
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair2",
+          "label": "baseline",
+          "pair": 2,
+          "frames": 576,
+          "rafInterval": {
+            "count": 575,
+            "median": 33.400000000001455,
+            "mean": 43.476695652173895,
+            "p95": 66.70000000000073,
+            "p99": 66.80000000000291,
+            "max": 83.40000000000146,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 568,
+            "rawExactOverrunDurationMs": 15416.3333333334,
+            "overruns": 553,
+            "overrunDurationMs": 15415.733333333385
+          },
+          "rafCallbackCpu": {
+            "count": 576,
+            "median": 37,
+            "mean": 43.24045139344202,
+            "p95": 65.5,
+            "p99": 69,
+            "max": 72,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 576,
+            "rawExactOverrunDurationMs": 15306.500002622666,
+            "overruns": 576,
+            "overrunDurationMs": 15306.500002622666
+          },
+          "heapBytes": 15677137,
+          "profiling": false,
+          "capture": {
+            "file": "baseline-rim-stress-2048-pair2.png",
+            "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f"
+          },
+          "fpsFromMeanInterval": 23.00082802980908
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair2",
+          "label": "candidate",
+          "pair": 2,
+          "frames": 886,
+          "rafInterval": {
+            "count": 885,
+            "median": 33.29999999999927,
+            "mean": 28.285197740113023,
+            "p95": 33.400000000001455,
+            "p99": 50,
+            "max": 50.099999999998545,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 774,
+            "rawExactOverrunDurationMs": 10290.000000000005,
+            "overruns": 583,
+            "overrunDurationMs": 10281.933333333367
+          },
+          "rafCallbackCpu": {
+            "count": 886,
+            "median": 11.899999856948853,
+            "mean": 17.362415348164923,
+            "p95": 37.80000019073486,
+            "p99": 40.39999985694885,
+            "max": 44.09999990463257,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 222,
+            "rawExactOverrunDurationMs": 4191.900000333796,
+            "overruns": 222,
+            "overrunDurationMs": 4191.900000333796
+          },
+          "heapBytes": 16610919,
+          "profiling": false,
+          "capture": {
+            "file": "candidate-rim-stress-2048-pair2.png",
+            "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f"
+          },
+          "fpsFromMeanInterval": 35.35418098144801
+        }
+      ],
+      "hardware": [
+        {
+          "vendorId": 4203,
+          "deviceId": 0,
+          "vendorString": "Google Inc. (Apple)",
+          "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+          "driverVendor": "Apple",
+          "driverVersion": "26.6.1"
+        }
+      ],
+      "driverSha256": "a1682277b37c73b69c0f76a7d8784a40d2c2a14269edcea06a6543adb057a42f"
+    },
+    "webgl": {
+      "groups": {
+        "baseline": {
+          "medianRunMeanCpuMs": 47.98115386045896,
+          "medianRunMeanRafMs": 48.1998073217726,
+          "medianRunFps": 20.74697090227339,
+          "fpsRange": [
+            19.66772733814101,
+            21.4408576343054
+          ],
+          "meanCpuRange": [
+            46.44040968031857,
+            50.56937119926933
+          ]
+        },
+        "candidate": {
+          "medianRunMeanCpuMs": 20.819552237596085,
+          "medianRunMeanRafMs": 37.36771300448431,
+          "medianRunFps": 26.76107044281771,
+          "fpsRange": [
+            24.728051357645928,
+            26.783180162857725
+          ],
+          "meanCpuRange": [
+            20.711935481332965,
+            21.903576752467945
+          ]
+        }
+      },
+      "pairedMeanRatios": [
+        {
+          "pair": 0,
+          "cpuMeanRatio": 0.4483068168629745,
+          "rafMeanRatio": 0.8011958146487306,
+          "fpsRatio": 1.2481343283582074
+        },
+        {
+          "pair": 1,
+          "cpuMeanRatio": 0.45650375178906605,
+          "rafMeanRatio": 0.7746268656716423,
+          "fpsRatio": 1.2909441233140644
+        },
+        {
+          "pair": 2,
+          "cpuMeanRatio": 0.4095747087642694,
+          "rafMeanRatio": 0.7953609871511262,
+          "fpsRatio": 1.2572907348421285
+        }
+      ],
+      "medianPairedCpuReduction": 0.5516931831370255,
+      "medianPairedFpsGain": 0.2572907348421285,
+      "driverFrameMedianRatios": [
+        {
+          "load": 2048,
+          "paired": [
+            {
+              "pair": 0,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 1280,
+                "height": 720,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.9970149253730691,
+              "cpuRatio": 0.360824742711481
+            },
+            {
+              "pair": 1,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 1280,
+                "height": 720,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6693386773546461,
+              "cpuRatio": 0.36090225716664437
+            },
+            {
+              "pair": 2,
+              "pixel": {
+                "pass": true,
+                "exact": true,
+                "width": 1280,
+                "height": 720,
+                "maxChannelDelta": 0,
+                "meanAbsoluteChannelDelta": 0,
+                "changedPixels": 0,
+                "changedFraction": 0,
+                "channelTolerance": 8,
+                "pixelFractionTolerance": 0.001
+              },
+              "rafRatio": 0.6680000000000291,
+              "cpuRatio": 0.3270588257733513
+            }
+          ],
+          "rafRatio": {
+            "count": 3,
+            "median": 0.6693386773546461,
+            "mean": 0.7781178675759147,
+            "p95": 0.9970149253730691,
+            "p99": 0.9970149253730691,
+            "max": 0.9970149253730691
+          },
+          "cpuRatio": {
+            "count": 3,
+            "median": 0.360824742711481,
+            "mean": 0.3495952752171589,
+            "p95": 0.36090225716664437,
+            "p99": 0.36090225716664437,
+            "max": 0.36090225716664437
+          }
+        }
+      ],
+      "report": "output/next-render-cycle-2/pairs-webgl/report.json",
+      "browser": "Chrome/156.0.8078.48",
+      "rows": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "label": "baseline",
+          "pair": 0,
+          "frames": 537,
+          "rafInterval": {
+            "count": 536,
+            "median": 33.5,
+            "mean": 46.63992537313427,
+            "p95": 66.70000000000073,
+            "p99": 83.20000000000073,
+            "max": 83.29999999999927,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 535,
+            "rawExactOverrunDurationMs": 16065.7333333334,
+            "overruns": 534,
+            "overrunDurationMs": 16065.700000000068
+          },
+          "rafCallbackCpu": {
+            "count": 537,
+            "median": 38.799999952316284,
+            "mean": 46.44040968031857,
+            "p95": 68.5,
+            "p99": 72.29999995231628,
+            "max": 74.40000009536743,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 537,
+            "rawExactOverrunDurationMs": 15988.499998331135,
+            "overruns": 537,
+            "overrunDurationMs": 15988.499998331135
+          },
+          "heapBytes": 10027847,
+          "profiling": false,
+          "capture": {
+            "file": "baseline-rim-stress-2048-pair0.png",
+            "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792"
+          },
+          "fpsFromMeanInterval": 21.4408576343054
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair0",
+          "label": "candidate",
+          "pair": 0,
+          "frames": 670,
+          "rafInterval": {
+            "count": 669,
+            "median": 33.39999999999782,
+            "mean": 37.36771300448431,
+            "p95": 50,
+            "p99": 50.100000000000364,
+            "max": 50.10000000000582,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 664,
+            "rawExactOverrunDurationMs": 13849.333333333372,
+            "overruns": 659,
+            "overrunDurationMs": 13849.06666666671
+          },
+          "rafCallbackCpu": {
+            "count": 670,
+            "median": 14,
+            "mean": 20.819552237596085,
+            "p95": 39.90000009536743,
+            "p99": 44.5,
+            "max": 47.09999990463257,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 224,
+            "rawExactOverrunDurationMs": 4410.466665665316,
+            "overruns": 223,
+            "overrunDurationMs": 4410.133332331982
+          },
+          "heapBytes": 7691759,
+          "profiling": false,
+          "capture": {
+            "file": "candidate-rim-stress-2048-pair0.png",
+            "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792"
+          },
+          "fpsFromMeanInterval": 26.76107044281771
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair1",
+          "label": "candidate",
+          "pair": 1,
+          "frames": 671,
+          "rafInterval": {
+            "count": 670,
+            "median": 33.39999999999782,
+            "mean": 37.33686567164179,
+            "p95": 50,
+            "p99": 50.10000000000218,
+            "max": 50.10000000000582,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 664,
+            "rawExactOverrunDurationMs": 13849.433333333387,
+            "overruns": 650,
+            "overrunDurationMs": 13848.866666666716
+          },
+          "rafCallbackCpu": {
+            "count": 671,
+            "median": 14.400000095367432,
+            "mean": 21.903576752467945,
+            "p95": 45.39999985694885,
+            "p99": 51.80000019073486,
+            "max": 53.40000009536743,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 254,
+            "rawExactOverrunDurationMs": 4927.16666642825,
+            "overruns": 238,
+            "overrunDurationMs": 4923.633332808815
+          },
+          "heapBytes": 7658582,
+          "profiling": false,
+          "capture": {
+            "file": "candidate-rim-stress-2048-pair1.png",
+            "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792"
+          },
+          "fpsFromMeanInterval": 26.783180162857725
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair1",
+          "label": "baseline",
+          "pair": 1,
+          "frames": 520,
+          "rafInterval": {
+            "count": 519,
+            "median": 49.900000000001455,
+            "mean": 48.1998073217726,
+            "p95": 66.70000000000073,
+            "p99": 83.30000000000291,
+            "max": 100,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 516,
+            "rawExactOverrunDurationMs": 16365.900000000078,
+            "overruns": 515,
+            "overrunDurationMs": 16365.86666666674
+          },
+          "rafCallbackCpu": {
+            "count": 520,
+            "median": 39.90000009536743,
+            "mean": 47.98115386045896,
+            "p95": 70.29999995231628,
+            "p99": 74.29999995231628,
+            "max": 87.10000014305115,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 520,
+            "rawExactOverrunDurationMs": 16283.533340772061,
+            "overruns": 520,
+            "overrunDurationMs": 16283.533340772061
+          },
+          "heapBytes": 8613647,
+          "profiling": false,
+          "capture": {
+            "file": "baseline-rim-stress-2048-pair1.png",
+            "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792"
+          },
+          "fpsFromMeanInterval": 20.74697090227339
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair2",
+          "label": "baseline",
+          "pair": 2,
+          "frames": 493,
+          "rafInterval": {
+            "count": 492,
+            "median": 50,
+            "mean": 50.84471544715444,
+            "p95": 83.29999999999927,
+            "p99": 83.40000000000146,
+            "max": 100,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 492,
+            "rawExactOverrunDurationMs": 16815.600000000064,
+            "overruns": 491,
+            "overrunDurationMs": 16815.56666666673
+          },
+          "rafCallbackCpu": {
+            "count": 493,
+            "median": 42.5,
+            "mean": 50.56937119926933,
+            "p95": 75.5,
+            "p99": 79.2999997138977,
+            "max": 84.10000014305115,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 493,
+            "rawExactOverrunDurationMs": 16714.03333457317,
+            "overruns": 493,
+            "overrunDurationMs": 16714.03333457317
+          },
+          "heapBytes": 7398859,
+          "profiling": false,
+          "capture": {
+            "file": "baseline-rim-stress-2048-pair2.png",
+            "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792"
+          },
+          "fpsFromMeanInterval": 19.66772733814101
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair2",
+          "label": "candidate",
+          "pair": 2,
+          "frames": 620,
+          "rafInterval": {
+            "count": 619,
+            "median": 33.400000000001455,
+            "mean": 40.43990306946687,
+            "p95": 50.099999999998545,
+            "p99": 50.10000000000218,
+            "max": 66.60000000000036,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 619,
+            "rawExactOverrunDurationMs": 14715.633333333413,
+            "overruns": 616,
+            "overrunDurationMs": 14715.433333333414
+          },
+          "rafCallbackCpu": {
+            "count": 620,
+            "median": 13.900000095367432,
+            "mean": 20.711935481332965,
+            "p95": 39.299999952316284,
+            "p99": 42.700000047683716,
+            "max": 45.90000009536743,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 211,
+            "rawExactOverrunDurationMs": 4005.93333252272,
+            "overruns": 209,
+            "overrunDurationMs": 4005.6666661898394
+          },
+          "heapBytes": 7599976,
+          "profiling": false,
+          "capture": {
+            "file": "candidate-rim-stress-2048-pair2.png",
+            "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792"
+          },
+          "fpsFromMeanInterval": 24.728051357645928
+        }
+      ],
+      "hardware": [
+        {
+          "vendorId": 4203,
+          "deviceId": 0,
+          "vendorString": "Google Inc. (Apple)",
+          "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+          "driverVendor": "Apple",
+          "driverVersion": "26.6.1"
+        }
+      ],
+      "driverSha256": "a1682277b37c73b69c0f76a7d8784a40d2c2a14269edcea06a6543adb057a42f"
+    }
+  },
+  "diagnostics": {
+    "stages-webgpu": {
+      "kind": "single unpaired profiler-enabled diagnostic pilot, 4s warmup/10s sample; not clean throughput",
+      "load": 1024,
+      "rafInterval": {
+        "count": 516,
+        "median": 16.699999999999818,
+        "mean": 19.379263565891456,
+        "p95": 33.399999999999636,
+        "p99": 33.400000000001455,
+        "max": 50.100000000000364,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 352,
+        "rawExactOverrunDurationMs": 1410.933333333339,
+        "overruns": 82,
+        "overrunDurationMs": 1399.7333333333324
+      },
+      "rafCallbackCpu": {
+        "count": 517,
+        "median": 17.5,
+        "mean": 19.12437137782689,
+        "p95": 28.5,
+        "p99": 29.899999856948853,
+        "max": 32.700000047683716,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 435,
+        "rawExactOverrunDurationMs": 1350.800001859664,
+        "overruns": 424,
+        "overrunDurationMs": 1347.5333350499463
+      },
+      "fps": 51.60154804644144,
+      "stagesMsPerRaf": {
+        "prepareStageMs.eligible": 0.7232108388233001,
+        "prepareStageMs.groups": 5.966924553913581,
+        "prepareStageMs.basis": 2.878529982594503,
+        "prepareStageMs.payload": 1.3477756156220426,
+        "prepareStageMs.records": 0.0738878199394713,
+        "prepareStageMs.resources": 0.6783365659141909
+      },
+      "gpuPassMs": {
+        "fxaa": {
+          "count": 17,
+          "median": 2.811791,
+          "mean": 3.1170504705882354,
+          "p95": 5.249086,
+          "p99": 5.249086,
+          "max": 5.249086,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "scene.main": {
+          "count": 17,
+          "median": 15.650303,
+          "mean": 15.677716588235288,
+          "p95": 17.113989,
+          "p99": 17.113989,
+          "max": 17.113989,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 1,
+          "rawExactOverrunDurationMs": 0.44732233333333227,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        }
+      },
+      "gpuSamples": 17,
+      "glRafGpuMs": null,
+      "queueScopeSparseEvidence": {
+        "observedHistoryChanges": 89,
+        "freshness": "observed-history-changes",
+        "lastSampleMs": {
+          "count": 89,
+          "median": 11.799999952316284,
+          "mean": 11.87078650345963,
+          "p95": 12.700000047683716,
+          "p99": 13.299999952316284,
+          "max": 13.299999952316284,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        }
+      }
+    },
+    "candidate-stages-webgpu": {
+      "kind": "single unpaired profiler-enabled diagnostic pilot, 4s warmup/10s sample; not clean throughput",
+      "load": 1024,
+      "rafInterval": {
+        "count": 583,
+        "median": 16.69999999999891,
+        "mean": 17.180617495711836,
+        "p95": 16.80000000000109,
+        "p99": 33.399999999999636,
+        "max": 33.400000000001455,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 362,
+        "rawExactOverrunDurationMs": 314.9666666666837,
+        "overruns": 18,
+        "overrunDurationMs": 300.00000000000455
+      },
+      "rafCallbackCpu": {
+        "count": 584,
+        "median": 7.299999952316284,
+        "mean": 9.22208904934256,
+        "p95": 21.799999952316284,
+        "p99": 25.09999990463257,
+        "max": 29.59999990463257,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 80,
+        "rawExactOverrunDurationMs": 352.16666857401515,
+        "overruns": 76,
+        "overrunDurationMs": 351.53333504994697
+      },
+      "fps": 58.20512564519832,
+      "stagesMsPerRaf": {
+        "prepareStageMs.eligible": 0,
+        "prepareStageMs.groups": 0,
+        "prepareStageMs.basis": 0,
+        "prepareStageMs.payload": 0,
+        "prepareStageMs.records": 0,
+        "prepareStageMs.resources": 0
+      },
+      "gpuPassMs": {
+        "fxaa": {
+          "count": 19,
+          "median": 2.724666,
+          "mean": 3.1339476842105265,
+          "p95": 5.444584,
+          "p99": 5.444584,
+          "max": 5.444584,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "scene.main": {
+          "count": 19,
+          "median": 15.821133,
+          "mean": 16.343816368421052,
+          "p95": 20.172818,
+          "p99": 20.172818,
+          "max": 20.172818,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 6,
+          "rawExactOverrunDurationMs": 8.790213999999992,
+          "overruns": 5,
+          "overrunDurationMs": 8.67738666666666
+        }
+      },
+      "gpuSamples": 19,
+      "glRafGpuMs": null,
+      "queueScopeSparseEvidence": {
+        "observedHistoryChanges": 91,
+        "freshness": "observed-history-changes",
+        "lastSampleMs": {
+          "count": 91,
+          "median": 0,
+          "mean": 0.04395604395604396,
+          "p95": 0.10000014305114746,
+          "p99": 0.20000004768371582,
+          "max": 0.20000004768371582,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        }
+      }
+    },
+    "stages-webgl": {
+      "kind": "single unpaired profiler-enabled diagnostic pilot, 4s warmup/10s sample; not clean throughput",
+      "load": 1024,
+      "rafInterval": {
+        "count": 393,
+        "median": 16.800000000000182,
+        "mean": 25.444529262086544,
+        "p95": 33.400000000000546,
+        "p99": 50.099999999998545,
+        "max": 66.70000000000073,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 310,
+        "rawExactOverrunDurationMs": 3455.233333333337,
+        "overruns": 194,
+        "overrunDurationMs": 3450.066666666677
+      },
+      "rafCallbackCpu": {
+        "count": 394,
+        "median": 21.399999856948853,
+        "mean": 23.790862949366495,
+        "p95": 37.40000009536743,
+        "p99": 44.19999980926514,
+        "max": 52.299999952316284,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 389,
+        "rawExactOverrunDurationMs": 2807.96666900317,
+        "overruns": 375,
+        "overrunDurationMs": 2805.0000021457686
+      },
+      "fps": 39.301179035371014,
+      "stagesMsPerRaf": {
+        "prepareStageMs.eligible": 0.8370558344168106,
+        "prepareStageMs.groups": 6.706598984408499,
+        "prepareStageMs.basis": 3.7124365537904844,
+        "prepareStageMs.payload": 1.6786802014723647,
+        "prepareStageMs.records": 0.09822334553384539,
+        "prepareStageMs.resources": 0.7459390907723287
+      },
+      "gpuPassMs": null,
+      "gpuSamples": 0,
+      "glRafGpuMs": {
+        "count": 13,
+        "median": 55.218375,
+        "mean": 50.91603792307693,
+        "p95": 66.925791,
+        "p99": 66.925791,
+        "max": 66.925791,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 13,
+        "rawExactOverrunDurationMs": 445.2418263333333,
+        "overruns": 13,
+        "overrunDurationMs": 445.2418263333333
+      },
+      "queueScopeSparseEvidence": {
+        "observedHistoryChanges": 88,
+        "freshness": "observed-history-changes",
+        "lastSampleMs": {
+          "count": 88,
+          "median": 13.599999904632568,
+          "mean": 14.230681825767864,
+          "p95": 18.700000047683716,
+          "p99": 24.800000190734863,
+          "max": 24.800000190734863,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 12,
+          "rawExactOverrunDurationMs": 25.400000333785997,
+          "overruns": 9,
+          "overrunDurationMs": 24.50000023841857
+        }
+      }
+    },
+    "candidate-stages-webgl": {
+      "kind": "single unpaired profiler-enabled diagnostic pilot, 4s warmup/10s sample; not clean throughput",
+      "load": 1024,
+      "rafInterval": {
+        "count": 366,
+        "median": 33.29999999999927,
+        "mean": 27.32131147540986,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 314,
+        "rawExactOverrunDurationMs": 3903.0666666666903,
+        "overruns": 234,
+        "overrunDurationMs": 3899.700000000033
+      },
+      "rafCallbackCpu": {
+        "count": 367,
+        "median": 8.700000047683716,
+        "mean": 11.208719357482744,
+        "p95": 22.200000047683716,
+        "p99": 24.59999990463257,
+        "max": 27.200000047683716,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 85,
+        "rawExactOverrunDurationMs": 332.333335717519,
+        "overruns": 79,
+        "overrunDurationMs": 331.63333566983533
+      },
+      "fps": 36.60146405856231,
+      "stagesMsPerRaf": {
+        "prepareStageMs.eligible": 0,
+        "prepareStageMs.groups": 0,
+        "prepareStageMs.basis": 0,
+        "prepareStageMs.payload": 0,
+        "prepareStageMs.records": 0,
+        "prepareStageMs.resources": 0
+      },
+      "gpuPassMs": null,
+      "gpuSamples": 0,
+      "glRafGpuMs": {
+        "count": 13,
+        "median": 62.500791,
+        "mean": 62.242329769230764,
+        "p95": 72.387541,
+        "p99": 72.387541,
+        "max": 72.387541,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 13,
+        "rawExactOverrunDurationMs": 592.4836203333333,
+        "overruns": 13,
+        "overrunDurationMs": 592.4836203333333
+      },
+      "queueScopeSparseEvidence": {
+        "observedHistoryChanges": 86,
+        "freshness": "observed-history-changes",
+        "lastSampleMs": {
+          "count": 86,
+          "median": 0.09999990463256836,
+          "mean": 0.06627907863883085,
+          "p95": 0.20000004768371582,
+          "p99": 0.20000004768371582,
+          "max": 0.20000004768371582,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        }
+      }
+    }
+  },
+  "ordinaryControls": {
+    "webgpu": {
+      "kind": "candidate-only 8s/25s stationary ordinary Rome control; no paired improvement inference",
+      "fps": 60.00240009600379,
+      "rafInterval": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.666000000000015,
+        "p95": 16.700000000004366,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 929,
+        "rawExactOverrunDurationMs": 37.66666666672545,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "rafCallbackCpu": {
+        "count": 1501,
+        "median": 0.5999999046325684,
+        "mean": 0.6752165196181773,
+        "p95": 1.2999999523162842,
+        "p99": 1.8999998569488525,
+        "max": 2.9000000953674316,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      }
+    },
+    "webgl": {
+      "kind": "candidate-only 8s/25s stationary ordinary Rome control; no paired improvement inference",
+      "fps": 60.00240009600379,
+      "rafInterval": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.666000000000015,
+        "p95": 16.700000000004366,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 928,
+        "rawExactOverrunDurationMs": 38.03333333332917,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "rafCallbackCpu": {
+        "count": 1501,
+        "median": 1.0999999046325684,
+        "mean": 1.1581612289309264,
+        "p95": 1.9000000953674316,
+        "p99": 2.5,
+        "max": 3.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      }
+    }
+  },
+  "remainingObservedScopes": {
+    "webgpu": [
+      {
+        "scope": "render.encode.overlays",
+        "meanChangedHistoryWallMs": 5.239130424416584,
+        "samples": 92
+      },
+      {
+        "scope": "scene.gpuUpdates",
+        "meanChangedHistoryWallMs": 1.4494505400186057,
+        "samples": 91
+      },
+      {
+        "scope": "gltf.update",
+        "meanChangedHistoryWallMs": 0.3347826081773509,
+        "samples": 92
+      },
+      {
+        "scope": "render.encode.color",
+        "meanChangedHistoryWallMs": 0.30989011041410675,
+        "samples": 91
+      },
+      {
+        "scope": "gltf.queue",
+        "meanChangedHistoryWallMs": 0.04395604395604396,
+        "samples": 91
+      }
+    ],
+    "webgl": [
+      {
+        "scope": "render.encode.overlays",
+        "meanChangedHistoryWallMs": 5.371590906923467,
+        "samples": 88
+      },
+      {
+        "scope": "scene.gpuUpdates",
+        "meanChangedHistoryWallMs": 1.5159090757369995,
+        "samples": 88
+      },
+      {
+        "scope": "render.encode.color",
+        "meanChangedHistoryWallMs": 0.5034883854001068,
+        "samples": 86
+      },
+      {
+        "scope": "gltf.update",
+        "meanChangedHistoryWallMs": 0.31818183172832837,
+        "samples": 88
+      },
+      {
+        "scope": "gltf.queue",
+        "meanChangedHistoryWallMs": 0.06627907863883085,
+        "samples": 86
+      }
+    ]
+  }
+}

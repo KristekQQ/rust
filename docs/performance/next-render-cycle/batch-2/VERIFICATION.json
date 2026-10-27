@@ -1,0 +1,85 @@
+{
+  "status": "PASS",
+  "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+  "exitCode": 0,
+  "native": {
+    "passed": 419,
+    "failed": 0,
+    "ignored": 2,
+    "ignoredScope": "existing manual timing benchmarks"
+  },
+  "browser": {
+    "passed": 139,
+    "failed": 0,
+    "backends": [
+      "webgpu",
+      "webgl"
+    ],
+    "report": "output/verification/browser-report.json",
+    "sha256": "76e5790228494d6ab6150536d976fb97f82a82ac6e5274215259bdd603439f58"
+  },
+  "sdkPassed": 32,
+  "xrPlatformPassed": 59,
+  "performanceHelperUnitsPassed": 42,
+  "separateHelperCommand": "node --test scripts/render-performance.test.mjs scripts/render-performance-api.test.mjs",
+  "helperLog": {
+    "path": "output/next-render-cycle-2/performance-helper-units-2.log",
+    "sha256": "a49b50c3afe62bb3521b383cf1268744badfb4e18debe05356063b6b68cb52ca"
+  },
+  "gateLog": {
+    "path": "output/next-render-cycle-2/final-gate.log",
+    "sha256": "507c26431a3450f3ab84eafb11edf79b03c5db7fc1fa97e0d10163df45eb3155"
+  },
+  "checkLogHashes": {
+    "rust-format": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rust-tests": "eabe08f745362fbf24fec9099dc2f3e5429c3ffba914e97f294e83bf3eb84e93",
+    "rust-clippy": "b79be03ec56485d0aeda5ce71d9bc4b61f571d6f48e1b314d70ccb7d499f1518",
+    "sdk": "12915cd0f94b2cce665f4a5e6ca72d59e4ae5995b83ee2e2bee4df7057794b05",
+    "harness": "59af146052be2d8e6bf933451fa5c40c456f3df6ad123786c248152d0738677f",
+    "xr-platform": "2c8b66acdf4966bc9d42cc4ccdccc9bda129a583d3be46b5d9a5423b6d366cee",
+    "wasm-check": "e221496485d18a6a668aa79db8ad05c45f7b967c12abdbaf8a4679fbf7f33fb6",
+    "wasm-clippy": "92a61dcfe40d72185e146a7d122d39746e371c1a9604ba831ee381b1f5ce8f5c",
+    "types": "8fa1cf5506304e8abac55868e7f1a136c9b1dde57a3981a382da4c21ea129a6f"
+  },
+  "build": {
+    "source": "1452a9f7ca544a1490773130f92719d223511b5feaa6c5b819bd3a9d325a0358",
+    "wasm": "af2905cc7d71af63b731c586198bd201917d63375821e80d1a70e7a99f1ea088",
+    "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "independentReview": "static inspected code and tests; no material findings; did not run builds/browser",
+  "physicalQuest": false,
+  "push": false,
+  "merge": false,
+  "deployment": false,
+  "sharedServerRestart": false,
+  "retainedFailures": [
+    "instrument-release.log: sandbox cache failure",
+    "instrument-check.log: macro recursion; repaired before build",
+    "cache-check.log and cache-check-2.log: initial implementation compile errors; repaired",
+    "cache-stereo-final.log: recorded dev-profile metadata after real release build; corrected to matching release configuration without changing WASM bytes",
+    "performance-helper-units.log: sandbox loopback restriction triggered Node native abort; identical tests pass with local server permission"
+  ],
+  "receiptRecheck": {
+    "command": "VERIFY_WASM_PROFILE=release npm exec --offline -- node scripts/verification-cache.mjs check all",
+    "exitCode": 0,
+    "result": "PASS reused: all  (unchanged inputs)",
+    "sha256": "bd3a531c2871b6c92dd4e8ef5db324dc498321345f0e68c5ab8a7bdb66a2850d"
+  },
+  "finalBuildIdentity": {
+    "source": "1452a9f7ca544a1490773130f92719d223511b5feaa6c5b819bd3a9d325a0358",
+    "wasm": "af2905cc7d71af63b731c586198bd201917d63375821e80d1a70e7a99f1ea088",
+    "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  }
+}

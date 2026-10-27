@@ -42,6 +42,7 @@ const suites = [
     {name:"table-tennis-xr",path:"tests/table-tennis-xr.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"monster-combat",path:"tests/monster-combat.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"gltf-batching",path:"tests/gltf-batching.html",status:"#result"},
+    {name:"gltf-plan-cache",path:"tests/gltf-plan-cache.html",status:"#result"},
     {name:"gltf-opaque-batching",path:"tests/gltf-opaque-batching.html",status:"#result"},
     {name:"gltf-light-classes",path:"tests/gltf-light-classes.html",status:"#result"},
     {name:"gltf-gpu-transforms",path:"tests/gltf-gpu-transforms.html",status:"#result"},
