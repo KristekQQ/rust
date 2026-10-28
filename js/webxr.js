@@ -1,4 +1,5 @@
 // @ts-nocheck -- WebXR browser interfaces are not yet part of TypeScript lib.dom.
+import {PresentationProfile} from './xr-presentation-profile.js';
 // Platform adapter only: XR scheduling and canvas transfer. Rust computes views and scene state.
 /** Logical tracked person. Scene objects are equipment, never built-in weapons or body meshes. */
 export class XRPlayer {
@@ -51,6 +52,17 @@ export class WebXRHost extends EventTarget {
     get player(){return this.#player;}
     #engine; #canvas; #session = null; #pending = false; #disposed = false;
     #gpuBinding = null; #gpuLayer = null; #gpuSessionUnavailable = false;
+    #sharedGl = false;
+    #profile = null; #lastProfile = null; #presentation = 'canvas-transfer';
+    get presentationProfile(){return this.#profile?.snapshot()??this.#lastProfile;}
+    /** @returns {'canvas-transfer'|'shared-framebuffer'|'webgpu'} */
+    get presentationMode(){return this.#gpuBinding?'webgpu':this.#presentation;}
+    #onGlLost = event => {
+        event.preventDefault();
+        if(!this.#session)return;
+        this.lastError=new Error(this.#sharedGl?'Renderer WebGL context lost; dispose/reinitialize the engine before retrying XR.':'XR WebGL context lost.');
+        void this.#session.end().catch(()=>{});this.#cleanup();this.dispatchEvent(new Event('error'));
+    };
     #gl; #program; #textures = []; #vao; #frame = null; #size; #previous = null;
     #pressed = [null, null];
     #sources = [null, null];
@@ -215,13 +227,17 @@ export class WebXRHost extends EventTarget {
     async isSupported() {
         return !!globalThis.isSecureContext && !!navigator.xr && (this.#engine.renderer_backend() === 'Gl' || (!this.#gpuSessionUnavailable && typeof globalThis.XRGPUBinding === 'function' && this.#engine.xr_gpu_supported())) && await navigator.xr.isSessionSupported('immersive-vr');
     }
-    async enter({resolutionScale=.75}={}) {
+    async enter({resolutionScale=.75,webglPresentation='canvas-transfer',presentationDiagnostics=false}={}) {
+        if(!['canvas-transfer','shared-framebuffer'].includes(webglPresentation))throw new RangeError('Unknown WebGL XR presentation path.');
+        if(typeof presentationDiagnostics!=='boolean')throw new TypeError('presentationDiagnostics must be boolean.');
         if(!Number.isFinite(resolutionScale)||resolutionScale<.5||resolutionScale>1.5)throw new RangeError('XR resolutionScale must be between 0.5 and 1.5.');
         if (this.#disposed) throw new Error('WebXR byl ukončen.');
         if (this.#pending || this.#session) throw new Error('WebXR již běží nebo se spouští.');
         if (!globalThis.isSecureContext) throw new Error('WebXR potřebuje důvěryhodné HTTPS nebo localhost přes ADB.');
         if (!navigator.xr) throw new Error('Tento prohlížeč nemá WebXR. Otevřete stránku v Meta Quest Browser.');
         const gpu = this.#engine.renderer_backend() === 'BrowserWebGpu';
+        if(gpu&&(webglPresentation!=='canvas-transfer'||presentationDiagnostics))throw new Error('WebGL presentation controls require the WebGL backend.');
+        this.#lastProfile=null;this.#sharedGl=false;this.#presentation='canvas-transfer';
         if (gpu && typeof globalThis.XRGPUBinding !== 'function') throw new Error('Prohlížeč nemá WebGPU pro WebXR (XRGPUBinding). Použijte odkaz WebGL.');
         if (gpu && this.#gpuSessionUnavailable) throw new Error('Tento prohlížeč odmítl WebGPU ve VR. Aktualizujte Meta Quest Browser, nebo použijte odkaz WebGL / WebXR.');
         if (gpu && !this.#engine.xr_gpu_supported()) throw new Error('WebGPU XR vyžaduje kompatibilní adaptér. Použijte WebGL.');
@@ -262,13 +278,22 @@ export class WebXRHost extends EventTarget {
                 });
                 session.updateRenderState({layers:[this.#gpuLayer],depthNear:0.05,depthFar:100});
             } else {
-                const canvas = document.createElement('canvas');
-                gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: false, antialias: false });
+                if(webglPresentation==='shared-framebuffer') {
+                    try {
+                        if(!this.#engine.xr_gl_context||!this.#engine.xr_render_gl_eye||!this.#engine.xr_present_gl_frame)throw new Error('Pinned renderer does not expose WebGL XR framebuffer interop.');
+                        gl=this.#engine.xr_gl_context();this.#sharedGl=true;this.#presentation='shared-framebuffer';
+                    } catch(error) {
+                        this.dispatchEvent(new CustomEvent('presentationfallback',{detail:{requested:webglPresentation,selected:'canvas-transfer',reason:String(error)}}));
+                    }
+                }
+                if(!gl){const canvas = document.createElement('canvas');gl = canvas.getContext('webgl2', { xrCompatible: true, alpha: false, antialias: false });}
                 if (!gl) throw new Error('WebGL2 není dostupné.');
                 this.#gl = gl;
+                gl.canvas?.addEventListener('webglcontextlost',this.#onGlLost);
                 await gl.makeXRCompatible();
                 if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
                 layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: resolutionScale });
+                if(this.#sharedGl&&(layer.antialias!==false||gl.getContextAttributes?.()?.antialias!==false||gl.isContextLost()))throw new Error('Shared WebGL XR requires a live single-sampled context and layer.');
                 session.updateRenderState({ baseLayer: layer, depthNear: 0.05, depthFar: 100 });
             }
             let space;
@@ -281,7 +306,8 @@ export class WebXRHost extends EventTarget {
             this.#space = space;
             space.addEventListener?.('reset',this.#resetInputs);
             session.addEventListener('visibilitychange',this.#visibilityChanged);
-            if (!gpu) this.#createBlit();
+            if (!gpu && !this.#sharedGl) this.#createBlit();
+            if (!gpu && presentationDiagnostics) this.#profile=new PresentationProfile({rendererGl:this.#canvas.getContext('webgl2'),xrGl:gl});
             this.#engine.xr_set_presenting(true);
             this.#trackingActive = true;
             let firstFrame = true;
@@ -297,12 +323,14 @@ export class WebXRHost extends EventTarget {
                 fixedFoveation:(gpu?this.#gpuLayer:layer)?.fixedFoveation??null,
                 antialias:gpu?false:layer?.antialias??null,
                 layerKind:gpu?'XRProjectionLayer':'XRWebGLLayer',
+                ...(!gpu?{presentation:this.#presentation,framebuffer:{width:layer.framebufferWidth,height:layer.framebufferHeight},rendererContextAttributes:this.#canvas.getContext?.('webgl2')?.getContextAttributes?.(),xrContextAttributes:gl.getContextAttributes?.(),sharedContext:gl===this.#canvas.getContext?.('webgl2'),depth:false,eyeTargets:eyeViewports.map(v=>({eye:v.eye,width:v.width,height:v.height,colorFormat:'rgba8unorm-srgb',depthFormat:'depth32float',sampleCount:1,ownership:this.#sharedGl?'renderer-owned per-eye stage':'renderer canvas output'})),drawingBufferColorSpace:gl.drawingBufferColorSpace??null}:{}),
             });
             let eyeViewports=[];
             const frame = (time, xrFrame) => {
                 this.#frame = null;
                 if (this.#session !== session) return;
                 try {
+                    this.#profile?.beginFrame(time);
                     const cpuStart=performance.now();
                     const elapsed=this.#previous===null?0:time-this.#previous;
                     const pose = xrFrame.getViewerPose(space);
@@ -344,6 +372,19 @@ export class WebXRHost extends EventTarget {
                             }
                         }
                         if(images.length)this.#engine.xr_present_gpu_frame(images);
+                    } else if(this.#sharedGl) {
+                        const viewports=[];
+                        if(pose)for(const [index,view] of pose.views.entries()) {
+                            const viewport=layer.getViewport(view);if(!viewport)continue;
+                            if(firstFrame)eyeViewports.push({eye:view.eye,x:viewport.x,y:viewport.y,width:viewport.width,height:viewport.height});
+                            const render=()=>this.#engine.xr_render_gl_eye(view.projectionMatrix,view.transform.matrix,index,viewport.width,viewport.height);
+                            if(this.#profile)this.#profile.scope(`eye.${view.eye}`,gl,render);else render();
+                            viewports.push([viewport.x,viewport.y,viewport.width,viewport.height]);
+                        }
+                        if(viewports.length){
+                            const present=()=>this.#engine.xr_present_gl_frame(layer.framebuffer,layer.framebufferWidth,layer.framebufferHeight,viewports);
+                            if(this.#profile)this.#profile.scope('present.stereo',gl,present);else present();
+                        }
                     } else {
                         gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
                         gl.clearColor(0.1, 0.1, 0.3, 1);
@@ -351,13 +392,15 @@ export class WebXRHost extends EventTarget {
                         if (pose) for (const [index, view] of pose.views.entries()) {
                             const viewport = layer.getViewport(view);
                             if (!viewport) continue;
-                            if(firstFrame)eyeViewports.push({eye:view.eye,width:viewport.width,height:viewport.height});
-                            this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
-                            this.#uploadCanvas(index);
-                            gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-                            gl.useProgram(this.#program);
-                            gl.bindVertexArray(this.#vao);
-                            gl.drawArrays(gl.TRIANGLES, 0, 3);
+                            if(firstFrame)eyeViewports.push({eye:view.eye,x:viewport.x,y:viewport.y,width:viewport.width,height:viewport.height});
+                            const render=()=>this.#engine.xr_render_eye(view.projectionMatrix, view.transform.matrix, viewport.width, viewport.height);
+                            if(this.#profile)this.#profile.scope(`eye.${view.eye}`,this.#canvas.getContext('webgl2'),render);else render();
+                            if(this.#profile)this.#profile.scope(`transfer.${view.eye}`,gl,()=>this.#uploadCanvas(index));else this.#uploadCanvas(index);
+                            const blit=()=>{
+                                gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+                                gl.useProgram(this.#program);gl.bindVertexArray(this.#vao);gl.drawArrays(gl.TRIANGLES, 0, 3);
+                            };
+                            if(this.#profile)this.#profile.scope(`blit.${view.eye}`,gl,blit);else blit();
                         }
                     }
                     this.#engine.xr_finish_frame();
@@ -386,7 +429,7 @@ export class WebXRHost extends EventTarget {
                     void session.end().catch(() => {});
                     this.#cleanup();
                     this.dispatchEvent(new Event('error'));
-                }
+                } finally { this.#profile?.endFrame(); }
             };
             this.#frame = session.requestAnimationFrame(frame);
             this.dispatchEvent(new Event('start'));
@@ -423,6 +466,9 @@ export class WebXRHost extends EventTarget {
         this.#bladePoses = [null, null];
         this.#buttonTouch = [false, false];
         this.#buttonPoints = [undefined, undefined];
+        this.#profile?.dispose();
+        this.#lastProfile=this.#profile?.snapshot()??this.#lastProfile;this.#profile=null;
+        this.#gl?.canvas?.removeEventListener('webglcontextlost',this.#onGlLost);
         try {
             this.#engine.xr_set_presenting(false);
             if (this.#size && !this.#gpuBinding) this.#engine.resize(...this.#size);
@@ -431,12 +477,13 @@ export class WebXRHost extends EventTarget {
             for (const image of this.#textures) if (image) this.#gl.deleteTexture(image.texture);
             this.#gl.deleteProgram(this.#program);
             this.#gl.deleteVertexArray(this.#vao);
-            this.#gl.getExtension('WEBGL_lose_context')?.loseContext();
+            if(!this.#sharedGl)this.#gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
         this.#gpuLayer?.destroy?.();
         this.#gpuBinding = this.#gpuLayer = null;
         this.#textures = [];
         this.#gl = this.#program = this.#vao = null;
+        this.#sharedGl=false;
         this.dispatchEvent(new Event('end'));
     }
     #uploadCanvas(index) {

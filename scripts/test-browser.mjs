@@ -78,6 +78,8 @@ const suites = [
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:1800000 },
     { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
+    {name:'xr-gl-presentation',path:'tests/xr-gl-presentation.html',status:'#result',backends:['webgl'],xrReport:true},
+    {name:'rim-gameplay-gl-shared',path:'tests/rim-gameplay.html?presentation=shared-framebuffer',status:'#result',backends:['webgl'],xrReport:true},
     { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },
     { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true, softwareTimeoutMs:1200000 },
     { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },

@@ -1,0 +1,5808 @@
+{
+  "evidence": "desktop simulated XR only, no physical headset/compositor measurement",
+  "workloads": {
+    "neon": {
+      "status": "PASS",
+      "options": {
+        "frozenRoot": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/candidate",
+        "out": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/primary-neon",
+        "warmup": 8000,
+        "sample": 25000,
+        "pairs": 3,
+        "workload": "neon",
+        "load": 0,
+        "eyeWidth": 320,
+        "eyeHeight": 320,
+        "asymmetric": true,
+        "diagnostics": false,
+        "routes": "both"
+      },
+      "exactPairs": [
+        {
+          "pair": 1,
+          "pass": true,
+          "exact": true,
+          "width": 635,
+          "height": 328,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 2,
+          "pass": true,
+          "exact": true,
+          "width": 635,
+          "height": 328,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 3,
+          "pass": true,
+          "exact": true,
+          "width": 635,
+          "height": 328,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "runs": [
+        {
+          "id": "pair-1-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 1,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.900000095367432,
+            "mean": 4.851099269855507,
+            "p95": 5.599999904632568,
+            "p99": 6.299999952316284,
+            "max": 8,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666066666666676,
+            "p95": 16.799999999995634,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 923,
+            "rawExactOverrunDurationMs": 38.36666666663521,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00216007776277,
+          "workPerFrame": {
+            "drawCalls": 0.0,
+            "trianglesDrawn": 0.0,
+            "instancesDrawn": 0.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 0.0,
+            "primitiveCulled": 0.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.75,
+            1.2000000476837158
+          ]
+        },
+        {
+          "id": "pair-1-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 1,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 3.9000000953674316,
+            "mean": 3.5556295777383764,
+            "p95": 4.5,
+            "p99": 4.8999998569488525,
+            "max": 6,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666066666666676,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 938,
+            "rawExactOverrunDurationMs": 37.866666666646125,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00216007776277,
+          "workPerFrame": {
+            "drawCalls": 0.0,
+            "trianglesDrawn": 0.0,
+            "instancesDrawn": 0.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 0.0,
+            "primitiveCulled": 0.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.75,
+            1.2000000476837158
+          ]
+        },
+        {
+          "id": "pair-2-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 2,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4,
+            "mean": 3.7376415692989546,
+            "p95": 4.5,
+            "p99": 4.799999952316284,
+            "max": 9.600000143051147,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666000000000004,
+            "p95": 16.799999999999272,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 922,
+            "rawExactOverrunDurationMs": 38.833333333313874,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003825,
+          "workPerFrame": {
+            "drawCalls": 0.0,
+            "trianglesDrawn": 0.0,
+            "instancesDrawn": 0.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 0.0,
+            "primitiveCulled": 0.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.75,
+            1.2000000476837158
+          ]
+        },
+        {
+          "id": "pair-2-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 2,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.799999952316284,
+            "mean": 4.779680215383196,
+            "p95": 5.5,
+            "p99": 6.5,
+            "max": 9.399999856948853,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666000000000004,
+            "p95": 16.799999999999272,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 911,
+            "rawExactOverrunDurationMs": 38.9666666666574,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003825,
+          "workPerFrame": {
+            "drawCalls": 0.0,
+            "trianglesDrawn": 0.0,
+            "instancesDrawn": 0.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 0.0,
+            "primitiveCulled": 0.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.75,
+            1.2000000476837158
+          ]
+        },
+        {
+          "id": "pair-3-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 3,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.799999952316284,
+            "mean": 4.781945372803222,
+            "p95": 5.6000001430511475,
+            "p99": 7.099999904632568,
+            "max": 13.400000095367432,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666000000000004,
+            "p95": 16.799999999995634,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 929,
+            "rawExactOverrunDurationMs": 38.56666666662865,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003825,
+          "workPerFrame": {
+            "drawCalls": 0.0,
+            "trianglesDrawn": 0.0,
+            "instancesDrawn": 0.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 0.0,
+            "primitiveCulled": 0.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.75,
+            1.2000000476837158
+          ]
+        },
+        {
+          "id": "pair-3-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 3,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.099999904632568,
+            "mean": 3.9182544972879105,
+            "p95": 4.799999952316284,
+            "p99": 5.1000001430511475,
+            "max": 5.700000047683716,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66600000000001,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 930,
+            "rawExactOverrunDurationMs": 38.29999999996345,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003804,
+          "workPerFrame": {
+            "drawCalls": 0.0,
+            "trianglesDrawn": 0.0,
+            "instancesDrawn": 0.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 0.0,
+            "primitiveCulled": 0.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.75,
+            1.2000000476837158
+          ]
+        }
+      ],
+      "summary": {
+        "canvas-transfer": {
+          "runCount": 3,
+          "frames": 4503,
+          "medianRunMeanCpuMs": 4.781945372803222,
+          "medianRunFps": 60.002400096003825,
+          "cpuP95ByRun": [
+            5.599999904632568,
+            5.5,
+            5.6000001430511475
+          ],
+          "cpuP99ByRun": [
+            6.299999952316284,
+            6.5,
+            7.099999904632568
+          ],
+          "cpuMaxByRun": [
+            8,
+            9.399999856948853,
+            13.400000095367432
+          ]
+        },
+        "shared-framebuffer": {
+          "runCount": 3,
+          "frames": 4503,
+          "medianRunMeanCpuMs": 3.7376415692989546,
+          "medianRunFps": 60.002400096003804,
+          "cpuP95ByRun": [
+            4.5,
+            4.5,
+            4.799999952316284
+          ],
+          "cpuP99ByRun": [
+            4.8999998569488525,
+            4.799999952316284,
+            5.1000001430511475
+          ],
+          "cpuMaxByRun": [
+            6,
+            9.600000143051147,
+            5.700000047683716
+          ]
+        }
+      },
+      "pairedRatios": [
+        {
+          "pair": 1,
+          "cpuCandidateOverBaseline": 0.7329533740595423,
+          "fpsCandidateOverBaseline": 1.0,
+          "workIdentical": true
+        },
+        {
+          "pair": 2,
+          "cpuCandidateOverBaseline": 0.7819856979698172,
+          "fpsCandidateOverBaseline": 1.0,
+          "workIdentical": true
+        },
+        {
+          "pair": 3,
+          "cpuCandidateOverBaseline": 0.8193850393131932,
+          "fpsCandidateOverBaseline": 0.9999999999999997,
+          "workIdentical": true
+        }
+      ]
+    },
+    "rome-ordinary": {
+      "status": "PASS",
+      "options": {
+        "frozenRoot": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/candidate",
+        "out": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/primary-rome-ordinary",
+        "warmup": 8000,
+        "sample": 25000,
+        "pairs": 3,
+        "workload": "rome",
+        "load": 0,
+        "eyeWidth": 320,
+        "eyeHeight": 320,
+        "asymmetric": true,
+        "diagnostics": false,
+        "routes": "both"
+      },
+      "exactPairs": [
+        {
+          "pair": 1,
+          "pass": true,
+          "exact": true,
+          "width": 635,
+          "height": 328,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 2,
+          "pass": true,
+          "exact": true,
+          "width": 635,
+          "height": 328,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 3,
+          "pass": true,
+          "exact": true,
+          "width": 635,
+          "height": 328,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "runs": [
+        {
+          "id": "pair-1-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 1,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.700000047683716,
+            "mean": 4.6113924016005825,
+            "p95": 5.5,
+            "p99": 6.5,
+            "max": 9.900000095367432,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666000000000004,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 943,
+            "rawExactOverrunDurationMs": 37.63333333339682,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003825,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-1-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 1,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 1.8999998569488525,
+            "mean": 2.4946035970297755,
+            "p95": 4.300000190734863,
+            "p99": 4.700000047683716,
+            "max": 5.099999904632568,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666000000000015,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000291,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 925,
+            "rawExactOverrunDurationMs": 38.13333333331134,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00240009600379,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-2-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 2,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 3.8999998569488525,
+            "mean": 3.636242502455232,
+            "p95": 4.6000001430511475,
+            "p99": 4.900000095367432,
+            "max": 7.099999904632568,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.665933333333346,
+            "p95": 16.799999999999272,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 909,
+            "rawExactOverrunDurationMs": 39.40000000003839,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00264011616507,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-2-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 2,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.8999998569488525,
+            "mean": 4.851565620567225,
+            "p95": 5.5,
+            "p99": 6.299999952316284,
+            "max": 8.299999952316284,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66593333333334,
+            "p95": 16.700000000000728,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 938,
+            "rawExactOverrunDurationMs": 37.16666666660903,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00264011616509,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-3-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 3,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4.900000095367432,
+            "mean": 4.837708192694433,
+            "p95": 5.700000047683716,
+            "p99": 6.400000095367432,
+            "max": 15.399999856948853,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666000000000015,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 938,
+            "rawExactOverrunDurationMs": 37.56666666666504,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00240009600379,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-3-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 3,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 4,
+            "mean": 3.812125252216042,
+            "p95": 4.400000095367432,
+            "p99": 4.6000001430511475,
+            "max": 5,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66600000000001,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 926,
+            "rawExactOverrunDurationMs": 38.06666666668505,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003804,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        }
+      ],
+      "summary": {
+        "canvas-transfer": {
+          "runCount": 3,
+          "frames": 4503,
+          "medianRunMeanCpuMs": 4.837708192694433,
+          "medianRunFps": 60.002400096003825,
+          "cpuP95ByRun": [
+            5.5,
+            5.5,
+            5.700000047683716
+          ],
+          "cpuP99ByRun": [
+            6.5,
+            6.299999952316284,
+            6.400000095367432
+          ],
+          "cpuMaxByRun": [
+            9.900000095367432,
+            8.299999952316284,
+            15.399999856948853
+          ]
+        },
+        "shared-framebuffer": {
+          "runCount": 3,
+          "frames": 4503,
+          "medianRunMeanCpuMs": 3.636242502455232,
+          "medianRunFps": 60.002400096003804,
+          "cpuP95ByRun": [
+            4.300000190734863,
+            4.6000001430511475,
+            4.400000095367432
+          ],
+          "cpuP99ByRun": [
+            4.700000047683716,
+            4.900000095367432,
+            4.6000001430511475
+          ],
+          "cpuMaxByRun": [
+            5.099999904632568,
+            7.099999904632568,
+            5
+          ]
+        }
+      },
+      "pairedRatios": [
+        {
+          "pair": 1,
+          "cpuCandidateOverBaseline": 0.5409653700613107,
+          "fpsCandidateOverBaseline": 0.9999999999999994,
+          "workIdentical": true
+        },
+        {
+          "pair": 2,
+          "cpuCandidateOverBaseline": 0.7494987776811926,
+          "fpsCandidateOverBaseline": 0.9999999999999997,
+          "workIdentical": true
+        },
+        {
+          "pair": 3,
+          "cpuCandidateOverBaseline": 0.7880023143960699,
+          "fpsCandidateOverBaseline": 1.0000000000000002,
+          "workIdentical": true
+        }
+      ]
+    },
+    "rome-stress": {
+      "status": "PASS",
+      "options": {
+        "frozenRoot": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/candidate",
+        "out": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/primary-rome-stress",
+        "warmup": 8000,
+        "sample": 25000,
+        "pairs": 3,
+        "workload": "rome",
+        "load": 512,
+        "eyeWidth": 960,
+        "eyeHeight": 1008,
+        "asymmetric": true,
+        "diagnostics": false,
+        "routes": "both"
+      },
+      "exactPairs": [
+        {
+          "pair": 1,
+          "pass": true,
+          "exact": true,
+          "width": 1915,
+          "height": 1016,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 2,
+          "pass": true,
+          "exact": true,
+          "width": 1915,
+          "height": 1016,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 3,
+          "pass": true,
+          "exact": true,
+          "width": 1915,
+          "height": 1016,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "runs": [
+        {
+          "id": "pair-1-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 1,
+          "frames": 807,
+          "cpuMs": {
+            "count": 807,
+            "median": 27.5,
+            "mean": 30.716480790460864,
+            "p95": 50.39999985694885,
+            "p99": 56.90000009536743,
+            "max": 66.80000019073486,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 803,
+            "rawExactOverrunDurationMs": 11340.066664616286,
+            "overruns": 797,
+            "overrunDurationMs": 11338.266664902389
+          },
+          "intervalMs": {
+            "count": 806,
+            "median": 33.29999999999927,
+            "mean": 30.995533498759297,
+            "p95": 50,
+            "p99": 50.10000000000218,
+            "max": 66.70000000000073,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 692,
+            "rawExactOverrunDurationMs": 11556.866666666698,
+            "overruns": 526,
+            "overrunDurationMs": 11550.033333333351
+          },
+          "fps": 32.26271294991675,
+          "workPerFrame": {
+            "drawCalls": 344.0,
+            "trianglesDrawn": 21107544.0,
+            "instancesDrawn": 68676.0,
+            "instancedDrawCalls": 268.0,
+            "primitiveTests": 7006.0,
+            "primitiveCulled": 10.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-1-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 1,
+          "frames": 1128,
+          "cpuMs": {
+            "count": 1128,
+            "median": 20.399999856948853,
+            "mean": 21.74929078039548,
+            "p95": 34.60000014305115,
+            "p99": 42.200000047683716,
+            "max": 49.09999990463257,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 830,
+            "rawExactOverrunDurationMs": 6749.766666094437,
+            "overruns": 809,
+            "overrunDurationMs": 6744.4666661421215
+          },
+          "intervalMs": {
+            "count": 1127,
+            "median": 16.700000000000728,
+            "mean": 22.1818988464952,
+            "p95": 33.400000000001455,
+            "p99": 50,
+            "max": 50.10000000000218,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 832,
+            "rawExactOverrunDurationMs": 6235.733333333328,
+            "overruns": 354,
+            "overrunDurationMs": 6215.999999999959
+          },
+          "fps": 45.08180327213072,
+          "workPerFrame": {
+            "drawCalls": 344.0,
+            "trianglesDrawn": 21107544.0,
+            "instancesDrawn": 68676.0,
+            "instancedDrawCalls": 268.0,
+            "primitiveTests": 7006.0,
+            "primitiveCulled": 10.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-2-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 2,
+          "frames": 1137,
+          "cpuMs": {
+            "count": 1137,
+            "median": 20.600000143051147,
+            "mean": 21.548109060436776,
+            "p95": 37.700000047683716,
+            "p99": 43.5,
+            "max": 52.799999952316284,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 727,
+            "rawExactOverrunDurationMs": 7109.8333335717225,
+            "overruns": 708,
+            "overrunDurationMs": 7106.0000002383895
+          },
+          "intervalMs": {
+            "count": 1136,
+            "median": 16.700000000000728,
+            "mean": 22.006073943662038,
+            "p95": 33.400000000001455,
+            "p99": 50,
+            "max": 50.10000000000218,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 842,
+            "rawExactOverrunDurationMs": 6085.8666666666895,
+            "overruns": 349,
+            "overrunDurationMs": 6065.033333333291
+          },
+          "fps": 45.441999447975576,
+          "workPerFrame": {
+            "drawCalls": 344.0,
+            "trianglesDrawn": 21107544.0,
+            "instancesDrawn": 68676.0,
+            "instancedDrawCalls": 268.0,
+            "primitiveTests": 7006.0,
+            "primitiveCulled": 10.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-2-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 2,
+          "frames": 811,
+          "cpuMs": {
+            "count": 811,
+            "median": 27.600000143051147,
+            "mean": 30.59531442657499,
+            "p95": 47.39999985694885,
+            "p99": 56.10000014305115,
+            "max": 58.5,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 810,
+            "rawExactOverrunDurationMs": 11297.39999985697,
+            "overruns": 810,
+            "overrunDurationMs": 11297.39999985697
+          },
+          "intervalMs": {
+            "count": 810,
+            "median": 33.29999999999927,
+            "mean": 30.842469135802453,
+            "p95": 50,
+            "p99": 50.10000000000218,
+            "max": 66.70000000000073,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 692,
+            "rawExactOverrunDurationMs": 11490.466666666696,
+            "overruns": 529,
+            "overrunDurationMs": 11483.333333333378
+          },
+          "fps": 32.422825669271184,
+          "workPerFrame": {
+            "drawCalls": 344.0,
+            "trianglesDrawn": 21107544.0,
+            "instancesDrawn": 68676.0,
+            "instancedDrawCalls": 268.0,
+            "primitiveTests": 7006.0,
+            "primitiveCulled": 10.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-3-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 3,
+          "frames": 818,
+          "cpuMs": {
+            "count": 818,
+            "median": 27.100000143051147,
+            "mean": 30.3277506090901,
+            "p95": 48.90000009536743,
+            "p99": 56.200000047683716,
+            "max": 58.299999952316284,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 817,
+            "rawExactOverrunDurationMs": 11174.833331664422,
+            "overruns": 815,
+            "overrunDurationMs": 11174.166664997754
+          },
+          "intervalMs": {
+            "count": 817,
+            "median": 33.29999999999927,
+            "mean": 30.578090575275382,
+            "p95": 50,
+            "p99": 50.100000000000364,
+            "max": 66.70000000000073,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 720,
+            "rawExactOverrunDurationMs": 11372.299999999985,
+            "overruns": 554,
+            "overrunDurationMs": 11365.466666666644
+          },
+          "fps": 32.70315383291372,
+          "workPerFrame": {
+            "drawCalls": 344.0,
+            "trianglesDrawn": 21107544.0,
+            "instancesDrawn": 68676.0,
+            "instancedDrawCalls": 268.0,
+            "primitiveTests": 7006.0,
+            "primitiveCulled": 10.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-3-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 3,
+          "frames": 1136,
+          "cpuMs": {
+            "count": 1136,
+            "median": 20.5,
+            "mean": 21.570950702042648,
+            "p95": 35.799999952316284,
+            "p99": 42.39999985694885,
+            "max": 45.89999985694885,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 789,
+            "rawExactOverrunDurationMs": 6928.699996232958,
+            "overruns": 773,
+            "overrunDurationMs": 6924.6666628519415
+          },
+          "intervalMs": {
+            "count": 1135,
+            "median": 16.700000000000728,
+            "mean": 21.99621145374458,
+            "p95": 33.400000000001455,
+            "p99": 33.400000000001455,
+            "max": 50.099999999998545,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 844,
+            "rawExactOverrunDurationMs": 6069.233333333313,
+            "overruns": 354,
+            "overrunDurationMs": 6050.200000000033
+          },
+          "fps": 45.46237437764596,
+          "workPerFrame": {
+            "drawCalls": 344.0,
+            "trianglesDrawn": 21107544.0,
+            "instancesDrawn": 68676.0,
+            "instancedDrawCalls": 268.0,
+            "primitiveTests": 7006.0,
+            "primitiveCulled": 10.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        }
+      ],
+      "summary": {
+        "canvas-transfer": {
+          "runCount": 3,
+          "frames": 2436,
+          "medianRunMeanCpuMs": 30.59531442657499,
+          "medianRunFps": 32.422825669271184,
+          "cpuP95ByRun": [
+            50.39999985694885,
+            47.39999985694885,
+            48.90000009536743
+          ],
+          "cpuP99ByRun": [
+            56.90000009536743,
+            56.10000014305115,
+            56.200000047683716
+          ],
+          "cpuMaxByRun": [
+            66.80000019073486,
+            58.5,
+            58.299999952316284
+          ]
+        },
+        "shared-framebuffer": {
+          "runCount": 3,
+          "frames": 3401,
+          "medianRunMeanCpuMs": 21.570950702042648,
+          "medianRunFps": 45.441999447975576,
+          "cpuP95ByRun": [
+            34.60000014305115,
+            37.700000047683716,
+            35.799999952316284
+          ],
+          "cpuP99ByRun": [
+            42.200000047683716,
+            43.5,
+            42.39999985694885
+          ],
+          "cpuMaxByRun": [
+            49.09999990463257,
+            52.799999952316284,
+            45.89999985694885
+          ]
+        }
+      },
+      "pairedRatios": [
+        {
+          "pair": 1,
+          "cpuCandidateOverBaseline": 0.7080658402491804,
+          "fpsCandidateOverBaseline": 1.3973345435058044,
+          "workIdentical": true
+        },
+        {
+          "pair": 2,
+          "cpuCandidateOverBaseline": 0.7042944144976708,
+          "fpsCandidateOverBaseline": 1.4015434654433387,
+          "workIdentical": true
+        },
+        {
+          "pair": 3,
+          "cpuCandidateOverBaseline": 0.7112611475899309,
+          "fpsCandidateOverBaseline": 1.390152601486737,
+          "workIdentical": true
+        }
+      ]
+    },
+    "rome-symmetric": {
+      "status": "PASS",
+      "options": {
+        "frozenRoot": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/candidate",
+        "out": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/primary-rome-symmetric",
+        "warmup": 8000,
+        "sample": 25000,
+        "pairs": 3,
+        "workload": "rome",
+        "load": 0,
+        "eyeWidth": 320,
+        "eyeHeight": 320,
+        "asymmetric": false,
+        "diagnostics": false,
+        "routes": "both"
+      },
+      "exactPairs": [
+        {
+          "pair": 1,
+          "pass": true,
+          "exact": true,
+          "width": 640,
+          "height": 320,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 2,
+          "pass": true,
+          "exact": true,
+          "width": 640,
+          "height": 320,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pair": 3,
+          "pass": true,
+          "exact": true,
+          "width": 640,
+          "height": 320,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "runs": [
+        {
+          "id": "pair-1-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 1,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 2,
+            "mean": 1.8958694196239778,
+            "p95": 2.9000000953674316,
+            "p99": 3.200000047683716,
+            "max": 4.3999998569488525,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66600000000001,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 939,
+            "rawExactOverrunDurationMs": 37.59999999998274,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002400096003804,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-1-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 1,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 3.4000000953674316,
+            "mean": 3.1915389752880405,
+            "p95": 4.200000047683716,
+            "p99": 4.599999904632568,
+            "max": 6,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66606666666667,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 933,
+            "rawExactOverrunDurationMs": 37.80000000001985,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00216007776279,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-2-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 2,
+          "frames": 1502,
+          "cpuMs": {
+            "count": 1502,
+            "median": 3.5,
+            "mean": 3.189613845789639,
+            "p95": 4.299999952316284,
+            "p99": 4.799999952316284,
+            "max": 5.400000095367432,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1501,
+            "median": 16.69999999999891,
+            "mean": 16.6659560293138,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 933,
+            "rawExactOverrunDurationMs": 37.400000000034765,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.002558403556144,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-2-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 2,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 2.1000001430511475,
+            "mean": 2.0093937425276662,
+            "p95": 3.299999952316284,
+            "p99": 3.700000047683716,
+            "max": 4.599999904632568,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66593333333334,
+            "p95": 16.799999999999272,
+            "p99": 16.799999999999272,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 921,
+            "rawExactOverrunDurationMs": 38.50000000000419,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00264011616509,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-3-canvas-transfer",
+          "route": "canvas-transfer",
+          "pair": 3,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 2.1999998092651367,
+            "mean": 2.034843440217864,
+            "p95": 2.9000000953674316,
+            "p99": 3.4000000953674316,
+            "max": 5,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.666066666666676,
+            "p95": 16.700000000004366,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 926,
+            "rawExactOverrunDurationMs": 38.066666666695966,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00216007776277,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        },
+        {
+          "id": "pair-3-shared-framebuffer",
+          "route": "shared-framebuffer",
+          "pair": 3,
+          "frames": 1501,
+          "cpuMs": {
+            "count": 1501,
+            "median": 3.4000000953674316,
+            "mean": 3.2767488363978865,
+            "p95": 4.099999904632568,
+            "p99": 4.3999998569488525,
+            "max": 5.6000001430511475,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 0,
+            "rawExactOverrunDurationMs": 0,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "intervalMs": {
+            "count": 1500,
+            "median": 16.69999999999891,
+            "mean": 16.66606666666668,
+            "p95": 16.799999999999272,
+            "p99": 16.80000000000109,
+            "max": 16.80000000000291,
+            "budgetMs": 16.666666666666668,
+            "overrunToleranceMs": 0.5,
+            "rawExactOverruns": 916,
+            "rawExactOverrunDurationMs": 39.433333333292396,
+            "overruns": 0,
+            "overrunDurationMs": 0
+          },
+          "fps": 60.00216007776275,
+          "workPerFrame": {
+            "drawCalls": 76.0,
+            "trianglesDrawn": 134296.0,
+            "instancesDrawn": 76.0,
+            "instancedDrawCalls": 0.0,
+            "primitiveTests": 38.0,
+            "primitiveCulled": 2.0
+          },
+          "queryStart": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "queryEnd": {
+            "createQueryCalls": 0,
+            "engineProfilingEnabled": false,
+            "presentationDiagnostics": false,
+            "scope": "actual WebGL2 createQuery calls intercepted before initEngine, all contexts"
+          },
+          "head": [
+            0,
+            1.7000000476837158,
+            42
+          ]
+        }
+      ],
+      "summary": {
+        "canvas-transfer": {
+          "runCount": 3,
+          "frames": 4503,
+          "medianRunMeanCpuMs": 2.0093937425276662,
+          "medianRunFps": 60.002400096003804,
+          "cpuP95ByRun": [
+            2.9000000953674316,
+            3.299999952316284,
+            2.9000000953674316
+          ],
+          "cpuP99ByRun": [
+            3.200000047683716,
+            3.700000047683716,
+            3.4000000953674316
+          ],
+          "cpuMaxByRun": [
+            4.3999998569488525,
+            4.599999904632568,
+            5
+          ]
+        },
+        "shared-framebuffer": {
+          "runCount": 3,
+          "frames": 4504,
+          "medianRunMeanCpuMs": 3.1915389752880405,
+          "medianRunFps": 60.00216007776279,
+          "cpuP95ByRun": [
+            4.200000047683716,
+            4.299999952316284,
+            4.099999904632568
+          ],
+          "cpuP99ByRun": [
+            4.599999904632568,
+            4.799999952316284,
+            4.3999998569488525
+          ],
+          "cpuMaxByRun": [
+            6,
+            5.400000095367432,
+            5.6000001430511475
+          ]
+        }
+      },
+      "pairedRatios": [
+        {
+          "pair": 1,
+          "cpuCandidateOverBaseline": 1.683417086774385,
+          "fpsCandidateOverBaseline": 0.9999959998559952,
+          "workIdentical": true
+        },
+        {
+          "pair": 2,
+          "cpuCandidateOverBaseline": 1.5873513380097146,
+          "fpsCandidateOverBaseline": 0.9999986381831069,
+          "workIdentical": true
+        },
+        {
+          "pair": 3,
+          "cpuCandidateOverBaseline": 1.610319876032849,
+          "fpsCandidateOverBaseline": 0.9999999999999998,
+          "workIdentical": true
+        }
+      ]
+    }
+  },
+  "diagnostics": {
+    "diagnostic-neon": {
+      "status": "PASS",
+      "runs": [
+        {
+          "route": "canvas-transfer",
+          "frames": 1501,
+          "scopes": {
+            "eye.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 2.0229180511993063,
+                "median": 2,
+                "p95": 2.5,
+                "p99": 3,
+                "max": 4
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 2.4366328,
+                "median": 2.3875,
+                "p95": 2.593208,
+                "p99": 3.389625,
+                "max": 3.389625
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "transfer.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.01658894204045041,
+                "median": 0,
+                "p95": 0.10000014305114746,
+                "p99": 0.10000014305114746,
+                "max": 0.20000004768371582
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.65756296,
+                "median": 0.661958,
+                "p95": 0.78825,
+                "p99": 0.824375,
+                "max": 0.824375
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "blit.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.0036642233742466774,
+                "median": 0,
+                "p95": 0,
+                "p99": 0.10000014305114746,
+                "max": 0.10000014305114746
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.5465228400000001,
+                "median": 0.616083,
+                "p95": 0.728083,
+                "p99": 0.822708,
+                "max": 0.822708
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "eye.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 2.595203197613944,
+                "median": 2.6000001430511475,
+                "p95": 3,
+                "p99": 3.799999952316284,
+                "max": 9.299999952316284
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 2.84622456,
+                "median": 2.806708,
+                "p95": 3.006958,
+                "p99": 3.627499,
+                "max": 3.627499
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "transfer.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.013457693948815618,
+                "median": 0,
+                "p95": 0.09999990463256836,
+                "p99": 0.10000014305114746,
+                "max": 0.10000014305114746
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.6938244,
+                "median": 0.674666,
+                "p95": 0.803916,
+                "p99": 1.468458,
+                "max": 1.468458
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "blit.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.0019986672372837052,
+                "median": 0,
+                "p95": 0,
+                "p99": 0.09999990463256836,
+                "max": 0.10000014305114746
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.0782496,
+                "median": 0.0575,
+                "p95": 0.065125,
+                "p99": 0.603249,
+                "max": 0.603249
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "whole-stereo-application": {
+              "cpuMs": null,
+              "validGpuMs": {
+                "count": 25,
+                "mean": 2.46081116,
+                "median": 2.374749,
+                "p95": 3.045041,
+                "p99": 3.179416,
+                "max": 3.179416
+              },
+              "gpuStatuses": {
+                "valid": 25
+              }
+            }
+          },
+          "profileMetadata": {
+            "intervalMeaning": "application-command elapsed; not GPU busy time or compositor time",
+            "frameCount": 1984,
+            "droppedFrames": 0,
+            "droppedScopes": 0,
+            "validGpuSamples": 237,
+            "pending": 0,
+            "reasons": {},
+            "disposed": false,
+            "limits": {
+              "maxFrames": 4096,
+              "sampleEvery": 30,
+              "maxQueriesPerContext": 16,
+              "maxScopesPerFrame": 128
+            },
+            "contexts": [
+              {
+                "name": "renderer",
+                "supported": true,
+                "allocatedQueries": 2
+              },
+              {
+                "name": "xr",
+                "supported": true,
+                "allocatedQueries": 4
+              }
+            ],
+            "sampleBoundary": {
+              "startInclusive": 476,
+              "endExclusive": 1977,
+              "expectedFrames": 1501,
+              "retainedFrames": 1501,
+              "complete": true
+            },
+            "counterScope": "pending, validGpuSamples, dropped counts and reasons cover entire profile lifetime; frames filtered to sample"
+          },
+          "apiDelta": {
+            "allocationEventsEnabled": null,
+            "allocationTotals": {
+              "createBuffer": {
+                "calls": {
+                  "delta": 30,
+                  "perFrame": 0.019986675549633577
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 30,
+                  "perFrame": 0.019986675549633577
+                }
+              },
+              "bufferData": {
+                "calls": {
+                  "delta": 30,
+                  "perFrame": 0.019986675549633577
+                },
+                "knownBytes": {
+                  "delta": 3218604,
+                  "perFrame": 2144.306462358428
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationLabels": {
+              "createBuffer:unlabeled": {
+                "calls": {
+                  "delta": 30,
+                  "perFrame": 0.019986675549633577
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 30,
+                  "perFrame": 0.019986675549633577
+                }
+              },
+              "bufferData:unlabeled": {
+                "calls": {
+                  "delta": 30,
+                  "perFrame": 0.019986675549633577
+                },
+                "knownBytes": {
+                  "delta": 3218604,
+                  "perFrame": 2144.306462358428
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationEvents": null,
+            "allocationEventLimit": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "allocationEventOverflow": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "webgpu": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "instances": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "primitives": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "triangles": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {}
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createCommandEncoder": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "submit": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginRenderPass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginComputePass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "finish": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyBufferToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "resolveQuerySet": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroups": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroupsIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "draw": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexed": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexedIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "executeBundles": {
+                "delta": 0,
+                "perFrame": 0.0
+              }
+            },
+            "webgl": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 42028,
+                  "perFrame": 28.0
+                },
+                "instances": {
+                  "delta": 66044,
+                  "perFrame": 44.0
+                },
+                "primitives": {
+                  "delta": 15496324,
+                  "perFrame": 10324.0
+                },
+                "triangles": {
+                  "delta": 15496324,
+                  "perFrame": 10324.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {
+                  "triangle-list": {
+                    "delta": 15496324,
+                    "perFrame": 10324.0
+                  }
+                }
+              },
+              "indexShadow": {
+                "retainedBytes": {
+                  "delta": 2016,
+                  "perFrame": 1.3431045969353763
+                },
+                "byteLimit": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedBuffers": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedVaos": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "overflowEvents": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bindBuffer": {
+                "delta": 513492,
+                "perFrame": 342.0999333777482
+              },
+              "bindVertexArray": {
+                "delta": 3002,
+                "perFrame": 2.0
+              },
+              "bufferData": {
+                "delta": 30,
+                "perFrame": 0.019986675549633577
+              },
+              "bufferSubData": {
+                "delta": 9036,
+                "perFrame": 6.019986675549633
+              },
+              "copyBufferSubData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteBuffer": {
+                "delta": 30,
+                "perFrame": 0.019986675549633577
+              },
+              "deleteVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArrays": {
+                "delta": 6004,
+                "perFrame": 4.0
+              },
+              "drawArraysInstanced": {
+                "delta": 6004,
+                "perFrame": 4.0
+              },
+              "drawElements": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawElementsInstanced": {
+                "delta": 30020,
+                "perFrame": 20.0
+              },
+              "createBuffer": {
+                "delta": 30,
+                "perFrame": 0.019986675549633577
+              },
+              "createTexture": {
+                "delta": 18012,
+                "perFrame": 12.0
+              },
+              "createProgram": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createShader": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texSubImage2D": {
+                "delta": 3002,
+                "perFrame": 2.0
+              },
+              "createFramebuffer": {
+                "delta": 3002,
+                "perFrame": 2.0
+              },
+              "bindFramebuffer": {
+                "delta": 52535,
+                "perFrame": 35.0
+              },
+              "framebufferTexture2D": {
+                "delta": 102068,
+                "perFrame": 68.0
+              },
+              "useProgram": {
+                "delta": 57038,
+                "perFrame": 38.0
+              }
+            },
+            "webglContexts": null,
+            "errors": null
+          },
+          "settings": {
+            "sessionId": 1793231288544,
+            "resolutionScale": 1,
+            "frameRate": 72,
+            "supportedFrameRates": [
+              72
+            ],
+            "fixedFoveation": 0,
+            "antialias": false,
+            "layerKind": "XRWebGLLayer",
+            "presentation": "canvas-transfer",
+            "framebuffer": {
+              "width": 635,
+              "height": 328
+            },
+            "rendererContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "xrContextAttributes": {
+              "alpha": false,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "sharedContext": false,
+            "depth": false,
+            "eyeTargets": [
+              {
+                "eye": "left",
+                "width": 320,
+                "height": 320,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer canvas output"
+              },
+              {
+                "eye": "right",
+                "width": 304,
+                "height": 304,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer canvas output"
+              }
+            ],
+            "drawingBufferColorSpace": "srgb",
+            "enabledFeatures": []
+          }
+        },
+        {
+          "route": "shared-framebuffer",
+          "frames": 1502,
+          "scopes": {
+            "eye.left": {
+              "cpuMs": {
+                "count": 1502,
+                "mean": 1.0157123886634125,
+                "median": 1.1000001430511475,
+                "p95": 1.4000000953674316,
+                "p99": 1.6000001430511475,
+                "max": 1.9000000953674316
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.2028345999999999,
+                "median": 1.184625,
+                "p95": 1.311833,
+                "p99": 1.3315,
+                "max": 1.3315
+              },
+              "gpuStatuses": {
+                "not-sampled": 1477,
+                "valid": 25
+              }
+            },
+            "eye.right": {
+              "cpuMs": {
+                "count": 1502,
+                "mean": 0.5691744285956839,
+                "median": 0.5999999046325684,
+                "p95": 0.8000001907348633,
+                "p99": 0.9000000953674316,
+                "max": 1.0999999046325684
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.44696944,
+                "median": 1.447833,
+                "p95": 1.593624,
+                "p99": 1.612249,
+                "max": 1.612249
+              },
+              "gpuStatuses": {
+                "not-sampled": 1477,
+                "valid": 25
+              }
+            },
+            "present.stereo": {
+              "cpuMs": {
+                "count": 1502,
+                "mean": 1.4617842867593474,
+                "median": 1.4000000953674316,
+                "p95": 2.299999952316284,
+                "p99": 2.5,
+                "max": 3.700000047683716
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.8210328,
+                "median": 0.758375,
+                "p95": 1.2455,
+                "p99": 1.273583,
+                "max": 1.273583
+              },
+              "gpuStatuses": {
+                "not-sampled": 1477,
+                "valid": 25
+              }
+            },
+            "whole-stereo-application": {
+              "cpuMs": null,
+              "validGpuMs": {
+                "count": 25,
+                "mean": 3.42015288,
+                "median": 3.356708,
+                "p95": 3.811458,
+                "p99": 4.122458,
+                "max": 4.122458
+              },
+              "gpuStatuses": {
+                "valid": 25
+              }
+            }
+          },
+          "profileMetadata": {
+            "intervalMeaning": "application-command elapsed; not GPU busy time or compositor time",
+            "frameCount": 1987,
+            "droppedFrames": 0,
+            "droppedScopes": 0,
+            "validGpuSamples": 135,
+            "pending": 0,
+            "reasons": {},
+            "disposed": false,
+            "limits": {
+              "maxFrames": 4096,
+              "sampleEvery": 30,
+              "maxQueriesPerContext": 16,
+              "maxScopesPerFrame": 128
+            },
+            "contexts": [
+              {
+                "name": "renderer",
+                "supported": true,
+                "allocatedQueries": 3
+              }
+            ],
+            "sampleBoundary": {
+              "startInclusive": 477,
+              "endExclusive": 1979,
+              "expectedFrames": 1502,
+              "retainedFrames": 1502,
+              "complete": true
+            },
+            "counterScope": "pending, validGpuSamples, dropped counts and reasons cover entire profile lifetime; frames filtered to sample"
+          },
+          "apiDelta": {
+            "allocationEventsEnabled": null,
+            "allocationTotals": {
+              "createBuffer": {
+                "calls": {
+                  "delta": 36,
+                  "perFrame": 0.023968042609853527
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 36,
+                  "perFrame": 0.023968042609853527
+                }
+              },
+              "bufferData": {
+                "calls": {
+                  "delta": 36,
+                  "perFrame": 0.023968042609853527
+                },
+                "knownBytes": {
+                  "delta": 3864744,
+                  "perFrame": 2573.0652463382157
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationLabels": {
+              "createBuffer:unlabeled": {
+                "calls": {
+                  "delta": 36,
+                  "perFrame": 0.023968042609853527
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 36,
+                  "perFrame": 0.023968042609853527
+                }
+              },
+              "bufferData:unlabeled": {
+                "calls": {
+                  "delta": 36,
+                  "perFrame": 0.023968042609853527
+                },
+                "knownBytes": {
+                  "delta": 3864744,
+                  "perFrame": 2573.0652463382157
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationEvents": null,
+            "allocationEventLimit": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "allocationEventOverflow": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "webgpu": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "instances": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "primitives": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "triangles": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {}
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createCommandEncoder": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "submit": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginRenderPass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginComputePass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "finish": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyBufferToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "resolveQuerySet": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroups": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroupsIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "draw": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexed": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexedIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "executeBundles": {
+                "delta": 0,
+                "perFrame": 0.0
+              }
+            },
+            "webgl": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 39052,
+                  "perFrame": 26.0
+                },
+                "instances": {
+                  "delta": 63084,
+                  "perFrame": 42.0
+                },
+                "primitives": {
+                  "delta": 15503644,
+                  "perFrame": 10322.0
+                },
+                "triangles": {
+                  "delta": 15503644,
+                  "perFrame": 10322.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {
+                  "triangle-list": {
+                    "delta": 15503644,
+                    "perFrame": 10322.0
+                  }
+                }
+              },
+              "indexShadow": {
+                "retainedBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "byteLimit": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedBuffers": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedVaos": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "overflowEvents": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bindBuffer": {
+                "delta": 512362,
+                "perFrame": 341.11984021304926
+              },
+              "bindVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferData": {
+                "delta": 36,
+                "perFrame": 0.023968042609853527
+              },
+              "bufferSubData": {
+                "delta": 9048,
+                "perFrame": 6.023968042609853
+              },
+              "copyBufferSubData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteBuffer": {
+                "delta": 36,
+                "perFrame": 0.023968042609853527
+              },
+              "deleteVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArrays": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArraysInstanced": {
+                "delta": 9012,
+                "perFrame": 6.0
+              },
+              "drawElements": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawElementsInstanced": {
+                "delta": 30040,
+                "perFrame": 20.0
+              },
+              "createBuffer": {
+                "delta": 36,
+                "perFrame": 0.023968042609853527
+              },
+              "createTexture": {
+                "delta": 12016,
+                "perFrame": 8.0
+              },
+              "createProgram": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createShader": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texSubImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createFramebuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bindFramebuffer": {
+                "delta": 46562,
+                "perFrame": 31.0
+              },
+              "framebufferTexture2D": {
+                "delta": 112650,
+                "perFrame": 75.0
+              },
+              "useProgram": {
+                "delta": 51068,
+                "perFrame": 34.0
+              }
+            },
+            "webglContexts": null,
+            "errors": null
+          },
+          "settings": {
+            "sessionId": 1793231322970,
+            "resolutionScale": 1,
+            "frameRate": 72,
+            "supportedFrameRates": [
+              72
+            ],
+            "fixedFoveation": 0,
+            "antialias": false,
+            "layerKind": "XRWebGLLayer",
+            "presentation": "shared-framebuffer",
+            "framebuffer": {
+              "width": 635,
+              "height": 328
+            },
+            "rendererContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "xrContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "sharedContext": true,
+            "depth": false,
+            "eyeTargets": [
+              {
+                "eye": "left",
+                "width": 320,
+                "height": 320,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer-owned per-eye stage"
+              },
+              {
+                "eye": "right",
+                "width": 304,
+                "height": 304,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer-owned per-eye stage"
+              }
+            ],
+            "drawingBufferColorSpace": "srgb",
+            "enabledFeatures": []
+          }
+        }
+      ]
+    },
+    "diagnostic-rome-stress": {
+      "status": "PASS",
+      "runs": [
+        {
+          "route": "canvas-transfer",
+          "frames": 812,
+          "scopes": {
+            "eye.left": {
+              "cpuMs": {
+                "count": 812,
+                "mean": 14.097660103748584,
+                "median": 13.5,
+                "p95": 21.299999952316284,
+                "p99": 30.09999990463257,
+                "max": 46.39999985694885
+              },
+              "validGpuMs": {
+                "count": 13,
+                "mean": 56.819252692307685,
+                "median": 48.649917,
+                "p95": 94.784791,
+                "p99": 94.784791,
+                "max": 94.784791
+              },
+              "gpuStatuses": {
+                "not-sampled": 799,
+                "valid": 13
+              }
+            },
+            "transfer.left": {
+              "cpuMs": {
+                "count": 812,
+                "mean": 0.019704433497536946,
+                "median": 0.0,
+                "p95": 0.10000014305114746,
+                "p99": 0.10000014305114746,
+                "max": 0.20000004768371582
+              },
+              "validGpuMs": {
+                "count": 13,
+                "mean": 9.253804076923076,
+                "median": 10.726666,
+                "p95": 20.902958,
+                "p99": 20.902958,
+                "max": 20.902958
+              },
+              "gpuStatuses": {
+                "not-sampled": 799,
+                "valid": 13
+              }
+            },
+            "blit.left": {
+              "cpuMs": {
+                "count": 812,
+                "mean": 0.0028325128437850277,
+                "median": 0.0,
+                "p95": 0,
+                "p99": 0.10000014305114746,
+                "max": 0.10000014305114746
+              },
+              "validGpuMs": {
+                "count": 13,
+                "mean": 5.661406769230769,
+                "median": 8.756,
+                "p95": 10.44475,
+                "p99": 10.44475,
+                "max": 10.44475
+              },
+              "gpuStatuses": {
+                "not-sampled": 799,
+                "valid": 13
+              }
+            },
+            "eye.right": {
+              "cpuMs": {
+                "count": 812,
+                "mean": 16.22869457693523,
+                "median": 11.799999952316284,
+                "p95": 32.5,
+                "p99": 39.59999990463257,
+                "max": 41.09999990463257
+              },
+              "validGpuMs": {
+                "count": 13,
+                "mean": 39.02649615384615,
+                "median": 32.912458,
+                "p95": 68.074207,
+                "p99": 68.074207,
+                "max": 68.074207
+              },
+              "gpuStatuses": {
+                "not-sampled": 799,
+                "valid": 13
+              }
+            },
+            "transfer.right": {
+              "cpuMs": {
+                "count": 812,
+                "mean": 0.02068965070940591,
+                "median": 0.0,
+                "p95": 0.10000014305114746,
+                "p99": 0.10000014305114746,
+                "max": 0.19999980926513672
+              },
+              "validGpuMs": {
+                "count": 13,
+                "mean": 6.6411116923076925,
+                "median": 9.186208,
+                "p95": 10.936958,
+                "p99": 10.936958,
+                "max": 10.936958
+              },
+              "gpuStatuses": {
+                "not-sampled": 799,
+                "valid": 13
+              }
+            },
+            "blit.right": {
+              "cpuMs": {
+                "count": 812,
+                "mean": 0.0034482760969641174,
+                "median": 0.0,
+                "p95": 0,
+                "p99": 0.10000014305114746,
+                "max": 0.10000014305114746
+              },
+              "validGpuMs": {
+                "count": 13,
+                "mean": 6.847114692307692,
+                "median": 9.387624,
+                "p95": 11.355083,
+                "p99": 11.355083,
+                "max": 11.355083
+              },
+              "gpuStatuses": {
+                "not-sampled": 799,
+                "valid": 13
+              }
+            },
+            "whole-stereo-application": {
+              "cpuMs": null,
+              "validGpuMs": {
+                "count": 14,
+                "mean": 43.58781807142857,
+                "median": 44.277041499999996,
+                "p95": 60.9115,
+                "p99": 60.9115,
+                "max": 60.9115
+              },
+              "gpuStatuses": {
+                "valid": 14
+              }
+            }
+          },
+          "profileMetadata": {
+            "intervalMeaning": "application-command elapsed; not GPU busy time or compositor time",
+            "frameCount": 1069,
+            "droppedFrames": 0,
+            "droppedScopes": 0,
+            "validGpuSamples": 126,
+            "pending": 0,
+            "reasons": {},
+            "disposed": false,
+            "limits": {
+              "maxFrames": 4096,
+              "sampleEvery": 30,
+              "maxQueriesPerContext": 16,
+              "maxScopesPerFrame": 128
+            },
+            "contexts": [
+              {
+                "name": "renderer",
+                "supported": true,
+                "allocatedQueries": 2
+              },
+              {
+                "name": "xr",
+                "supported": true,
+                "allocatedQueries": 4
+              }
+            ],
+            "sampleBoundary": {
+              "startInclusive": 253,
+              "endExclusive": 1065,
+              "expectedFrames": 812,
+              "retainedFrames": 812,
+              "complete": true
+            },
+            "counterScope": "pending, validGpuSamples, dropped counts and reasons cover entire profile lifetime; frames filtered to sample"
+          },
+          "apiDelta": {
+            "allocationEventsEnabled": null,
+            "allocationTotals": {
+              "createBuffer": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationLabels": {
+              "createBuffer:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationEvents": null,
+            "allocationEventLimit": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "allocationEventOverflow": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "webgpu": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "instances": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "primitives": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "triangles": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {}
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createCommandEncoder": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "submit": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginRenderPass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginComputePass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "finish": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyBufferToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "resolveQuerySet": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroups": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroupsIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "draw": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexed": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexedIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "executeBundles": {
+                "delta": 0,
+                "perFrame": 0.0
+              }
+            },
+            "webgl": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 284200,
+                  "perFrame": 350.0
+                },
+                "instances": {
+                  "delta": 55769784,
+                  "perFrame": 68682.0
+                },
+                "primitives": {
+                  "delta": 17139330600,
+                  "perFrame": 21107550.0
+                },
+                "triangles": {
+                  "delta": 17139330600,
+                  "perFrame": 21107550.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {
+                  "triangle-list": {
+                    "delta": 17139330600,
+                    "perFrame": 21107550.0
+                  }
+                }
+              },
+              "indexShadow": {
+                "retainedBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "byteLimit": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedBuffers": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedVaos": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "overflowEvents": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bindBuffer": {
+                "delta": 1079960,
+                "perFrame": 1330.0
+              },
+              "bindVertexArray": {
+                "delta": 1624,
+                "perFrame": 2.0
+              },
+              "bufferData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferSubData": {
+                "delta": 3248,
+                "perFrame": 4.0
+              },
+              "copyBufferSubData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArrays": {
+                "delta": 3248,
+                "perFrame": 4.0
+              },
+              "drawArraysInstanced": {
+                "delta": 1624,
+                "perFrame": 2.0
+              },
+              "drawElements": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawElementsInstanced": {
+                "delta": 279328,
+                "perFrame": 344.0
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 6496,
+                "perFrame": 8.0
+              },
+              "createProgram": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createShader": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texSubImage2D": {
+                "delta": 1624,
+                "perFrame": 2.0
+              },
+              "createFramebuffer": {
+                "delta": 1624,
+                "perFrame": 2.0
+              },
+              "bindFramebuffer": {
+                "delta": 21924,
+                "perFrame": 27.0
+              },
+              "framebufferTexture2D": {
+                "delta": 35728,
+                "perFrame": 44.0
+              },
+              "useProgram": {
+                "delta": 25984,
+                "perFrame": 32.0
+              }
+            },
+            "webglContexts": null,
+            "errors": null
+          },
+          "settings": {
+            "sessionId": 1793231146473,
+            "resolutionScale": 1,
+            "frameRate": 72,
+            "supportedFrameRates": [
+              72
+            ],
+            "fixedFoveation": 0,
+            "antialias": false,
+            "layerKind": "XRWebGLLayer",
+            "presentation": "canvas-transfer",
+            "framebuffer": {
+              "width": 1915,
+              "height": 1016
+            },
+            "rendererContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "xrContextAttributes": {
+              "alpha": false,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "sharedContext": false,
+            "depth": false,
+            "eyeTargets": [
+              {
+                "eye": "left",
+                "width": 960,
+                "height": 1008,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer canvas output"
+              },
+              {
+                "eye": "right",
+                "width": 944,
+                "height": 992,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer canvas output"
+              }
+            ],
+            "drawingBufferColorSpace": "srgb",
+            "enabledFeatures": []
+          }
+        },
+        {
+          "route": "shared-framebuffer",
+          "frames": 1142,
+          "scopes": {
+            "eye.left": {
+              "cpuMs": {
+                "count": 1142,
+                "mean": 5.7418563910833385,
+                "median": 5.700000047683716,
+                "p95": 6.700000047683716,
+                "p99": 7.799999952316284,
+                "max": 10
+              },
+              "validGpuMs": {
+                "count": 18,
+                "mean": 264.5854508888889,
+                "median": 263.241541,
+                "p95": 289.397124,
+                "p99": 289.397124,
+                "max": 289.397124
+              },
+              "gpuStatuses": {
+                "not-sampled": 1123,
+                "valid": 18,
+                "pending": 1
+              }
+            },
+            "eye.right": {
+              "cpuMs": {
+                "count": 1142,
+                "mean": 4.621366024017334,
+                "median": 4.400000095367432,
+                "p95": 6.299999952316284,
+                "p99": 7.6000001430511475,
+                "max": 14
+              },
+              "validGpuMs": {
+                "count": 18,
+                "mean": 262.17942555555555,
+                "median": 263.666375,
+                "p95": 284.104875,
+                "p99": 284.104875,
+                "max": 284.104875
+              },
+              "gpuStatuses": {
+                "not-sampled": 1123,
+                "valid": 18,
+                "pending": 1
+              }
+            },
+            "present.stereo": {
+              "cpuMs": {
+                "count": 1142,
+                "mean": 10.793432572050813,
+                "median": 9.75,
+                "p95": 26.799999952316284,
+                "p99": 33,
+                "max": 39.299999952316284
+              },
+              "validGpuMs": {
+                "count": 18,
+                "mean": 29.779395222222224,
+                "median": 28.841937,
+                "p95": 44.017708,
+                "p99": 44.017708,
+                "max": 44.017708
+              },
+              "gpuStatuses": {
+                "not-sampled": 1123,
+                "valid": 18,
+                "pending": 1
+              }
+            },
+            "whole-stereo-application": {
+              "cpuMs": null,
+              "validGpuMs": {
+                "count": 19,
+                "mean": 538.5770587894737,
+                "median": 556.83675,
+                "p95": 609.048375,
+                "p99": 609.048375,
+                "max": 609.048375
+              },
+              "gpuStatuses": {
+                "valid": 19
+              }
+            }
+          },
+          "profileMetadata": {
+            "intervalMeaning": "application-command elapsed; not GPU busy time or compositor time",
+            "frameCount": 1522,
+            "droppedFrames": 0,
+            "droppedScopes": 0,
+            "validGpuSamples": 100,
+            "pending": 3,
+            "reasons": {},
+            "disposed": false,
+            "limits": {
+              "maxFrames": 4096,
+              "sampleEvery": 30,
+              "maxQueriesPerContext": 16,
+              "maxScopesPerFrame": 128
+            },
+            "contexts": [
+              {
+                "name": "renderer",
+                "supported": true,
+                "allocatedQueries": 3
+              }
+            ],
+            "sampleBoundary": {
+              "startInclusive": 373,
+              "endExclusive": 1515,
+              "expectedFrames": 1142,
+              "retainedFrames": 1142,
+              "complete": true
+            },
+            "counterScope": "pending, validGpuSamples, dropped counts and reasons cover entire profile lifetime; frames filtered to sample"
+          },
+          "apiDelta": {
+            "allocationEventsEnabled": null,
+            "allocationTotals": {
+              "createBuffer": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationLabels": {
+              "createBuffer:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationEvents": null,
+            "allocationEventLimit": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "allocationEventOverflow": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "webgpu": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "instances": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "primitives": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "triangles": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {}
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createCommandEncoder": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "submit": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginRenderPass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginComputePass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "finish": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyBufferToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "resolveQuerySet": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroups": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroupsIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "draw": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexed": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexedIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "executeBundles": {
+                "delta": 0,
+                "perFrame": 0.0
+              }
+            },
+            "webgl": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 397416,
+                  "perFrame": 348.0
+                },
+                "instances": {
+                  "delta": 78432560,
+                  "perFrame": 68680.0
+                },
+                "primitives": {
+                  "delta": 24104819816,
+                  "perFrame": 21107548.0
+                },
+                "triangles": {
+                  "delta": 24104819816,
+                  "perFrame": 21107548.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {
+                  "triangle-list": {
+                    "delta": 24104819816,
+                    "perFrame": 21107548.0
+                  }
+                }
+              },
+              "indexShadow": {
+                "retainedBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "byteLimit": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedBuffers": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedVaos": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "overflowEvents": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bindBuffer": {
+                "delta": 1517718,
+                "perFrame": 1329.0
+              },
+              "bindVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferSubData": {
+                "delta": 4568,
+                "perFrame": 4.0
+              },
+              "copyBufferSubData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArrays": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArraysInstanced": {
+                "delta": 4568,
+                "perFrame": 4.0
+              },
+              "drawElements": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawElementsInstanced": {
+                "delta": 392848,
+                "perFrame": 344.0
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 4568,
+                "perFrame": 4.0
+              },
+              "createProgram": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createShader": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texSubImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createFramebuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bindFramebuffer": {
+                "delta": 26266,
+                "perFrame": 23.0
+              },
+              "framebufferTexture2D": {
+                "delta": 58242,
+                "perFrame": 51.0
+              },
+              "useProgram": {
+                "delta": 31976,
+                "perFrame": 28.0
+              }
+            },
+            "webglContexts": null,
+            "errors": null
+          },
+          "settings": {
+            "sessionId": 1793231181714,
+            "resolutionScale": 1,
+            "frameRate": 72,
+            "supportedFrameRates": [
+              72
+            ],
+            "fixedFoveation": 0,
+            "antialias": false,
+            "layerKind": "XRWebGLLayer",
+            "presentation": "shared-framebuffer",
+            "framebuffer": {
+              "width": 1915,
+              "height": 1016
+            },
+            "rendererContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "xrContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "sharedContext": true,
+            "depth": false,
+            "eyeTargets": [
+              {
+                "eye": "left",
+                "width": 960,
+                "height": 1008,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer-owned per-eye stage"
+              },
+              {
+                "eye": "right",
+                "width": 944,
+                "height": 992,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer-owned per-eye stage"
+              }
+            ],
+            "drawingBufferColorSpace": "srgb",
+            "enabledFeatures": []
+          }
+        }
+      ]
+    },
+    "diagnostic-rome-symmetric": {
+      "status": "PASS",
+      "runs": [
+        {
+          "route": "canvas-transfer",
+          "frames": 1501,
+          "scopes": {
+            "eye.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 1.108860761304445,
+                "median": 1.2000000476837158,
+                "p95": 1.6000001430511475,
+                "p99": 2.299999952316284,
+                "max": 3.299999952316284
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 2.8369160399999998,
+                "median": 2.266208,
+                "p95": 6.862249,
+                "p99": 7.951916,
+                "max": 7.951916
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "transfer.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.03437707981691608,
+                "median": 0,
+                "p95": 0.10000014305114746,
+                "p99": 0.20000004768371582,
+                "max": 0.20000004768371582
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.2227162,
+                "median": 0.808791,
+                "p95": 2.966624,
+                "p99": 3.749958,
+                "max": 3.749958
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "blit.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.005662892358768471,
+                "median": 0,
+                "p95": 0.09999990463256836,
+                "p99": 0.10000014305114746,
+                "max": 0.20000004768371582
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.570061,
+                "median": 0.862499,
+                "p95": 4.429124,
+                "p99": 4.524916,
+                "max": 4.524916
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "eye.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.6972018651053716,
+                "median": 0.7000000476837158,
+                "p95": 1.1999998092651367,
+                "p99": 1.5999999046325684,
+                "max": 2.1000001430511475
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 3.6913712,
+                "median": 2.569541,
+                "p95": 8.343458,
+                "p99": 8.529166,
+                "max": 8.529166
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "transfer.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.021585609180620715,
+                "median": 0,
+                "p95": 0.10000014305114746,
+                "p99": 0.10000014305114746,
+                "max": 0.20000004768371582
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.65831288,
+                "median": 0.869958,
+                "p95": 4.440499,
+                "p99": 4.545791,
+                "max": 4.545791
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "blit.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.0036642241684458083,
+                "median": 0,
+                "p95": 0,
+                "p99": 0.10000014305114746,
+                "max": 0.10000014305114746
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.07351304,
+                "median": 0.063749,
+                "p95": 0.173125,
+                "p99": 0.189,
+                "max": 0.189
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "whole-stereo-application": {
+              "cpuMs": null,
+              "validGpuMs": {
+                "count": 25,
+                "mean": 5.74856952,
+                "median": 4.298916,
+                "p95": 16.118458,
+                "p99": 16.164291,
+                "max": 16.164291
+              },
+              "gpuStatuses": {
+                "valid": 25
+              }
+            }
+          },
+          "profileMetadata": {
+            "intervalMeaning": "application-command elapsed; not GPU busy time or compositor time",
+            "frameCount": 1986,
+            "droppedFrames": 0,
+            "droppedScopes": 0,
+            "validGpuSamples": 237,
+            "pending": 0,
+            "reasons": {},
+            "disposed": false,
+            "limits": {
+              "maxFrames": 4096,
+              "sampleEvery": 30,
+              "maxQueriesPerContext": 16,
+              "maxScopesPerFrame": 128
+            },
+            "contexts": [
+              {
+                "name": "renderer",
+                "supported": true,
+                "allocatedQueries": 2
+              },
+              {
+                "name": "xr",
+                "supported": true,
+                "allocatedQueries": 4
+              }
+            ],
+            "sampleBoundary": {
+              "startInclusive": 478,
+              "endExclusive": 1979,
+              "expectedFrames": 1501,
+              "retainedFrames": 1501,
+              "complete": true
+            },
+            "counterScope": "pending, validGpuSamples, dropped counts and reasons cover entire profile lifetime; frames filtered to sample"
+          },
+          "apiDelta": {
+            "allocationEventsEnabled": null,
+            "allocationTotals": {
+              "createBuffer": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationLabels": {
+              "createBuffer:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationEvents": null,
+            "allocationEventLimit": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "allocationEventOverflow": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "webgpu": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "instances": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "primitives": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "triangles": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {}
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createCommandEncoder": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "submit": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginRenderPass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginComputePass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "finish": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyBufferToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "resolveQuerySet": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroups": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroupsIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "draw": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexed": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexedIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "executeBundles": {
+                "delta": 0,
+                "perFrame": 0.0
+              }
+            },
+            "webgl": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 123082,
+                  "perFrame": 82.0
+                },
+                "instances": {
+                  "delta": 123082,
+                  "perFrame": 82.0
+                },
+                "primitives": {
+                  "delta": 201587302,
+                  "perFrame": 134302.0
+                },
+                "triangles": {
+                  "delta": 201587302,
+                  "perFrame": 134302.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {
+                  "triangle-list": {
+                    "delta": 201587302,
+                    "perFrame": 134302.0
+                  }
+                }
+              },
+              "indexShadow": {
+                "retainedBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "byteLimit": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedBuffers": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedVaos": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "overflowEvents": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bindBuffer": {
+                "delta": 387258,
+                "perFrame": 258.0
+              },
+              "bindVertexArray": {
+                "delta": 3002,
+                "perFrame": 2.0
+              },
+              "bufferData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferSubData": {
+                "delta": 6004,
+                "perFrame": 4.0
+              },
+              "copyBufferSubData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArrays": {
+                "delta": 6004,
+                "perFrame": 4.0
+              },
+              "drawArraysInstanced": {
+                "delta": 3002,
+                "perFrame": 2.0
+              },
+              "drawElements": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawElementsInstanced": {
+                "delta": 114076,
+                "perFrame": 76.0
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createProgram": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createShader": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texSubImage2D": {
+                "delta": 3002,
+                "perFrame": 2.0
+              },
+              "createFramebuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bindFramebuffer": {
+                "delta": 37525,
+                "perFrame": 25.0
+              },
+              "framebufferTexture2D": {
+                "delta": 63042,
+                "perFrame": 42.0
+              },
+              "useProgram": {
+                "delta": 45030,
+                "perFrame": 30.0
+              }
+            },
+            "webglContexts": null,
+            "errors": null
+          },
+          "settings": {
+            "sessionId": 1793231218478,
+            "resolutionScale": 1,
+            "frameRate": 72,
+            "supportedFrameRates": [
+              72
+            ],
+            "fixedFoveation": 0,
+            "antialias": false,
+            "layerKind": "XRWebGLLayer",
+            "presentation": "canvas-transfer",
+            "framebuffer": {
+              "width": 640,
+              "height": 320
+            },
+            "rendererContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "xrContextAttributes": {
+              "alpha": false,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "sharedContext": false,
+            "depth": false,
+            "eyeTargets": [
+              {
+                "eye": "left",
+                "width": 320,
+                "height": 320,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer canvas output"
+              },
+              {
+                "eye": "right",
+                "width": 320,
+                "height": 320,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer canvas output"
+              }
+            ],
+            "drawingBufferColorSpace": "srgb",
+            "enabledFeatures": []
+          }
+        },
+        {
+          "route": "shared-framebuffer",
+          "frames": 1501,
+          "scopes": {
+            "eye.left": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 1.011325783764498,
+                "median": 1.1000001430511475,
+                "p95": 1.4000000953674316,
+                "p99": 1.9000000953674316,
+                "max": 2.5999999046325684
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.28020624,
+                "median": 1.23775,
+                "p95": 1.778791,
+                "p99": 1.813416,
+                "max": 1.813416
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "eye.right": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 0.6205862758161226,
+                "median": 0.6000001430511475,
+                "p95": 1.2000000476837158,
+                "p99": 2,
+                "max": 2.8000001907348633
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 1.72396116,
+                "median": 1.754708,
+                "p95": 1.950541,
+                "p99": 2.558166,
+                "max": 2.558166
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "present.stereo": {
+              "cpuMs": {
+                "count": 1501,
+                "mean": 1.1268487680283965,
+                "median": 1,
+                "p95": 2.1000001430511475,
+                "p99": 2.799999952316284,
+                "max": 3.3999998569488525
+              },
+              "validGpuMs": {
+                "count": 25,
+                "mean": 0.9537062000000001,
+                "median": 0.812,
+                "p95": 1.827166,
+                "p99": 3.188041,
+                "max": 3.188041
+              },
+              "gpuStatuses": {
+                "not-sampled": 1476,
+                "valid": 25
+              }
+            },
+            "whole-stereo-application": {
+              "cpuMs": null,
+              "validGpuMs": {
+                "count": 25,
+                "mean": 3.74831792,
+                "median": 3.608833,
+                "p95": 4.142416,
+                "p99": 6.836208,
+                "max": 6.836208
+              },
+              "gpuStatuses": {
+                "valid": 25
+              }
+            }
+          },
+          "profileMetadata": {
+            "intervalMeaning": "application-command elapsed; not GPU busy time or compositor time",
+            "frameCount": 1985,
+            "droppedFrames": 0,
+            "droppedScopes": 0,
+            "validGpuSamples": 135,
+            "pending": 0,
+            "reasons": {},
+            "disposed": false,
+            "limits": {
+              "maxFrames": 4096,
+              "sampleEvery": 30,
+              "maxQueriesPerContext": 16,
+              "maxScopesPerFrame": 128
+            },
+            "contexts": [
+              {
+                "name": "renderer",
+                "supported": true,
+                "allocatedQueries": 3
+              }
+            ],
+            "sampleBoundary": {
+              "startInclusive": 477,
+              "endExclusive": 1978,
+              "expectedFrames": 1501,
+              "retainedFrames": 1501,
+              "complete": true
+            },
+            "counterScope": "pending, validGpuSamples, dropped counts and reasons cover entire profile lifetime; frames filtered to sample"
+          },
+          "apiDelta": {
+            "allocationEventsEnabled": null,
+            "allocationTotals": {
+              "createBuffer": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationLabels": {
+              "createBuffer:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bufferData:unlabeled": {
+                "calls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "knownBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "unknownSizeCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              }
+            },
+            "allocationEvents": null,
+            "allocationEventLimit": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "allocationEventOverflow": {
+              "delta": 0,
+              "perFrame": 0.0
+            },
+            "webgpu": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "instances": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "primitives": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "triangles": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {}
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createComputePipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createCommandEncoder": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createRenderPipelineAsync": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "writeTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "submit": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginRenderPass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "beginComputePass": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "finish": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyBufferToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "copyTextureToBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "resolveQuerySet": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroups": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "dispatchWorkgroupsIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setPipeline": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "setBindGroup": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "draw": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexed": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawIndexedIndirect": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "executeBundles": {
+                "delta": 0,
+                "perFrame": 0.0
+              }
+            },
+            "webgl": {
+              "submitted": {
+                "drawCalls": {
+                  "delta": 120080,
+                  "perFrame": 80.0
+                },
+                "instances": {
+                  "delta": 120080,
+                  "perFrame": 80.0
+                },
+                "primitives": {
+                  "delta": 201584300,
+                  "perFrame": 134300.0
+                },
+                "triangles": {
+                  "delta": 201584300,
+                  "perFrame": 134300.0
+                },
+                "lines": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "points": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "complete": null,
+                "incompleteReasons": null,
+                "topologies": {
+                  "triangle-list": {
+                    "delta": 201584300,
+                    "perFrame": 134300.0
+                  }
+                }
+              },
+              "indexShadow": {
+                "retainedBytes": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "byteLimit": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedBuffers": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "trackedVaos": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                },
+                "overflowEvents": {
+                  "delta": 0,
+                  "perFrame": 0.0
+                }
+              },
+              "bindBuffer": {
+                "delta": 385757,
+                "perFrame": 257.0
+              },
+              "bindVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bufferSubData": {
+                "delta": 6004,
+                "perFrame": 4.0
+              },
+              "copyBufferSubData": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "deleteVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArrays": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawArraysInstanced": {
+                "delta": 6004,
+                "perFrame": 4.0
+              },
+              "drawElements": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "drawElementsInstanced": {
+                "delta": 114076,
+                "perFrame": 76.0
+              },
+              "createBuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createTexture": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createProgram": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createShader": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createVertexArray": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "texSubImage2D": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "createFramebuffer": {
+                "delta": 0,
+                "perFrame": 0.0
+              },
+              "bindFramebuffer": {
+                "delta": 34523,
+                "perFrame": 23.0
+              },
+              "framebufferTexture2D": {
+                "delta": 76551,
+                "perFrame": 51.0
+              },
+              "useProgram": {
+                "delta": 39026,
+                "perFrame": 26.0
+              }
+            },
+            "webglContexts": null,
+            "errors": null
+          },
+          "settings": {
+            "sessionId": 1793231253014,
+            "resolutionScale": 1,
+            "frameRate": 72,
+            "supportedFrameRates": [
+              72
+            ],
+            "fixedFoveation": 0,
+            "antialias": false,
+            "layerKind": "XRWebGLLayer",
+            "presentation": "shared-framebuffer",
+            "framebuffer": {
+              "width": 640,
+              "height": 320
+            },
+            "rendererContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "xrContextAttributes": {
+              "alpha": true,
+              "antialias": false,
+              "depth": true,
+              "desynchronized": false,
+              "failIfMajorPerformanceCaveat": false,
+              "powerPreference": "default",
+              "premultipliedAlpha": true,
+              "preserveDrawingBuffer": false,
+              "stencil": false,
+              "xrCompatible": false
+            },
+            "sharedContext": true,
+            "depth": false,
+            "eyeTargets": [
+              {
+                "eye": "left",
+                "width": 320,
+                "height": 320,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer-owned per-eye stage"
+              },
+              {
+                "eye": "right",
+                "width": 320,
+                "height": 320,
+                "colorFormat": "rgba8unorm-srgb",
+                "depthFormat": "depth32float",
+                "sampleCount": 1,
+                "ownership": "renderer-owned per-eye stage"
+              }
+            ],
+            "drawingBufferColorSpace": "srgb",
+            "enabledFeatures": []
+          }
+        }
+      ]
+    }
+  },
+  "power": [
+    {
+      "case": "neon",
+      "id": "pair-1-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:38:51.489Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:39:25.874Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "neon",
+      "id": "pair-1-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:39:25.920Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:40:00.114Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "neon",
+      "id": "pair-2-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:40:00.158Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:40:34.366Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "neon",
+      "id": "pair-2-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:40:34.402Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:41:08.592Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "neon",
+      "id": "pair-3-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:41:08.640Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:41:42.857Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "neon",
+      "id": "pair-3-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:41:42.900Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:42:17.125Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:37 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-ordinary",
+      "id": "pair-1-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:31:50.532Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:08 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:32:25.081Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:08 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-ordinary",
+      "id": "pair-1-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:32:25.127Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:08 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:32:59.383Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:05 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-ordinary",
+      "id": "pair-2-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:32:59.430Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:05 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:33:33.698Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:05 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-ordinary",
+      "id": "pair-2-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:33:33.742Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:05 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:34:08.030Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-ordinary",
+      "id": "pair-3-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:34:08.076Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:34:42.345Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-ordinary",
+      "id": "pair-3-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:34:42.388Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:35:16.682Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-stress",
+      "id": "pair-1-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:35:17.928Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t49%; discharging; 3:17 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:35:53.088Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t48%; discharging; 3:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-stress",
+      "id": "pair-1-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:35:53.196Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t48%; discharging; 3:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:36:28.625Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t47%; discharging; 2:47 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-stress",
+      "id": "pair-2-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:36:28.737Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t47%; discharging; 2:47 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:37:04.180Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t47%; discharging; 2:47 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-stress",
+      "id": "pair-2-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:37:04.222Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t47%; discharging; 2:47 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:37:39.302Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t46%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-stress",
+      "id": "pair-3-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:37:39.376Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t46%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:38:14.370Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t46%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-stress",
+      "id": "pair-3-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:38:14.410Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t46%; discharging; 2:27 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:38:49.887Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:07 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-symmetric",
+      "id": "pair-1-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:42:18.203Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:37 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:42:52.525Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:47 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-symmetric",
+      "id": "pair-1-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:42:52.568Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t45%; discharging; 2:47 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:43:26.879Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 2:50 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-symmetric",
+      "id": "pair-2-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:43:26.921Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 2:50 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:44:01.153Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:00 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-symmetric",
+      "id": "pair-2-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:44:01.197Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:00 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:44:35.492Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:00 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-symmetric",
+      "id": "pair-3-canvas-transfer",
+      "before": {
+        "at": "2026-10-28T23:44:35.549Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:00 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:45:09.828Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:10 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "case": "rome-symmetric",
+      "id": "pair-3-shared-framebuffer",
+      "before": {
+        "at": "2026-10-28T23:45:09.866Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:10 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "after": {
+        "at": "2026-10-28T23:45:44.166Z",
+        "command": "pmset -g batt; pmset -g therm",
+        "battery": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=23593059)\t44%; discharging; 3:10 remaining present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    }
+  ],
+  "failures": [
+    {
+      "path": "pilot-rome-ordinary/report.json",
+      "errors": [
+        "Error: Runtime error or resource failure\n    at file:///private/tmp/rust-next-render-cycle-8/scripts/benchmark-xr-presentation.mjs:118:137"
+      ]
+    }
+  ]
+}

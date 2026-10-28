@@ -30,3 +30,5 @@ pub mod xr_present;
 
 pub mod graph_probe;
 mod view_uniforms;
+
+pub mod xr_gl_output;

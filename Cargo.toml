@@ -25,6 +25,8 @@ wgpu = { version = "30.0.1", default-features = false, features = ["std", "webgp
 console_error_panic_hook = "0.1"
 web-sys = { version = "0.3", features = [
     "HtmlCanvasElement",
+    "WebGl2RenderingContext",
+    "WebGlFramebuffer",
     "Window",
     "Document",
     "console",

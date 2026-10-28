@@ -403,3 +403,51 @@ Pravidelný test používá i nečtvercové oko 192×208.
 Podklad: [WebXR WebGPU binding – synchronizace posledního submitu](https://github.com/immersive-web/webxr-webgpu-binding/blob/main/index.bs).
 Více submitů je podle specifikace platných; tento workaround omezuje aplikační
 závislost na této cestě, sám o sobě nedokazuje chybu prohlížeče.
+
+## Volitelný prototyp WebGL se společným kontextem (dávka8)
+
+Výchozí `engine.xr.enter()` používá původní `canvas-transfer`. Nová cesta je
+výhradně explicitní:
+
+```js
+await engine.xr.enter({webglPresentation:'shared-framebuffer'});
+// Samostatný diagnostický běh, nikoli čistý benchmark:
+// await engine.xr.enter({webglPresentation:'shared-framebuffer',presentationDiagnostics:true});
+// engine.xr.presentationMode; engine.xr.presentationProfile;
+```
+
+Platí pouze pro backend WebGL. Připnuté wgpu/hal30.0.1 veřejně zpřístupňuje
+vlastní GL kontext a render-only `ExternalFramebuffer` import. XRWebGLLayer
+vzniká na stejném kontextu; Rust vykreslí obě oči do vlastních oddělených
+sRGB/depth cílů a jediným backendem řízeným průchodem je přenese do aktuálního
+XR framebufferu. Odpadá mezikontextový `texSubImage2D(canvas)` i prezentace
+rendererového canvasu. Zůstává finální stereo copy a náklady skutečného renderingu.
+Vyžaduje skutečně jednovzorkový kontext i vrstvu. XR vrstva má `alpha:false`,
+`depth:false`, `antialias:false`; interní hloubka/postprocessing zůstávají.
+
+Cizí framebuffer se nesampluje, nemaže ani se nemění jeho attachmenty. Jeho
+wrapper žije jen po dobu aktuálního XR callbacku. Stav GL obnovuje wgpu backend,
+nikoli nahodilé JS bindování. Opačná osa Y, barvy/sRGB, alpha, asymetrické
+viewporty a efekty mají nezávislý pixelový test proti původní cestě.
+`firstframe`/`performance` obsahují skutečné rozměry očí/cílů a vrstvy,
+AA, foveaci a dostupnou obnovovací frekvenci; chybějící hodnoty jsou `null`.
+
+Při chybě capability probe host ohlásí `presentationfallback` a ponechá původní
+cestu. Neplatné skutečné AA nebo runtime import relaci bezpečně ukončí; uživatel
+může znovu zvolit původní cestu. Cleanup nikdy záměrně neztratí sdílený kontext.
+Skutečná ztráta rendererového kontextu vyžaduje `engine.dispose()` a novou
+inicializaci; automatická obnova wgpu prostředků zatím není součástí prototypu.
+Ztráta soukromého XR kontextu zachovává renderer pro desktop.
+
+`presentationDiagnostics` uchovává omezené CPU historie a asynchronní platné
+EXT timer queries. Odděluje render oka, canvas transfer, blit/present a celý
+stereo aplikační interval; nedostupné/disjoint/invalid výsledky nejsou nuly.
+CPU délka uploadu není úplná GPU cena a stereo query není čas kompozitoru.
+Čisté výkonové běhy mají obě profilování vypnutá.
+
+Ověření: `node scripts/test-browser.mjs --backend webgl --page xr-gl-presentation,rim-gameplay-gl-shared --capture`.
+Nový benchmark `scripts/benchmark-xr-presentation.mjs` sdílí frozen server,
+statistiky, browser flags a cleanup s udržovaným performance runnerem.
+[Protokol a omezení](performance/next-render-cycle/batch-8/PROTOCOL.md).
+Simulované XR na desktopu nepotvrzuje výkon ani komfort fyzického Questu;
+prototyp se proto automaticky nezapíná. WebGPU staging/final submit se nemění.

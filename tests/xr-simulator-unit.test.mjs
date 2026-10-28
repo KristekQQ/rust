@@ -103,7 +103,9 @@ test('XR host reuses eye storage and provides optional contact-onset and cut hap
         await host.exit();assert.equal(sim.session.pendingFrameCount,0);assert.equal(canvas.width,640);assert.equal(canvas.height,480);
         for(const {texture} of uploads.slice(0,2))assert.equal(deleted.filter(value=>value===texture).length,1);
         // A new session must allocate fresh storage; stale size caches cannot survive disposal.
-        await host.enter();sim.frame();assert.equal(allocations.length-layerAllocations,6);
+        const fallbacks=[];host.addEventListener('presentationfallback',event=>fallbacks.push(event.detail));
+        await host.enter({webglPresentation:'shared-framebuffer'});sim.frame();assert.equal(allocations.length-layerAllocations,6);
+        assert.equal(host.presentationMode,'canvas-transfer');assert.equal(fallbacks.length,1);assert.match(fallbacks[0].reason,/interop/);
         const fresh=uploads.slice(-2).map(upload=>upload.texture);host.dispose();host.dispose();
         for(const texture of fresh)assert.equal(deleted.filter(value=>value===texture).length,1);
         assert.equal(sim.session.pendingFrameCount,0);
@@ -344,3 +346,16 @@ test('combo display binding forwards only handles and configuration to Rust',()=
     assert.throws(()=>host.configureComboDisplay({...options,awardPanels:awards.slice(1)}),/tomuto enginu/);
     host.clearComboDisplay();assert.equal(calls.at(-1),'clear');
 });
+
+
+test('asymmetric XR viewport profile validates dimensions before session creation',()=>environment(async()=>{
+    for(const viewports of [[],[{x:0,y:0,width:0,height:20},{x:20,y:0,width:20,height:20}],
+        [{x:-1,y:0,width:20,height:20},{x:20,y:0,width:20,height:20}],
+        [{x:0,y:0,width:20.5,height:20},{x:20,y:0,width:20,height:20}]]) {
+        assert.throws(()=>installXRSimulator({profile:{viewports}}),/Invalid XR viewports/);
+    }
+    const viewports=[{x:0,y:8,width:192,height:208},{x:203,y:0,width:176,height:192}];
+    const sim=installXRSimulator({profile:{viewports},clockTimers:false});
+    try{assert.deepEqual(sim.profile.viewports,viewports);await navigator.xr.requestSession('immersive-vr');sim.frame();assert.equal(sim.session.frameRate,72);}
+    finally{sim.dispose();}
+}));

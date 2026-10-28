@@ -406,7 +406,10 @@ export interface WebXRHost extends EventTarget {
     readonly lastError?: unknown;
     isSupported(): Promise<boolean>;
     /** Call directly from a click. Requires WebGL backend and secure context. */
-    enter(options?: {resolutionScale?:number}): Promise<void>;
+    enter(options?: {resolutionScale?:number;webglPresentation?:'canvas-transfer'|'shared-framebuffer';presentationDiagnostics?:boolean}): Promise<void>;
+    /** Opt-in bounded WebGL-only CPU/query diagnostics; application intervals, not GPU busy/compositor time. */
+    readonly presentationProfile: unknown|null;
+    readonly presentationMode: 'canvas-transfer'|'shared-framebuffer'|'webgpu';
     exit(): Promise<void>;
     dispose(): void;
 }

@@ -27,6 +27,7 @@ pub struct State {
     postprocess: PostProcessor,
     xr_depth_resolve: Option<super::depth_resolve::DepthResolve>,
     xr_present: Option<super::xr_present::XrPresent>,
+    xr_gl_present: Option<super::xr_gl_output::GlXrOutput>,
     environment: Option<super::environment::EnvironmentProbe>,
     background: wgpu::Color,
     pub backend: String,
@@ -88,6 +89,7 @@ impl State {
             postprocess,
             xr_depth_resolve: None,
             xr_present: None,
+            xr_gl_present: None,
             environment: None,
             background: wgpu::Color {
                 r: 0.1,
@@ -742,6 +744,9 @@ impl State {
         if let Some(present) = &mut self.xr_present {
             present.reset_frame();
         }
+        if let Some(present) = &mut self.xr_gl_present {
+            present.reset_frame();
+        }
         super::profiler::begin_frame();
         if let Some(display) = &mut self.combo_display {
             display.advance(&mut self.renderer.scene, dt);
@@ -774,6 +779,66 @@ impl State {
     }
     pub fn render(&mut self) -> Result<(), JsValue> {
         self.render_to(None, true)
+    }
+    pub fn xr_gl_context(&self) -> Result<JsValue, JsValue> {
+        if self.backend != "Gl" || self.output.color_format() != wgpu::TextureFormat::Rgba8UnormSrgb
+        {
+            return Err(JsValue::from_str(
+                "Shared XR requires the WebGL RGBA8 sRGB renderer",
+            ));
+        }
+        Ok(super::xr_gl_output::context(&self.renderer.device)?.into())
+    }
+    pub fn release_xr_gl(&mut self) {
+        self.xr_gl_present = None;
+    }
+    pub fn render_xr_gl_eye(
+        &mut self,
+        matrix: Mat4,
+        position: Vec3,
+        index: usize,
+        width: u32,
+        height: u32,
+    ) -> Result<(), JsValue> {
+        self.xr_gl_context()?;
+        if index >= 2 || index != self.xr_eye_count as usize {
+            return Err(JsValue::from_str("Invalid WebGL XR eye order"));
+        }
+        self.xr_view_slot = index as u32 + 1;
+        self.xr_eye_count += 1;
+        let mut present = self
+            .xr_gl_present
+            .take()
+            .unwrap_or_else(|| super::xr_gl_output::GlXrOutput::new(&self.renderer.device));
+        let result = (|| {
+            present.ensure_eye(&self.renderer.device, index, width, height)?;
+            self.render_xr_gpu_eye(matrix, position, &present.target(index), false)?;
+            present.mark_ready(index);
+            Ok(())
+        })();
+        self.xr_gl_present = Some(present);
+        result
+    }
+    pub fn present_xr_gl(
+        &mut self,
+        framebuffer: JsValue,
+        width: u32,
+        height: u32,
+        viewports: &[super::target::Viewport],
+    ) -> Result<(), JsValue> {
+        let present = self
+            .xr_gl_present
+            .as_mut()
+            .ok_or_else(|| JsValue::from_str("WebGL XR eyes not staged"))?;
+        self.renderer.draw_calls += present.present(
+            &self.renderer.device,
+            &self.renderer.queue,
+            framebuffer,
+            width,
+            height,
+            viewports,
+        )?;
+        Ok(())
     }
     pub fn xr_gpu_supported(&self) -> bool {
         self.output.xr_compatible

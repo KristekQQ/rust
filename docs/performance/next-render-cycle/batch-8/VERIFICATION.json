@@ -1,0 +1,44 @@
+{
+  "projectGate": {
+    "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+    "passed": true,
+    "nativePassed": 428,
+    "nativeIgnoredManualTiming": 2,
+    "browserPassed": 149,
+    "browserFailed": 0,
+    "sdkPassed": 32,
+    "xrPlatformPassed": 71,
+    "harnessNodePassed": 13,
+    "harnessPythonPassed": [
+      2,
+      11
+    ],
+    "types": "PASS",
+    "strictWasmClippy": "PASS",
+    "wasmBuild": "matching release reused by gate; prototype release compiled twice earlier",
+    "receiptCheck": "PASS reused: all  (unchanged inputs)",
+    "sandboxDisabled": false
+  },
+  "build": {
+    "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+    "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+    "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "correctness": {
+    "exactPrimaryStereoPairs": 12,
+    "exactDiagnosticStereoPairs": 3,
+    "independentPixelStates": 6,
+    "sharedRouteActualRimWorkerCut": true,
+    "contextLossAndFreshReinitialization": true,
+    "opaqueAttachmentGuards": true,
+    "webgpuXrOutputAndPresentFilesUnchanged": true
+  },
+  "independentReview": "scoped source inspection; no additional material findings",
+  "evidenceBoundary": "desktop/simulated XR only; physical Quest, compositor performance, CI, deployment and push not established"
+}

@@ -1,0 +1,92 @@
+{
+  "batch": 8,
+  "date": "2026-10-29",
+  "status": "complete locally; explicit opt-in prototype; stop before9",
+  "checkout": "/private/tmp/rust-next-render-cycle-8",
+  "branch": "codex/next-render-cycle-8",
+  "parent": "0711e024e48fc61b418831cd645aee92b27677ba",
+  "baseline": {
+    "source": "da7117cc33917296e0a73bd94007b3e73c7a882e744a8dc2e8b7c09b6a447715",
+    "wasm": "a5ada8fb48ad0fddbc457a7a251f2743d52e262ca988eec5ba672f2c3449ea22",
+    "root": "output/next-render-cycle-8/baseline"
+  },
+  "backend": {
+    "wgpu": "30.0.1",
+    "wgpu-core": "30.0.1",
+    "wgpu-hal": "30.0.1",
+    "wgpu-types": "30.0.1",
+    "api": "public GLES ExternalFramebuffer import"
+  },
+  "default": "canvas-transfer",
+  "candidate": {
+    "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+    "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+    "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+    "root": "output/next-render-cycle-8/candidate"
+  },
+  "evidence": "desktop simulated XR only; no physical Quest",
+  "publication": false,
+  "measurementRuntime": "same candidate frozen WASM/SDK for both routes; current common harness identity recorded per run",
+  "fixedWorkloads": [
+    {
+      "name": "rome-ordinary",
+      "load": 0,
+      "eyeWidth": 320,
+      "eyeHeight": 320,
+      "asymmetric": true
+    },
+    {
+      "name": "rome-stress",
+      "load": 512,
+      "eyeWidth": 960,
+      "eyeHeight": 1008,
+      "asymmetric": true
+    },
+    {
+      "name": "neon",
+      "load": 0,
+      "eyeWidth": 320,
+      "eyeHeight": 320,
+      "asymmetric": true
+    },
+    {
+      "name": "rome-symmetric",
+      "load": 0,
+      "eyeWidth": 320,
+      "eyeHeight": 320,
+      "asymmetric": false
+    }
+  ],
+  "measurement": {
+    "primaryRuns": 24,
+    "primaryFrames": 32856,
+    "diagnosticRuns": 6,
+    "diagnosticFrames": 7959,
+    "exactPrimaryPairs": 12,
+    "exactDiagnosticPairs": 3,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "order": "AB/BA/AB",
+    "cleanQueryCalls": 0,
+    "browser": "Chrome/156.0.8078.48",
+    "gpu": "ANGLE Metal Apple M1",
+    "physicalHeadset": false,
+    "gpuBusyMs": null,
+    "gpuBusyReason": "Elapsed query intervals include scheduling; cross-context whole interval not complete stereo; stress intervals surprising and not attributed to shader execution",
+    "defaultChangeAccepted": false,
+    "symmetricCpuRegression": true
+  },
+  "verification": "VERIFICATION.json",
+  "results": "RESULTS.json",
+  "archive": "ARCHIVE.json",
+  "archiveIdentity": {
+    "path": "docs/performance/next-render-cycle/batch-8/evidence.tar.gz",
+    "sha256": "de7e632e5569d1448d2797c5a9b2e465f7768a85c2e0f3c6800d7bc9592517ec",
+    "bytes": 19097395,
+    "indexedFiles": 297,
+    "storedUniqueContents": 250,
+    "logicalBytes": 126122570,
+    "entriesVerified": true,
+    "scope": "all run records/captures, retained failures, actually served primary/diagnostic runtime/harness bytes, both pkg snapshots/manifests, gate logs; transient pilot harness hashes preserved in raw reports; deduplicated INDEX aliases; no nested historical archives"
+  }
+}

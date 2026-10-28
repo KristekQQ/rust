@@ -1,0 +1,10 @@
+{
+  "path": "docs/performance/next-render-cycle/batch-8/evidence.tar.gz",
+  "sha256": "de7e632e5569d1448d2797c5a9b2e465f7768a85c2e0f3c6800d7bc9592517ec",
+  "bytes": 19097395,
+  "indexedFiles": 297,
+  "storedUniqueContents": 250,
+  "logicalBytes": 126122570,
+  "entriesVerified": true,
+  "scope": "all run records/captures, retained failures, actually served primary/diagnostic runtime/harness bytes, both pkg snapshots/manifests, gate logs; transient pilot harness hashes preserved in raw reports; deduplicated INDEX aliases; no nested historical archives"
+}

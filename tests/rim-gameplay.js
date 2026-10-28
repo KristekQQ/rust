@@ -17,6 +17,7 @@ const run=new XRTestRun('rim-gameplay',sim,publishXRReport);let engine,stop,info
 const browserRAF=window.requestAnimationFrame;let documentRAFCalls=0;
 const testXR=engine=>new URLSearchParams(location.search).has('omitXRHook')?{get isPresenting(){return engine.xr.isPresenting;},addEventListener:(name,fn)=>{if(name!=='frame')engine.xr.addEventListener(name,fn);},removeEventListener:(name,fn)=>engine.xr.removeEventListener(name,fn)}:engine.xr;
 const measureOnly=new URLSearchParams(location.search).has('measureCuts');
+const xrOptions={resolutionScale:1,...(query.get('presentation')==='shared-framebuffer'?{webglPresentation:'shared-framebuffer'}:{})};
 const cutTiming={acceptMs:[],prepareMs:[],framesMs:[],frameEvents:[]};let cutMeasuring=false,deathAt=0,cutRequestedAt=0,cutPublishedAt=0;
 await run.execute(async test=>{
  engine=await initEngine(document.querySelector('#gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
@@ -32,7 +33,7 @@ await run.execute(async test=>{
  }
  stop=installCutTransport(transportScene,testXR(engine));const input=v=>engine.scene.rimInput(v),state=()=>engine.scene.rimState;
  info=installRuntimeInfo(engine);
- input({start:true});await engine.xr.enter({resolutionScale:1});
+ input({start:true});await engine.xr.enter(xrOptions);
  // Immersive browsers may suspend document RAF while XRSession RAF continues.
  window.requestAnimationFrame=()=>{documentRAFCalls++;return 0;};
  const frame=(v={})=>{const start=performance.now();sim.frame(v);if(cutMeasuring){const cpuMs=performance.now()-start;cutTiming.framesMs.push(cpuMs);const s=state();if(!deathAt&&s.kills>0)deathAt=performance.now();if(cutRequestedAt&&!cutPublishedAt&&s.cuts.pieces>0)cutPublishedAt=performance.now();if(measureOnly)cutTiming.frameEvents.push({cpuMs,kills:s.kills,cuts:s.cuts,uploadBytes:engine.renderer_stats().uploadBytes});}if(engine.xr.lastError)throw Error(String(engine.xr.lastError));};
@@ -150,5 +151,5 @@ await run.execute(async test=>{
  window.rimCutEvidence.halfVisibility=halfVisibility;
  window.rimCutEvidence.visualStages=snapshots.map(({label,age})=>({label,age}));
  advanceTo(3.1);frame();test.assert(state().cuts.motion.length===0&&state().cuts.pieces===0,'evaporated halves are removed after three seconds');
- await engine.xr.exit();test.assert(engine.xr.player.head.object===null,'diagnostics panel releases head binding on XR exit');await engine.xr.enter({resolutionScale:1});frame();test.assert(state().kills>=1,'XR reentry preserves encounter state');await engine.xr.exit();
+ await engine.xr.exit();test.assert(engine.xr.player.head.object===null,'diagnostics panel releases head binding on XR exit');await engine.xr.enter(xrOptions);frame();test.assert(state().kills>=1,'XR reentry preserves encounter state');await engine.xr.exit();
 });window.requestAnimationFrame=browserRAF;stop?.();info?.dispose();engine?.dispose();projection?.dispose();

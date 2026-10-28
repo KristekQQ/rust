@@ -2625,6 +2625,7 @@ pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
             .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
         if !active {
             let mut state = state.borrow_mut();
+            state.release_xr_gl();
             XR_PLAYER.with(|player| {
                 let mut player = player.borrow_mut();
                 player.reset_tracking(&mut state.scene);
@@ -2673,6 +2674,80 @@ pub fn xr_gpu_color_format() -> Result<String, JsValue> {
             .xr_color_format())
     })
 }
+/// Exact WebGL context owned by wgpu; never create a second renderer/device.
+#[wasm_bindgen]
+pub fn xr_gl_context() -> Result<JsValue, JsValue> {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow()
+            .xr_gl_context()
+    })
+}
+#[wasm_bindgen]
+pub fn xr_render_gl_eye(
+    projection: &[f32],
+    world: &[f32],
+    index: u32,
+    width: u32,
+    height: u32,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    let (matrix, position) = crate::render_math::xr_view(projection, &xr_world_array(world)?)
+        .ok_or_else(|| JsValue::from_str("Invalid XR matrices"))?;
+    STATE.with(|slot| {
+        let state = slot.borrow();
+        let mut state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow_mut();
+        let result = state.render_xr_gl_eye(matrix, position, index as usize, width, height);
+        ack_rim_cut_uploads(&state);
+        result
+    })
+}
+#[wasm_bindgen]
+pub fn xr_present_gl_frame(
+    framebuffer: JsValue,
+    width: u32,
+    height: u32,
+    viewports: JsValue,
+) -> Result<(), JsValue> {
+    if !XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Invalid XR frame"));
+    }
+    if !js_sys::Array::is_array(&viewports)
+        || !(1..=2).contains(&js_sys::Array::from(&viewports).length())
+    {
+        return Err(JsValue::from_str("WebGL XR requires one or two viewports"));
+    }
+    let fields: Vec<[u32; 4]> = serde_json::from_str(
+        &js_sys::JSON::stringify(&viewports)?
+            .as_string()
+            .ok_or_else(|| JsValue::from_str("Invalid XR viewports"))?,
+    )
+    .map_err(|_| JsValue::from_str("Invalid XR viewports"))?;
+    let viewports: Vec<_> = fields
+        .into_iter()
+        .map(|[x, y, width, height]| crate::render::target::Viewport {
+            x,
+            y,
+            width,
+            height,
+        })
+        .collect();
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow_mut()
+            .present_xr_gl(framebuffer, width, height, &viewports)
+    })
+}
+
 /// Render into the browser-owned projection texture. No canvas transfer/readback.
 #[wasm_bindgen]
 pub fn xr_render_gpu_eye(

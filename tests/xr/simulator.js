@@ -20,6 +20,9 @@ function quaternion(m) {
 export function installXRSimulator({profile:options={},clockTimers=true,floorAvailable=true,supported=true}={}) {
     const profile={...DEFAULT_PROFILE,...options};
     if(typeof profile.id!=='string'||!Number.isFinite(profile.hz)||profile.hz<=0||profile.hz>1000||!Number.isFinite(profile.ipd)||profile.ipd<0||profile.ipd>1||!['eyeWidth','eyeHeight'].every(key=>Number.isInteger(profile[key])&&profile[key]>0&&profile[key]<=8192)) throw new TypeError('Invalid XR profile');
+    const viewports=profile.viewports??[{x:0,y:0,width:profile.eyeWidth,height:profile.eyeHeight},{x:profile.eyeWidth,y:0,width:profile.eyeWidth,height:profile.eyeHeight}];
+    if(!Array.isArray(viewports)||viewports.length!==2||viewports.some(v=>!['x','y','width','height'].every(k=>Number.isInteger(v[k])&&v[k]>=(k==='width'||k==='height'?1:0)&&v[k]<=8192)))throw new TypeError('Invalid XR viewports');
+    const framebufferWidth=Math.max(...viewports.map(v=>v.x+v.width)),framebufferHeight=Math.max(...viewports.map(v=>v.y+v.height));
     let session=null,layer=null,now=0,nextId=-1,disposed=false,deny=false,deferred=null,sessionIndex=-1,referenceReset=false;
     const pendingReleases=new Set();
     let head={matrix:matrixFromPose({position:[0,floorAvailable?1.55:-.05,0]}),tracked:true};
@@ -51,7 +54,7 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
     }
     const spaces=new Set();
     class Session extends EventTarget {
-        constructor() {super();this.inputSources=[];this.ended=false;this.visibilityState='visible';this.renderState={depthNear:.1,depthFar:1000,baseLayer:null};this.callbacks=new Map();}
+        constructor() {super();this.frameRate=profile.hz;this.supportedFrameRates=new Float32Array([profile.hz]);this.inputSources=[];this.ended=false;this.visibilityState='visible';this.renderState={depthNear:.1,depthFar:1000,baseLayer:null};this.callbacks=new Map();}
         get pendingFrameCount() {return this.callbacks.size;}
         requestAnimationFrame(callback) {if(this.ended) return 0;const id=nextId--;this.callbacks.set(id,callback);return id;}
         cancelAnimationFrame(id) {this.callbacks.delete(id);}
@@ -73,9 +76,9 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
     replace(navigator,'xr',xr);replace(globalThis,'XRRigidTransform',Transform);
     for(const name of ['WebGLRenderingContext','WebGL2RenderingContext']) if(globalThis[name]) replace(globalThis[name].prototype,'makeXRCompatible',async function(){});
     replace(globalThis,'XRWebGLLayer',class {
-        constructor(owner,gl) {
+        constructor(owner,gl,options={}) {
             const oldTexture=gl.getParameter(gl.TEXTURE_BINDING_2D),oldFramebuffer=gl.getParameter(gl.FRAMEBUFFER_BINDING),oldRenderbuffer=gl.getParameter(gl.RENDERBUFFER_BINDING);
-            this.gl=gl;this.framebufferWidth=profile.eyeWidth*2;this.framebufferHeight=profile.eyeHeight;
+            this.gl=gl;this.framebufferWidth=framebufferWidth;this.framebufferHeight=framebufferHeight;this.antialias=false;this.fixedFoveation=0;this.requestedOptions={...options};
             this.texture=gl.createTexture();this.framebuffer=gl.createFramebuffer();this.depth=gl.createRenderbuffer();layers.add(this);
             try {
                 gl.bindTexture(gl.TEXTURE_2D,this.texture);
@@ -91,7 +94,7 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
             } finally {gl.bindTexture(gl.TEXTURE_2D,oldTexture);gl.bindFramebuffer(gl.FRAMEBUFFER,oldFramebuffer);gl.bindRenderbuffer(gl.RENDERBUFFER,oldRenderbuffer);}
             layer=this;
         }
-        getViewport(view) {return {x:(view.eye==='right'||view.index===1)?profile.eyeWidth:0,y:0,width:profile.eyeWidth,height:profile.eyeHeight};}
+        getViewport(view) {return {...viewports[(view.eye==='right'||view.index===1)?1:0]};}
     });
     if(clockTimers) {
         const schedule=(repeat)=>(callback,delay=0,...args)=>{alive();if(typeof callback!=='function')throw new TypeError('XR timer needs a function');const interval=Math.max(1,Number(delay)||0);if(!Number.isFinite(interval))throw new TypeError('Invalid timer delay');const id=nextId--;timers.set(id,{callback:()=>callback(...args),delay:interval,next:now+interval,repeat});return id;};
@@ -127,6 +130,7 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
         controllers[hand]=next;
     }
     const api={
+        get layer(){return layer;},
         get profile(){return {...profile};},get session(){return session;},get time(){return now;},get timerCount(){return timers.size;},
         timerCountForDelay(delay){return [...timers.values()].filter(timer=>timer.repeat&&timer.delay===Number(delay)).length;},
         gripX(angle,position){return matrixFromPose({position,orientation:[Math.sin(angle/2),0,0,Math.cos(angle/2)]});},
@@ -150,7 +154,7 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
                     const near=session.renderState.depthNear,far=session.renderState.depthFar;
                     const f=1.2,aspect=profile.eyeWidth/profile.eyeHeight;
                     const projection=new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,-(far+near)/(far-near),-1,0,0,-2*far*near/(far-near),0]);
-                    return {transform:transform(relative(head.matrix,reference)),emulatedPosition:false,views:[-1,1].map((side,index)=>({eye:index?'right':'left',index,projectionMatrix:projection.slice(),transform:transform(relative(multiply(head.matrix,matrixFromPose({position:[side*profile.ipd/2,0,0]})),reference))}))};
+                    return {transform:transform(relative(head.matrix,reference)),emulatedPosition:false,views:[-1,1].map((side,index)=>({eye:index?'right':'left',index,projectionMatrix:new Float32Array([f/(viewports[index].width/viewports[index].height),...projection.slice(1)]),transform:transform(relative(multiply(head.matrix,matrixFromPose({position:[side*profile.ipd/2,0,0]})),reference))}))};
                 }};
             const callbacks=[...session.callbacks.values()];session.callbacks.clear();for(const callback of callbacks)callback(now,frame);
         },
@@ -160,8 +164,9 @@ export function installXRSimulator({profile:options={},clockTimers=true,floorAva
         },
         pixels(eye='stereo') {
             alive();if(!layer)throw new Error('No XR render layer');if(!['stereo','left','right'].includes(eye))throw new TypeError('Invalid XR eye');
-            const gl=layer.gl,width=profile.eyeWidth*(eye==='stereo'?2:1),height=profile.eyeHeight,bytes=new Uint8Array(width*height*4),old=gl.getParameter(gl.FRAMEBUFFER_BINDING);
-            try {gl.bindFramebuffer(gl.FRAMEBUFFER,layer.framebuffer);gl.readPixels(eye==='right'?profile.eyeWidth:0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,bytes);}finally{gl.bindFramebuffer(gl.FRAMEBUFFER,old);}
+            const region=eye==='stereo'?{x:0,y:0,width:framebufferWidth,height:framebufferHeight}:viewports[eye==='right'?1:0];
+            const gl=layer.gl,{width,height}=region,bytes=new Uint8Array(width*height*4),old=gl.getParameter(gl.FRAMEBUFFER_BINDING);
+            try {gl.bindFramebuffer(gl.FRAMEBUFFER,layer.framebuffer);gl.readPixels(region.x,region.y,width,height,gl.RGBA,gl.UNSIGNED_BYTE,bytes);}finally{gl.bindFramebuffer(gl.FRAMEBUFFER,old);}
             const data=new Uint8ClampedArray(bytes.length);for(let y=0;y<height;y++)data.set(bytes.subarray(y*width*4,(y+1)*width*4),(height-1-y)*width*4);
             return new ImageData(data,width,height);
         },
