@@ -1017,7 +1017,10 @@ impl State {
         }
         // Flush before depth resolve, HUD, presentation or preparing another eye:
         // those steps may read these attachments or overwrite shared uniforms.
-        self.renderer.queue.submit(commands);
+        {
+            let _scope = super::profiler::cpu_scope("render.submit");
+            self.renderer.queue.submit(commands);
+        }
         if postprocessed {
             self.postprocess.record_submission();
         }

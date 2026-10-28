@@ -1276,6 +1276,9 @@ impl SceneRenderer {
         }
         stats
     }
+    pub fn set_renderer_experiment(&mut self, mode: u32) -> bool {
+        self.gltf_gpu.set_experiment(mode)
+    }
     pub fn gltf_index_layouts(&self) -> serde_json::Value {
         self.gltf_gpu.index_layouts()
     }
@@ -2372,6 +2375,7 @@ impl SceneRenderer {
         let cache_index = self.last_main_cache;
         let rings = self.cut_feedback_rings(cache_index);
         let has_rings = rings.iter().any(Option::is_some);
+        let select_scope = super::profiler::cpu_scope("render.overlays.select");
         let has_transparent = self.passes[self.last_main_cache]
             .queue
             .visible_imported_ids()
@@ -2408,6 +2412,7 @@ impl SceneRenderer {
         if has_rings {
             self.prepare_cut_feedback(target);
         }
+        drop(select_scope);
         let helper_key = (target.color_format, target.depth_format);
         if has_helpers {
             self.helper_pipelines.entry(helper_key).or_insert_with(|| {

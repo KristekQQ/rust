@@ -55,7 +55,17 @@ try{
   assert(cache.retainedBytes<=cache.byteLimit&&cache.retainedSlots<=cache.slotLimit,label+' bounded storage');
   evidence.push({label,draws,cache,before,after});return cached;
  };
+ assert(!e.setRendererExperiment(2)&&!e.setRendererExperiment(3),'rejected depth prototype and invalid diagnostic mode');
  const first=await check('warm immutable opaque',{warm:true});
+ // Alpha/depth coverage is independently compared with the original production
+ // shader. RGB must differ: this reduced shader is only a diagnostic control.
+ const masked=await load(fixture({alpha:'MASK'}));masked.setPosition([0,.5,.4]).setScale([.6,.6,.6]).setRenderOptions(options(true));
+ const lit=await capturePixels(canvas);assert(e.setRendererExperiment(1),'cheap fragment selected');
+ const cheap=await capturePixels(canvas);assertChanged(lit,cheap,'diagnostic actually changes lighting');
+ const covered=(im,i)=>im.data[i]!==im.data[0]||im.data[i+1]!==im.data[1]||im.data[i+2]!==im.data[2];
+ let coverageChanges=0;for(let i=0;i<lit.data.length;i+=4)if(covered(lit,i)!==covered(cheap,i))coverageChanges++;
+ assert(coverageChanges===0,'cheap shader preserves opaque/MASK coverage: '+coverageChanges);
+ assert(e.setRendererExperiment(0),'production selected');equal(lit,await capturePixels(canvas),'original shader restored');masked.remove();
  models[2].setPosition([.65,.2,.14]);assertChanged(first,await check('root transform',{warm:true}),'root transform');
  models[1].setRotation([.1,.22,.04]);await check('affine basis change',{warm:true});
  models[1].setScale([-.7,.8,.9]);await check('mirrored variant',{warm:true});
@@ -85,7 +95,11 @@ try{
  full.playAnimation('Morph',{loop:false}).pauseAnimation().seekAnimation(.2);await check('animation pose');
  full.seekAnimation(.8);await check('changed animation pose');
  full.stopAnimation().setMorphWeights(1,[.75]);await check('morph payload revision');
- full.selectScene(1);await check('active primitives scene1');full.selectScene(0);await check('active primitives restored');
+ assert(e.renderer_stats().drawCalls===3,'three authored primitives before scene switch');
+ full.selectScene(1);await check('active primitives scene1');assert(e.renderer_stats().drawCalls===1,'single MASK primitive after scene switch');
+ full.selectScene(0);await check('active primitives restored');assert(e.renderer_stats().drawCalls===3,'OPAQUE/MASK/BLEND counts restored');
+ const instance=full.createInstance().setPosition([0,.3,0]);await check('shared classification instance');assert(e.renderer_stats().drawCalls===6,'independent instance adds three active primitives');
+ instance.remove();await frames();assert(e.renderer_stats().drawCalls===3,'instance removal retains source classification');
  full.remove();await frames();assert(e.debugStats().gltf.preparedPlanCache.retainedBytes===0,'last model removal releases cache');
  const fox=await e.scene.loadModel(new URL('../assets/models/fox/Fox.glb',location.href));e.setCameraView([3,2,5],[0,1,0]);fox.setScale([.025,.025,.025]).playAnimation('Walk').pauseAnimation().seekAnimation(0);await check('skin palette');fox.seekAnimation(.3);await check('changed skin palette');
  e.dispose();await init();e.scene.createLight({position:[-2,3,5],color:[10,10,10]});await load(fixture());await check('dispose and reinitialize',{warm:true});

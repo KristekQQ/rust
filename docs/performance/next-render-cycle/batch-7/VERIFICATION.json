@@ -1,0 +1,281 @@
+{
+  "projectGate": {
+    "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+    "passed": true,
+    "nativePassed": 428,
+    "nativeIgnoredManualTiming": 2,
+    "browserPassed": 147,
+    "browserFailed": 0,
+    "strictWasmSdkHarnessTypes": "PASS",
+    "browser": "Chrome/156.0.8078.48",
+    "sandboxDisabled": false,
+    "receipt": {
+      "passed": true,
+      "key": "2785854a5f248a20911c2b62e6f76f00a7d92c9fd9ff19091a1996149cab51a8",
+      "mode": "all",
+      "args": [],
+      "build": {
+        "source": "da7117cc33917296e0a73bd94007b3e73c7a882e744a8dc2e8b7c09b6a447715",
+        "wasm": "a5ada8fb48ad0fddbc457a7a251f2743d52e262ca988eec5ba672f2c3449ea22",
+        "bindings": "0bcc61b73798dd1970a3dbe030d449772b89cce53e8cd771779bf980bf9136e1",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "types": "40e81103f91fee19389d0726d209f42a9395de74a2c05741d85156aba23562ab",
+      "finished": "2026-10-28T22:21:02.429Z"
+    },
+    "postGateIdentity": {
+      "passed": true,
+      "runtimeFiles": 106,
+      "runtimeMatchesFrozenR": true,
+      "browserBuildMatchesR": true,
+      "browserResults": 147,
+      "browser": "Chrome/156.0.8078.48",
+      "sandboxDisabled": false,
+      "nativePassed": 428,
+      "nativeIgnored": 2
+    },
+    "receiptRecheckCommand": "VERIFY_WASM_PROFILE=release npm exec --offline -- node scripts/verification-cache.mjs check all",
+    "receiptRecheckPassed": true,
+    "supersededCandidateGate": "Also passed, retained but not final evidence after rollback"
+  },
+  "performanceHelperUnits": {
+    "passed": 38,
+    "failed": 0
+  },
+  "independentAudit": {
+    "passed": true,
+    "reports": [
+      {
+        "report": "matrix-webgl-anchor",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1059
+      },
+      {
+        "report": "matrix-webgl-anchor-repeat",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1066
+      },
+      {
+        "report": "matrix-webgl-cheap",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1502
+      },
+      {
+        "report": "matrix-webgl-depth",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1148
+      },
+      {
+        "report": "matrix-webgl-fxaa-off",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1088
+      },
+      {
+        "report": "matrix-webgl-high",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 847
+      },
+      {
+        "report": "matrix-webgl-low",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1438
+      },
+      {
+        "report": "matrix-webgl-shadow-off",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1266
+      },
+      {
+        "report": "matrix-webgpu-anchor",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 945
+      },
+      {
+        "report": "matrix-webgpu-anchor-repeat",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 945
+      },
+      {
+        "report": "matrix-webgpu-cheap",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 962
+      },
+      {
+        "report": "matrix-webgpu-depth",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 943
+      },
+      {
+        "report": "matrix-webgpu-fxaa-off",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 948
+      },
+      {
+        "report": "matrix-webgpu-high",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 858
+      },
+      {
+        "report": "matrix-webgpu-low",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 1027
+      },
+      {
+        "report": "matrix-webgpu-shadow-off",
+        "runs": 1,
+        "driver": "7797f9f23c15768c0a25d39080225f32134f95d4166ded4e6b4cce0d5c096e14",
+        "frames": 946
+      },
+      {
+        "report": "primary-arena-static-webgl",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 9009
+      },
+      {
+        "report": "primary-arena-static-webgpu",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 9009
+      },
+      {
+        "report": "primary-rim-mixed-webgl",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 6370
+      },
+      {
+        "report": "primary-rim-mixed-webgpu",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 8997
+      },
+      {
+        "report": "primary-rim-static-webgl",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 9008
+      },
+      {
+        "report": "primary-rim-static-webgpu",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 9009
+      },
+      {
+        "report": "primary-rim-stress-webgl",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 6356
+      },
+      {
+        "report": "primary-rim-stress-webgpu",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 5645
+      },
+      {
+        "report": "profile-candidate-webgl",
+        "runs": 1,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 1051
+      },
+      {
+        "report": "profile-candidate-webgpu",
+        "runs": 1,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 940
+      },
+      {
+        "report": "restored-webgl",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 6378
+      },
+      {
+        "report": "restored-webgpu",
+        "runs": 6,
+        "driver": "1fb2caab125c4eb6591d3ff0b9e7fbee8ae58c552b4552c4107c980a9004c5dd",
+        "frames": 5633
+      },
+      {
+        "report": "three-profile",
+        "runs": 2,
+        "driver": "bebcb3c3e9488a2f2eef75a8198f11e6f5f957ce3a867562a3f9b7e53b4fdb3d",
+        "frames": 1984
+      },
+      {
+        "report": "three-rim-common-webgl",
+        "runs": 6,
+        "driver": "bebcb3c3e9488a2f2eef75a8198f11e6f5f957ce3a867562a3f9b7e53b4fdb3d",
+        "frames": 5625
+      },
+      {
+        "report": "three-rim-common-webgpu",
+        "runs": 6,
+        "driver": "bebcb3c3e9488a2f2eef75a8198f11e6f5f957ce3a867562a3f9b7e53b4fdb3d",
+        "frames": 5959
+      },
+      {
+        "report": "three-rim-stress-webgl",
+        "runs": 6,
+        "driver": "bebcb3c3e9488a2f2eef75a8198f11e6f5f957ce3a867562a3f9b7e53b4fdb3d",
+        "frames": 6537
+      }
+    ],
+    "runs": 98,
+    "rawFrames": 114498,
+    "frozenFiles": 10084,
+    "independentRawDistributions": true,
+    "servedPayloadsAndDriverHashes": true,
+    "cleanProfilerOffAsserted": true,
+    "restoredRuntimeEqualsCurrent": true
+  },
+  "archive": {
+    "passed": true,
+    "archive": "docs/performance/next-render-cycle/batch-7/evidence.tar.gz",
+    "sha256": "83c759e8930c39d7e70636ab6dedebcf2b47195044e74b062a32e9ad9071b0ce",
+    "bytes": 44318633,
+    "files": 1744,
+    "logicalBytes": 195379843,
+    "uniqueContentBytes": 97378443,
+    "everyEntryAndHardlinkReadbackVerified": true,
+    "privacyExclusions": [
+      "hardware.txt",
+      "processes-before.txt"
+    ],
+    "frozenScope": "Full src/js/pkg/scripts/tests and root build configs per build; complete render-build file inventory. Unchanged assets, vendored dependencies, fixtures and original examples require parent checkout and hash verification; full local frozen trees remain under ignored output."
+  },
+  "sourceDump": {
+    "file": "all_sources.txt",
+    "sha256": "187fc868f0eafcdf1c5342b910340171b2a7d1c70a86908c9ce2924e440edc58"
+  },
+  "independentReview": "Scoped no material findings; exact original draw_count and rejection/metric boundaries confirmed. Read-only, no GPU execution.",
+  "limits": [
+    "No accepted production FPS optimization; C and depth prototype rejected",
+    "Power changed AC\u2192battery; transition time unobserved; foreign GPU contention",
+    "B4 crowded-moving WebGPU strict-pixel limitation inherited and unresolved",
+    "Desktop/simulated XR only; no physical Quest, push, main merge, deployment, shared server change or remote CI"
+  ],
+  "completedAt": "2026-10-28T22:23:13.157800+00:00"
+}

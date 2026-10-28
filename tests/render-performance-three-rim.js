@@ -1,8 +1,11 @@
+import {REVISION} from 'three';
 // Benchmark adapter around the unchanged original Three Rome application.
 // This exposes observed rendering work; it does not claim identical AA/shaders
 // or replace its gameplay with a synthetic workload.
-import '/examples/rim/main.js';
-import {REVISION} from 'three';
+const query=new URLSearchParams(location.search);
+if(query.get('family')==='rim-common'){await import('/tests/render-performance-three-common.js');}else{
+await import('/examples/rim-three/app.js');
+
 const d=window.cityDebug;
 await d.characters.ready;await d.combat.ready;
 if(d.characters.state.failed.length)throw Error('Original Three character loading failed');
@@ -26,7 +29,11 @@ const render=()=>d.renderer.render(d.scene,d.camera);
 render();
 const stats=()=>({...d.renderer.info.render,drawCalls:d.renderer.info.render.calls,mainDrawCalls:d.renderer.info.render.calls,memory:{...d.renderer.info.memory}});
 const gl=d.renderer.getContext();
+const lights=[];d.scene.traverse(node=>{if(node.isLight)lights.push({type:node.type,intensity:node.intensity,color:node.color.toArray(),position:node.position.toArray(),castShadow:node.castShadow,shadow:node.shadow?{mapSize:node.shadow.mapSize.toArray(),bias:node.shadow.bias,normalBias:node.shadow.normalBias,radius:node.shadow.radius}:null});});
+const fog=d.scene.fog?{type:d.scene.fog.isFogExp2?'exponential':'linear',near:d.scene.fog.near??null,far:d.scene.fog.far??null,density:d.scene.fog.density??null,color:d.scene.fog.color.toArray()}:null;
 const engine={renderer_backend:()=> 'ThreeWebGL2',renderer_stats:stats,debugStats:stats,frameProfile:()=>({enabled:false,cpu:{},gpu:{supported:false,available:false,passesMs:null,sampleFrame:null,ageFrames:null,error:null}}),postprocessing:{stats:()=>({enabled:false,antialias:d.renderer.getContext().getContextAttributes().antialias,samples:gl.getParameter(gl.SAMPLES)}),graph:()=>({passes:[]})}};
-window.bench={engine,family,load,operations:{transforms:0,spawns:0,removes:0,cuts:0},start(){d.setManualTime(true);},stop(){d.setManualTime(true);},capturePose(){d.setManualTime(true);render();},phaseState:()=>({kind:'original-three-rim',stressModels,stress:stress?.describe()??null,gameplay:d.combat.describe().phase,characters:d.characters.describe()}),metadata:{family,load,stressModels,stress:stress?.describe()??null,scene:'unchanged original Three Rome application, static gate camera; original character mixers at time0',viewport:{width,height,deviceScaleFactor:1},camera:{position:[0,1.7,42],target:[0,1.7,-20],fov:65,near:.08,far:350},renderer:{version:REVISION,antialias:gl.getContextAttributes().antialias,samples:gl.getParameter(gl.SAMPLES),shadows:d.renderer.shadowMap.enabled,shadowMapSize:2048,shadowAutoUpdate:d.renderer.shadowMap.autoUpdate,runtimeInfoIncluded:true,toneMappingExposure:d.renderer.toneMappingExposure},unmatchedThreeReference:true,differences:'Same authored city/camera/viewport and lighting profile, but Three uses hardware MSAA instead of Rust FXAA; shaders/material normal semantics, shadow policy and independently authored gameplay differ. Static render diagnostic only, not proven whole-game or pixel equivalence.'}};
+window.bench={engine,family,load,operations:{transforms:0,spawns:0,removes:0,cuts:0},start(){d.setManualTime(true);},stop(){d.setManualTime(true);},capturePose(){d.setManualTime(true);render();},phaseState:()=>({kind:'original-three-rim',stressModels,stress:stress?.describe()??null,gameplay:d.combat.describe().phase,characters:d.characters.describe()}),metadata:{family,load,stressModels,stress:stress?.describe()??null,scene:'unchanged original Three Rome application, static gate camera; original character mixers at time0',viewport:{width,height,deviceScaleFactor:1},camera:{position:[0,1.7,42],target:[0,1.7,-20],fov:65,near:.08,far:350},renderer:{version:REVISION,antialias:gl.getContextAttributes().antialias,samples:gl.getParameter(gl.SAMPLES),shadows:d.renderer.shadowMap.enabled,shadowMapSize:2048,shadowAutoUpdate:d.renderer.shadowMap.autoUpdate,runtimeInfoIncluded:true,toneMapping:d.renderer.toneMapping,toneMappingExposure:d.renderer.toneMappingExposure,outputColorSpace:d.renderer.outputColorSpace,shadowType:d.renderer.shadowMap.type,lights,fog,postprocessing:false},unmatchedThreeReference:true,differences:'Same authored city/camera/viewport and lighting profile, but Three uses hardware MSAA instead of Rust FXAA; shaders/material normal semantics, shadow policy and independently authored gameplay differ. Static render diagnostic only, not proven whole-game or pixel equivalence.'}};
 
 window.bench.stress=stress;window.addEventListener('pagehide',()=>stress?.dispose(),{once:true});
+
+}

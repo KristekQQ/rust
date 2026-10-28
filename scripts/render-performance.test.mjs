@@ -149,3 +149,8 @@ test('actual GL bufferData allocation events use the selected source range',asyn
   window.renderApiCounters.allocationEventsEnabled=false;gl.bufferData(1,16,2);assert.equal(window.renderApiCounters.allocationEvents.length,4);assert.deepEqual(window.renderApiCounters.allocationTotals.bufferData,{calls:5,knownBytes:200,unknownSizeCalls:0});
  }finally{for(const [k,d] of old)if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}
 });
+
+test('common Rome is scalable and respects actual instance budget',()=>{assert.equal(fixedLoadFamily('rim-common'),false);assert.equal(parseArgs(['calibrate','--family','rim-common','--load','128']).load,128);assert.throws(()=>parseArgs(['smoke','--family','rim-common','--load','2049','--max-load','2049']));});
+test('diagnostic axes are bounded and production remains default',()=>{assert.equal(parseArgs(['smoke']).experiment,'production');for(const experiment of ['cheap-fragment','no-shadows','no-fxaa','depth-order'])assert.equal(parseArgs(['smoke','--experiment',experiment]).experiment,experiment);assert.throws(()=>parseArgs(['smoke','--experiment','arbitrary-wgsl']));});
+
+test('paired diagnostic axis is explicit and rejects unsupported/Three combinations',()=>{assert.equal(parseArgs(['compare','--candidate-experiment','depth-order']).candidateExperiment,'depth-order');assert.throws(()=>parseArgs(['compare','--candidate-experiment','unsafe']));assert.throws(()=>parseArgs(['compare','--candidate-experiment','depth-order','--three-root','x']));});

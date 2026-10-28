@@ -1,0 +1,133 @@
+{
+  "batch": 7,
+  "status": "complete-local-checkpoint",
+  "parent": "c5cd402c23171cf205e72f34f4213f7b869f5dc8",
+  "branch": "codex/next-render-cycle-7",
+  "checkout": "/private/tmp/rust-next-render-cycle-7",
+  "builds": {
+    "baseline": {
+      "source": "48d3f3189f54b82781658a93b8f8395ba0b2fe89a5f0077ef00812cd411af5f7",
+      "wasm": "845f7ea2098ff0529cc6b94ae724b81d9f7e93cd61f469f9abc58911e96403d7",
+      "bindings": "b41af79b1c02664a43b6a32bf7459762470173ce8c2ecebe65150624e23fca96",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      },
+      "sdk": "f14b89f90a00e5332683d769d5ec702d07910ef1ada2388c4c1d71c099b81009",
+      "sdkTypes": "feb5e6f2bece07be5454948d95c44c5fb1074e38e2f848e0c8afc8103339b969",
+      "fileInventory": "baseline/render-build.json (evidence archive)"
+    },
+    "diagnostic": {
+      "source": "0cac4d342625e9efa21b334cabf4e5e49ae1c0b9126e291eefba8a8e53f72719",
+      "wasm": "b6e8e338ccec0634d50e5f629f370abb39765915280210c6b644084177147e21",
+      "bindings": "0bcc61b73798dd1970a3dbe030d449772b89cce53e8cd771779bf980bf9136e1",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      },
+      "sdk": "5a5c81f5c79a5c44789d6f9973ff5b6fc8e926d982c36ae8d4bda149d764644a",
+      "sdkTypes": "fa7baf8a24d2de474ed36f5808ebcc8c0a07809fa367c51d0f2420274c102b84",
+      "fileInventory": "diagnostic/render-build.json (evidence archive)"
+    },
+    "candidate": {
+      "source": "af794f1012e6c7171e66c9b19e63c65eff652cf5fba35249aa26c4471c94a377",
+      "wasm": "9a04543865e1483c05548bcbc55c60f3624254fb6dd26e431f4e188d7b3e7335",
+      "bindings": "0bcc61b73798dd1970a3dbe030d449772b89cce53e8cd771779bf980bf9136e1",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      },
+      "sdk": "b241f136503ff95a34b7fb700efa5b0681d4d645e1a7ab75bd8846b7e119b748",
+      "sdkTypes": "a4ab476b481f53137b8f219565c96ac29f758fc4613806aa94715fbacddab08e",
+      "fileInventory": "candidate/render-build.json (evidence archive)"
+    },
+    "restored": {
+      "source": "da7117cc33917296e0a73bd94007b3e73c7a882e744a8dc2e8b7c09b6a447715",
+      "wasm": "a5ada8fb48ad0fddbc457a7a251f2743d52e262ca988eec5ba672f2c3449ea22",
+      "bindings": "0bcc61b73798dd1970a3dbe030d449772b89cce53e8cd771779bf980bf9136e1",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      },
+      "sdk": "b241f136503ff95a34b7fb700efa5b0681d4d645e1a7ab75bd8846b7e119b748",
+      "sdkTypes": "a4ab476b481f53137b8f219565c96ac29f758fc4613806aa94715fbacddab08e",
+      "fileInventory": "restored/render-build.json (evidence archive)"
+    }
+  },
+  "protocol": {
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "pairs": 3,
+    "order": "AB/BA/AB",
+    "width": 1280,
+    "height": 720,
+    "DPR": 1,
+    "profilingEnabledInCleanRuns": false
+  },
+  "environment": {
+    "hardware": "MacBookAir10,1 Apple M1,8CPU/7GPU,16GB",
+    "power": "Before: AC attached70%,not charging. After all timed runs: battery67%,discharging. Transition time unobserved; no continuous power log.",
+    "foreignGpuContention": true,
+    "physicalQuest": false,
+    "powerControlledThroughout": false,
+    "browser": "Chrome/156.0.8078.48"
+  },
+  "limits": [
+    "B4 crowded-moving WebGPU exact-pixel limitation inherited, unresolved",
+    "No push/main merge/shared server change/deployment/CI",
+    "GPU scope boundaries differ between native WebGPU and GL EXT; compositor utilization unavailable",
+    "Power changed between pre/post snapshots; timing of transition unobserved, small timing differences cannot be causally attributed."
+  ],
+  "baselineRuntimeImagesVerified": true,
+  "results": "RESULTS.json",
+  "buildDisposition": {
+    "baseline": "B6 frozen original",
+    "diagnostic": "D: instrumented unchanged production, historical rejected depth mode2 available",
+    "candidate": "C: REJECTED count reuse; all C/Three measurements experimental only",
+    "restored": "R: final source restores exact B6 count scan; diagnostic modes0/1 retained"
+  },
+  "productionOptimizationAccepted": false,
+  "three": {
+    "revision": 170,
+    "representation": "existing createThreeStressLoad per-part InstancedMesh",
+    "vendor": "examples/rim-three/vendor/three.module.js",
+    "vendorSha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+    "runtimeCompared": "REJECTED experimental C, not final R",
+    "profiles": "limited common base-color and separate unmatched production; no full graphics parity"
+  },
+  "archive": {
+    "passed": true,
+    "archive": "docs/performance/next-render-cycle/batch-7/evidence.tar.gz",
+    "sha256": "83c759e8930c39d7e70636ab6dedebcf2b47195044e74b062a32e9ad9071b0ce",
+    "bytes": 44318633,
+    "files": 1744,
+    "logicalBytes": 195379843,
+    "uniqueContentBytes": 97378443,
+    "everyEntryAndHardlinkReadbackVerified": true,
+    "privacyExclusions": [
+      "hardware.txt",
+      "processes-before.txt"
+    ],
+    "frozenScope": "Full src/js/pkg/scripts/tests and root build configs per build; complete render-build file inventory. Unchanged assets, vendored dependencies, fixtures and original examples require parent checkout and hash verification; full local frozen trees remain under ignored output."
+  },
+  "verification": "VERIFICATION.json",
+  "auditSummary": {
+    "passed": true,
+    "runs": 98,
+    "rawFrames": 114498,
+    "frozenFiles": 10084,
+    "independentRawDistributions": true,
+    "servedPayloadsAndDriverHashes": true,
+    "cleanProfilerOffAsserted": true,
+    "restoredRuntimeEqualsCurrent": true
+  },
+  "checkpoint": "Owned local commit after measurements and final gate; frozen build Git HEAD remains parent plus recorded source/package hashes. No remote publication."
+}

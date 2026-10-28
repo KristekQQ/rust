@@ -713,6 +713,8 @@ async function initializeEngine(canvas, backend, initialization) {
         /** Optional Rust-rendered HUD; disabled by default. */
         /** @param {boolean} enabled */
         setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },
+        /** Diagnostic only:0 production,1 cheap fragment. @param {0|1} mode */
+        setRendererExperiment(mode) { return Number.isInteger(mode) && mode >= 0 && mode <= 1 && wasm.set_renderer_experiment(mode); },
         /** Detailed native rigid buffer layouts; query outside clean timing windows. */
         gltfIndexLayouts() { return JSON.parse(wasm.gltf_index_layouts()); },
         /** Original Uint32 reference; rejects live-asset changes. @param {boolean} enabled */

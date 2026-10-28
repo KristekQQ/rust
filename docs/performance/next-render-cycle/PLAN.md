@@ -1,6 +1,6 @@
 # Next renderer cycle
 
-Batches1–6 have been separately authorized. Batch6 is complete locally: portable lossless16-bit index storage accepted; no demonstrated FPS gain. The inherited B4 moving-stress image limit remains open. Batches7–9 require separate requests.
+Batches1–7 have been separately authorized and completed locally. Batch7 delivers GPU diagnosis/fairer pinned Three controls and documented rejection of both production candidates; no production speedup accepted. The inherited B4 moving-stress image limit remains open. Batches8–9 require separate requests.
 Base source is the live GitHub main observed at start, not the historical commit in the task description. See MANIFEST.json and STATE.md.
 
 ## Nine batches
@@ -11,7 +11,7 @@ Base source is the live GitHub main observed at start, not the historical commit
 4. Bounded GPU resource pools — complete locally; [report](batch-4/REPORT.md); [fixed protocol](batch-4/PROTOCOL.md), [design](batch-4/DESIGN.md).
 5. Omit exactly white vertex colors losslessly — complete locally; [report](batch-5/REPORT.md). Original interpolator retained for exact XR pixels; no proven FPS gain.
 6. Lossless 16-bit indices where representable — complete locally; [report](batch-6/REPORT.md).
-7. Isolate GPU costs and deliver one demonstrated optimization stage — not started.
+7. Isolate GPU costs and deliver one demonstrated optimization stage — in progress; [fixed protocol](batch-7/PROTOCOL.md).
 8. WebGL XR presentation between contexts — not started.
 9. Integration, regressions, results and skill update — not started.
 

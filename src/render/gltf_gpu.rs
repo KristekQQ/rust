@@ -911,6 +911,7 @@ pub struct PipelineKey {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Variant {
+    cheap_fragment: bool,
     key: PipelineKey,
     texture_mask: u8,
     opaque_unclipped: bool,
@@ -927,6 +928,7 @@ struct Variant {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ShaderKey {
+    cheap_fragment: bool,
     omit_color: bool,
     texture_mask: u8,
     shadow: bool,
@@ -966,6 +968,7 @@ pub struct GltfGpu {
     assets: RefCell<HashMap<usize, Weak<SharedAsset>>>,
     omit_white_colors: bool,
     compact_indices: bool,
+    experiment: u32,
     index_upload_bytes: Cell<u64>,
     index_allocated_bytes: Cell<u64>,
     counters: Cell<GltfGpuStats>,
@@ -1090,6 +1093,7 @@ impl GltfGpu {
             assets: RefCell::new(HashMap::new()),
             omit_white_colors: true,
             compact_indices: true,
+            experiment: 0,
             index_upload_bytes: Cell::new(0),
             index_allocated_bytes: Cell::new(0),
             counters: Cell::new(GltfGpuStats::default()),
@@ -1744,6 +1748,18 @@ impl GltfGpu {
         self.omit_white_colors = enabled;
         true
     }
+    /// Bounded diagnostic controls. Production remains mode0; no arbitrary shaders.
+    pub fn set_experiment(&mut self, mode: u32) -> bool {
+        if mode > 1 {
+            return false;
+        }
+        if self.experiment != mode {
+            self.invalidate_plan_inputs();
+            self.fine_views.borrow_mut().fill_with(|| None);
+            self.experiment = mode;
+        }
+        true
+    }
     /// Original Uint32 oracle. Never mutate immutable geometry held by live models.
     pub fn set_compact_indices_enabled(&mut self, enabled: bool) -> bool {
         if self.compact_indices == enabled {
@@ -1783,7 +1799,7 @@ impl GltfGpu {
                 payload += u64::from(g.count) * u64::from(g.index_format.byte_size());
             }
         }
-        serde_json::json!({"enabled":self.compact_indices,"uint16Primitives":u16_count,"uint32Primitives":u32_count,"bufferBytes":bytes,"payloadBytes":payload,"paddingBytes":bytes-payload,"uploadBytes":self.index_upload_bytes.get(),"allocatedBytes":self.index_allocated_bytes.get(),"memoryScope":"requested live shared index buffers; excludes driver overhead; upload/allocated cumulative"})
+        serde_json::json!({"enabled":self.compact_indices,"experiment":self.experiment,"uint16Primitives":u16_count,"uint32Primitives":u32_count,"bufferBytes":bytes,"payloadBytes":payload,"paddingBytes":bytes-payload,"uploadBytes":self.index_upload_bytes.get(),"allocatedBytes":self.index_allocated_bytes.get(),"memoryScope":"requested live shared index buffers; excludes driver overhead; upload/allocated cumulative"})
     }
     /// Detailed diagnostics are deliberately separate from regularly polled stats.
     pub fn vertex_layouts(&self) -> serde_json::Value {
@@ -2213,6 +2229,7 @@ impl GltfGpu {
             immediate_size: 0,
         });
         let shader_key = ShaderKey {
+            cheap_fragment: variant.cheap_fragment,
             omit_color: variant.omit_color,
             texture_mask: variant.texture_mask,
             shadow: variant.key.shadow,
@@ -3004,6 +3021,7 @@ impl GltfGpu {
             let material = &model.materials[d.material];
             let instanced = group.len() > 1;
             let variant = Variant {
+                cheap_fragment: self.experiment == 1,
                 key,
                 texture_mask: material.texture_mask,
                 opaque_unclipped: material.alpha == AlphaMode::Opaque
@@ -3482,6 +3500,7 @@ impl GltfGpu {
 // operation on either backend. Raw fallback texels preserve the original decoder.
 fn material_shader_source(key: ShaderKey) -> String {
     let ShaderKey {
+        cheap_fragment,
         omit_color,
         texture_mask,
         shadow,
@@ -3621,6 +3640,16 @@ fn material_shader_source(key: ShaderKey) -> String {
         source = source.replacen(", @location(8) color:vec4<f32>", "", 1);
         source = source.replace("o.color=v.color;", "o.color=vec4<f32>(1.0);");
     }
+    if cheap_fragment && !shadow {
+        let start = source
+            .find("fn surface(v:Output,front:bool)->vec4<f32> {")
+            .expect("surface entry");
+        let end = start
+            + source[start..]
+                .find("@fragment fn fs_main")
+                .expect("surface end");
+        source.replace_range(start..end, "fn surface(v:Output,front:bool)->vec4<f32> {\n    let base=base_color(v);\n    surface_alpha_clip(v,base.a);\n    return base;\n}\n");
+    }
     if opaque_unclipped && !shadow {
         // Remove only the color entrypoints' discard call. fs_shadow continues
         // to reach alpha_test and retains MASK/BLEND shadow coverage.
@@ -3647,6 +3676,7 @@ fn material_shader_source(key: ShaderKey) -> String {
             source = source.replace(&format!("scene.appearance_{field}"), value);
         }
     }
+
     source
 }
 pub fn draw_count(model: &GpuModel, blend: bool) -> usize {

@@ -661,6 +661,14 @@ pub fn configure_gltf_instance_pool(
 }
 
 #[wasm_bindgen]
+pub fn set_renderer_experiment(mode: u32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().set_renderer_experiment(mode))
+    })
+}
+#[wasm_bindgen]
 pub fn gltf_index_layouts() -> String {
     STATE.with(|s| {
         s.borrow()

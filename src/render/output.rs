@@ -331,6 +331,7 @@ impl CanvasOutput {
         }
     }
     pub fn present(&mut self, frame: CanvasFrame, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let _scope = super::profiler::cpu_scope("output.present.cpu");
         if self.offscreen {
             let output = self
                 .texture_output
@@ -339,6 +340,7 @@ impl CanvasOutput {
             let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("present encoder"),
             });
+            let stamp = super::profiler::stamp("output.present");
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("present texture"),
@@ -352,7 +354,7 @@ impl CanvasOutput {
                         },
                     })],
                     depth_stencil_attachment: None,
-                    timestamp_writes: None,
+                    timestamp_writes: stamp.as_ref().map(|s| s.writes()),
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });
