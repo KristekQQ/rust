@@ -1,6 +1,6 @@
 # Next renderer cycle
 
-Batches1–3 have been separately authorized. Batch3 is complete locally with an unresolved strict stress-pixel-repeatability limit; batches4–9 require separate requests.
+Batches1–4 have been separately authorized. Batch4 is complete locally with an open strict stress-image limit; the batch3 strict stress-pixel-repeatability limit remains documented. Batches5–9 require separate requests.
 Base source is the live GitHub main observed at start, not the historical commit in the task description. See MANIFEST.json and STATE.md.
 
 ## Nine batches
@@ -8,7 +8,7 @@ Base source is the live GitHub main observed at start, not the historical commit
 1. Verified baseline, measurement coverage and optimization plan — complete; report, verified evidence and local checkpoint.
 2. Cache prepared batches for immutable scenes — complete locally; see [report](batch-2/REPORT.md) and [design](batch-2/DESIGN.md).
 3. Fine-grained invalidation during motion and VR — complete locally; [report](batch-3/REPORT.md), [design](batch-3/DESIGN.md); strict crowded-WebGPU repeatability remains a documented limit.
-4. Bounded GPU resource pools — not started.
+4. Bounded GPU resource pools — complete locally; [report](batch-4/REPORT.md); [fixed protocol](batch-4/PROTOCOL.md), [design](batch-4/DESIGN.md).
 5. Omit exactly white vertex colors losslessly — not started.
 6. Lossless 16-bit indices where representable — not started.
 7. Isolate GPU costs and deliver one demonstrated optimization stage — not started.

@@ -1,0 +1,142 @@
+{
+  "projectGate": {
+    "pass": true,
+    "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+    "nativePassed": 423,
+    "nativeIgnoredManualTiming": 2,
+    "browserPassed": 143,
+    "browserFailed": 0,
+    "sdkHarnessXrTypesFormatStrictClippy": "PASS",
+    "releaseBuildReusedOnlyAfterMatchingInputs": true,
+    "receipt": {
+      "passed": true,
+      "key": "3dec5f520b455232903879dec77a1a8d73959cb00f7dd9d66fe98f283782fd96",
+      "mode": "all",
+      "args": [],
+      "build": {
+        "source": "f3e185262040df47bd7d3c5c7e2a12a06c3ba761cd935ed44ceb06df5f40b5bf",
+        "wasm": "c77e4b1e063052aa22f3935c7ab54c6b6fb3c16051add000a353c9d18f0f2a3d",
+        "bindings": "5f41e0361544aed6dbf3d17c9393e94146520af0e4e49ba84b28dcf67e28a64e",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "types": "21e094e42b1b83a56a3418ac7d2db3336e7159d040d47fa0f2303b67d6b26ad8",
+      "finished": "2026-10-28T14:48:25.658Z"
+    }
+  },
+  "performanceHelper": {
+    "passed": 35,
+    "command": "node --test --test-isolation=none scripts/render-performance.test.mjs"
+  },
+  "strictPrimaryImages": {
+    "testedPairs": 20,
+    "exact": 19,
+    "failed": 1,
+    "liveNeonUngatedPairs": 2,
+    "pass": false,
+    "limit": "unresolved moving1024 WebGPU repeatability; failing candidate SHA not reproduced by current baseline sample; no tolerance/reference change"
+  },
+  "independentStressOracle": {
+    "baselineTemporalInstabilityObserved": true,
+    "candidateExact": 1,
+    "candidateSamples": 3,
+    "remainingTwo": "4 pixels,max1 channel delta",
+    "universalParityProven": false
+  },
+  "poolFixture": {
+    "backends": [
+      "webgpu",
+      "webgl"
+    ],
+    "clearReloadKnownBytes": [
+      2944,
+      2944,
+      2944
+    ],
+    "liveBytesAfterClear": 0,
+    "buffersAndBindGroupsReleased": [
+      63,
+      48
+    ],
+    "activeDisposeReinitAndIndependentExactPixels": true,
+    "zeroWarmResourceRecreation": true
+  },
+  "inputAudit": {
+    "frozenFiles": 4979,
+    "servedPayloadRecords": 612,
+    "primaryReports": 10,
+    "diagnosticReports": 12,
+    "driverFileChecks": 198,
+    "allPassed": true,
+    "finalBuild": {
+      "source": "f3e185262040df47bd7d3c5c7e2a12a06c3ba761cd935ed44ceb06df5f40b5bf",
+      "wasm": "c77e4b1e063052aa22f3935c7ab54c6b6fb3c16051add000a353c9d18f0f2a3d",
+      "bindings": "5f41e0361544aed6dbf3d17c9393e94146520af0e4e49ba84b28dcf67e28a64e",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "finalSdkSha256": "18bac3daef447b56d1cb64c4a853c18d982b669f22ced715151437cf463b0f6f",
+    "canonicalSdkRuntimeProof": [
+      {
+        "path": "js/engine.js",
+        "canonicalRuntimeSha256": "3268dc323e45675471afc7de2a7032871591807f66d28c7fe4d631285b10842d"
+      },
+      {
+        "path": "output/next-render-cycle-4/candidate/js/engine.js",
+        "canonicalRuntimeSha256": "3268dc323e45675471afc7de2a7032871591807f66d28c7fe4d631285b10842d"
+      }
+    ],
+    "sourceDumpSha256": "67dea027fbafd08b4fbea1bfe73f405fe568df3b8b269a43038cd2a0906d2d5f"
+  },
+  "archiveAudit": {
+    "path": "docs/performance/next-render-cycle/batch-4/evidence.tar.gz",
+    "bytes": 27103390,
+    "sha256": "cab88de081124ab6cd1accdb33fb678639b641bec33121307926ee6794df3b14",
+    "payloads": 504,
+    "storedEntries": 506,
+    "uniquePayloads": 359,
+    "exactContentHardlinks": 145,
+    "recordedUncompressedBytes": 180454130,
+    "everyPayloadAndHardlinkReadBack": true,
+    "frozenRuntimeChangedInputsIncluded": [
+      "docs/performance/next-render-cycle/batch-4/PROTOCOL.md",
+      "js/engine.d.ts",
+      "js/engine.js",
+      "pkg/verification-build.json",
+      "pkg/webgpu_wasm.d.ts",
+      "pkg/webgpu_wasm.js",
+      "pkg/webgpu_wasm_bg.wasm",
+      "pkg/webgpu_wasm_bg.wasm.d.ts",
+      "scripts/render-performance-api.mjs",
+      "scripts/render-performance-lib.mjs",
+      "scripts/render-performance.mjs",
+      "scripts/test-browser.mjs",
+      "src/render/gltf_gpu.rs",
+      "src/render/renderer.rs",
+      "src/web.rs",
+      "tests/gltf-instance-pool.html",
+      "tests/gltf-instance-pool.js",
+      "tests/render-performance.js",
+      "tests/webxr-webgpu.html",
+      "tests/xr/gltf-instance-checks.js"
+    ],
+    "unchangedBaseAssetsExcluded": true
+  },
+  "evidenceBoundaries": {
+    "physicalQuest": false,
+    "freshThreeComparison": false,
+    "push": false,
+    "mainMerge": false,
+    "deployment": false,
+    "shared8443Restart": false,
+    "wholeGpuPhysicalReleaseOrVramMeasured": false
+  }
+}

@@ -98,7 +98,35 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
         frame();
     }
 
+    // Repeated eye-owned pool oscillation; keep the asset alive while culling
+    // changes membership, then compare actual independent eye attachments.
+    if (engine.configureGltfInstancePool) {
+        engine.configureGltfInstancePool({byteLimit:64*1024*1024});
+        place(baseline);frame();frame();
+        const poolStart=engine.debugStats().gltf.instancePool;
+        for(let cycle=0;cycle<4;cycle++) {
+            place([0,10000,10001]);frame();
+            place([10000,10001,10002]);frame();
+            place(baseline);frame();frame();
+        }
+        const poolEnd=engine.debugStats().gltf.instancePool;
+        test.assert(poolEnd.buffersCreated===poolStart.buffersCreated && poolEnd.bindGroupsCreated===poolStart.bindGroupsCreated,
+            'many/few/zero/many XR eye resources plateau after warmup',{poolStart,poolEnd});
+        const pooled=await readEyes();
+        engine.setPreparedPlanCacheEnabled(false);engine.set_frustum_culling(false);frame();
+        const oracle=await readEyes();
+        test.assert(oracle.every((image,eye)=>pixelDifference(pooled[eye],image,0)===0),
+            'pooled stereo resources match independent cache-off culling-off pixels');
+        engine.set_frustum_culling(true);engine.setPreparedPlanCacheEnabled(true);
+        for(let cycle=0;cycle<3;cycle++) {
+            await engine.xr.exit();await engine.xr.enter();frame();frame();
+            const image=await readEyes();
+            test.assert(image.every((image,eye)=>pixelDifference(pooled[eye],image,0)===0),
+                'XR reentry preserves exact pooled eye pixels '+cycle);
+        }
+    }
+
     engine.scene.clear();
     frame();
-    test.assert(engine.debugStats().gltf.instanceBufferBytes===0, 'scene.clear releases glTF XR instance buffers', engine.debugStats().gltf);
+    test.assert(engine.debugStats().gltf.instancePool?.liveBytes===0 && engine.debugStats().gltf.instanceBufferBytes===0, 'scene.clear releases glTF XR instance buffers', engine.debugStats().gltf);
 }

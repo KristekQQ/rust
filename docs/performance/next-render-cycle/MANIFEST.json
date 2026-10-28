@@ -548,5 +548,11 @@
     "path": "RESULTS.json",
     "sha256": "4179356b22280d33a8edef226735eeb459614eb063b01586aea0b793ea5813a2",
     "scope": "descriptive aggregation; archived raw evidence authoritative"
+  },
+  "latestBatch": {
+    "number": 4,
+    "status": "complete local checkpoint with open strict stress-pixel limit",
+    "manifest": "batch-4/MANIFEST.json",
+    "state": "STATE.md"
   }
 }

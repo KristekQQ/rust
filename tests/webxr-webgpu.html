@@ -334,8 +334,8 @@ const report=await run.execute(async test=>{
         await second.checkValidation(test);
     }
     if(!profiling)await verifyGltfInstanceViews(engine,sim,test,{
-        pixels:index=>second.pixels(index),
-        shiftLeft:amount=>{second.leftProjectionShift=amount;}
+        pixels:index=>bindings.at(-1).pixels(index),
+        shiftLeft:amount=>{bindings.at(-1).leftProjectionShift=amount;}
     });
     const active=sim.session;engine.dispose();
     test.assert(!engine.xr.isPresenting&&active.pendingFrameCount===0,'dispose cancels active GPU XR');

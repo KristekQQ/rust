@@ -128,3 +128,24 @@ test('fine counters use exact boundaries, while cache-byte gauges stay out of ev
  assert.equal(d.gauges.end.fineCacheBytes,400);
  assert.equal(d.gltf.fineDynamicFallbacks.delta,null);
 });
+
+
+test('allocation diagnostic duration is bounded independently from primary',()=>{
+ assert.equal(parseArgs(['smoke','--diagnostic-sample','25000']).diagnosticSample,25000);
+ for(const n of ['0','-1','300001','Infinity'])assert.throws(()=>parseArgs(['smoke','--diagnostic-sample',n]));
+});
+test('actual GL bufferData allocation events use the selected source range',async()=>{
+ const {installApiCounters}=await import('./render-performance-api.mjs');
+ const names=['window','HTMLCanvasElement','WebGL2RenderingContext'],old=new Map(names.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]));
+ try{
+  globalThis.window={};delete globalThis.HTMLCanvasElement;
+  class GL{bufferData(){} }
+  globalThis.WebGL2RenderingContext=GL;installApiCounters();window.renderApiCounters.allocationEventsEnabled=true;const gl=new GL();
+  gl.bufferData(1,new Uint16Array(100),2,10,20);
+  gl.bufferData(1,new Float32Array(20),2,3,0);
+  gl.bufferData(1,new Uint8Array(12),2);
+  gl.bufferData(1,64,2);
+  assert.deepEqual(window.renderApiCounters.allocationEvents.filter(e=>e.api==='bufferData').map(e=>e.bytes),[40,68,12,64]);
+  window.renderApiCounters.allocationEventsEnabled=false;gl.bufferData(1,16,2);assert.equal(window.renderApiCounters.allocationEvents.length,4);assert.deepEqual(window.renderApiCounters.allocationTotals.bufferData,{calls:5,knownBytes:200,unknownSizeCalls:0});
+ }finally{for(const [k,d] of old)if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}
+});

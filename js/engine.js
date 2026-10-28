@@ -713,6 +713,8 @@ async function initializeEngine(canvas, backend, initialization) {
         /** Optional Rust-rendered HUD; disabled by default. */
         /** @param {boolean} enabled */
         setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },
+        /** Rust-owned bounded instance resources. @param {{byteLimit?:number,resourceLimit?:number,streamByteLimit?:number}} [options] */
+        configureGltfInstancePool({byteLimit,resourceLimit,streamByteLimit} = {}) { return wasm.configure_gltf_instance_pool(byteLimit,resourceLimit,streamByteLimit); },
         /** Exact opaque prepared-plan reuse; disable for independent comparison. @param {boolean} enabled */
         setPreparedPlanCacheEnabled(enabled) { wasm.set_prepared_plan_cache_enabled(enabled); },
         debugStats() { return JSON.parse(wasm.debug_stats()); },

@@ -1,0 +1,3623 @@
+{
+  "at": "2026-10-28T14:24:02.840Z",
+  "scope": "medians of per-run means/quantiles; maxima across runs; adjacent frames not independent replicates; full per-run counters/manifests/raw remain in evidence archive",
+  "results": [
+    {
+      "family": "rim-pool-cycle",
+      "load": 64,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-4/cal-rim-pool-cycle-64-webgpu/config.json",
+      "sha256": "b58687e66e0d21476fbf25eae50832caa016f0f42f6f18f2ce62c7b2fe94acbc",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 4504,
+          "fps": 60.002558403556144,
+          "callbackMeanMs": 1.6077896189911864,
+          "callbackP95Ms": 3.5,
+          "callbackP99Ms": 4.700000047683716,
+          "callbackMaxMs": 10.099999904632568,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            816,
+            816,
+            816
+          ],
+          "instanceBindGroupsCreated": [
+            804,
+            804,
+            804
+          ],
+          "ownedBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "liveBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "peakLiveBytes": [
+            null,
+            null,
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 89.89680426098535,
+            "instancesDrawn": 2461.348868175766,
+            "trianglesDrawn": 807807.6644474035,
+            "uniformUploadBytes": 823.3870752831446,
+            "bufferUploadCalls": 0.5522984676882079,
+            "instanceUploadBytes": 694.8327781479014,
+            "prepareGroupRebuilds": 0.02529960053262317,
+            "preparePayloadRebuilds": 1.1159227181878748,
+            "finePayloadRecordsWritten": 9.007328447701532,
+            "finePayloadBytesWritten": 144.1172551632245
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 4505,
+          "fps": 60.00255840355613,
+          "callbackMeanMs": 1.6743009336461399,
+          "callbackP95Ms": 3.700000047683716,
+          "callbackP99Ms": 4.900000095367432,
+          "callbackMaxMs": 9.300000190734863,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0,
+            0,
+            0
+          ],
+          "ownedBytesEnd": [
+            213216,
+            213216,
+            213216
+          ],
+          "liveBytesEnd": [
+            213216,
+            213216,
+            213216
+          ],
+          "peakLiveBytes": [
+            213216,
+            213216,
+            213216
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 89.89680426098535,
+            "instancesDrawn": 2461.348868175766,
+            "trianglesDrawn": 807807.6644474035,
+            "uniformUploadBytes": 694.37017310253,
+            "bufferUploadCalls": 0.016644474034620507,
+            "instanceUploadBytes": 694.37017310253,
+            "prepareGroupRebuilds": 0.02529960053262317,
+            "preparePayloadRebuilds": 1.1151797603195739,
+            "finePayloadRecordsWritten": 9.00133155792277,
+            "finePayloadBytesWritten": 144.02130492676432
+          },
+          "poolGaugeExample": {
+            "activeBytes": 0,
+            "activePages": 0,
+            "activeStreams": 0,
+            "bindGroupsCreated": 274,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 276,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              147456,
+              0,
+              65760,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              274,
+              0,
+              0
+            ],
+            "createdBytes": 213216,
+            "evictions": 0,
+            "inactiveBytes": 213216,
+            "inactivePages": 274,
+            "inactiveStreams": 2,
+            "liveBindGroups": 274,
+            "liveBuffers": 276,
+            "liveBytes": 213216,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 213216,
+            "peakLiveBytes": 213216,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 2244,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-pool-cycle-64-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-64-pair0",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-64-pair1",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-64-pair1",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-64-pair2",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-64-pair2",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-pool-cycle",
+      "load": 64,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-4/cal-rim-pool-cycle-64-webgl/config.json",
+      "sha256": "d319d1a6c7240e995bfe73aff7f8b3b278f462e918873e8257d6c37e783e521c",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 4505,
+          "fps": 60.002318543954345,
+          "callbackMeanMs": 2.209993339236143,
+          "callbackP95Ms": 4.099999904632568,
+          "callbackP99Ms": 5.1000001430511475,
+          "callbackMaxMs": 9.5,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            816,
+            816,
+            816
+          ],
+          "instanceBindGroupsCreated": [
+            804,
+            804,
+            804
+          ],
+          "ownedBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "liveBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "peakLiveBytes": [
+            null,
+            null,
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 89.89680426098535,
+            "instancesDrawn": 2461.348868175766,
+            "trianglesDrawn": 807807.6644474035,
+            "uniformUploadBytes": 822.8388814913449,
+            "bufferUploadCalls": 0.551930758988016,
+            "instanceUploadBytes": 694.37017310253,
+            "prepareGroupRebuilds": 0.02529960053262317,
+            "preparePayloadRebuilds": 1.1151797603195739,
+            "finePayloadRecordsWritten": 9.00133155792277,
+            "finePayloadBytesWritten": 144.02130492676432
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 4504,
+          "fps": 60.002400096003804,
+          "callbackMeanMs": 2.1073950699851323,
+          "callbackP95Ms": 4.099999904632568,
+          "callbackP99Ms": 5.200000047683716,
+          "callbackMaxMs": 9.400000095367432,
+          "intervalP95Ms": 16.799999999999272,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0,
+            0,
+            0
+          ],
+          "ownedBytesEnd": [
+            213216,
+            213216,
+            213216
+          ],
+          "liveBytesEnd": [
+            213216,
+            213216,
+            213216
+          ],
+          "peakLiveBytes": [
+            213216,
+            213216,
+            213216
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 89.93071285809461,
+            "instancesDrawn": 2462.962691538974,
+            "trianglesDrawn": 808301.0126582278,
+            "uniformUploadBytes": 694.8327781479014,
+            "bufferUploadCalls": 0.016655562958027982,
+            "instanceUploadBytes": 694.8327781479014,
+            "prepareGroupRebuilds": 0.02465023317788141,
+            "preparePayloadRebuilds": 1.1159227181878748,
+            "finePayloadRecordsWritten": 9.007328447701532,
+            "finePayloadBytesWritten": 144.1172551632245
+          },
+          "poolGaugeExample": {
+            "activeBytes": 147152,
+            "activePages": 67,
+            "activeStreams": 1,
+            "bindGroupsCreated": 274,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 276,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              147456,
+              0,
+              65760,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              274,
+              0,
+              0
+            ],
+            "createdBytes": 213216,
+            "evictions": 0,
+            "inactiveBytes": 66064,
+            "inactivePages": 207,
+            "inactiveStreams": 1,
+            "liveBindGroups": 274,
+            "liveBuffers": 276,
+            "liveBytes": 213216,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 213216,
+            "peakLiveBytes": 213216,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 2244,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-pool-cycle-64-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-64-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-64-pair1",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-64-pair1",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-64-pair2",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-64-pair2",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-pool-cycle",
+      "load": 1024,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-4/cal-rim-pool-cycle-1024-webgl/config.json",
+      "sha256": "9e46245c653466c3c7b8409442277cad692c13da42621b1e85c8039fb832244a",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 3825,
+          "fps": 50.928017205195026,
+          "callbackMeanMs": 5.748238059068529,
+          "callbackP95Ms": 15.200000047683716,
+          "callbackP99Ms": 21,
+          "callbackMaxMs": 70.70000004768372,
+          "intervalP95Ms": 33.399999999999636,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 66.79999999999927,
+          "instanceBuffersCreated": [
+            2424,
+            2424,
+            2424
+          ],
+          "instanceBindGroupsCreated": [
+            2412,
+            2412,
+            2412
+          ],
+          "ownedBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "liveBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "peakLiveBytes": [
+            null,
+            null,
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 145.3592156862745,
+            "instancesDrawn": 29394.112156862746,
+            "trianglesDrawn": 9147358.170980392,
+            "uniformUploadBytes": 10677.157647058824,
+            "bufferUploadCalls": 1.9113725490196078,
+            "instanceUploadBytes": 10223.13411764706,
+            "prepareGroupRebuilds": 0.02980392156862745,
+            "preparePayloadRebuilds": 2.5749019607843135,
+            "finePayloadRecordsWritten": 10.767058823529412,
+            "finePayloadBytesWritten": 172.2729411764706
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 3830,
+          "fps": 51.04204168166714,
+          "callbackMeanMs": 5.683137256771911,
+          "callbackP95Ms": 15.299999952316284,
+          "callbackP99Ms": 19.90000009536743,
+          "callbackMaxMs": 96.40000009536743,
+          "intervalP95Ms": 33.39999999999782,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 83.29999999999927,
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0,
+            0,
+            0
+          ],
+          "ownedBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "liveBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "peakLiveBytes": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 145.25411764705882,
+            "instancesDrawn": 29342.604705882353,
+            "trianglesDrawn": 9131420.97882353,
+            "uniformUploadBytes": 10207.12294440094,
+            "bufferUploadCalls": 0.01957713390759593,
+            "instanceUploadBytes": 10207.12294440094,
+            "prepareGroupRebuilds": 0.02975724353954581,
+            "preparePayloadRebuilds": 2.5708692247454974,
+            "finePayloadRecordsWritten": 10.750195771339076,
+            "finePayloadBytesWritten": 172.00313234142521
+          },
+          "poolGaugeExample": {
+            "activeBytes": 0,
+            "activePages": 0,
+            "activeStreams": 0,
+            "bindGroupsCreated": 408,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 410,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              2113536,
+              0,
+              97920,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              408,
+              0,
+              0
+            ],
+            "createdBytes": 2211456,
+            "evictions": 0,
+            "inactiveBytes": 2211456,
+            "inactivePages": 408,
+            "inactiveStreams": 2,
+            "liveBindGroups": 408,
+            "liveBuffers": 410,
+            "liveBytes": 2211456,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 2211456,
+            "peakLiveBytes": 2211456,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 4596,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 1277,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair0",
+          "frames": 1277,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair1",
+          "frames": 1278,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair1",
+          "frames": 1273,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair2",
+          "frames": 1275,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair2",
+          "frames": 1275,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-pool-cycle",
+      "load": 1024,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-4/cal-rim-pool-cycle-1024-webgpu/config.json",
+      "sha256": "0169567ee01459bd34a97bdca377511a6f6fe8834cfbd6c63fdee5dddf43557a",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 4414,
+          "fps": 58.802116876207506,
+          "callbackMeanMs": 4.893686353148689,
+          "callbackP95Ms": 14.799999952316284,
+          "callbackP99Ms": 18.59999990463257,
+          "callbackMaxMs": 71.39999985694885,
+          "intervalP95Ms": 16.799999999999272,
+          "intervalP99Ms": 16.80000000000291,
+          "intervalMaxMs": 66.79999999999927,
+          "instanceBuffersCreated": [
+            2424,
+            2424,
+            2424
+          ],
+          "instanceBindGroupsCreated": [
+            2412,
+            2412,
+            2412
+          ],
+          "ownedBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "liveBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "peakLiveBytes": [
+            null,
+            null,
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 155.26069246435844,
+            "instancesDrawn": 33037.30319510537,
+            "trianglesDrawn": 10274464.231135283,
+            "uniformUploadBytes": 9254.504418762746,
+            "bufferUploadCalls": 1.656696125084976,
+            "instanceUploadBytes": 8860.976206662135,
+            "prepareGroupRebuilds": 0.025797691785471828,
+            "preparePayloadRebuilds": 2.2318150917743034,
+            "finePayloadRecordsWritten": 9.33242692046227,
+            "finePayloadBytesWritten": 149.31883072739632
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 4421,
+          "fps": 58.88235529421173,
+          "callbackMeanMs": 4.849762711605783,
+          "callbackP95Ms": 15,
+          "callbackP99Ms": 20,
+          "callbackMaxMs": 70,
+          "intervalP95Ms": 16.799999999999272,
+          "intervalP99Ms": 16.80000000000291,
+          "intervalMaxMs": 66.79999999999927,
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0,
+            0,
+            0
+          ],
+          "ownedBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "liveBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "peakLiveBytes": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 155.37559322033897,
+            "instancesDrawn": 33083.12219959267,
+            "trianglesDrawn": 10288640.00814664,
+            "uniformUploadBytes": 8848.945010183299,
+            "bufferUploadCalls": 0.01697216564833673,
+            "instanceUploadBytes": 8848.945010183299,
+            "prepareGroupRebuilds": 0.02576271186440678,
+            "preparePayloadRebuilds": 2.228784792939579,
+            "finePayloadRecordsWritten": 9.319755600814664,
+            "finePayloadBytesWritten": 149.11608961303463
+          },
+          "poolGaugeExample": {
+            "activeBytes": 0,
+            "activePages": 0,
+            "activeStreams": 0,
+            "bindGroupsCreated": 408,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 410,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              2113536,
+              0,
+              97920,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              408,
+              0,
+              0
+            ],
+            "createdBytes": 2211456,
+            "evictions": 0,
+            "inactiveBytes": 2211456,
+            "inactivePages": 408,
+            "inactiveStreams": 2,
+            "liveBindGroups": 408,
+            "liveBuffers": 410,
+            "liveBytes": 2211456,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 2211456,
+            "peakLiveBytes": 2211456,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 4388,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 1473,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair0",
+          "frames": 1473,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair1",
+          "frames": 1475,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair1",
+          "frames": 1470,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair2",
+          "frames": 1471,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair2",
+          "frames": 1473,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-clustered",
+      "load": 1024,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-4/cal-rim-clustered-1024-webgpu/config.json",
+      "sha256": "e9370c87ffb0f42214751708c68a3e0363e196d635af3faa778b5ecb72a6ee0a",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 1939,
+          "fps": 25.881035241409666,
+          "callbackMeanMs": 38.42962963934298,
+          "callbackP95Ms": 47.59999990463257,
+          "callbackP99Ms": 49,
+          "callbackMaxMs": 58.200000047683716,
+          "intervalP95Ms": 50.099999999998545,
+          "intervalP99Ms": 50.10000000000218,
+          "intervalMaxMs": 83.5,
+          "instanceBuffersCreated": [
+            268,
+            268,
+            268
+          ],
+          "instanceBindGroupsCreated": [
+            268,
+            268,
+            268
+          ],
+          "ownedBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "liveBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "peakLiveBytes": [
+            null,
+            null,
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 202.00924499229583,
+            "instancesDrawn": 52161.630200308166,
+            "trianglesDrawn": 16154144.409861324,
+            "uniformUploadBytes": 873084.3020030817,
+            "bufferUploadCalls": 164.00924499229583,
+            "instanceUploadBytes": 833962.0832049306,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 163.00924499229583,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 1939,
+          "fps": 25.85830768183875,
+          "callbackMeanMs": 38.4548686239782,
+          "callbackP95Ms": 47.60000014305115,
+          "callbackP99Ms": 48.799999952316284,
+          "callbackMaxMs": 59.799999713897705,
+          "intervalP95Ms": 50,
+          "intervalP99Ms": 50.10000000000218,
+          "intervalMaxMs": 66.70000000000073,
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0,
+            0,
+            0
+          ],
+          "ownedBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "liveBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "peakLiveBytes": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 201.89180834621328,
+            "instancesDrawn": 52187.489953632146,
+            "trianglesDrawn": 16163184.905718701,
+            "uniformUploadBytes": 873435.7465224111,
+            "bufferUploadCalls": 163.75894245723174,
+            "instanceUploadBytes": 834375.8392581143,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 162.89180834621328,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": {
+            "activeBytes": 2145392,
+            "activePages": 201,
+            "activeStreams": 1,
+            "bindGroupsCreated": 408,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 410,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              2113536,
+              0,
+              97920,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              408,
+              0,
+              0
+            ],
+            "createdBytes": 2211456,
+            "evictions": 0,
+            "inactiveBytes": 66064,
+            "inactivePages": 207,
+            "inactiveStreams": 1,
+            "liveBindGroups": 408,
+            "liveBuffers": 410,
+            "liveBytes": 2211456,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 2211456,
+            "peakLiveBytes": 2211456,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 140681,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": false,
+          "exact": false,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 2,
+          "meanAbsoluteChannelDelta": 5.696614583333334e-06,
+          "changedPixels": 8,
+          "changedFraction": 8.680555555555556e-06,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-clustered-1024-pair0",
+          "frames": 648,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair0",
+          "frames": 643,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair1",
+          "frames": 649,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair1",
+          "frames": 642,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair2",
+          "frames": 649,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair2",
+          "frames": 647,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-clustered",
+      "load": 1024,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-4/cal-rim-clustered-1024-webgl/config.json",
+      "sha256": "094cf94027a4629b0459253f761df021c88f4546a3a15524e836a75b27dc32fe",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 1892,
+          "fps": 25.20100804032163,
+          "callbackMeanMs": 39.49572107342268,
+          "callbackP95Ms": 48.39999985694885,
+          "callbackP99Ms": 50,
+          "callbackMaxMs": 64.19999980926514,
+          "intervalP95Ms": 50.099999999998545,
+          "intervalP99Ms": 50.10000000000218,
+          "intervalMaxMs": 66.70000000000073,
+          "instanceBuffersCreated": [
+            268,
+            268,
+            268
+          ],
+          "instanceBindGroupsCreated": [
+            268,
+            268,
+            268
+          ],
+          "ownedBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "liveBytesEnd": [
+            null,
+            null,
+            null
+          ],
+          "peakLiveBytes": [
+            null,
+            null,
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 201.98732171156894,
+            "instancesDrawn": 52208.03328050713,
+            "trianglesDrawn": 16168055.334389858,
+            "uniformUploadBytes": 873846.9730586371,
+            "bufferUploadCalls": 163.98732171156894,
+            "instanceUploadBytes": 834704.5324881141,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 162.98732171156894,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 1890,
+          "fps": 25.304109019535755,
+          "callbackMeanMs": 39.335646689126165,
+          "callbackP95Ms": 48.200000047683716,
+          "callbackP99Ms": 49.5,
+          "callbackMaxMs": 58.39999985694885,
+          "intervalP95Ms": 50.099999999998545,
+          "intervalP99Ms": 50.10000000000218,
+          "intervalMaxMs": 66.80000000000291,
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0,
+            0,
+            0
+          ],
+          "ownedBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "liveBytesEnd": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "peakLiveBytes": [
+            2211456,
+            2211456,
+            2211456
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 201.74447949526814,
+            "instancesDrawn": 52210.39935587762,
+            "trianglesDrawn": 16168098.225442834,
+            "uniformUploadBytes": 873764.2254428341,
+            "bufferUploadCalls": 163.74447949526814,
+            "instanceUploadBytes": 834742.3896940419,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 162.74447949526814,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": {
+            "activeBytes": 2145392,
+            "activePages": 201,
+            "activeStreams": 1,
+            "bindGroupsCreated": 408,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 410,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              2113536,
+              0,
+              97920,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              408,
+              0,
+              0
+            ],
+            "createdBytes": 2211456,
+            "evictions": 0,
+            "inactiveBytes": 66064,
+            "inactivePages": 207,
+            "inactiveStreams": 1,
+            "liveBindGroups": 408,
+            "liveBuffers": 410,
+            "liveBytes": 2211456,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 2211456,
+            "peakLiveBytes": 2211456,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 139271,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-clustered-1024-pair0",
+          "frames": 631,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair0",
+          "frames": 634,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair1",
+          "frames": 635,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair1",
+          "frames": 631,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair2",
+          "frames": 630,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair2",
+          "frames": 621,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-stress",
+      "load": 1024,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-4/cal-rim-stress-1024-webgl/config.json",
+      "sha256": "b1621006fa82efa9fbfe919bbe1221b5aa1fa4411a5abc362cd533314458ac8d",
+      "byLabel": {
+        "baseline": {
+          "runs": 1,
+          "frames": 1063,
+          "fps": 42.5099269885998,
+          "callbackMeanMs": 8.277046091469076,
+          "callbackP95Ms": 15.599999904632568,
+          "callbackP99Ms": 17,
+          "callbackMaxMs": 18.200000047683716,
+          "intervalP95Ms": 33.400000000001455,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 33.400000000001455,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            null
+          ],
+          "liveBytesEnd": [
+            null
+          ],
+          "peakLiveBytes": [
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 240,
+            "instancesDrawn": 66783,
+            "trianglesDrawn": 20714924,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 0,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 1,
+          "frames": 1056,
+          "fps": 42.201688067522525,
+          "callbackMeanMs": 8.377178032967178,
+          "callbackP95Ms": 15.800000190734863,
+          "callbackP99Ms": 18,
+          "callbackMaxMs": 20.700000047683716,
+          "intervalP95Ms": 33.400000000001455,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 33.5,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            2211456
+          ],
+          "liveBytesEnd": [
+            2211456
+          ],
+          "peakLiveBytes": [
+            2211456
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 240,
+            "instancesDrawn": 66783,
+            "trianglesDrawn": 20714924,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 0,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": {
+            "activeBytes": 2145392,
+            "activePages": 201,
+            "activeStreams": 1,
+            "bindGroupsCreated": 408,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 410,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              2113536,
+              0,
+              97920,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              408,
+              0,
+              0
+            ],
+            "createdBytes": 2211456,
+            "evictions": 0,
+            "inactiveBytes": 66064,
+            "inactivePages": 207,
+            "inactiveStreams": 1,
+            "liveBindGroups": 408,
+            "liveBuffers": 410,
+            "liveBytes": 2211456,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 2211456,
+            "peakLiveBytes": 2211456,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 208,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-stress-1024-pair0",
+          "frames": 1063,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-1024-pair0",
+          "frames": 1056,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-stress",
+      "load": 1024,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-4/cal-rim-stress-1024-webgpu/config.json",
+      "sha256": "f069d97f4b077dbdd02a7794faeea693d0dd74ae2e36e1096b6cd06c6b735515",
+      "byLabel": {
+        "baseline": {
+          "runs": 1,
+          "frames": 1498,
+          "fps": 59.88215575760723,
+          "callbackMeanMs": 6.667890526105628,
+          "callbackP95Ms": 15.299999952316284,
+          "callbackP99Ms": 16.90000009536743,
+          "callbackMaxMs": 29.700000286102295,
+          "intervalP95Ms": 16.799999999999272,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 33.400000000001455,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            null
+          ],
+          "liveBytesEnd": [
+            null
+          ],
+          "peakLiveBytes": [
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 240,
+            "instancesDrawn": 66783,
+            "trianglesDrawn": 20714924,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 0,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 1,
+          "frames": 1501,
+          "fps": 59.9623436481889,
+          "callbackMeanMs": 6.6606262425912535,
+          "callbackP95Ms": 15.200000047683716,
+          "callbackP99Ms": 16.799999952316284,
+          "callbackMaxMs": 18.09999990463257,
+          "intervalP95Ms": 16.799999999999272,
+          "intervalP99Ms": 16.80000000000291,
+          "intervalMaxMs": 33.39999999999782,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            2211456
+          ],
+          "liveBytesEnd": [
+            2211456
+          ],
+          "peakLiveBytes": [
+            2211456
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 240,
+            "instancesDrawn": 66783,
+            "trianglesDrawn": 20714924,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 0,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": {
+            "activeBytes": 2145392,
+            "activePages": 201,
+            "activeStreams": 1,
+            "bindGroupsCreated": 408,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 410,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              2113536,
+              0,
+              97920,
+              0,
+              0
+            ],
+            "createReasons": [
+              2,
+              0,
+              408,
+              0,
+              0
+            ],
+            "createdBytes": 2211456,
+            "evictions": 0,
+            "inactiveBytes": 66064,
+            "inactivePages": 207,
+            "inactiveStreams": 1,
+            "liveBindGroups": 408,
+            "liveBuffers": 410,
+            "liveBytes": 2211456,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 2211456,
+            "peakLiveBytes": 2211456,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 0,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-rim-stress-1024-pair0",
+          "frames": 1498,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-1024-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "arena-active",
+      "load": 1,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-4/cal-arena-active-1-webgpu/config.json",
+      "sha256": "a2465dbd588ac825aa769b007f8e9b4c8d5c880c86f9573ce0a97c85f8b79cc7",
+      "byLabel": {
+        "baseline": {
+          "runs": 1,
+          "frames": 1501,
+          "fps": 60.002400096003804,
+          "callbackMeanMs": 1.1040639578700462,
+          "callbackP95Ms": 2,
+          "callbackP99Ms": 2.6000001430511475,
+          "callbackMaxMs": 3.8000001907348633,
+          "intervalP95Ms": 16.700000000000728,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            null
+          ],
+          "liveBytesEnd": [
+            null
+          ],
+          "peakLiveBytes": [
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 0,
+            "instancesDrawn": 0,
+            "trianglesDrawn": 0,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 1,
+          "frames": 1501,
+          "fps": 60.002400096003804,
+          "callbackMeanMs": 1.0858760758450157,
+          "callbackP95Ms": 2,
+          "callbackP99Ms": 2.6000001430511475,
+          "callbackMaxMs": 4.400000095367432,
+          "intervalP95Ms": 16.700000000000728,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            0
+          ],
+          "liveBytesEnd": [
+            0
+          ],
+          "peakLiveBytes": [
+            0
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 0,
+            "instancesDrawn": 0,
+            "trianglesDrawn": 0,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": {
+            "activeBytes": 0,
+            "activePages": 0,
+            "activeStreams": 0,
+            "bindGroupsCreated": 0,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 0,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "createReasons": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "createdBytes": 0,
+            "evictions": 0,
+            "inactiveBytes": 0,
+            "inactivePages": 0,
+            "inactiveStreams": 0,
+            "liveBindGroups": 0,
+            "liveBuffers": 0,
+            "liveBytes": 0,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 0,
+            "peakLiveBytes": 0,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 0,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": null,
+          "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-arena-active-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "arena-active",
+      "load": 1,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-4/cal-arena-active-1-webgl/config.json",
+      "sha256": "bd83ae9c332085dd812561c7fe6b847df15b0dbbe465bff0244907e27afa50f5",
+      "byLabel": {
+        "baseline": {
+          "runs": 1,
+          "frames": 1501,
+          "fps": 60.00240009600379,
+          "callbackMeanMs": 1.9557628256729807,
+          "callbackP95Ms": 2.9000000953674316,
+          "callbackP99Ms": 3.3000001907348633,
+          "callbackMaxMs": 5.700000047683716,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            null
+          ],
+          "liveBytesEnd": [
+            null
+          ],
+          "peakLiveBytes": [
+            null
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 0,
+            "instancesDrawn": 0,
+            "trianglesDrawn": 0,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": null
+        },
+        "candidate": {
+          "runs": 1,
+          "frames": 1501,
+          "fps": 60.00240009600379,
+          "callbackMeanMs": 1.8998667564811427,
+          "callbackP95Ms": 2.8000001907348633,
+          "callbackP99Ms": 3.299999952316284,
+          "callbackMaxMs": 3.799999952316284,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "instanceBuffersCreated": [
+            0
+          ],
+          "instanceBindGroupsCreated": [
+            0
+          ],
+          "ownedBytesEnd": [
+            0
+          ],
+          "liveBytesEnd": [
+            0
+          ],
+          "peakLiveBytes": [
+            0
+          ],
+          "workMediansPerApplicationRaf": {
+            "drawCalls": 0,
+            "instancesDrawn": 0,
+            "trianglesDrawn": 0,
+            "uniformUploadBytes": 0,
+            "bufferUploadCalls": 0,
+            "instanceUploadBytes": 0,
+            "prepareGroupRebuilds": 1,
+            "preparePayloadRebuilds": 0,
+            "finePayloadRecordsWritten": 0,
+            "finePayloadBytesWritten": 0
+          },
+          "poolGaugeExample": {
+            "activeBytes": 0,
+            "activePages": 0,
+            "activeStreams": 0,
+            "bindGroupsCreated": 0,
+            "bindGroupsReleased": 0,
+            "buffersCreated": 0,
+            "buffersReleased": 0,
+            "byteLimit": 67108864,
+            "createReasonBytes": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "createReasons": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "createdBytes": 0,
+            "evictions": 0,
+            "inactiveBytes": 0,
+            "inactivePages": 0,
+            "inactiveStreams": 0,
+            "liveBindGroups": 0,
+            "liveBuffers": 0,
+            "liveBytes": 0,
+            "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "overBudgetEvents": 0,
+            "ownedBytes": 0,
+            "peakLiveBytes": 0,
+            "reasonNames": [
+              "streamCold",
+              "streamGrowth",
+              "pageMaterial",
+              "standaloneCold",
+              "standaloneGrowth"
+            ],
+            "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+            "releasedBytes": 0,
+            "resourceLimit": 4096,
+            "retiredBytes": 0,
+            "reuses": 0,
+            "streamByteLimit": 16777216
+          }
+        }
+      },
+      "pixelPairs": [
+        {
+          "pass": null,
+          "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+        }
+      ],
+      "driver": "bafbb5081c52d143f3b0f7cec6794002f1e64cba713873ba6dd9b25c8676183e",
+      "checks": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-arena-active-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    }
+  ],
+  "qualityAudit": {
+    "all44Matched": true,
+    "runs": 44
+  },
+  "diagnostics": {
+    "scope": "separate instrumented25s callback-wall association, not causal cost or primary throughput; GL bindGroup API absent; cold startup uses bounded aggregate totals only",
+    "rows": [
+      {
+        "family": "rim-pool-cycle",
+        "load": 64,
+        "backend": "webgpu",
+        "label": "baseline",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25002.299999952316,
+        "frameCount": 1500,
+        "eventCount": 1620,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": 1620,
+        "actualApiDelta": {
+          "createBuffer": 816,
+          "createBindGroup": 804,
+          "bufferData": null,
+          "deleteBuffer": null
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 816,
+            "knownBytes": 1765824,
+            "unknownSizeCalls": 0
+          },
+          "createBindGroup": {
+            "calls": 804,
+            "knownBytes": 0,
+            "unknownSizeCalls": 804
+          }
+        },
+        "allCallbackMs": {
+          "count": 1500,
+          "median": 1.0999999046325684,
+          "mean": 1.258933336575826,
+          "p95": 2.0999999046325684,
+          "p99": 4.700000047683716,
+          "max": 9.899999856948853,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "allocationAssociatedCallbackMs": {
+          "count": 12,
+          "median": 8.199999809265137,
+          "mean": 7.874999940395355,
+          "p95": 9.899999856948853,
+          "p99": 9.899999856948853,
+          "max": 9.899999856948853,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1488,
+          "median": 1.0999999046325684,
+          "mean": 1.2055779607385717,
+          "p95": 2.0999999046325684,
+          "p99": 3,
+          "max": 5.900000095367432,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "poolAllocationAssociatedCallbackMs": {
+          "count": 12,
+          "median": 8.199999809265137,
+          "mean": 7.874999940395355,
+          "p95": 9.899999856948853,
+          "p99": 9.899999856948853,
+          "max": 9.899999856948853,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "finalPool": null,
+        "submittedDelta": {
+          "drawCalls": 136380,
+          "instances": 3694080,
+          "triangles": 1211883180
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 64,
+        "backend": "webgpu",
+        "label": "candidate",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25003,
+        "frameCount": 1501,
+        "eventCount": 0,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": 0,
+        "actualApiDelta": {
+          "createBuffer": 0,
+          "createBindGroup": 0,
+          "bufferData": null,
+          "deleteBuffer": null
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          },
+          "createBindGroup": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 1501,
+          "median": 1.2000000476837158,
+          "mean": 1.3051299062432804,
+          "p95": 2,
+          "p99": 4.200000047683716,
+          "max": 7.599999904632568,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "allocationAssociatedCallbackMs": null,
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1501,
+          "median": 1.2000000476837158,
+          "mean": 1.3051299062432804,
+          "p95": 2,
+          "p99": 4.200000047683716,
+          "max": 7.599999904632568,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": {
+          "activeBytes": 147152,
+          "activePages": 67,
+          "activeStreams": 1,
+          "bindGroupsCreated": 274,
+          "bindGroupsReleased": 0,
+          "buffersCreated": 276,
+          "buffersReleased": 0,
+          "byteLimit": 67108864,
+          "createReasonBytes": [
+            147456,
+            0,
+            65760,
+            0,
+            0
+          ],
+          "createReasons": [
+            2,
+            0,
+            274,
+            0,
+            0
+          ],
+          "createdBytes": 213216,
+          "evictions": 0,
+          "inactiveBytes": 66064,
+          "inactivePages": 207,
+          "inactiveStreams": 1,
+          "liveBindGroups": 274,
+          "liveBuffers": 276,
+          "liveBytes": 213216,
+          "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+          "overBudgetEvents": 0,
+          "ownedBytes": 213216,
+          "peakLiveBytes": 213216,
+          "reasonNames": [
+            "streamCold",
+            "streamGrowth",
+            "pageMaterial",
+            "standaloneCold",
+            "standaloneGrowth"
+          ],
+          "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+          "releasedBytes": 0,
+          "resourceLimit": 4096,
+          "retiredBytes": 0,
+          "reuses": 2180,
+          "streamByteLimit": 16777216
+        },
+        "submittedDelta": {
+          "drawCalls": 136487,
+          "instances": 3698408,
+          "triangles": 1213261321
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 64,
+        "backend": "webgl",
+        "label": "baseline",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25003,
+        "frameCount": 1500,
+        "eventCount": 1632,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": null,
+        "actualApiDelta": {
+          "createBuffer": 816,
+          "createBindGroup": null,
+          "bufferData": 816,
+          "deleteBuffer": 816
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 816,
+            "knownBytes": 0,
+            "unknownSizeCalls": 816
+          },
+          "bufferData": {
+            "calls": 816,
+            "knownBytes": 1765872,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 1500,
+          "median": 2.0999999046325684,
+          "mean": 2.1744666646321615,
+          "p95": 3.5,
+          "p99": 5.200000047683716,
+          "max": 10.400000095367432,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "allocationAssociatedCallbackMs": {
+          "count": 12,
+          "median": 7.900000095367432,
+          "mean": 7.524999996026357,
+          "p95": 10.400000095367432,
+          "p99": 10.400000095367432,
+          "max": 10.400000095367432,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1488,
+          "median": 2.0999999046325684,
+          "mean": 2.1313172022822084,
+          "p95": 3.3999998569488525,
+          "p99": 4.700000047683716,
+          "max": 5.6000001430511475,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": null,
+        "submittedDelta": {
+          "drawCalls": 137880,
+          "instances": 3698796,
+          "triangles": 1212867816
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 64,
+        "backend": "webgl",
+        "label": "candidate",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25004.10000014305,
+        "frameCount": 1500,
+        "eventCount": 0,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": null,
+        "actualApiDelta": {
+          "createBuffer": 0,
+          "createBindGroup": null,
+          "bufferData": 0,
+          "deleteBuffer": 0
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          },
+          "bufferData": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 1500,
+          "median": 1.9000000953674316,
+          "mean": 1.9419333329200745,
+          "p95": 3.1000001430511475,
+          "p99": 4.799999952316284,
+          "max": 8.200000047683716,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "allocationAssociatedCallbackMs": null,
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1500,
+          "median": 1.9000000953674316,
+          "mean": 1.9419333329200745,
+          "p95": 3.1000001430511475,
+          "p99": 4.799999952316284,
+          "max": 8.200000047683716,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 0,
+          "rawExactOverrunDurationMs": 0,
+          "overruns": 0,
+          "overrunDurationMs": 0
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": {
+          "activeBytes": 147152,
+          "activePages": 67,
+          "activeStreams": 1,
+          "bindGroupsCreated": 274,
+          "bindGroupsReleased": 0,
+          "buffersCreated": 276,
+          "buffersReleased": 0,
+          "byteLimit": 67108864,
+          "createReasonBytes": [
+            147456,
+            0,
+            65760,
+            0,
+            0
+          ],
+          "createReasons": [
+            2,
+            0,
+            274,
+            0,
+            0
+          ],
+          "createdBytes": 213216,
+          "evictions": 0,
+          "inactiveBytes": 66064,
+          "inactivePages": 207,
+          "inactiveStreams": 1,
+          "liveBindGroups": 274,
+          "liveBuffers": 276,
+          "liveBytes": 213216,
+          "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+          "overBudgetEvents": 0,
+          "ownedBytes": 213216,
+          "peakLiveBytes": 213216,
+          "reasonNames": [
+            "streamCold",
+            "streamGrowth",
+            "pageMaterial",
+            "standaloneCold",
+            "standaloneGrowth"
+          ],
+          "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+          "releasedBytes": 0,
+          "resourceLimit": 4096,
+          "retiredBytes": 0,
+          "reuses": 2180,
+          "streamByteLimit": 16777216
+        },
+        "submittedDelta": {
+          "drawCalls": 137880,
+          "instances": 3698796,
+          "triangles": 1212867816
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 1024,
+        "backend": "webgpu",
+        "label": "baseline",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25002.599999904633,
+        "frameCount": 1474,
+        "eventCount": 4836,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": 4836,
+        "actualApiDelta": {
+          "createBuffer": 2424,
+          "createBindGroup": 2412,
+          "bufferData": null,
+          "deleteBuffer": null
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 2424,
+            "knownBytes": 25744704,
+            "unknownSizeCalls": 0
+          },
+          "createBindGroup": {
+            "calls": 2412,
+            "knownBytes": 0,
+            "unknownSizeCalls": 2412
+          }
+        },
+        "allCallbackMs": {
+          "count": 1474,
+          "median": 5,
+          "mean": 4.25264586295978,
+          "p95": 6.200000047683716,
+          "p99": 19,
+          "max": 61.5,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 25,
+          "rawExactOverrunDurationMs": 486.8333340485889,
+          "overruns": 25,
+          "overrunDurationMs": 486.8333340485889
+        },
+        "allocationAssociatedCallbackMs": {
+          "count": 12,
+          "median": 56.799999952316284,
+          "mean": 53.98333336909612,
+          "p95": 61.5,
+          "p99": 61.5,
+          "max": 61.5,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 12,
+          "rawExactOverrunDurationMs": 447.80000042915333,
+          "overruns": 12,
+          "overrunDurationMs": 447.80000042915333
+        },
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1462,
+          "median": 4.199999809265137,
+          "mean": 3.8444596453991537,
+          "p95": 6.1000001430511475,
+          "p99": 10.100000143051147,
+          "max": 27.59999990463257,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 13,
+          "rawExactOverrunDurationMs": 39.03333361943561,
+          "overruns": 13,
+          "overrunDurationMs": 39.03333361943561
+        },
+        "poolAllocationAssociatedCallbackMs": {
+          "count": 12,
+          "median": 56.799999952316284,
+          "mean": 53.98333336909612,
+          "p95": 61.5,
+          "p99": 61.5,
+          "max": 61.5,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 12,
+          "rawExactOverrunDurationMs": 447.80000042915333,
+          "overruns": 12,
+          "overrunDurationMs": 447.80000042915333
+        },
+        "finalPool": null,
+        "submittedDelta": {
+          "drawCalls": 231150,
+          "instances": 49062384,
+          "triangles": 15257162810
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 1024,
+        "backend": "webgpu",
+        "label": "candidate",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25003.5,
+        "frameCount": 1478,
+        "eventCount": 0,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": 0,
+        "actualApiDelta": {
+          "createBuffer": 0,
+          "createBindGroup": 0,
+          "bufferData": null,
+          "deleteBuffer": null
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          },
+          "createBindGroup": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 1478,
+          "median": 4.799999952316284,
+          "mean": 4.255412722150108,
+          "p95": 6,
+          "p99": 18.5,
+          "max": 57,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 23,
+          "rawExactOverrunDurationMs": 468.16666738192225,
+          "overruns": 23,
+          "overrunDurationMs": 468.16666738192225
+        },
+        "allocationAssociatedCallbackMs": null,
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1478,
+          "median": 4.799999952316284,
+          "mean": 4.255412722150108,
+          "p95": 6,
+          "p99": 18.5,
+          "max": 57,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 23,
+          "rawExactOverrunDurationMs": 468.16666738192225,
+          "overruns": 23,
+          "overrunDurationMs": 468.16666738192225
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": {
+          "activeBytes": 2113232,
+          "activePages": 67,
+          "activeStreams": 1,
+          "bindGroupsCreated": 408,
+          "bindGroupsReleased": 0,
+          "buffersCreated": 410,
+          "buffersReleased": 0,
+          "byteLimit": 67108864,
+          "createReasonBytes": [
+            2113536,
+            0,
+            97920,
+            0,
+            0
+          ],
+          "createReasons": [
+            2,
+            0,
+            408,
+            0,
+            0
+          ],
+          "createdBytes": 2211456,
+          "evictions": 0,
+          "inactiveBytes": 98224,
+          "inactivePages": 341,
+          "inactiveStreams": 1,
+          "liveBindGroups": 408,
+          "liveBuffers": 410,
+          "liveBytes": 2211456,
+          "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+          "overBudgetEvents": 0,
+          "ownedBytes": 2211456,
+          "peakLiveBytes": 2211456,
+          "reasonNames": [
+            "streamCold",
+            "streamGrowth",
+            "pageMaterial",
+            "standaloneCold",
+            "standaloneGrowth"
+          ],
+          "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+          "releasedBytes": 0,
+          "resourceLimit": 4096,
+          "retiredBytes": 0,
+          "reuses": 3848,
+          "streamByteLimit": 16777216
+        },
+        "submittedDelta": {
+          "drawCalls": 231578,
+          "instances": 49066832,
+          "triangles": 15258742830
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 1024,
+        "backend": "webgl",
+        "label": "baseline",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25004.799999952316,
+        "frameCount": 1274,
+        "eventCount": 4848,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": null,
+        "actualApiDelta": {
+          "createBuffer": 2424,
+          "createBindGroup": null,
+          "bufferData": 2424,
+          "deleteBuffer": 2558
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 2424,
+            "knownBytes": 0,
+            "unknownSizeCalls": 2424
+          },
+          "bufferData": {
+            "calls": 2424,
+            "knownBytes": 25744752,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 1274,
+          "median": 3.700000047683716,
+          "mean": 5.194583984896003,
+          "p95": 7.400000095367432,
+          "p99": 22.399999856948853,
+          "max": 59.200000047683716,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 25,
+          "rawExactOverrunDurationMs": 515.2333327134448,
+          "overruns": 24,
+          "overrunDurationMs": 515.0999994277952
+        },
+        "allocationAssociatedCallbackMs": {
+          "count": 12,
+          "median": 57.200000047683716,
+          "mean": 55.48333330949148,
+          "p95": 59.200000047683716,
+          "p99": 59.200000047683716,
+          "max": 59.200000047683716,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 12,
+          "rawExactOverrunDurationMs": 465.79999971389753,
+          "overruns": 12,
+          "overrunDurationMs": 465.79999971389753
+        },
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1262,
+          "median": 3.6000001430511475,
+          "mean": 4.716402533315063,
+          "p95": 7.400000095367432,
+          "p99": 16.799999952316284,
+          "max": 22.399999856948853,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 13,
+          "rawExactOverrunDurationMs": 49.433332999547304,
+          "overruns": 12,
+          "overrunDurationMs": 49.29999971389768
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": null,
+        "submittedDelta": {
+          "drawCalls": 187440,
+          "instances": 37282986,
+          "triangles": 11601857164
+        },
+        "completePrimitives": false
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 1024,
+        "backend": "webgl",
+        "label": "candidate",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25001.700000047684,
+        "frameCount": 1277,
+        "eventCount": 0,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": null,
+        "actualApiDelta": {
+          "createBuffer": 0,
+          "createBindGroup": null,
+          "bufferData": 0,
+          "deleteBuffer": 0
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          },
+          "bufferData": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 1277,
+          "median": 3.799999952316284,
+          "mean": 5.324040720774591,
+          "p95": 7.6000001430511475,
+          "p99": 22.90000009536743,
+          "max": 56.799999952316284,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 25,
+          "rawExactOverrunDurationMs": 487.03333361943544,
+          "overruns": 24,
+          "overrunDurationMs": 486.70000028610207
+        },
+        "allocationAssociatedCallbackMs": null,
+        "noAllocationAssociatedCallbackMs": {
+          "count": 1277,
+          "median": 3.799999952316284,
+          "mean": 5.324040720774591,
+          "p95": 7.6000001430511475,
+          "p99": 22.90000009536743,
+          "max": 56.799999952316284,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 25,
+          "rawExactOverrunDurationMs": 487.03333361943544,
+          "overruns": 24,
+          "overrunDurationMs": 486.70000028610207
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": {
+          "activeBytes": 2113232,
+          "activePages": 67,
+          "activeStreams": 1,
+          "bindGroupsCreated": 408,
+          "bindGroupsReleased": 0,
+          "buffersCreated": 410,
+          "buffersReleased": 0,
+          "byteLimit": 67108864,
+          "createReasonBytes": [
+            2113536,
+            0,
+            97920,
+            0,
+            0
+          ],
+          "createReasons": [
+            2,
+            0,
+            408,
+            0,
+            0
+          ],
+          "createdBytes": 2211456,
+          "evictions": 0,
+          "inactiveBytes": 98224,
+          "inactivePages": 341,
+          "inactiveStreams": 1,
+          "liveBindGroups": 408,
+          "liveBuffers": 410,
+          "liveBytes": 2211456,
+          "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+          "overBudgetEvents": 0,
+          "ownedBytes": 2211456,
+          "peakLiveBytes": 2211456,
+          "reasonNames": [
+            "streamCold",
+            "streamGrowth",
+            "pageMaterial",
+            "standaloneCold",
+            "standaloneGrowth"
+          ],
+          "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+          "releasedBytes": 0,
+          "resourceLimit": 4096,
+          "retiredBytes": 0,
+          "reuses": 3848,
+          "streamByteLimit": 16777216
+        },
+        "submittedDelta": {
+          "drawCalls": 188568,
+          "instances": 37680357,
+          "triangles": 11724961702
+        },
+        "completePrimitives": false
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgpu",
+        "label": "baseline",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25034.700000047684,
+        "frameCount": 676,
+        "eventCount": 536,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": 536,
+        "actualApiDelta": {
+          "createBuffer": 268,
+          "createBindGroup": 268,
+          "bufferData": null,
+          "deleteBuffer": null
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 268,
+            "knownBytes": 64320,
+            "unknownSizeCalls": 0
+          },
+          "createBindGroup": {
+            "calls": 268,
+            "knownBytes": 0,
+            "unknownSizeCalls": 268
+          }
+        },
+        "allCallbackMs": {
+          "count": 676,
+          "median": 36.59999990463257,
+          "mean": 36.837721896947485,
+          "p95": 40,
+          "p99": 42.10000014305115,
+          "max": 47.90000009536743,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 676,
+          "rawExactOverrunDurationMs": 13635.633335669932,
+          "overruns": 676,
+          "overrunDurationMs": 13635.633335669932
+        },
+        "allocationAssociatedCallbackMs": {
+          "count": 4,
+          "median": 36.99999976158142,
+          "mean": 37.57499998807907,
+          "p95": 40.00000023841858,
+          "p99": 40.00000023841858,
+          "max": 40.00000023841858,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 4,
+          "rawExactOverrunDurationMs": 83.63333328564961,
+          "overruns": 4,
+          "overrunDurationMs": 83.63333328564961
+        },
+        "noAllocationAssociatedCallbackMs": {
+          "count": 672,
+          "median": 36.59999990463257,
+          "mean": 36.83333333688123,
+          "p95": 39.90000009536743,
+          "p99": 42.10000014305115,
+          "max": 47.90000009536743,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 672,
+          "rawExactOverrunDurationMs": 13552.00000238428,
+          "overruns": 672,
+          "overrunDurationMs": 13552.00000238428
+        },
+        "poolAllocationAssociatedCallbackMs": {
+          "count": 4,
+          "median": 36.99999976158142,
+          "mean": 37.57499998807907,
+          "p95": 40.00000023841858,
+          "p99": 40.00000023841858,
+          "max": 40.00000023841858,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 4,
+          "rawExactOverrunDurationMs": 83.63333328564961,
+          "overruns": 4,
+          "overrunDurationMs": 83.63333328564961
+        },
+        "finalPool": null,
+        "submittedDelta": {
+          "drawCalls": 141610,
+          "instances": 36440943,
+          "triangles": 11284395160
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgpu",
+        "label": "candidate",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25074.700000047684,
+        "frameCount": 679,
+        "eventCount": 0,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": 0,
+        "actualApiDelta": {
+          "createBuffer": 0,
+          "createBindGroup": 0,
+          "bufferData": null,
+          "deleteBuffer": null
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          },
+          "createBindGroup": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 679,
+          "median": 36.5,
+          "mean": 36.73814433277619,
+          "p95": 39.89999985694885,
+          "p99": 42.299999952316284,
+          "max": 44.5,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 679,
+          "rawExactOverrunDurationMs": 13628.533335288463,
+          "overruns": 679,
+          "overrunDurationMs": 13628.533335288463
+        },
+        "allocationAssociatedCallbackMs": null,
+        "noAllocationAssociatedCallbackMs": {
+          "count": 679,
+          "median": 36.5,
+          "mean": 36.73814433277619,
+          "p95": 39.89999985694885,
+          "p99": 42.299999952316284,
+          "max": 44.5,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 679,
+          "rawExactOverrunDurationMs": 13628.533335288463,
+          "overruns": 679,
+          "overrunDurationMs": 13628.533335288463
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": {
+          "activeBytes": 2145392,
+          "activePages": 201,
+          "activeStreams": 1,
+          "bindGroupsCreated": 408,
+          "bindGroupsReleased": 0,
+          "buffersCreated": 410,
+          "buffersReleased": 0,
+          "byteLimit": 67108864,
+          "createReasonBytes": [
+            2113536,
+            0,
+            97920,
+            0,
+            0
+          ],
+          "createReasons": [
+            2,
+            0,
+            408,
+            0,
+            0
+          ],
+          "createdBytes": 2211456,
+          "evictions": 0,
+          "inactiveBytes": 66064,
+          "inactivePages": 207,
+          "inactiveStreams": 1,
+          "liveBindGroups": 408,
+          "liveBuffers": 410,
+          "liveBytes": 2211456,
+          "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+          "overBudgetEvents": 0,
+          "ownedBytes": 2211456,
+          "peakLiveBytes": 2211456,
+          "reasonNames": [
+            "streamCold",
+            "streamGrowth",
+            "pageMaterial",
+            "standaloneCold",
+            "standaloneGrowth"
+          ],
+          "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+          "releasedBytes": 0,
+          "resourceLimit": 4096,
+          "retiredBytes": 0,
+          "reuses": 132642,
+          "streamByteLimit": 16777216
+        },
+        "submittedDelta": {
+          "drawCalls": 142400,
+          "instances": 36633325,
+          "triangles": 11343305903
+        },
+        "completePrimitives": true
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgl",
+        "label": "baseline",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25006.900000095367,
+        "frameCount": 657,
+        "eventCount": 536,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": null,
+        "actualApiDelta": {
+          "createBuffer": 268,
+          "createBindGroup": null,
+          "bufferData": 268,
+          "deleteBuffer": 201
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 268,
+            "knownBytes": 0,
+            "unknownSizeCalls": 268
+          },
+          "bufferData": {
+            "calls": 268,
+            "knownBytes": 64320,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 657,
+          "median": 37.799999952316284,
+          "mean": 37.90121765586702,
+          "p95": 40.90000009536743,
+          "p99": 42.200000047683716,
+          "max": 46.59999990463257,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 657,
+          "rawExactOverrunDurationMs": 13951.099999904733,
+          "overruns": 657,
+          "overrunDurationMs": 13951.099999904733
+        },
+        "allocationAssociatedCallbackMs": {
+          "count": 4,
+          "median": 37.5,
+          "mean": 38.049999952316284,
+          "p95": 39.59999990463257,
+          "p99": 39.59999990463257,
+          "max": 39.59999990463257,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 4,
+          "rawExactOverrunDurationMs": 85.53333314259847,
+          "overruns": 4,
+          "overrunDurationMs": 85.53333314259847
+        },
+        "noAllocationAssociatedCallbackMs": {
+          "count": 653,
+          "median": 37.799999952316284,
+          "mean": 37.900306278859674,
+          "p95": 40.90000009536743,
+          "p99": 42.200000047683716,
+          "max": 46.59999990463257,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 653,
+          "rawExactOverrunDurationMs": 13865.566666762132,
+          "overruns": 653,
+          "overrunDurationMs": 13865.566666762132
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": null,
+        "submittedDelta": {
+          "drawCalls": 138358,
+          "instances": 35428899,
+          "triangles": 10970554836
+        },
+        "completePrimitives": false
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgl",
+        "label": "candidate",
+        "driver": "3d7c815aa74ba04348e5534e7bfa513e1108fd25e3d80a84aecc75c5f643368f",
+        "elapsedMs": 25025.89999985695,
+        "frameCount": 654,
+        "eventCount": 0,
+        "eventsOutsideRaf": 0,
+        "poolLabelEventCount": null,
+        "actualApiDelta": {
+          "createBuffer": 0,
+          "createBindGroup": null,
+          "bufferData": 0,
+          "deleteBuffer": 0
+        },
+        "actualAllocationTotalsDelta": {
+          "createBuffer": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          },
+          "bufferData": {
+            "calls": 0,
+            "knownBytes": 0,
+            "unknownSizeCalls": 0
+          }
+        },
+        "allCallbackMs": {
+          "count": 654,
+          "median": 37.90000009536743,
+          "mean": 38.10122324312134,
+          "p95": 42.40000009536743,
+          "p99": 47.299999952316284,
+          "max": 57.200000047683716,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 654,
+          "rawExactOverrunDurationMs": 14018.200001001458,
+          "overruns": 654,
+          "overrunDurationMs": 14018.200001001458
+        },
+        "allocationAssociatedCallbackMs": null,
+        "noAllocationAssociatedCallbackMs": {
+          "count": 654,
+          "median": 37.90000009536743,
+          "mean": 38.10122324312134,
+          "p95": 42.40000009536743,
+          "p99": 47.299999952316284,
+          "max": 57.200000047683716,
+          "budgetMs": 16.666666666666668,
+          "overrunToleranceMs": 0.5,
+          "rawExactOverruns": 654,
+          "rawExactOverrunDurationMs": 14018.200001001458,
+          "overruns": 654,
+          "overrunDurationMs": 14018.200001001458
+        },
+        "poolAllocationAssociatedCallbackMs": null,
+        "finalPool": {
+          "activeBytes": 2145392,
+          "activePages": 201,
+          "activeStreams": 1,
+          "bindGroupsCreated": 408,
+          "bindGroupsReleased": 0,
+          "buffersCreated": 410,
+          "buffersReleased": 0,
+          "byteLimit": 67108864,
+          "createReasonBytes": [
+            2113536,
+            0,
+            97920,
+            0,
+            0
+          ],
+          "createReasons": [
+            2,
+            0,
+            408,
+            0,
+            0
+          ],
+          "createdBytes": 2211456,
+          "evictions": 0,
+          "inactiveBytes": 66064,
+          "inactivePages": 207,
+          "inactiveStreams": 1,
+          "liveBindGroups": 408,
+          "liveBuffers": 410,
+          "liveBytes": 2211456,
+          "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+          "overBudgetEvents": 0,
+          "ownedBytes": 2211456,
+          "peakLiveBytes": 2211456,
+          "reasonNames": [
+            "streamCold",
+            "streamGrowth",
+            "pageMaterial",
+            "standaloneCold",
+            "standaloneGrowth"
+          ],
+          "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+          "releasedBytes": 0,
+          "resourceLimit": 4096,
+          "retiredBytes": 0,
+          "reuses": 127993,
+          "streamByteLimit": 16777216
+        },
+        "submittedDelta": {
+          "drawCalls": 137498,
+          "instances": 35250412,
+          "triangles": 10915406272
+        },
+        "completePrimitives": false
+      }
+    ]
+  },
+  "pixels": {
+    "strictPrimary": [
+      {
+        "backend": "webgpu",
+        "label": "baseline",
+        "pair": 0,
+        "sha256": "cfbfcd6e0c59ee02396dace96f7a47ff2b0f0ba4b3a385f08334fceccabb599d",
+        "occursInExtraBaseline": true
+      },
+      {
+        "backend": "webgpu",
+        "label": "candidate",
+        "pair": 0,
+        "sha256": "6e4ae6aba9223f1dd0f29b1ad7e42b91cc809cf22d2df324e6f9cec2ce24209e",
+        "occursInExtraBaseline": false
+      },
+      {
+        "backend": "webgpu",
+        "label": "candidate",
+        "pair": 1,
+        "sha256": "cfbfcd6e0c59ee02396dace96f7a47ff2b0f0ba4b3a385f08334fceccabb599d",
+        "occursInExtraBaseline": true
+      },
+      {
+        "backend": "webgpu",
+        "label": "baseline",
+        "pair": 1,
+        "sha256": "cfbfcd6e0c59ee02396dace96f7a47ff2b0f0ba4b3a385f08334fceccabb599d",
+        "occursInExtraBaseline": true
+      },
+      {
+        "backend": "webgpu",
+        "label": "baseline",
+        "pair": 2,
+        "sha256": "cfbfcd6e0c59ee02396dace96f7a47ff2b0f0ba4b3a385f08334fceccabb599d",
+        "occursInExtraBaseline": true
+      },
+      {
+        "backend": "webgpu",
+        "label": "candidate",
+        "pair": 2,
+        "sha256": "cfbfcd6e0c59ee02396dace96f7a47ff2b0f0ba4b3a385f08334fceccabb599d",
+        "occursInExtraBaseline": true
+      },
+      {
+        "backend": "webgl",
+        "label": "baseline",
+        "pair": 0,
+        "sha256": "b9d1210a1a3afc7c67d0fa0963a427fd4aab613aa73c00e9aa6b00d4954fbb97",
+        "occursInExtraBaseline": false
+      },
+      {
+        "backend": "webgl",
+        "label": "candidate",
+        "pair": 0,
+        "sha256": "b9d1210a1a3afc7c67d0fa0963a427fd4aab613aa73c00e9aa6b00d4954fbb97",
+        "occursInExtraBaseline": false
+      },
+      {
+        "backend": "webgl",
+        "label": "candidate",
+        "pair": 1,
+        "sha256": "b9d1210a1a3afc7c67d0fa0963a427fd4aab613aa73c00e9aa6b00d4954fbb97",
+        "occursInExtraBaseline": false
+      },
+      {
+        "backend": "webgl",
+        "label": "baseline",
+        "pair": 1,
+        "sha256": "b9d1210a1a3afc7c67d0fa0963a427fd4aab613aa73c00e9aa6b00d4954fbb97",
+        "occursInExtraBaseline": false
+      },
+      {
+        "backend": "webgl",
+        "label": "baseline",
+        "pair": 2,
+        "sha256": "b9d1210a1a3afc7c67d0fa0963a427fd4aab613aa73c00e9aa6b00d4954fbb97",
+        "occursInExtraBaseline": false
+      },
+      {
+        "backend": "webgl",
+        "label": "candidate",
+        "pair": 2,
+        "sha256": "b9d1210a1a3afc7c67d0fa0963a427fd4aab613aa73c00e9aa6b00d4954fbb97",
+        "occursInExtraBaseline": false
+      }
+    ],
+    "oracleSummary": [
+      {
+        "label": "baseline",
+        "index": 0,
+        "strictComparisons": {
+          "repeat": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "independent": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "restored": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      },
+      {
+        "label": "baseline",
+        "index": 1,
+        "strictComparisons": {
+          "repeat": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 85,
+            "meanAbsoluteChannelDelta": 0.020606282552083334,
+            "changedPixels": 14906,
+            "changedFraction": 0.016174045138888888,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "independent": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "restored": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      },
+      {
+        "label": "baseline",
+        "index": 2,
+        "strictComparisons": {
+          "repeat": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "independent": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "restored": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 1,
+            "meanAbsoluteChannelDelta": 2.7126736111111112e-06,
+            "changedPixels": 8,
+            "changedFraction": 8.680555555555556e-06,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      },
+      {
+        "label": "candidate",
+        "index": 0,
+        "strictComparisons": {
+          "repeat": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "independent": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 1,
+            "meanAbsoluteChannelDelta": 1.3563368055555556e-06,
+            "changedPixels": 4,
+            "changedFraction": 4.340277777777778e-06,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "restored": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 1,
+            "meanAbsoluteChannelDelta": 1.3563368055555556e-06,
+            "changedPixels": 4,
+            "changedFraction": 4.340277777777778e-06,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      },
+      {
+        "label": "candidate",
+        "index": 1,
+        "strictComparisons": {
+          "repeat": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "independent": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 1,
+            "meanAbsoluteChannelDelta": 1.3563368055555556e-06,
+            "changedPixels": 4,
+            "changedFraction": 4.340277777777778e-06,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "restored": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 1,
+            "meanAbsoluteChannelDelta": 1.3563368055555556e-06,
+            "changedPixels": 4,
+            "changedFraction": 4.340277777777778e-06,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      },
+      {
+        "label": "candidate",
+        "index": 2,
+        "strictComparisons": {
+          "repeat": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "independent": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          },
+          "restored": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      }
+    ],
+    "baselineVariants": [
+      "cfbfcd6e0c59ee02396dace96f7a47ff2b0f0ba4b3a385f08334fceccabb599d",
+      "54836d59411fe20f989383ee401f6f582b9e58bb3d7953b12dbd47d3157bf6db",
+      "f0e43a99ed6932cd61d2c41a150d99d57f908bc7ee96bc1b3066408ef508a71f"
+    ]
+  }
+}

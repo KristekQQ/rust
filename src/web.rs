@@ -644,6 +644,23 @@ pub fn set_frustum_culling(enabled: bool) {
 
 /// Independent uncached preparation path for correctness/performance controls.
 #[wasm_bindgen]
+pub fn configure_gltf_instance_pool(
+    byte_limit: Option<u32>,
+    resource_limit: Option<u32>,
+    stream_byte_limit: Option<u32>,
+) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().configure_gltf_instance_pool(
+                byte_limit,
+                resource_limit,
+                stream_byte_limit,
+            )
+        })
+    })
+}
+
+#[wasm_bindgen]
 pub fn set_prepared_plan_cache_enabled(enabled: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {

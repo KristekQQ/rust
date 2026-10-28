@@ -1,6 +1,11 @@
 # Renderer performance — current state
 
-## Next renderer cycle — batch3 local checkpoint, 2026-10-28
+## Next renderer cycle — batch4 local checkpoint, 2026-10-28
+
+[Current state](next-render-cycle/STATE.md), [report](next-render-cycle/batch-4/REPORT.md). Bounded pass/view-owned instance pages/streams/material binds, one64MiB/4096handle budget, safe prepared-row leases and explicit active/inactive/retired gauges.44clean runs/53290frames: measured warm instance allocations21048buffers/20904binds→0/0;12separate API pages confirm. Known capacities plateau; FPS neutral/p99 mixed.423native/143browser/35helper PASS, actual simulated-eye/reentry/active-dispose checks. Strict stress pixels19/20exact,1FAIL; independent stress oracle1/3exact, baseline unstable; universal parity unproven. Local only, no push/merge/deployment/shared8443 change/physicalQuest/freshThree. Stop before batch5; prior delivery/batch facts below are historical.
+
+
+## Historical next renderer cycle — batch3 local checkpoint, 2026-10-28
 
 [Current state](next-render-cycle/STATE.md), [batch3 report](next-render-cycle/batch-3/REPORT.md). Fine compatibility/data/view reuse preserves static rows during camera/sparse motion, with measured dynamic fallback and unchanged quality/content.108clean paired runs/131,673frame records; camera2048WG36.92→42.73FPS, GL31.68→32.78; one-moving1024WG48.44→59.20,GL40.20→41.01.423native/141browser gate PASS,16diagnostics/24real-worker replays; desktop/simulatedXR only. Strict primary pixels40/42exact,2FAIL: baseline temporal instability demonstrated, candidate stress oracle2/3exact; exact repeatability unresolved, not universal parity. Local candidate checkpoint only: no push/merge/deployment/shared8443 change, no physicalQuest/freshThree. Stop before batch4. Prior delivery/device facts below are historical.
 

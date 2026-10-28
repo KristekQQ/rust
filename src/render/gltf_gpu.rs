@@ -94,6 +94,67 @@ impl RigidInstance {
         }
     }
 }
+// Count engine-owned handles, including clones pinned by prepared rows. Dropping
+// the last lease releases our ownership; wgpu may defer GPU destruction until
+// submitted commands finish. Never call Buffer::destroy on pooled resources.
+#[derive(Clone, Copy, Default)]
+struct PoolMetrics {
+    live_bytes: usize,
+    peak_live_bytes: usize,
+    buffers_created: u64,
+    buffers_released: u64,
+    binds_created: u64,
+    binds_released: u64,
+    created_bytes: u64,
+    released_bytes: u64,
+    reasons: [u64; 5],
+    reason_bytes: [u64; 5],
+    reuses: u64,
+    evictions: u64,
+    over_budget: u64,
+}
+#[derive(Default)]
+struct PoolLedger(Cell<PoolMetrics>);
+struct PoolLease {
+    ledger: Rc<PoolLedger>,
+    bytes: usize,
+    buffers: u64,
+    binds: u64,
+}
+impl PoolLedger {
+    // Called only after the corresponding native create_buffer/create_bind_group.
+    fn lease(self: &Rc<Self>, bytes: usize, binds: u64, reason: usize) -> Rc<PoolLease> {
+        let mut m = self.0.get();
+        m.live_bytes += bytes;
+        m.peak_live_bytes = m.peak_live_bytes.max(m.live_bytes);
+        m.buffers_created += 1;
+        m.binds_created += binds;
+        m.created_bytes += bytes as u64;
+        m.reasons[reason] += 1;
+        m.reason_bytes[reason] += bytes as u64;
+        self.0.set(m);
+        Rc::new(PoolLease {
+            ledger: self.clone(),
+            bytes,
+            buffers: 1,
+            binds,
+        })
+    }
+}
+impl Drop for PoolLease {
+    fn drop(&mut self) {
+        let mut m = self.ledger.0.get();
+        m.live_bytes -= self.bytes;
+        m.buffers_released += self.buffers;
+        m.binds_released += self.binds;
+        m.released_bytes += self.bytes as u64;
+        self.ledger.0.set(m);
+    }
+}
+type InstanceOwner = (PipelineKey, usize);
+const POOL_BYTES: usize = 64 * 1024 * 1024;
+const POOL_RESOURCES: usize = 4096;
+const STREAM_BYTES: usize = 16 * 1024 * 1024;
 struct InstancePage {
     generation: u64,
     buffer: Option<wgpu::Buffer>,
@@ -102,6 +163,8 @@ struct InstancePage {
     material: Option<Uniform>,
     capacity: usize,
     last: Vec<u8>,
+    material_lease: Rc<PoolLease>,
+    buffer_lease: Option<Rc<PoolLease>>,
 }
 // Bounded pass/view-owned stream. Material uniforms remain per draw group;
 // only the existing rigid instance records share one contiguous upload.
@@ -112,11 +175,13 @@ struct InstanceStream {
     capacity: usize,
     last: Vec<u8>,
     scratch: Vec<u8>,
+    lease: Rc<PoolLease>,
 }
 struct InstanceBinding {
     buffer: wgpu::Buffer,
     offset: u64,
     bytes: u64,
+    _lease: Rc<PoolLease>,
 }
 struct PreparedDraw {
     variant: Variant,
@@ -129,6 +194,7 @@ struct PreparedDraw {
     count: u32,
     instances: u32,
     records: Vec<(u32, usize, usize)>,
+    _material_lease: Option<Rc<PoolLease>>,
 }
 #[derive(Default)]
 pub struct PreparedDraws {
@@ -181,6 +247,12 @@ impl Default for PlanCache {
     }
 }
 impl PlanCache {
+    fn evict_slot(&mut self, slot: usize) {
+        if let Some(Some(old)) = self.slots.get_mut(slot).map(Option::take) {
+            self.bytes -= old.bytes;
+            self.reasons[10] += 1;
+        }
+    }
     fn clear(&mut self, reason: usize) {
         if self.bytes != 0 {
             self.slots.fill_with(|| None);
@@ -886,6 +958,15 @@ pub struct GltfGpu {
     instance_pages: HashMap<(PipelineKey, usize), Vec<InstancePage>>,
     instance_streams: HashMap<(PipelineKey, usize), InstanceStream>,
     active_instance_pages: HashMap<(PipelineKey, usize), usize>,
+    pool_ledger: Rc<PoolLedger>,
+    pool_byte_limit: usize,
+    pool_resource_limit: usize,
+    stream_byte_limit: usize,
+    pool_frame: u64,
+    owner_frames: HashMap<InstanceOwner, u64>,
+    owner_access: HashMap<InstanceOwner, u64>,
+    pool_clock: u64,
+    used_streams: HashSet<InstanceOwner>,
     instancing_supported: bool,
     queue_scratch: QueueScratch,
     plan_cache: RefCell<PlanCache>,
@@ -997,6 +1078,15 @@ impl GltfGpu {
             instance_pages: HashMap::new(),
             instance_streams: HashMap::new(),
             active_instance_pages: HashMap::new(),
+            pool_ledger: Rc::default(),
+            pool_byte_limit: POOL_BYTES,
+            pool_resource_limit: POOL_RESOURCES,
+            stream_byte_limit: STREAM_BYTES,
+            pool_frame: 0,
+            owner_frames: HashMap::new(),
+            owner_access: HashMap::new(),
+            pool_clock: 0,
+            used_streams: HashSet::new(),
             queue_scratch: QueueScratch::default(),
             plan_cache: RefCell::new(PlanCache::default()),
             input_epoch: Cell::new(0),
@@ -1540,7 +1630,12 @@ impl GltfGpu {
                 stats.fine_layout_reserved_bytes += group.reserved_bytes;
             }
         }
-        stats.instance_pages_active = self.active_instance_pages.values().sum();
+        stats.instance_pages_active = self
+            .active_instance_pages
+            .iter()
+            .filter(|(owner, _)| self.owner_frames.get(owner) == Some(&self.pool_frame))
+            .map(|(_, count)| *count)
+            .sum();
         stats.instance_pages_retained = self.instance_pages.values().map(Vec::len).sum();
         stats.instance_buffer_bytes = self
             .instance_pages
@@ -2088,7 +2183,198 @@ impl GltfGpu {
         });
         self.pipelines.insert(variant, pipeline);
     }
-    pub fn begin_frame(&self) {
+    pub fn configure_instance_pool(
+        &mut self,
+        bytes: Option<u32>,
+        resources: Option<u32>,
+        stream: Option<u32>,
+    ) -> bool {
+        if bytes.is_some_and(|n| n > 256 * 1024 * 1024)
+            || resources.is_some_and(|n| n > 65536)
+            || stream.is_some_and(|n| n < 16 || n as usize > STREAM_BYTES || n % 16 != 0)
+        {
+            return false;
+        }
+        if let Some(n) = bytes {
+            self.pool_byte_limit = n as usize;
+        }
+        if let Some(n) = resources {
+            self.pool_resource_limit = n as usize;
+        }
+        if let Some(n) = stream {
+            if self.stream_byte_limit != n as usize {
+                self.stream_byte_limit = n as usize;
+                self.plan_cache.borrow_mut().clear(5);
+                self.fine_views.borrow_mut().fill_with(|| None);
+            }
+        }
+        self.trim_instance_pool();
+        true
+    }
+    fn pool_over_budget(&self) -> bool {
+        let m = self.pool_ledger.0.get();
+        m.live_bytes > self.pool_byte_limit
+            || (m.buffers_created - m.buffers_released + m.binds_created - m.binds_released)
+                > self.pool_resource_limit as u64
+    }
+    fn protected_pages(&self, owner: &InstanceOwner) -> usize {
+        // A pass scheduled later this frame still owns last frame's allocation.
+        // One-frame grace avoids repeatedly stealing the other eye's resources.
+        if self
+            .owner_frames
+            .get(owner)
+            .is_some_and(|f| *f + 1 >= self.pool_frame)
+        {
+            self.active_instance_pages.get(owner).copied().unwrap_or(0)
+        } else {
+            0
+        }
+    }
+    fn trim_instance_pool(&mut self) {
+        if !self.pool_over_budget() {
+            return;
+        }
+        let mut owners: Vec<_> = self.owner_access.iter().map(|(o, t)| (*t, *o)).collect();
+        owners.sort_unstable_by_key(|(t, _)| *t);
+        for (_, owner) in owners {
+            if !self.pool_over_budget() {
+                break;
+            }
+            let protected = self.protected_pages(&owner);
+            let streaming = protected > 0 && self.used_streams.contains(&owner);
+            let tails = self
+                .instance_pages
+                .get(&owner)
+                .is_some_and(|p| p.len() > protected);
+            let idle_stream = !streaming && self.instance_streams.contains_key(&owner);
+            let idle_buffer = streaming
+                && self
+                    .instance_pages
+                    .get(&owner)
+                    .is_some_and(|p| p.iter().take(protected).any(|p| p.buffer.is_some()));
+            if !(tails || idle_stream || idle_buffer) {
+                continue;
+            }
+            self.plan_cache.borrow_mut().evict_slot(owner.1);
+            if let Some(slot) = self.fine_views.borrow_mut().get_mut(owner.1) {
+                *slot = None;
+            }
+            while self.pool_over_budget()
+                && self
+                    .instance_pages
+                    .get(&owner)
+                    .is_some_and(|p| p.len() > protected)
+            {
+                self.instance_pages.get_mut(&owner).unwrap().pop();
+                let mut m = self.pool_ledger.0.get();
+                m.evictions += 1;
+                self.pool_ledger.0.set(m);
+            }
+            if self.pool_over_budget() && idle_stream {
+                self.instance_streams.remove(&owner);
+                let mut m = self.pool_ledger.0.get();
+                m.evictions += 1;
+                self.pool_ledger.0.set(m);
+            }
+            if streaming {
+                for i in 0..protected {
+                    if !self.pool_over_budget() {
+                        break;
+                    }
+                    let Some(page) = self
+                        .instance_pages
+                        .get_mut(&owner)
+                        .and_then(|p| p.get_mut(i))
+                    else {
+                        break;
+                    };
+                    if page.buffer.take().is_some() {
+                        page.buffer_lease = None;
+                        page.capacity = 0;
+                        page.last = Vec::new();
+                        let mut m = self.pool_ledger.0.get();
+                        m.evictions += 1;
+                        self.pool_ledger.0.set(m);
+                    }
+                }
+            }
+            if self.instance_pages.get(&owner).is_some_and(Vec::is_empty) {
+                self.instance_pages.remove(&owner);
+            }
+            if !self.instance_pages.contains_key(&owner)
+                && !self.instance_streams.contains_key(&owner)
+            {
+                self.owner_access.remove(&owner);
+                self.owner_frames.remove(&owner);
+                self.active_instance_pages.remove(&owner);
+                self.used_streams.remove(&owner);
+            }
+        }
+        if self.pool_over_budget() {
+            let mut m = self.pool_ledger.0.get();
+            m.over_budget += 1;
+            self.pool_ledger.0.set(m);
+        }
+    }
+    pub fn instance_pool_stats(&self) -> serde_json::Value {
+        let m = self.pool_ledger.0.get();
+        let mut owned = 0;
+        let mut active = 0;
+        let mut pages = 0;
+        let mut active_pages = 0;
+        let mut active_streams = 0;
+        for (owner, entries) in &self.instance_pages {
+            let count = if self.owner_frames.get(owner) == Some(&self.pool_frame) {
+                self.active_instance_pages.get(owner).copied().unwrap_or(0)
+            } else {
+                0
+            };
+            for (i, p) in entries.iter().enumerate() {
+                let bytes = std::mem::size_of::<Uniform>();
+                owned += bytes + p.buffer.as_ref().map_or(0, |_| p.capacity);
+                pages += 1;
+                if i < count {
+                    active_pages += 1;
+                    active += bytes
+                        + if self.used_streams.contains(owner) {
+                            0
+                        } else {
+                            p.capacity
+                        };
+                }
+            }
+        }
+        for (owner, stream) in &self.instance_streams {
+            owned += stream.capacity;
+            if self.owner_frames.get(owner) == Some(&self.pool_frame)
+                && self.used_streams.contains(owner)
+            {
+                active_streams += 1;
+                active += stream.capacity;
+            }
+        }
+        serde_json::json!({
+            "byteLimit":self.pool_byte_limit,"resourceLimit":self.pool_resource_limit,
+            "streamByteLimit":self.stream_byte_limit,
+            "ownedBytes":owned,"activeBytes":active,"inactiveBytes":owned-active,
+            "liveBytes":m.live_bytes,"retiredBytes":m.live_bytes.saturating_sub(owned),
+            "peakLiveBytes":m.peak_live_bytes,
+            "activePages":active_pages,"inactivePages":pages-active_pages,
+            "activeStreams":active_streams,"inactiveStreams":self.instance_streams.len()-active_streams,
+            "buffersCreated":m.buffers_created,"buffersReleased":m.buffers_released,
+            "bindGroupsCreated":m.binds_created,"bindGroupsReleased":m.binds_released,
+            "createdBytes":m.created_bytes,"releasedBytes":m.released_bytes,
+            "liveBuffers":m.buffers_created-m.buffers_released,
+            "liveBindGroups":m.binds_created-m.binds_released,
+            "reuses":m.reuses,"evictions":m.evictions,"overBudgetEvents":m.over_budget,
+            "createReasons":m.reasons,"createReasonBytes":m.reason_bytes,
+            "reasonNames":["streamCold","streamGrowth","pageMaterial","standaloneCold","standaloneGrowth"],
+            "memoryScope":"known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+            "releaseScope":"last engine lease dropped; GPU destruction may be deferred by wgpu"
+        })
+    }
+    pub fn begin_frame(&mut self) {
+        self.pool_frame += 1;
         self.draw_records.borrow_mut().clear();
     }
     pub fn set_diagnostics(&self, enabled: bool) {
@@ -2117,6 +2403,9 @@ impl GltfGpu {
         self.instance_pages.clear();
         self.instance_streams.clear();
         self.active_instance_pages.clear();
+        self.owner_frames.clear();
+        self.owner_access.clear();
+        self.used_streams.clear();
         self.queue_scratch = QueueScratch::default();
     }
     #[allow(clippy::too_many_arguments)]
@@ -2149,6 +2438,12 @@ impl GltfGpu {
             light_class: Default::default(),
             ..key
         };
+        let owner = (storage_key, view_slot);
+        if !blend {
+            self.owner_frames.insert(owner, self.pool_frame);
+            self.pool_clock += 1;
+            self.owner_access.insert(owner, self.pool_clock);
+        }
         let models: Vec<_> = models.collect();
         let mut plan_key = PlanKey {
             pipeline: key,
@@ -2170,6 +2465,7 @@ impl GltfGpu {
                 // Do not attribute lookup/model-list validation to rebuild stages.
                 // These are cumulative work counters, not the parent queue scope.
                 stages.finish();
+                self.trim_instance_pool();
                 return PreparedDraws {
                     draws,
                     upload_bytes: 0,
@@ -2498,7 +2794,10 @@ impl GltfGpu {
             }
         }
         stages.switch(Some(5));
-        let stream_limit = device.limits().max_buffer_size.min(16 * 1024 * 1024);
+        let stream_limit = device
+            .limits()
+            .max_buffer_size
+            .min(self.stream_byte_limit as u64);
         let stream_bytes = (required_bytes as u64 <= stream_limit).then_some(required_bytes);
         let mut stream = if !blend && records > 0 && stream_bytes.is_some() {
             let capacity = required_bytes
@@ -2512,6 +2811,7 @@ impl GltfGpu {
                 let mut stats = self.counters.get();
                 stats.instance_buffers_created += 1;
                 self.counters.set(stats);
+                let reason = usize::from(existing.is_some());
                 existing = Some(InstanceStream {
                     generation: self.resource_id(),
                     buffer: device.create_buffer(&wgpu::BufferDescriptor {
@@ -2523,7 +2823,12 @@ impl GltfGpu {
                     capacity,
                     last: Vec::new(),
                     scratch: Vec::new(),
+                    lease: self.pool_ledger.lease(capacity, 0, reason),
                 });
+            } else {
+                let mut m = self.pool_ledger.0.get();
+                m.reuses += 1;
+                self.pool_ledger.0.set(m);
             }
             if fine.is_some() {
                 existing.as_mut().unwrap().last.resize(required_bytes, 0);
@@ -2532,11 +2837,15 @@ impl GltfGpu {
             }
             existing
         } else {
-            if !blend {
-                self.instance_streams.remove(&(storage_key, view_slot));
-            }
             None
         };
+        if !blend {
+            if stream.is_some() {
+                self.used_streams.insert(owner);
+            } else {
+                self.used_streams.remove(&owner);
+            }
+        }
         let mut page_index = 0;
         let mut stream_offset = 0usize;
         let mut stream_dirty: Option<(usize, usize)> = None;
@@ -2576,6 +2885,7 @@ impl GltfGpu {
                 stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
             }
             let mut draw_bind = d.bind.clone();
+            let mut material_lease = None;
             let mut row_storage = (d.identity, 0, 0, 0);
             let instance = if instanced {
                 let payload_bytes = group.len() * if translated { 16 } else { 112 };
@@ -2602,13 +2912,9 @@ impl GltfGpu {
                     .entry((storage_key, view_slot))
                     .or_default();
                 let capacity = payload_bytes.next_power_of_two();
-                if pages.len() <= page_index
-                    || (stream.is_none()
-                        && (pages[page_index].buffer.is_none()
-                            || pages[page_index].capacity < capacity))
-                {
+                if pages.len() <= page_index {
                     stats.instance_pages_created += 1;
-                    stats.instance_buffers_created += if stream.is_some() { 1 } else { 2 };
+                    stats.instance_buffers_created += 1;
                     stats.instance_bind_groups_created += 1;
                     let material_buffer = device.create_buffer(&wgpu::BufferDescriptor {
                         label: Some("glTF instanced material"),
@@ -2624,35 +2930,44 @@ impl GltfGpu {
                             resource: material_buffer.as_entire_binding(),
                         }],
                     });
-                    let generation = self
-                        .next_resource
-                        .get()
-                        .checked_add(1)
-                        .expect("glTF resource identity exhausted");
+                    let generation = self.next_resource.get() + 1;
                     self.next_resource.set(generation);
-                    let page = InstancePage {
+                    pages.push(InstancePage {
                         generation,
                         material_buffer,
                         bind,
                         material: None,
-                        buffer: stream.is_none().then(|| {
-                            device.create_buffer(&wgpu::BufferDescriptor {
-                                label: Some("glTF rigid instances"),
-                                size: capacity as u64,
-                                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                                mapped_at_creation: false,
-                            })
-                        }),
-                        capacity,
+                        buffer: None,
+                        capacity: 0,
                         last: Vec::new(),
-                    };
-                    if pages.len() <= page_index {
-                        pages.push(page);
-                    } else {
-                        pages[page_index] = page;
-                    }
+                        material_lease: self.pool_ledger.lease(
+                            std::mem::size_of::<Uniform>(),
+                            1,
+                            2,
+                        ),
+                        buffer_lease: None,
+                    });
+                } else {
+                    let mut m = self.pool_ledger.0.get();
+                    m.reuses += 1;
+                    self.pool_ledger.0.set(m);
                 }
                 let page = &mut pages[page_index];
+                if stream.is_none() && (page.buffer.is_none() || page.capacity < capacity) {
+                    let reason = if page.buffer.is_some() { 4 } else { 3 };
+                    page.buffer = Some(device.create_buffer(&wgpu::BufferDescriptor {
+                        label: Some("glTF rigid instances"),
+                        size: capacity as u64,
+                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                        mapped_at_creation: false,
+                    }));
+                    page.buffer_lease = Some(self.pool_ledger.lease(capacity, 0, reason));
+                    page.capacity = capacity;
+                    page.last.clear();
+                    page.generation = self.next_resource.get() + 1;
+                    self.next_resource.set(page.generation);
+                    stats.instance_buffers_created += 1;
+                }
                 let mut material = d.last_uniform;
                 if translated {
                     material.model[3] = [0., 0., 0., 1.];
@@ -2678,6 +2993,7 @@ impl GltfGpu {
                     stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
                 }
                 draw_bind = page.bind.clone();
+                material_lease = Some(page.material_lease.clone());
                 let binding = if let Some(s) = stream.as_mut() {
                     let offset = if fine.is_some() {
                         stream_offset
@@ -2703,8 +3019,6 @@ impl GltfGpu {
                         s.scratch.extend_from_slice(&scratch.payload);
                     }
                     stages.switch(Some(5));
-                    page.buffer = None;
-                    page.last.clear();
                     row_storage = (
                         page.generation,
                         s.generation,
@@ -2718,6 +3032,7 @@ impl GltfGpu {
                         buffer: s.buffer.clone(),
                         offset: offset as u64,
                         bytes: payload_bytes as u64,
+                        _lease: s.lease.clone(),
                     }
                 } else {
                     let buffer = page.buffer.as_ref().expect("standalone instance buffer");
@@ -2757,6 +3072,7 @@ impl GltfGpu {
                         buffer: buffer.clone(),
                         offset: 0,
                         bytes: payload_bytes as u64,
+                        _lease: page.buffer_lease.as_ref().unwrap().clone(),
                     }
                 };
                 page_index += 1;
@@ -2801,6 +3117,7 @@ impl GltfGpu {
                     variant,
                     textures: material.textures.clone(),
                     bind: draw_bind,
+                    _material_lease: material_lease,
                     vertex: d.vertex.clone(),
                     index: d.index.clone(),
                     skin: d.skin.as_ref().map(|s| s.influences.clone()),
@@ -2867,9 +3184,6 @@ impl GltfGpu {
         if !blend {
             self.active_instance_pages
                 .insert((storage_key, view_slot), page_index);
-            if let Some(pages) = self.instance_pages.get_mut(&(storage_key, view_slot)) {
-                pages.truncate(page_index);
-            }
         }
         stages.switch(Some(4));
         let mut stats = self.counters.get();
@@ -2912,6 +3226,9 @@ impl GltfGpu {
                 &models,
                 prepared.draws.clone(),
             );
+        }
+        if !blend {
+            self.trim_instance_pool();
         }
         if let Some(times) = stages.finish() {
             let mut stats = self.counters.get();

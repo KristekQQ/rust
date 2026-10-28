@@ -1279,6 +1279,15 @@ impl SceneRenderer {
     pub fn set_prepared_plan_cache_enabled(&self, enabled: bool) {
         self.gltf_gpu.set_plan_cache_enabled(enabled);
     }
+    pub fn configure_gltf_instance_pool(
+        &mut self,
+        bytes: Option<u32>,
+        resources: Option<u32>,
+        stream: Option<u32>,
+    ) -> bool {
+        self.gltf_gpu
+            .configure_instance_pool(bytes, resources, stream)
+    }
     pub fn debug_values(&self) -> serde_json::Value {
         let gltf = self.gltf_gpu.stats();
         let stats = self.render_stats();
@@ -1334,6 +1343,7 @@ impl SceneRenderer {
                     "drawPrimitive": gltf.draw_batch_breaks[6],
                     "drawOptions": gltf.draw_batch_breaks[7],
                 },
+                "instancePool": self.gltf_gpu.instance_pool_stats(),
                 "instancePagesCreated": gltf.instance_pages_created,
                 "instanceBuffersCreated": gltf.instance_buffers_created,
                 "instanceBindGroupsCreated": gltf.instance_bind_groups_created,

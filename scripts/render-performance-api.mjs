@@ -1,14 +1,25 @@
 // Inject in a separate diagnostic page only. Wrappers count calls that reach the
 // actual browser API, never inferred Rust capacities. Unsupported APIs stay null.
 export function installApiCounters(){
- const output={webgpu:null,webgl:null,webglContexts:[],errors:[]};window.renderApiCounters=output;
+ let allocationLabelCount=0;
+ const output={allocationEventsEnabled:false,allocationTotals:{},allocationLabels:{},allocationEvents:[],allocationEventLimit:50000,allocationEventOverflow:0,webgpu:null,webgl:null,webglContexts:[],errors:[]};window.renderApiCounters=output;
  const metrics=()=>({drawCalls:0,instances:0,primitives:0,triangles:0,lines:0,points:0,complete:true,incompleteReasons:[],topologies:{}});
  function incomplete(target,reason){target.complete=false;if(!target.incompleteReasons.includes(reason))target.incompleteReasons.push(reason);}
  function countPrimitives(target,topology,count,instances=1){target.drawCalls++;target.instances+=instances;const n=Math.max(0,Math.floor(count));let primitiveCount,kind;if(topology==='triangle-list'){primitiveCount=Math.floor(n/3);kind='triangles';}else if(topology==='triangle-strip'||topology==='triangle-fan'){primitiveCount=Math.max(0,n-2);kind='triangles';}else if(topology==='line-list'){primitiveCount=Math.floor(n/2);kind='lines';}else if(topology==='line-strip'){primitiveCount=Math.max(0,n-1);kind='lines';}else if(topology==='line-loop'){primitiveCount=n>=2?n:0;kind='lines';}else if(topology==='point-list'){primitiveCount=n;kind='points';}else{incomplete(target,'unknown topology: '+String(topology));return;}
   const submitted=primitiveCount*instances;target.primitives+=submitted;target[kind]+=submitted;target.topologies[topology]=(target.topologies[topology]||0)+submitted;
  }
  function countUnproven(target,instances,reason){target.drawCalls++;target.instances+=instances;incomplete(target,reason);}
- function wrap(prototype,name,counters,onSuccess,onBefore){if(!prototype||typeof prototype[name]!=='function'){counters[name]=null;return;}const original=prototype[name];counters[name]=0;try{prototype[name]=function(...args){let captured;try{captured=onBefore?.(args);}catch(e){output.errors.push(name+' instrumentation: '+e.message);}const result=original.apply(this,args);const succeeded=value=>{counters[name]++;try{onSuccess?.call(this,args,value,captured);}catch(e){output.errors.push(name+' instrumentation: '+e.message);if(counters.submitted)incomplete(counters.submitted,name+' instrumentation failed');}return value;};if(result&&typeof result.then==='function')return result.then(succeeded);return succeeded(result);};}catch(e){counters[name]=null;output.errors.push(name+': '+e.message);}}
+ function wrap(prototype,name,counters,onSuccess,onBefore){if(!prototype||typeof prototype[name]!=='function'){counters[name]=null;return;}const original=prototype[name];counters[name]=0;try{prototype[name]=function(...args){let captured;try{captured=onBefore?.(args);}catch(e){output.errors.push(name+' instrumentation: '+e.message);}const result=original.apply(this,args);const succeeded=value=>{counters[name]++;
+ if(['createBuffer','createBindGroup','bufferData'].includes(name)) {
+  const bytes=name==='createBindGroup'?null:name==='createBuffer'?(args[0]?.size??null):captured?.allocationBytes??null;
+  const label=typeof args[0]?.label==='string'?args[0].label.slice(0,160):null;
+  const add=target=>{target.calls++;if(Number.isFinite(bytes))target.knownBytes+=bytes;else target.unknownSizeCalls++;};
+  add(output.allocationTotals[name]??=( {calls:0,knownBytes:0,unknownSizeCalls:0} ));
+  let key=name+':'+(label??'unlabeled');if(!output.allocationLabels[key]&&allocationLabelCount>=128)key='other';
+  if(!output.allocationLabels[key]){output.allocationLabels[key]={calls:0,knownBytes:0,unknownSizeCalls:0};allocationLabelCount++;}add(output.allocationLabels[key]);
+  if(output.allocationEventsEnabled){if(output.allocationEvents.length<output.allocationEventLimit)output.allocationEvents.push({atMs:performance.now(),api:name,bytes,label,scope:'actual browser API allocation call; GL createBuffer size unknown until bufferData'});else output.allocationEventOverflow++;}
+ }
+try{onSuccess?.call(this,args,value,captured);}catch(e){output.errors.push(name+' instrumentation: '+e.message);if(counters.submitted)incomplete(counters.submitted,name+' instrumentation failed');}return value;};if(result&&typeof result.then==='function')return result.then(succeeded);return succeeded(result);};}catch(e){counters[name]=null;output.errors.push(name+': '+e.message);}}
  if(typeof GPUDevice!=='undefined'){
  const c=output.webgpu={submitted:metrics()};const pipelineTopology=new WeakMap(),passTopology=new WeakMap();
  for(const name of ['createBuffer','createTexture','createBindGroup','createComputePipeline','createComputePipelineAsync','createCommandEncoder'])wrap(GPUDevice.prototype,name,c);
@@ -58,7 +69,7 @@ export function installApiCounters(){
  function indexedDraw(context,args,instances){const mode=args[0],count=args[1],type=args[2],offset=args[3],topology=modeNames.get(mode)||'unknown GLenum '+mode,proof=proveNoRestart(context,stateFor(context),offset,count,type);if(!proof.ok){countUnproven(c.submitted,instances,proof.reason);return;}countPrimitives(c.submitted,topology,count,instances);}
  wrap(gl,'bindBuffer',c,function(args){const state=stateFor(this),target=args[0],buffer=args[1]||null;if(target===this.ELEMENT_ARRAY_BUFFER){if(buffer){if(!state.vaoElements.has(state.vao))c.indexShadow.trackedVaos++;state.vaoElements.set(state.vao,buffer);}else if(state.vaoElements.delete(state.vao))c.indexShadow.trackedVaos--;}else state.bindings.set(target,buffer);});
  wrap(gl,'bindVertexArray',c,function(args){stateFor(this).vao=args[0]||defaultVao;});
- wrap(gl,'bufferData',c,function(args){trackBufferData(this,args);});wrap(gl,'bufferSubData',c,function(args){trackBufferSubData(this,args);});
+ wrap(gl,'bufferData',c,function(args){trackBufferData(this,args);},args=>({allocationBytes:typeof args[1]==='number'?args[1]:uploadView(args[1],args[3]??0,args[4])?.byteLength??null}));wrap(gl,'bufferSubData',c,function(args){trackBufferSubData(this,args);});
  wrap(gl,'copyBufferSubData',c,function(args){invalidateCopiedRange(this,args);});
  wrap(gl,'deleteBuffer',c,function(args){const state=states.get(this),buffer=args[0];if(!state||!buffer)return;const meta=state.buffers.get(buffer);if(meta){const bytes=meta.shadow?meta.shadow.byteLength*2:0;state.shadowBytes-=bytes;c.indexShadow.retainedBytes-=bytes;state.buffers.delete(buffer);c.indexShadow.trackedBuffers--;}state.overflowedBuffers.delete(buffer);for(const [target,bound]of state.bindings)if(bound===buffer)state.bindings.delete(target);for(const [vao,bound]of state.vaoElements)if(bound===buffer){state.vaoElements.delete(vao);c.indexShadow.trackedVaos--;}});
  wrap(gl,'deleteVertexArray',c,function(args){const state=states.get(this),vao=args[0];if(!state||!vao)return;if(state.vaoElements.delete(vao))c.indexShadow.trackedVaos--;if(state.vao===vao)state.vao=defaultVao;});

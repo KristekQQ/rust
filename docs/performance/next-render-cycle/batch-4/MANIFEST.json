@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "status": "complete-local-checkpoint; strict moving-stress pixel limit open",
+  "parentCommit": "8e03df21ddc26f1a36c41bc7a12293d3405b4b22",
+  "worktree": "/private/tmp/rust-next-render-cycle-4",
+  "branch": "codex/next-render-cycle-4",
+  "scope": "batch4 only; local checkpoint; no deployment/push/merge/shared-server restart",
+  "deviceEvidence": "desktop headless and simulated XR; no physical Quest",
+  "baseline": {
+    "build": {
+      "source": "e8b39fcf650592b36a9e5897e8c4f9e85f131ab4782307ff36f5657dedfcd2dd",
+      "wasm": "bdae44e11cd107177241ec19de3d44137399603cb42f2f5de2dc4513a1c553ea",
+      "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sdkSha256": "8ca04b16735803ef5cc85f92b1eac617e9a2564cc75016bd2b4983abbf72e0cc",
+    "frozenFiles": 2488,
+    "manifest": "output/next-render-cycle-4/baseline/render-build.json"
+  },
+  "candidate": {
+    "build": {
+      "source": "f3e185262040df47bd7d3c5c7e2a12a06c3ba761cd935ed44ceb06df5f40b5bf",
+      "wasm": "c77e4b1e063052aa22f3935c7ab54c6b6fb3c16051add000a353c9d18f0f2a3d",
+      "bindings": "5f41e0361544aed6dbf3d17c9393e94146520af0e4e49ba84b28dcf67e28a64e",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sdkSha256": "597f987b2be9d7d92557306bb7b283389f89f26c2b91ea02a2dfb99d1d265df7",
+    "frozenFiles": 2491,
+    "manifest": "output/next-render-cycle-4/candidate/render-build.json"
+  },
+  "protocol": "PROTOCOL.md",
+  "primaryConfigurations": {
+    "at": "2026-10-28T13:55:09.944Z",
+    "scope": "baseline-only short pilots; preselected real workloads frozen before candidate A/B",
+    "cases": [
+      {
+        "family": "rim-pool-cycle",
+        "load": 64,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-4/cal-rim-pool-cycle-64-webgpu/config.json",
+        "sha256": "b58687e66e0d21476fbf25eae50832caa016f0f42f6f18f2ce62c7b2fe94acbc"
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 64,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-4/cal-rim-pool-cycle-64-webgl/config.json",
+        "sha256": "d319d1a6c7240e995bfe73aff7f8b3b278f462e918873e8257d6c37e783e521c"
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 1024,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-4/cal-rim-pool-cycle-1024-webgl/config.json",
+        "sha256": "9e46245c653466c3c7b8409442277cad692c13da42621b1e85c8039fb832244a"
+      },
+      {
+        "family": "rim-pool-cycle",
+        "load": 1024,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-4/cal-rim-pool-cycle-1024-webgpu/config.json",
+        "sha256": "0169567ee01459bd34a97bdca377511a6f6fe8834cfbd6c63fdee5dddf43557a"
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-4/cal-rim-clustered-1024-webgpu/config.json",
+        "sha256": "e9370c87ffb0f42214751708c68a3e0363e196d635af3faa778b5ecb72a6ee0a"
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-4/cal-rim-clustered-1024-webgl/config.json",
+        "sha256": "094cf94027a4629b0459253f761df021c88f4546a3a15524e836a75b27dc32fe"
+      },
+      {
+        "family": "rim-stress",
+        "load": 1024,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-4/cal-rim-stress-1024-webgl/config.json",
+        "sha256": "b1621006fa82efa9fbfe919bbe1221b5aa1fa4411a5abc362cd533314458ac8d"
+      },
+      {
+        "family": "rim-stress",
+        "load": 1024,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-4/cal-rim-stress-1024-webgpu/config.json",
+        "sha256": "f069d97f4b077dbdd02a7794faeea693d0dd74ae2e36e1096b6cd06c6b735515"
+      },
+      {
+        "family": "arena-active",
+        "load": 1,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-4/cal-arena-active-1-webgpu/config.json",
+        "sha256": "a2465dbd588ac825aa769b007f8e9b4c8d5c880c86f9573ce0a97c85f8b79cc7"
+      },
+      {
+        "family": "arena-active",
+        "load": 1,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-4/cal-arena-active-1-webgl/config.json",
+        "sha256": "bd83ae9c332085dd812561c7fe6b847df15b0dbbe465bff0244907e27afa50f5"
+      }
+    ]
+  },
+  "candidateSourceCheckpoint": "containing local commit; frozen snapshot was captured as owned dirty source above baseline parent",
+  "finalBuild": {
+    "source": "f3e185262040df47bd7d3c5c7e2a12a06c3ba761cd935ed44ceb06df5f40b5bf",
+    "wasm": "c77e4b1e063052aa22f3935c7ab54c6b6fb3c16051add000a353c9d18f0f2a3d",
+    "bindings": "5f41e0361544aed6dbf3d17c9393e94146520af0e4e49ba84b28dcf67e28a64e",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "finalSdkSha256": "18bac3daef447b56d1cb64c4a853c18d982b669f22ced715151437cf463b0f6f",
+  "canonicalSdkRuntimeProof": [
+    {
+      "path": "js/engine.js",
+      "canonicalRuntimeSha256": "3268dc323e45675471afc7de2a7032871591807f66d28c7fe4d631285b10842d"
+    },
+    {
+      "path": "output/next-render-cycle-4/candidate/js/engine.js",
+      "canonicalRuntimeSha256": "3268dc323e45675471afc7de2a7032871591807f66d28c7fe4d631285b10842d"
+    }
+  ],
+  "environment": {
+    "browser": "Chrome/156.0.8078.48",
+    "node": "v24.22.1",
+    "devices": [
+      {
+        "vendorId": 4203,
+        "deviceId": 0,
+        "vendorString": "Google Inc. (Apple)",
+        "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+        "driverVendor": "Apple",
+        "driverVersion": "26.6.1"
+      }
+    ],
+    "isolation": "four preserved foreign GPU processes;11case-boundary snapshots; aggregate AGX device utilization32-98%; no per-process GPU attribution",
+    "evidence": "desktop headless and simulated XR only"
+  },
+  "audits": {
+    "frozenFiles": 4979,
+    "servedPayloadRecords": 612,
+    "primaryReports": 10,
+    "diagnosticReports": 12,
+    "driverFileChecks": 198,
+    "allPassed": true,
+    "sourceDumpSha256": "67dea027fbafd08b4fbea1bfe73f405fe568df3b8b269a43038cd2a0906d2d5f"
+  },
+  "archive": {
+    "path": "docs/performance/next-render-cycle/batch-4/evidence.tar.gz",
+    "bytes": 27103390,
+    "sha256": "cab88de081124ab6cd1accdb33fb678639b641bec33121307926ee6794df3b14",
+    "payloads": 504,
+    "storedEntries": 506,
+    "uniquePayloads": 359,
+    "exactContentHardlinks": 145,
+    "recordedUncompressedBytes": 180454130,
+    "everyPayloadAndHardlinkReadBack": true,
+    "frozenRuntimeChangedInputsIncluded": [
+      "docs/performance/next-render-cycle/batch-4/PROTOCOL.md",
+      "js/engine.d.ts",
+      "js/engine.js",
+      "pkg/verification-build.json",
+      "pkg/webgpu_wasm.d.ts",
+      "pkg/webgpu_wasm.js",
+      "pkg/webgpu_wasm_bg.wasm",
+      "pkg/webgpu_wasm_bg.wasm.d.ts",
+      "scripts/render-performance-api.mjs",
+      "scripts/render-performance-lib.mjs",
+      "scripts/render-performance.mjs",
+      "scripts/test-browser.mjs",
+      "src/render/gltf_gpu.rs",
+      "src/render/renderer.rs",
+      "src/web.rs",
+      "tests/gltf-instance-pool.html",
+      "tests/gltf-instance-pool.js",
+      "tests/render-performance.js",
+      "tests/webxr-webgpu.html",
+      "tests/xr/gltf-instance-checks.js"
+    ],
+    "unchangedBaseAssetsExcluded": true
+  },
+  "measurements": {
+    "primaryRuns": 44,
+    "rawRafRows": 53290,
+    "protocol": "8s warmup/25s sample;3AB/BA/AB pairs per dynamic configuration/backend;1pair static/Neon control",
+    "profiling": false,
+    "gpuTimes": "unavailable; no queries issued in clean or allocation-association windows",
+    "diagnosticFinalPages": 12,
+    "diagnosticWindowMs": 25000,
+    "preliminaryPagesPreserved": 4,
+    "rejectedColdOverflowAttemptPreserved": true,
+    "strictPrimaryPixelGate": "19/20exact;1FAIL;2liveNeon pairs ungated"
+  }
+}
