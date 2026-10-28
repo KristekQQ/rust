@@ -1,0 +1,422 @@
+{
+  "version": 1,
+  "batch": 3,
+  "status": "completed_locally_with_unresolved_strict_stress_repeatability",
+  "scope": "fine opaque-plan invalidation; desktop WebGPU and WebGL2, simulated XR; no physical Quest/fresh Three comparison",
+  "checkout": "/private/tmp/rust-next-render-cycle-3",
+  "branch": "codex/next-render-cycle-3",
+  "parentCheckpoint": "1afcd015787a3bff3fb58afd54126a6c7728a512",
+  "baseline": {
+    "kind": "completed batch2 frozen release",
+    "build": {
+      "source": "1452a9f7ca544a1490773130f92719d223511b5feaa6c5b819bd3a9d325a0358",
+      "wasm": "af2905cc7d71af63b731c586198bd201917d63375821e80d1a70e7a99f1ea088",
+      "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sdkSha256": "8ca04b16735803ef5cc85f92b1eac617e9a2564cc75016bd2b4983abbf72e0cc",
+    "frozenManifest": "evidence/baseline/render-build.json",
+    "files": 2480
+  },
+  "candidate": {
+    "build": {
+      "source": "e8b39fcf650592b36a9e5897e8c4f9e85f131ab4782307ff36f5657dedfcd2dd",
+      "wasm": "bdae44e11cd107177241ec19de3d44137399603cb42f2f5de2dc4513a1c553ea",
+      "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sdkSha256": "8ca04b16735803ef5cc85f92b1eac617e9a2564cc75016bd2b4983abbf72e0cc",
+    "frozenManifest": "evidence/candidate-admission/render-build.json",
+    "files": 2484
+  },
+  "environment": {
+    "node": "v24.22.1",
+    "hardware": "Apple M1 MacBookAir10,1;8CPU/7GPU cores;16GB",
+    "isolation": "contended desktop; foreign GPU processes preserved; per-process GPU busy time unavailable",
+    "power": "per-case pmset snapshots; preserved in evidence/admission-primary-environment.jsonl",
+    "deviceEvidence": "headless ordinary browser and maintained simulated XR only",
+    "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.1\nBuildVersion:\t\t25G76",
+    "browser": "Chrome/156.0.8078.48",
+    "architecture": "arm64"
+  },
+  "protocol": {
+    "at": "2026-10-27T21:49:16.788Z",
+    "scope": "frozen before all primary pairs; baseline-only bounded explicit-load probes",
+    "cases": [
+      {
+        "family": "rim-stress",
+        "load": 2048,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-stress-2048-webgpu/config.json",
+        "sha256": "1a0c93ce018c21921a82918b5ae2d2dd0add39e3daf39356b3ef2246996dded3"
+      },
+      {
+        "family": "rim-stress",
+        "load": 2048,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-stress-2048-webgl/config.json",
+        "sha256": "8ef3a37deacd8465760cbb2c755760ec75f200d01ef129d8c000c570211c2468"
+      },
+      {
+        "family": "rim-camera-stress",
+        "load": 2048,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-camera-stress-2048-webgl/config.json",
+        "sha256": "93d8d136d979f5ff7bc25ba20c7161d60efce3d2a9c78766a4d88431ec406668"
+      },
+      {
+        "family": "rim-camera-stress",
+        "load": 2048,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-camera-stress-2048-webgpu/config.json",
+        "sha256": "d9445d0dece6b4648ed199eeccb9bfaeea03d23bc115c007444b830acda8521c"
+      },
+      {
+        "family": "rim-mixed",
+        "load": 1024,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-mixed-1024-webgpu/config.json",
+        "sha256": "aa7e1f18a9b284e9ef8c80b1b2fbcfb632c7137ae39a8e4d35f917c7e8fffad9"
+      },
+      {
+        "family": "rim-mixed",
+        "load": 1024,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-mixed-1024-webgl/config.json",
+        "sha256": "bb79bd5055aa7a3d5a91c69f39a045f688de961aed603994d7554ad7e33377d8"
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-clustered-1024-webgl/config.json",
+        "sha256": "6144be14ff1642d5e71a3151ecf59e826fed753c01d5b88d71e508e5ccf8cb33"
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-clustered-1024-webgpu/config.json",
+        "sha256": "d1f55105ce73d6ab5d4c99895b6ef689528e9f67046c3c3c10e4742b451543d0"
+      },
+      {
+        "family": "rim-clustered",
+        "load": 16,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-clustered-16-webgpu/config.json",
+        "sha256": "fb441fea4e057c744bfa5478e99b141b683a235c8a15b65a5292d0181942a801"
+      },
+      {
+        "family": "rim-clustered",
+        "load": 16,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-clustered-16-webgl/config.json",
+        "sha256": "597e135db77fb3cc8bc1476d0d23691c19d8fdf118edcc610b61937756b8a18a"
+      },
+      {
+        "family": "rim-camera",
+        "load": 1,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-camera-1-webgl/config.json",
+        "sha256": "a1cedceba3127465e52f6ba988b8532be81f99f1206e3be9235dfc5417bc283f"
+      },
+      {
+        "family": "rim-camera",
+        "load": 1,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-camera-1-webgpu/config.json",
+        "sha256": "28485125b68ac1da3a03343b624a20801e7c681625b4f76630b7e38985981410"
+      },
+      {
+        "family": "rim-active",
+        "load": 1,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-rim-active-1-webgpu/config.json",
+        "sha256": "772ad4d79cf7013c432f947b5ecc173e263018d54c8ab87c13ca0d2c944a9018"
+      },
+      {
+        "family": "rim-active",
+        "load": 1,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-rim-active-1-webgl/config.json",
+        "sha256": "8ba622bb3acc352626dc81ba18f83c4342eb0c32b758f101f6590875b38caff3"
+      },
+      {
+        "family": "dynamic",
+        "load": 64,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-dynamic-64-webgl/config.json",
+        "sha256": "da17fd3d2df54a417b7631b0bbd39550832fba50739aab6f5cbaa31e6e518fc4"
+      },
+      {
+        "family": "dynamic",
+        "load": 64,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-dynamic-64-webgpu/config.json",
+        "sha256": "cb61da073a90fd8b3b6ad82305726155ed0c8cd58da85fee8921deecc882f669"
+      },
+      {
+        "family": "arena-active",
+        "load": 1,
+        "backend": "webgpu",
+        "file": "output/next-render-cycle-3/cal-arena-active-1-webgpu/config.json",
+        "sha256": "da4216c032bb8571cf2665ff1428a4ab1488c2ac2ae9ee51e4faa1832ed31796"
+      },
+      {
+        "family": "arena-active",
+        "load": 1,
+        "backend": "webgl",
+        "file": "output/next-render-cycle-3/cal-arena-active-1-webgl/config.json",
+        "sha256": "7410c4821656352403379c6fd4380b90a66aec132d6482782504391fedb61a4c"
+      }
+    ],
+    "protocol": {
+      "warmupMs": 8000,
+      "sampleMs": 25000,
+      "pairs": 3,
+      "order": "AB/BA/AB",
+      "width": 1280,
+      "height": 720,
+      "DPR": 1,
+      "profiling": false
+    }
+  },
+  "correctnessReference": "cache disabled + CPU frustum culling disabled; original builder and hardware clipping; exact pixel comparison",
+  "metrics": {
+    "rafIntervals": "all raw frame records; per-run mean/median/p95/p99/max independently recomputed",
+    "callback": "CPU wall time, includes driver waits; not pure compute or worker handlers",
+    "gpuCleanRuns": "unavailable by design: native profiling and GL queries explicitly OFF",
+    "memory": "bounded accounted fine/exact element storage; not whole-process/GPU memory",
+    "worker": "24 simulated-XR replays/144 real jobs/72 installation events; worker-internal compute unavailable; no causal worker-speedup claim",
+    "gpuDiagnostics": "separate valid WebGPU per-pass and WebGL whole-RAF intervals; distinct scopes, no CPU/GPU sum"
+  },
+  "constraints": {
+    "push": false,
+    "mergeMain": false,
+    "deployment": false,
+    "shared8443Restart": false,
+    "nextBatchStarted": false
+  },
+  "evidenceArchive": {
+    "path": "docs/performance/next-render-cycle/batch-3/evidence.tar.gz",
+    "sha256": "231273647b4b7e83e39de94dd24d4025c6c7a08632d6483249f466ca6af330ca",
+    "bytes": 59753125,
+    "files": 1391,
+    "uniquePayloads": 811,
+    "exactContentHardlinks": 580,
+    "uncompressedRecordedBytes": 407470137,
+    "allMembersAndHardlinkTargetsVerified": true,
+    "excluded": "unchanged base repository/runtime assets; full unfiltered process list; frozen changed source/pkg bytes and full manifests retained",
+    "scope": "lossless exact-content deduplication; every member and link target checked; unchanged base assets and private full process list excluded",
+    "name": "evidence.tar.gz"
+  },
+  "verification": {
+    "path": "VERIFICATION.json",
+    "sha256": "ce0c9b52aed2d5bb4ef964608705ad3f4a2b6ba86d21e27c054e93d4154d50b0",
+    "projectGate": "PASS423native/141browser; separate strict pixel limit remains open",
+    "receiptMatched": true
+  },
+  "strictPixelAcceptance": {
+    "status": "FAIL",
+    "deterministicPairs": 42,
+    "exactPairs": 40,
+    "failures": [
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgpu",
+        "pair": 1,
+        "pixel": {
+          "pass": false,
+          "exact": false,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 1,
+          "meanAbsoluteChannelDelta": 1.3563368055555556e-06,
+          "changedPixels": 4,
+          "changedFraction": 4.340277777777778e-06,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      },
+      {
+        "family": "rim-clustered",
+        "load": 1024,
+        "backend": "webgpu",
+        "pair": 2,
+        "pixel": {
+          "pass": false,
+          "exact": false,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 1,
+          "meanAbsoluteChannelDelta": 1.3563368055555556e-06,
+          "changedPixels": 4,
+          "changedFraction": 4.340277777777778e-06,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      }
+    ],
+    "toleranceChanged": false,
+    "additionalOracle": "evidence/pixel-oracle/report.json",
+    "baselineRepeatInstabilityObserved": true,
+    "candidateImagesWithinPrimaryBaselineVariants": true,
+    "candidateIndependentExact": 2,
+    "candidateIndependentTotal": 3,
+    "qualification": "Exact repeatability of this WebGPU stress case remains unresolved. Same output-set membership weakens new-cache attribution but does not exclude a changed frequency or shared older cache bug. These strict failures are preserved, not accepted as exact parity."
+  },
+  "primaryEvidence": {
+    "runs": 108,
+    "frameRecords": 131673,
+    "metricAndHashAudit": "PASS",
+    "strictPixelGate": "FAIL 40/42 exact; known unresolved WebGPU stress repeatability, retained without tolerance change"
+  },
+  "frozenAttempts": [
+    {
+      "directory": "evidence/baseline",
+      "build": {
+        "source": "1452a9f7ca544a1490773130f92719d223511b5feaa6c5b819bd3a9d325a0358",
+        "wasm": "af2905cc7d71af63b731c586198bd201917d63375821e80d1a70e7a99f1ea088",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2480,
+      "decision": "baseline"
+    },
+    {
+      "directory": "evidence/candidate-first",
+      "build": {
+        "source": "eeb3fad07fa07bb6b721a00b864d1af69c5ae4f9b020fa64151db381cb6be140",
+        "wasm": "9fee5ae19335a7eb724f3a07c0ff959503f754775756aeec4cbe325ede266f21",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2483,
+      "decision": "rejected or intermediate; retained, not pooled into final data"
+    },
+    {
+      "directory": "evidence/candidate",
+      "build": {
+        "source": "b4071250abcb1ba8c265d827832deb9111521bded41eba0665d4449073fd593c",
+        "wasm": "b6283211f1d768b1e49d90921ef7ff81fbf7b8772ccf97d3b187421240cf2bfd",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2483,
+      "decision": "rejected or intermediate; retained, not pooled into final data"
+    },
+    {
+      "directory": "evidence/candidate-final",
+      "build": {
+        "source": "529af64503ff78a6f15e0d6e05aa89b0855ee67037add769c58bb08db1f53516",
+        "wasm": "e57c50e85794fb9dd52b5dd4c4275d90f1337b0500d70232365c48e319b7a420",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2484,
+      "decision": "rejected or intermediate; retained, not pooled into final data"
+    },
+    {
+      "directory": "evidence/candidate-basis",
+      "build": {
+        "source": "8d5e084c9cc1f111b10de736d7e919112491ffd855f55a2c72a1cff3d125ff9c",
+        "wasm": "cf135b73fba51cd5096ef70a149a5ba7a4d3408be1dee46f4dc4ca5201a94699",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2484,
+      "decision": "rejected or intermediate; retained, not pooled into final data"
+    },
+    {
+      "directory": "evidence/candidate-uniform",
+      "build": {
+        "source": "e591b128a9cc4cb68caf55b801ff65825a318160a32a0fed142c0a8c525093a6",
+        "wasm": "e33a7f8b3cafd26ff4333afcd9f2dfb69170a2655a953616b74098592ed55c0e",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2484,
+      "decision": "rejected or intermediate; retained, not pooled into final data"
+    },
+    {
+      "directory": "evidence/candidate-admission",
+      "build": {
+        "source": "e8b39fcf650592b36a9e5897e8c4f9e85f131ab4782307ff36f5657dedfcd2dd",
+        "wasm": "bdae44e11cd107177241ec19de3d44137399603cb42f2f5de2dc4513a1c553ea",
+        "bindings": "e837eaf52620498917a8320954644e7f70918146ba7fed6bed52f18c7be914cd",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "files": 2484,
+      "decision": "final measured candidate with known pixel-repeatability limit"
+    }
+  ],
+  "extraEvidence": {
+    "diagnosticCaptures": 16,
+    "workerReplays": 24,
+    "workerJobs": 144,
+    "installationStageEvents": 72,
+    "separateFromPrimary": true,
+    "details": "RESULTS.json"
+  },
+  "workerRunnerLifecycle": {
+    "recordedCoordinator": "evidence/run-workers.original.mjs",
+    "actualCommands": "evidence/worker-commands.json",
+    "completedCliCleanup": "evidence/worker-completed-cli-cleanup.json and evidence/worker-extra-cli-cleanups.json",
+    "signalExits": "four completed stress CLIs required own exact-PID cleanup after final PASS and browser/server close; null exit codes are not treated as fresh test PASS",
+    "reproductionCoordinator": "evidence/run-workers.mjs awaits the same maintained CLI module then explicitly exits; browser workload unchanged"
+  },
+  "completedAt": "2026-10-28T00:42:13.195903+00:00",
+  "results": {
+    "path": "RESULTS.json",
+    "sha256": "638a91e97f60fbda4285eb1cf6819bb1fe0ef5fa75657a33f3dd934960ee44d8"
+  },
+  "sourceDumpSha256": "6007ef16564258ac12bcf33257c0236c93defa71a73831014b1ba02ddd853fe6",
+  "checkpoint": "the containing local Git commit, not pushed or integrated",
+  "archiveSourceReconstruction": "completedB2parent checkout + per-attempt changed source/runtime files and all package bytes; full frozen manifests retained"
+}

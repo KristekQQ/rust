@@ -112,3 +112,19 @@ test('CPU scope evidence excludes unchanged cold histories and deduplicates snap
  assert.equal(e.scopes.zero.lastSampleMs,null);assert.equal(e.scopes.queue.observedHistoryChanges,2);
  assert.equal(e.scopes.queue.lastSampleMs.count,2);assert.equal(e.scopes.queue.lastSampleMs.max,3);
 });
+
+// New batch3 families reuse the maintained frozen-runtime/common-harness path.
+test('camera-stress and one-moving-root Rome are scalable frozen workload families',()=>{
+ for(const family of ['rim-camera-stress','rim-mixed']){
+  assert.equal(fixedLoadFamily(family),false);
+  assert.equal(parseArgs(['smoke','--family',family,'--load','1024']).family,family);
+ }
+});
+test('fine counters use exact boundaries, while cache-byte gauges stay out of event deltas',()=>{
+ const d=workDeltas({boundaryStart:{profile:{frame:1},debug:{gltf:{finePayloadRecordsWritten:10,finePreparedRowsReused:20,fineCacheBytes:300}}},boundaryEnd:{profile:{frame:3},debug:{gltf:{finePayloadRecordsWritten:12,finePreparedRowsReused:30,fineCacheBytes:400}}},frames:Array(2),elapsedMs:100});
+ assert.equal(d.gltf.finePayloadRecordsWritten.delta,2);
+ assert.equal(d.gltf.finePreparedRowsReused.perApplicationRaf,5);
+ assert.equal(d.gltf.fineCacheBytes,undefined);
+ assert.equal(d.gauges.end.fineCacheBytes,400);
+ assert.equal(d.gltf.fineDynamicFallbacks.delta,null);
+});

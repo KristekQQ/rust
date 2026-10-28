@@ -94,11 +94,16 @@ try{
   const compactBefore=engine.debugStats().gltf;
   streamModels[count-1].setPosition([((count-1)-(count-1)/2)*.7+.01,0,0]);await frames(1);const compactAfter=engine.debugStats().gltf;
   assert(compactAfter.translatedDrawCalls>compactBefore.translatedDrawCalls,'actual shared-basis GPU commands required');
-  assert(compactAfter.instanceUploadBytes-compactBefore.instanceUploadBytes===count*3*16,'pure translation columns upload sixteen bytes per instance');
+  const compactUploaded=compactAfter.instanceUploadBytes-compactBefore.instanceUploadBytes;
+  assert(compactUploaded>0&&compactUploaded<=compactAfter.fineLayoutReservedBytes,'translation upload stays inside bounded reserved slots: '+compactUploaded);
+  assert(compactAfter.fineLayoutActiveBytes===count*3*16,'all live translation instance records remain sixteen bytes');
+  assert(compactAfter.finePayloadBytesWritten-compactBefore.finePayloadBytesWritten===3*16,'one translated root patches exactly its three16-byte records');
   streamModels[count-1].setPosition([((count-1)-(count-1)/2)*.7,0,0]);await frames();
   const before=engine.debugStats().gltf;streamModels[count-1].setRotation([.07,.11,0]);await frames(1);const after=engine.debugStats().gltf;
   assert(after.bufferUploadCalls-before.bufferUploadCalls===4,'full-matrix fallback updates three material uniforms and one shared stream');
-  assert(after.instanceUploadBytes-before.instanceUploadBytes===count*3*112,'stream bytes preserve all original instance records');
+  const affineUploaded=after.instanceUploadBytes-before.instanceUploadBytes;
+  assert(affineUploaded>0&&affineUploaded<=after.fineLayoutReservedBytes,'affine upload covers live records within bounded reserved slots: '+affineUploaded);
+  assert(after.fineLayoutActiveBytes===count*3*112,'all live affine instance records retain112-byte representation');
   assert(after.instanceBufferBytes>=previousBytes,'stream capacity survives shrink');previousBytes=after.instanceBufferBytes;
   const draws=records(false);assert(draws.length===3&&draws.every(d=>d.instances===count),'stream slices preserve primitive/instance counts');streamEvidence.push({count,uploadCalls:after.bufferUploadCalls-before.bufferUploadCalls,uploadBytes:after.instanceUploadBytes-before.instanceUploadBytes,bufferBytes:after.instanceBufferBytes});
  }

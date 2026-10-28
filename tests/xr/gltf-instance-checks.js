@@ -12,8 +12,8 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
     engine.postprocessing.disable('bloom');
     engine.setNeonGlow({strength:0});
     engine.scene.createLight({position:[-2,4,0],color:[12,12,12]});
-    const frame = () => {
-        sim.frame({dt:0, head:{position:[0,1.6,0], orientation:[0,0,0,1]}});
+    const frame = (headPosition=[0,1.6,0]) => {
+        sim.frame({dt:0, head:{position:headPosition, orientation:[0,0,0,1]}});
         test.assert(!engine.xr.lastError, 'glTF instance stereo frame completes', String(engine.xr.lastError));
     };
 
@@ -48,10 +48,10 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
         'both frozen XR eye plans hit', {planBefore:planBefore.preparedPlanCache,planAfter:planAfter.preparedPlanCache});
     test.assert(planAfter.prepareOpaqueGroupRebuilds===planBefore.prepareOpaqueGroupRebuilds && planAfter.preparePayloadRebuilds===planBefore.preparePayloadRebuilds,
         'frozen XR eyes skip opaque groups and payload packing');
-    engine.setPreparedPlanCacheEnabled(false);frame();
+    engine.setPreparedPlanCacheEnabled(false);engine.set_frustum_culling(false);frame();
     const uncached=await readEyes();
-    test.assert(uncached.every((image,eye)=>pixelDifference(warm[eye],image,0)===0),'cache-off oracle preserves exact stereo pixels');
-    engine.setPreparedPlanCacheEnabled(true);frame();frame();
+    test.assert(uncached.every((image,eye)=>pixelDifference(warm[eye],image,0)===0),'cache-off culling-off independent oracle preserves exact stereo pixels');
+    engine.set_frustum_culling(true);engine.setPreparedPlanCacheEnabled(true);frame();frame();
 
     instances[2].setPosition([.9,1.6,-2]);
     frame();
@@ -64,10 +64,33 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
     test.assert(restored.every((image, eye) => pixelDifference(first[eye], image, 0)===0),
         'restoring the glTF instance reproduces exact stereo pixels');
 
+    frame();frame();const headBefore=engine.debugStats().gltf;
+    frame([.01,1.6,0]);const headAfter=engine.debugStats().gltf;
+    test.assert(headAfter.finePreparedRowsReused>headBefore.finePreparedRowsReused && headAfter.finePayloadRecordsWritten===headBefore.finePayloadRecordsWritten && headAfter.fineWorldDataUpdates===headBefore.fineWorldDataUpdates,
+        'head movement refreshes both views without rebuilding world payloads', {headBefore,headAfter});
+    const headMoved=await readEyes();engine.setPreparedPlanCacheEnabled(false);engine.set_frustum_culling(false);frame([.01,1.6,0]);
+    const headOracle=await readEyes();test.assert(headOracle.every((image,eye)=>pixelDifference(headMoved[eye],image,0)===0),'moving stereo head matches independent cache-off culling-off oracle');
+    engine.set_frustum_culling(true);engine.setPreparedPlanCacheEnabled(true);
+    frame();frame();
+
     if (shiftLeft) {
         const rightBefore = restored[1];
-        shiftLeft(3);
+        frame();frame();const fineBefore=engine.debugStats().gltf;
+        // Small change retains membership; the original large shift below
+        // deliberately removes all geometry from the left view.
+        shiftLeft(.015);
         frame();
+        const fineAfter=engine.debugStats().gltf;
+        test.assert(fineAfter.finePreparedRowsReused>fineBefore.finePreparedRowsReused && fineAfter.finePayloadRecordsWritten===fineBefore.finePayloadRecordsWritten,
+            'changing only left projection reuses fine rows without repacking either eye', {fineBefore,fineAfter});
+        const finePixels=await readEyes();
+        test.assert(pixelDifference(restored[0],finePixels[0])>0 && pixelDifference(rightBefore,finePixels[1],0)===0,
+            'fine left-only projection changes left pixels and preserves exact right pixels');
+        engine.setPreparedPlanCacheEnabled(false);engine.set_frustum_culling(false);frame();
+        const fineOracle=await readEyes();test.assert(fineOracle.every((image,eye)=>pixelDifference(finePixels[eye],image,0)===0),
+            'fine left-only projection matches independent cache-off culling-off stereo oracle');
+        engine.set_frustum_culling(true);engine.setPreparedPlanCacheEnabled(true);
+        shiftLeft(0);frame();shiftLeft(3);frame();
         const shifted = await readEyes();
         test.assert(pixelDifference(restored[0], shifted[0])>0, 'left projection shift changes glTF pixels in the left eye');
         test.assert(pixelDifference(rightBefore, shifted[1], 0)===0, 'left projection shift preserves exact glTF pixels in the right eye');

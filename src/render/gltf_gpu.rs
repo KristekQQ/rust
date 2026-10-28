@@ -95,6 +95,7 @@ impl RigidInstance {
     }
 }
 struct InstancePage {
+    generation: u64,
     buffer: Option<wgpu::Buffer>,
     material_buffer: wgpu::Buffer,
     bind: wgpu::BindGroup,
@@ -105,6 +106,7 @@ struct InstancePage {
 // Bounded pass/view-owned stream. Material uniforms remain per draw group;
 // only the existing rigid instance records share one contiguous upload.
 struct InstanceStream {
+    generation: u64,
     buffer: wgpu::Buffer,
     // Bytes, because groups can mix 16B translation and 112B affine records.
     capacity: usize,
@@ -130,7 +132,7 @@ struct PreparedDraw {
 }
 #[derive(Default)]
 pub struct PreparedDraws {
-    draws: Rc<Vec<PreparedDraw>>,
+    draws: Rc<Vec<Rc<PreparedDraw>>>,
     pub upload_bytes: usize,
 }
 
@@ -152,8 +154,8 @@ struct PlanKey {
 }
 struct CachedPlan {
     key: PlanKey,
-    models: Vec<(u32, u64, bool)>,
-    draws: Rc<Vec<PreparedDraw>>,
+    models: Vec<(u32, u64, u64, bool)>,
+    draws: Rc<Vec<Rc<PreparedDraw>>>,
     bytes: usize,
 }
 struct PlanCache {
@@ -191,7 +193,7 @@ impl PlanCache {
         slot: usize,
         key: &PlanKey,
         models: &[(u32, &GpuModel)],
-    ) -> Option<Rc<Vec<PreparedDraw>>> {
+    ) -> Option<Rc<Vec<Rc<PreparedDraw>>>> {
         let reason = match self.slots.get(slot) {
             None => 11,
             Some(None) => 0,
@@ -201,11 +203,9 @@ impl PlanCache {
                 } else if p.key.inputs != key.inputs {
                     2
                 } else if p.models.len() != models.len()
-                    || !p
-                        .models
-                        .iter()
-                        .zip(models)
-                        .all(|(a, (id, m))| *a == (*id, m.generation, m.opaque_reorderable))
+                    || !p.models.iter().zip(models).all(|(a, (id, m))| {
+                        *a == (*id, m.generation, m.data_revision, m.opaque_reorderable)
+                    })
                 {
                     3
                 } else if p.key.camera != key.camera
@@ -241,21 +241,22 @@ impl PlanCache {
         slot: usize,
         key: PlanKey,
         models: &[(u32, &GpuModel)],
-        draws: Rc<Vec<PreparedDraw>>,
+        draws: Rc<Vec<Rc<PreparedDraw>>>,
     ) {
         if slot >= PLAN_SLOTS {
             return;
         }
         let models: Vec<_> = models
             .iter()
-            .map(|(id, m)| (*id, m.generation, m.opaque_reorderable))
+            .map(|(id, m)| (*id, m.generation, m.data_revision, m.opaque_reorderable))
             .collect();
-        let bytes = draws.capacity() * std::mem::size_of::<PreparedDraw>()
+        let bytes = draws.capacity() * std::mem::size_of::<Rc<PreparedDraw>>()
             + draws
                 .iter()
                 .map(|d| d.records.capacity() * std::mem::size_of::<(u32, usize, usize)>())
                 .sum::<usize>()
-            + models.capacity() * std::mem::size_of::<(u32, u64, bool)>()
+            + draws.len() * std::mem::size_of::<PreparedDraw>()
+            + models.capacity() * std::mem::size_of::<(u32, u64, u64, bool)>()
             + std::mem::size_of::<CachedPlan>();
         if bytes > PLAN_BYTES {
             self.reasons[10] += 1;
@@ -280,6 +281,170 @@ impl PlanCache {
     }
 }
 
+#[derive(Clone, Copy)]
+struct FineSource {
+    owner: u64,
+    draw: u64,
+    data: u64,
+    basis: u64,
+    matched: bool,
+}
+#[derive(Default)]
+struct FineGroup {
+    sources: Vec<FineSource>,
+    members_same: bool,
+    first_basis: Option<(u64, u64)>,
+    first_affine: bool,
+    matched: usize,
+    translated: bool,
+    payload_slot: Option<(u64, usize, usize)>,
+    row_storage: (u64, u64, u64, u64),
+    active_bytes: usize,
+    reserved_bytes: usize,
+    row: Option<Rc<PreparedDraw>>,
+}
+impl FineGroup {
+    fn select(
+        &mut self,
+        items: &[QueueItem],
+        models: &[(u32, &GpuModel)],
+        translation_allowed: bool,
+        stats: &mut GltfGpuStats,
+    ) {
+        stats.fine_groups_visited += 1;
+        self.members_same = self.sources.len() == items.len()
+            && self
+                .sources
+                .iter()
+                .zip(items)
+                .all(|(s, i)| s.draw == models[i.model].1.draws[i.draw].identity);
+        if self.members_same {
+            stats.fine_group_membership_hits += 1;
+        } else {
+            stats.fine_group_membership_misses += 1;
+            self.sources.clear();
+            if self.sources.capacity() < items.len() {
+                self.sources = Vec::with_capacity(items.len());
+            }
+            self.sources.extend(items.iter().map(|i| {
+                let m = models[i.model].1;
+                let d = &m.draws[i.draw];
+                FineSource {
+                    owner: m.generation,
+                    draw: d.identity,
+                    data: u64::MAX,
+                    basis: u64::MAX,
+                    matched: false,
+                }
+            }));
+            self.first_basis = None;
+            self.payload_slot = None;
+            self.row = None;
+        }
+        if !translation_allowed {
+            self.translated = false;
+            return;
+        }
+        let i = items[0];
+        let first = &models[i.model].1.draws[i.draw];
+        let stamp = (first.identity, first.basis_revision);
+        let changed = self.first_basis != Some(stamp);
+        if changed {
+            self.first_affine = first.last_uniform.affine_basis();
+            self.matched = 0;
+        }
+        for (source, i) in self.sources.iter_mut().zip(items) {
+            let d = &models[i.model].1.draws[i.draw];
+            if changed || source.basis != d.basis_revision {
+                stats.fine_basis_comparisons += 1;
+                let matches = first.last_uniform.same_basis(&d.last_uniform);
+                if changed {
+                    self.matched += usize::from(matches);
+                } else if matches != source.matched {
+                    if matches {
+                        self.matched += 1;
+                    } else {
+                        self.matched -= 1;
+                    }
+                }
+                source.basis = d.basis_revision;
+                source.matched = matches;
+            }
+        }
+        self.first_basis = Some(stamp);
+        self.translated = self.first_affine && self.matched == items.len();
+    }
+    // The retained stream/page mirror owns actual bytes. A record is copied only
+    // after source revision or layout changes. World uniforms are already canonical;
+    // pack a full record only inside the dirty full112B branch.
+    fn patch(
+        &mut self,
+        target: &mut [u8],
+        storage: u64,
+        offset: usize,
+        items: &[QueueItem],
+        models: &[(u32, &GpuModel)],
+        stats: &mut GltfGpuStats,
+    ) -> Option<(usize, usize)> {
+        let stride = if self.translated { 16 } else { 112 };
+        let full = self.payload_slot != Some((storage, offset, stride)) || !self.members_same;
+        let mut dirty = None;
+        let mut rebuilt = full;
+        for (index, (source, i)) in self.sources.iter_mut().zip(items).enumerate() {
+            let d = &models[i.model].1.draws[i.draw];
+            if full || source.data != d.data_revision {
+                rebuilt = true;
+                let packed;
+                let bytes = if self.translated {
+                    as_bytes(std::slice::from_ref(&d.last_uniform.model[3]))
+                } else {
+                    packed = RigidInstance::from_uniform(&d.last_uniform);
+                    stats.fine_full_record_packs += 1;
+                    as_bytes(std::slice::from_ref(&packed))
+                };
+                let start = offset + index * stride;
+                let end = start + stride;
+                if target[start..end] != *bytes {
+                    target[start..end].copy_from_slice(bytes);
+                    stats.fine_payload_records_written += 1;
+                    stats.fine_payload_bytes_written += stride as u64;
+                    dirty = Some(match dirty {
+                        Some((a, b)) => (start.min(a), end.max(b)),
+                        None => (start, end),
+                    });
+                }
+                source.data = d.data_revision;
+            }
+        }
+        self.payload_slot = Some((storage, offset, stride));
+        if rebuilt {
+            stats.fine_payload_groups_rebuilt += 1;
+            stats.prepare_payload_rebuilds += 1;
+        } else {
+            stats.fine_payload_groups_reused += 1;
+        }
+        dirty
+    }
+    fn bytes(&self) -> usize {
+        self.sources.capacity() * std::mem::size_of::<FineSource>()
+            + self.row.as_ref().map_or(0, |r| {
+                std::mem::size_of::<PreparedDraw>()
+                    + r.records.capacity() * std::mem::size_of::<(u32, usize, usize)>()
+            })
+    }
+}
+struct FineView {
+    storage_key: PipelineKey,
+    diagnostics: bool,
+    groups: Vec<FineGroup>,
+}
+impl FineView {
+    fn bytes(&self) -> usize {
+        self.groups.capacity() * std::mem::size_of::<FineGroup>()
+            + self.groups.iter().map(FineGroup::bytes).sum::<usize>()
+    }
+}
+
 /// Frame-local indices only: no references or GPU resources survive a preparation call.
 #[derive(Clone, Copy)]
 struct QueueItem {
@@ -296,6 +461,7 @@ struct QueueScratch {
     occupied: crate::render_overlap::OrderedBounds,
     payload: Vec<u8>,
     translated: Vec<bool>,
+    compatibility_hits: u64,
 }
 impl QueueScratch {
     fn clear(&mut self) {
@@ -307,6 +473,7 @@ impl QueueScratch {
         self.occupied.clear();
         self.payload.clear();
         self.translated.clear();
+        self.compatibility_hits = 0;
     }
     fn capacities(&self) -> [usize; 8] {
         [
@@ -343,7 +510,12 @@ impl QueueScratch {
         self.ordered.push(item);
         self.groups.push(start..start + 1);
     }
-    fn append_compatible(&mut self, item: QueueItem, models: &[(u32, &GpuModel)]) -> Option<usize> {
+    fn append_compatible(
+        &mut self,
+        item: QueueItem,
+        models: &[(u32, &GpuModel)],
+        reuse: bool,
+    ) -> Option<usize> {
         let model = models[item.model].1;
         let draw = &model.draws[item.draw];
         // First failed condition, in the original short-circuit order. A first
@@ -356,6 +528,15 @@ impl QueueScratch {
                 Some(0)
             } else if previous.draw != item.draw {
                 Some(1)
+            } else if reuse
+                && draw
+                    .batch_class
+                    .as_ref()
+                    .zip(other.batch_class.as_ref())
+                    .is_some_and(|(a, b)| Rc::ptr_eq(a, b))
+            {
+                self.compatibility_hits += 1;
+                None
             } else if !Rc::ptr_eq(&other_model._shared, &model._shared) {
                 Some(2)
             } else if !draw.rigid || !other.rigid {
@@ -479,7 +660,39 @@ struct Geometry {
     topology: wgpu::PrimitiveTopology,
     center: Vec3,
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct BatchClassKey {
+    ordinal: usize,
+    negative: bool,
+    options: [u32; 4],
+}
+#[derive(Default)]
+struct BatchClasses {
+    entries: HashMap<BatchClassKey, Weak<()>>,
+    saturated: bool,
+}
+impl BatchClasses {
+    fn get(&mut self, key: BatchClassKey) -> Option<Rc<()>> {
+        if let Some(class) = self.entries.get(&key).and_then(Weak::upgrade) {
+            return Some(class);
+        }
+        if self.saturated {
+            return None;
+        }
+        if self.entries.len() >= 4096 {
+            self.entries.retain(|_, v| v.strong_count() > 0);
+            if self.entries.len() >= 4096 {
+                self.saturated = true;
+                return None;
+            }
+        }
+        let class = Rc::new(());
+        self.entries.insert(key, Rc::downgrade(&class));
+        Some(class)
+    }
+}
 struct SharedAsset {
+    batch_classes: RefCell<BatchClasses>,
     asset: Arc<ModelAsset>,
     materials: Rc<Vec<Material>>,
     geometry: Vec<Option<Geometry>>,
@@ -533,8 +746,32 @@ pub struct GltfGpuStats {
     pub prepare_record_rebuilds: u64,
     pub prepare_timed_calls: u64,
     pub prepare_stage_ms: [f64; 6],
+    pub fine_groups_visited: u64,
+    pub fine_group_membership_hits: u64,
+    pub fine_group_membership_misses: u64,
+    pub fine_prepared_rows_reused: u64,
+    pub fine_prepared_rows_created: u64,
+    pub fine_payload_groups_reused: u64,
+    pub fine_payload_groups_rebuilt: u64,
+    pub fine_payload_records_written: u64,
+    pub fine_payload_bytes_written: u64,
+    pub fine_basis_comparisons: u64,
+    pub fine_world_data_updates: u64,
+    pub fine_full_record_packs: u64,
+    pub fine_compatibility_hits: u64,
+    pub fine_cache_budget_fallbacks: u64,
+    pub fine_dynamic_fallbacks: u64,
+    pub fine_no_instance_fallbacks: u64,
+    pub fine_cache_bytes: usize,
+    pub fine_layout_active_bytes: usize,
+    pub fine_layout_reserved_bytes: usize,
 }
 struct Draw {
+    identity: u64,
+    data_revision: u64,
+    basis_revision: u64,
+    batch_class: Option<Rc<()>>,
+    batch_key: Option<BatchClassKey>,
     node: usize,
     primitive: usize,
     material: usize,
@@ -556,6 +793,7 @@ struct Draw {
 }
 pub struct GpuModel {
     generation: u64,
+    data_revision: u64,
     draws: Vec<Draw>,
     materials: Rc<Vec<Material>>,
     _shared: Rc<SharedAsset>,
@@ -653,6 +891,10 @@ pub struct GltfGpu {
     plan_cache: RefCell<PlanCache>,
     input_epoch: Cell<u64>,
     content_epoch: Cell<u64>,
+    next_resource: Cell<u64>,
+    fine_views: RefCell<[Option<FineView>; PLAN_SLOTS]>,
+    model_data_epoch: Cell<u64>,
+    model_data_marks: [u64; PLAN_SLOTS],
 }
 impl GltfGpu {
     pub fn new(
@@ -759,6 +1001,10 @@ impl GltfGpu {
             plan_cache: RefCell::new(PlanCache::default()),
             input_epoch: Cell::new(0),
             content_epoch: Cell::new(0),
+            next_resource: Cell::new(0),
+            fine_views: RefCell::new(std::array::from_fn(|_| None)),
+            model_data_epoch: Cell::new(0),
+            model_data_marks: [0; PLAN_SLOTS],
             instancing_supported: limits.max_vertex_attributes >= 16
                 && limits.max_vertex_buffers >= 2,
         }
@@ -1263,6 +1509,7 @@ impl GltfGpu {
         self.counters.set(stats);
         let shared = Rc::new(SharedAsset {
             asset: asset.clone(),
+            batch_classes: RefCell::new(BatchClasses::default()),
             materials: Rc::new(materials),
             geometry,
         });
@@ -1280,6 +1527,19 @@ impl GltfGpu {
             stats.material_resources += shared.materials.len();
         }
         stats.queue_scratch_bytes = self.queue_scratch.bytes();
+        stats.fine_cache_bytes = self
+            .fine_views
+            .borrow()
+            .iter()
+            .flatten()
+            .map(FineView::bytes)
+            .sum();
+        for view in self.fine_views.borrow().iter().flatten() {
+            for group in &view.groups {
+                stats.fine_layout_active_bytes += group.active_bytes;
+                stats.fine_layout_reserved_bytes += group.reserved_bytes;
+            }
+        }
         stats.instance_pages_active = self.active_instance_pages.values().sum();
         stats.instance_pages_retained = self.instance_pages.values().map(Vec::len).sum();
         stats.instance_buffer_bytes = self
@@ -1304,10 +1564,33 @@ impl GltfGpu {
         );
         self.plan_cache.borrow_mut().clear(2);
     }
+    fn resource_id(&self) -> u64 {
+        let id = self
+            .next_resource
+            .get()
+            .checked_add(1)
+            .expect("glTF resource identity exhausted");
+        self.next_resource.set(id);
+        id
+    }
+    pub(crate) fn model_generation(model: &GpuModel) -> u64 {
+        model.generation
+    }
+    pub(crate) fn models_removed(&self, removed: &HashSet<u64>) {
+        self.invalidate_plan_inputs();
+        for view in self.fine_views.borrow_mut().iter_mut().flatten() {
+            for group in &mut view.groups {
+                if group.sources.iter().any(|s| removed.contains(&s.owner)) {
+                    *group = FineGroup::default();
+                }
+            }
+        }
+    }
     pub fn set_plan_cache_enabled(&self, enabled: bool) {
         let mut cache = self.plan_cache.borrow_mut();
         if cache.enabled != enabled {
             cache.clear(9);
+            self.fine_views.borrow_mut().fill_with(|| None);
             cache.enabled = enabled;
         }
     }
@@ -1397,6 +1680,11 @@ impl GltfGpu {
                     entries: &entries,
                 });
                 draws.push(Draw {
+                    identity: self.resource_id(),
+                    data_revision: 0,
+                    basis_revision: 0,
+                    batch_class: None,
+                    batch_key: None,
                     node,
                     primitive,
                     material,
@@ -1436,6 +1724,7 @@ impl GltfGpu {
         });
         GpuModel {
             generation: self.input_epoch.get(),
+            data_revision: 0,
             active_draws,
             opaque_reorderable: false,
             reorderable_draws,
@@ -1465,7 +1754,13 @@ impl GltfGpu {
         if model.last_pose.as_ref() == Some(&stamp) {
             return Ok(0);
         }
-        self.invalidate_plan_inputs();
+        let epoch = self
+            .model_data_epoch
+            .get()
+            .checked_add(1)
+            .expect("glTF model data epoch exhausted");
+        self.model_data_epoch.set(epoch);
+        model.data_revision = epoch;
         model.active.clear();
         model.active.extend(pose.active_nodes.iter().copied());
         let mut stats = self.counters.get();
@@ -1508,7 +1803,7 @@ impl GltfGpu {
                 }
             }
         }
-        for draw in &mut model.draws {
+        for (ordinal, draw) in model.draws.iter_mut().enumerate() {
             if !model.active.contains(&draw.node) {
                 continue;
             }
@@ -1591,7 +1886,49 @@ impl GltfGpu {
                 0.0
             };
             if uniform != draw.last_uniform {
+                if draw.rigid {
+                    // last_uniform already owns the canonical world data. Mark
+                    // publication conservatively; build112B only for a dirty
+                    // full-record payload, never for compact translation groups.
+                    draw.data_revision = draw
+                        .data_revision
+                        .checked_add(1)
+                        .expect("glTF draw revision exhausted");
+                    stats.fine_world_data_updates += 1;
+                }
+                if !super::data::instance_basis_unchanged(
+                    &draw.last_uniform.model,
+                    &draw.last_uniform.normal,
+                    &draw.last_uniform.transform,
+                    &uniform.model,
+                    &uniform.normal,
+                    &uniform.transform,
+                ) {
+                    draw.basis_revision = draw
+                        .basis_revision
+                        .checked_add(1)
+                        .expect("glTF basis revision exhausted");
+                }
                 draw.last_uniform = uniform;
+            }
+            if draw.rigid && draw.last_uniform.options.iter().all(|v| v.is_finite()) {
+                let key = BatchClassKey {
+                    ordinal,
+                    negative: draw.negative,
+                    options: draw
+                        .last_uniform
+                        .options
+                        .map(|v| if v == 0. { 0 } else { v.to_bits() }),
+                };
+                // Only actual compatibility changes enter the bounded shared map.
+                // Translation/pose data never re-intern an unchanged class.
+                if draw.batch_key != Some(key) {
+                    draw.batch_class = model._shared.batch_classes.borrow_mut().get(key);
+                    draw.batch_key = Some(key);
+                }
+            } else {
+                draw.batch_class = None;
+                draw.batch_key = None;
             }
         }
         self.counters.set(stats);
@@ -1757,6 +2094,7 @@ impl GltfGpu {
     pub fn set_diagnostics(&self, enabled: bool) {
         if self.diagnostics.get() != enabled {
             self.plan_cache.borrow_mut().clear(7);
+            self.fine_views.borrow_mut().fill_with(|| None);
         }
         self.diagnostics.set(enabled);
         if !enabled {
@@ -1769,6 +2107,7 @@ impl GltfGpu {
     /// Pages contain transforms only. Drop cached pages as soon as all models disappear.
     pub fn clear_instance_pages(&mut self) {
         self.plan_cache.borrow_mut().clear(8);
+        self.fine_views.borrow_mut().fill_with(|| None);
         self.content_epoch.set(
             self.content_epoch
                 .get()
@@ -1963,7 +2302,9 @@ impl GltfGpu {
                         if cursor < scratch.model_ranges[model].end {
                             let item = scratch.eligible[cursor];
                             if item.draw == ordinal {
-                                if let Some(reason) = scratch.append_compatible(item, &models) {
+                                if let Some(reason) =
+                                    scratch.append_compatible(item, &models, cache_enabled)
+                                {
                                     draw_batch_breaks[reason] += 1;
                                 }
                                 scratch.cursors[model] += 1;
@@ -2001,6 +2342,7 @@ impl GltfGpu {
             });
         }
         let mut stats = self.counters.get();
+        stats.fine_compatibility_hits += scratch.compatibility_hits;
         stats.overlap_tests += overlap_tests;
         stats.overlap_node_tests += overlap_node_tests;
         for (total, count) in stats.root_batch_breaks.iter_mut().zip(root_batch_breaks) {
@@ -2010,6 +2352,100 @@ impl GltfGpu {
             *total += count;
         }
         self.counters.set(stats);
+        // Fine metadata regressed for a heavily changing fleet. Count only
+        // models actually contributing to this view, never global primitive
+        // publications: a single large or offscreen model must not discard the
+        // unaffected static groups. Weight current eligible items, not equal
+        // root votes: small moving fleets can dominate work beside many small
+        // static roots. At least eight changed roots exclude single-root
+        // invalidation. The epoch is monotonic across lifecycle.
+        let epoch = self.model_data_epoch.get();
+        let previous = self
+            .model_data_marks
+            .get(view_slot)
+            .copied()
+            .unwrap_or(epoch);
+        let mut changed = 0usize;
+        let mut changed_items = 0usize;
+        if cache_enabled {
+            if let Some(mark) = self.model_data_marks.get_mut(view_slot) {
+                *mark = epoch;
+            }
+            for (index, (_, model)) in models.iter().enumerate() {
+                if !scratch.model_ranges[index].is_empty() && model.data_revision > previous {
+                    changed += 1;
+                    changed_items += scratch.model_ranges[index].len();
+                }
+            }
+        }
+        let dynamic_fallback = cache_enabled
+            && previous > 0
+            && changed >= 8
+            && scratch.ordered.len() >= 512
+            && changed_items.saturating_mul(4) >= scratch.ordered.len().saturating_mul(3);
+        if dynamic_fallback {
+            if view_slot < PLAN_SLOTS {
+                self.fine_views.borrow_mut()[view_slot] = None;
+            }
+            let mut stats = self.counters.get();
+            stats.fine_dynamic_fallbacks += 1;
+            self.counters.set(stats);
+        }
+        // Singleton-only views have no payload work to save; ordinary Rome
+        // pilots showed metadata overhead here. Keep their original builder.
+        let no_instances = !scratch.groups.iter().any(|g| g.len() > 1);
+        if cache_enabled && no_instances {
+            if view_slot < PLAN_SLOTS {
+                self.fine_views.borrow_mut()[view_slot] = None;
+            }
+            let mut stats = self.counters.get();
+            stats.fine_no_instance_fallbacks += 1;
+            self.counters.set(stats);
+        }
+        let mut fine =
+            if cache_enabled && !dynamic_fallback && !no_instances && view_slot < PLAN_SLOTS {
+                let estimate = scratch
+                    .ordered
+                    .len()
+                    .saturating_mul(std::mem::size_of::<FineSource>())
+                    + scratch.groups.len().saturating_mul(
+                        std::mem::size_of::<FineGroup>() + std::mem::size_of::<PreparedDraw>(),
+                    )
+                    + if self.diagnostics.get() {
+                        scratch
+                            .ordered
+                            .len()
+                            .saturating_mul(std::mem::size_of::<(u32, usize, usize)>())
+                    } else {
+                        0
+                    };
+                if estimate <= PLAN_BYTES {
+                    let old = self.fine_views.borrow_mut()[view_slot].take();
+                    Some(
+                        old.filter(|v| {
+                            v.storage_key == storage_key && v.diagnostics == self.diagnostics.get()
+                        })
+                        .unwrap_or_else(|| FineView {
+                            storage_key,
+                            diagnostics: self.diagnostics.get(),
+                            groups: Vec::new(),
+                        }),
+                    )
+                } else {
+                    self.fine_views.borrow_mut()[view_slot] = None;
+                    let mut stats = self.counters.get();
+                    stats.fine_cache_budget_fallbacks += 1;
+                    self.counters.set(stats);
+                    None
+                }
+            } else {
+                None
+            };
+        if let Some(v) = fine.as_mut() {
+            v.groups
+                .resize_with(scratch.groups.len(), FineGroup::default);
+            v.groups.truncate(scratch.groups.len());
+        }
         stages.switch(Some(4));
         let mut prepared_draws = Vec::with_capacity(scratch.groups.len());
         // Blend preparation shares this key with the opaque preparation and
@@ -2017,26 +2453,48 @@ impl GltfGpu {
         let mut records = 0usize;
         let mut required_bytes = 0usize;
         stages.switch(Some(2));
-        for group in &scratch.groups {
+        for (group_index, group) in scratch.groups.iter().enumerate() {
             let item = scratch.ordered[group.start];
             let first = &models[item.model].1.draws[item.draw].last_uniform;
-            let translated = group.len() > 1
-                && !blend
-                && !key.shadow
-                && !key.clipped
-                && first.affine_basis()
-                && scratch.ordered[group.clone()].iter().all(|item| {
-                    first.same_basis(&models[item.model].1.draws[item.draw].last_uniform)
-                });
+            let allowed = group.len() > 1 && !blend && !key.shadow && !key.clipped;
+            let translated = if let Some(view) = fine.as_mut() {
+                let mut stats = self.counters.get();
+                view.groups[group_index].select(
+                    &scratch.ordered[group.clone()],
+                    &models,
+                    allowed,
+                    &mut stats,
+                );
+                self.counters.set(stats);
+                view.groups[group_index].translated
+            } else {
+                allowed
+                    && first.affine_basis()
+                    && scratch.ordered[group.clone()].iter().all(|item| {
+                        first.same_basis(&models[item.model].1.draws[item.draw].last_uniform)
+                    })
+            };
             scratch.translated.push(translated);
             if group.len() > 1 {
                 records = records.saturating_add(group.len());
+                let payload_bytes = group
+                    .len()
+                    .saturating_mul(if translated { 16 } else { 112 });
+                let reserved = if let Some(view) = fine.as_mut() {
+                    let g = &mut view.groups[group_index];
+                    g.active_bytes = payload_bytes;
+                    // Keep current group slots stable across small culling/count
+                    // changes. Bind only live bytes; padding is never rendered.
+                    g.reserved_bytes = g.reserved_bytes.max(payload_bytes.next_power_of_two());
+                    g.reserved_bytes
+                } else {
+                    payload_bytes
+                };
+                required_bytes = required_bytes.saturating_add(reserved);
+            } else if let Some(view) = fine.as_mut() {
+                view.groups[group_index].active_bytes = 0;
                 required_bytes =
-                    required_bytes.saturating_add(group.len().saturating_mul(if translated {
-                        16
-                    } else {
-                        112
-                    }));
+                    required_bytes.saturating_add(view.groups[group_index].reserved_bytes);
             }
         }
         stages.switch(Some(5));
@@ -2055,6 +2513,7 @@ impl GltfGpu {
                 stats.instance_buffers_created += 1;
                 self.counters.set(stats);
                 existing = Some(InstanceStream {
+                    generation: self.resource_id(),
                     buffer: device.create_buffer(&wgpu::BufferDescriptor {
                         label: Some("glTF pass-view instance stream"),
                         size: capacity as u64,
@@ -2066,7 +2525,11 @@ impl GltfGpu {
                     scratch: Vec::new(),
                 });
             }
-            existing.as_mut().unwrap().scratch.clear();
+            if fine.is_some() {
+                existing.as_mut().unwrap().last.resize(required_bytes, 0);
+            } else {
+                existing.as_mut().unwrap().scratch.clear();
+            }
             existing
         } else {
             if !blend {
@@ -2075,6 +2538,8 @@ impl GltfGpu {
             None
         };
         let mut page_index = 0;
+        let mut stream_offset = 0usize;
+        let mut stream_dirty: Option<(usize, usize)> = None;
         for (group_index, group) in scratch.groups.iter().enumerate() {
             let translated = scratch.translated[group_index];
             let first = scratch.ordered[group.start];
@@ -2097,14 +2562,6 @@ impl GltfGpu {
                 translated,
                 compact_vertex: d.rigid,
             };
-            self.ensure_pipeline(device, variant);
-            self.ensure_pipeline(
-                device,
-                Variant {
-                    negative: !variant.negative,
-                    ..variant
-                },
-            );
             let mut stats = self.counters.get();
             if !instanced && d.uploaded_uniform.get() != d.last_uniform {
                 queue.write_buffer(&d.uniform, 0, as_bytes(&[d.last_uniform]));
@@ -2119,27 +2576,32 @@ impl GltfGpu {
                 stats.uniform_upload_bytes += std::mem::size_of::<Uniform>() as u64;
             }
             let mut draw_bind = d.bind.clone();
+            let mut row_storage = (d.identity, 0, 0, 0);
             let instance = if instanced {
-                stages.switch(Some(3));
-                stats.prepare_payload_rebuilds += 1;
-                scratch.payload.clear();
-                for item in &scratch.ordered[group.clone()] {
-                    let u = &models[item.model].1.draws[item.draw].last_uniform;
-                    if translated {
-                        scratch.payload.extend_from_slice(as_bytes(&[u.model[3]]));
-                    } else {
-                        scratch
-                            .payload
-                            .extend_from_slice(as_bytes(&[RigidInstance::from_uniform(u)]));
+                let payload_bytes = group.len() * if translated { 16 } else { 112 };
+                if fine.is_none() {
+                    stages.switch(Some(3));
+                    stats.prepare_payload_rebuilds += 1;
+                    scratch.payload.clear();
+                    for item in &scratch.ordered[group.clone()] {
+                        let draw = &models[item.model].1.draws[item.draw];
+                        if translated {
+                            scratch
+                                .payload
+                                .extend_from_slice(as_bytes(&[draw.last_uniform.model[3]]));
+                        } else {
+                            let packed = RigidInstance::from_uniform(&draw.last_uniform);
+                            stats.fine_full_record_packs += 1;
+                            scratch.payload.extend_from_slice(as_bytes(&[packed]));
+                        }
                     }
+                    stages.switch(Some(5));
                 }
-                stages.switch(Some(5));
-                let payload = &scratch.payload;
                 let pages = self
                     .instance_pages
                     .entry((storage_key, view_slot))
                     .or_default();
-                let capacity = payload.len().next_power_of_two();
+                let capacity = payload_bytes.next_power_of_two();
                 if pages.len() <= page_index
                     || (stream.is_none()
                         && (pages[page_index].buffer.is_none()
@@ -2162,7 +2624,14 @@ impl GltfGpu {
                             resource: material_buffer.as_entire_binding(),
                         }],
                     });
+                    let generation = self
+                        .next_resource
+                        .get()
+                        .checked_add(1)
+                        .expect("glTF resource identity exhausted");
+                    self.next_resource.set(generation);
                     let page = InstancePage {
+                        generation,
                         material_buffer,
                         bind,
                         material: None,
@@ -2210,21 +2679,69 @@ impl GltfGpu {
                 }
                 draw_bind = page.bind.clone();
                 let binding = if let Some(s) = stream.as_mut() {
-                    let offset = s.scratch.len() as u64;
+                    let offset = if fine.is_some() {
+                        stream_offset
+                    } else {
+                        s.scratch.len()
+                    };
                     stages.switch(Some(3));
-                    s.scratch.extend_from_slice(payload);
+                    if let Some(view) = fine.as_mut() {
+                        if let Some((start, end)) = view.groups[group_index].patch(
+                            &mut s.last,
+                            s.generation,
+                            offset,
+                            &scratch.ordered[group.clone()],
+                            &models,
+                            &mut stats,
+                        ) {
+                            stream_dirty = Some(match stream_dirty {
+                                Some((a, b)) => (a.min(start), b.max(end)),
+                                None => (start, end),
+                            });
+                        }
+                    } else {
+                        s.scratch.extend_from_slice(&scratch.payload);
+                    }
                     stages.switch(Some(5));
                     page.buffer = None;
                     page.last.clear();
+                    row_storage = (
+                        page.generation,
+                        s.generation,
+                        offset as u64,
+                        payload_bytes as u64,
+                    );
+                    stream_offset += fine
+                        .as_ref()
+                        .map_or(payload_bytes, |v| v.groups[group_index].reserved_bytes);
                     InstanceBinding {
                         buffer: s.buffer.clone(),
-                        offset,
-                        bytes: payload.len() as u64,
+                        offset: offset as u64,
+                        bytes: payload_bytes as u64,
                     }
                 } else {
                     let buffer = page.buffer.as_ref().expect("standalone instance buffer");
-                    if page.last != *payload {
-                        queue.write_buffer(buffer, 0, payload);
+                    let dirty = if let Some(view) = fine.as_mut() {
+                        stages.switch(Some(3));
+                        page.last.resize(payload_bytes, 0);
+                        let dirty = view.groups[group_index].patch(
+                            &mut page.last,
+                            page.generation,
+                            0,
+                            &scratch.ordered[group.clone()],
+                            &models,
+                            &mut stats,
+                        );
+                        stages.switch(Some(5));
+                        dirty
+                    } else if page.last != scratch.payload {
+                        page.last.clone_from(&scratch.payload);
+                        Some((0, payload_bytes))
+                    } else {
+                        None
+                    };
+                    if let Some((start, end)) = dirty {
+                        queue.write_buffer(buffer, start as u64, &page.last[start..end]);
                         self.content_epoch.set(
                             self.content_epoch
                                 .get()
@@ -2232,65 +2749,118 @@ impl GltfGpu {
                                 .expect("glTF content epoch exhausted"),
                         );
                         stats.buffer_upload_calls += 1;
-                        stats.uniform_upload_bytes += payload.len() as u64;
-                        stats.instance_upload_bytes += payload.len() as u64;
-                        page.last.clone_from(payload);
+                        stats.uniform_upload_bytes += (end - start) as u64;
+                        stats.instance_upload_bytes += (end - start) as u64;
                     }
+                    row_storage = (page.generation, 0, 0, payload_bytes as u64);
                     InstanceBinding {
                         buffer: buffer.clone(),
                         offset: 0,
-                        bytes: payload.len() as u64,
+                        bytes: payload_bytes as u64,
                     }
                 };
                 page_index += 1;
                 Some(binding)
             } else {
+                if stream.is_some() {
+                    stream_offset += fine
+                        .as_ref()
+                        .map_or(0, |v| v.groups[group_index].reserved_bytes);
+                }
                 None
             };
-            stats.prepare_record_rebuilds += 1;
-            self.counters.set(stats);
-            stages.switch(Some(4));
-            prepared_draws.push(PreparedDraw {
-                variant,
-                textures: material.textures.clone(),
-                bind: draw_bind,
-                vertex: d.vertex.clone(),
-                index: d.index.clone(),
-                skin: d.skin.as_ref().map(|s| s.influences.clone()),
-                instance,
-                count: d.count,
-                instances: group.len() as u32,
-                records: if self.diagnostics.get() {
-                    scratch.ordered[group.clone()]
-                        .iter()
-                        .map(|item| {
-                            let (id, model) = models[item.model];
-                            let draw = &model.draws[item.draw];
-                            (id, draw.node, draw.primitive)
-                        })
-                        .collect()
-                } else {
-                    Vec::new()
-                },
+            let retained = fine.as_ref().and_then(|v| {
+                let g = &v.groups[group_index];
+                g.row
+                    .as_ref()
+                    .filter(|r| {
+                        g.members_same && g.row_storage == row_storage && r.variant == variant
+                    })
+                    .cloned()
             });
+            let row = if let Some(row) = retained {
+                stats.fine_prepared_rows_reused += 1;
+                row
+            } else {
+                stats.prepare_record_rebuilds += 1;
+                if fine.is_some() {
+                    stats.fine_prepared_rows_created += 1;
+                }
+                self.counters.set(stats);
+                self.ensure_pipeline(device, variant);
+                self.ensure_pipeline(
+                    device,
+                    Variant {
+                        negative: !variant.negative,
+                        ..variant
+                    },
+                );
+                stats = self.counters.get();
+                stages.switch(Some(4));
+                let row = Rc::new(PreparedDraw {
+                    variant,
+                    textures: material.textures.clone(),
+                    bind: draw_bind,
+                    vertex: d.vertex.clone(),
+                    index: d.index.clone(),
+                    skin: d.skin.as_ref().map(|s| s.influences.clone()),
+                    instance,
+                    count: d.count,
+                    instances: group.len() as u32,
+                    records: if self.diagnostics.get() {
+                        scratch.ordered[group.clone()]
+                            .iter()
+                            .map(|item| {
+                                let (id, model) = models[item.model];
+                                let draw = &model.draws[item.draw];
+                                (id, draw.node, draw.primitive)
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    },
+                });
+
+                if let Some(view) = fine.as_mut() {
+                    let g = &mut view.groups[group_index];
+                    g.row = Some(row.clone());
+                    g.row_storage = row_storage;
+                }
+                row
+            };
+            prepared_draws.push(row);
+            self.counters.set(stats);
             stages.switch(Some(5));
         }
         if let Some(mut s) = stream {
-            if s.last != s.scratch {
-                queue.write_buffer(&s.buffer, 0, &s.scratch);
+            let dirty = if fine.is_some() {
+                stream_dirty
+            } else if s.last != s.scratch {
+                Some((0, s.scratch.len()))
+            } else {
+                None
+            };
+            if let Some((start, end)) = dirty {
+                let bytes = if fine.is_some() {
+                    &s.last[start..end]
+                } else {
+                    &s.scratch[start..end]
+                };
+                queue.write_buffer(&s.buffer, start as u64, bytes);
                 self.content_epoch.set(
                     self.content_epoch
                         .get()
                         .checked_add(1)
                         .expect("glTF content epoch exhausted"),
                 );
-                let bytes = s.scratch.len() as u64;
                 let mut stats = self.counters.get();
                 stats.buffer_upload_calls += 1;
-                stats.uniform_upload_bytes += bytes;
-                stats.instance_upload_bytes += bytes;
+                stats.uniform_upload_bytes += (end - start) as u64;
+                stats.instance_upload_bytes += (end - start) as u64;
                 self.counters.set(stats);
-                std::mem::swap(&mut s.last, &mut s.scratch);
+                if fine.is_none() {
+                    std::mem::swap(&mut s.last, &mut s.scratch);
+                }
             }
             self.instance_streams.insert((storage_key, view_slot), s);
         }
@@ -2314,6 +2884,26 @@ impl GltfGpu {
             draws: Rc::new(prepared_draws),
             upload_bytes: (self.counters.get().uniform_upload_bytes - upload_before) as usize,
         };
+        if let Some(view) = fine {
+            let bytes = view.bytes();
+            if bytes <= PLAN_BYTES {
+                let mut entries = self.fine_views.borrow_mut();
+                let mut total = entries.iter().flatten().map(FineView::bytes).sum::<usize>();
+                for entry in entries.iter_mut() {
+                    if total + bytes <= PLAN_BYTES {
+                        break;
+                    }
+                    if let Some(old) = entry.take() {
+                        total -= old.bytes();
+                    }
+                }
+                entries[view_slot] = Some(view);
+            } else {
+                let mut stats = self.counters.get();
+                stats.fine_cache_budget_fallbacks += 1;
+                self.counters.set(stats);
+            }
+        }
         if cache_enabled {
             plan_key.content = self.content_epoch.get();
             self.plan_cache.borrow_mut().store(

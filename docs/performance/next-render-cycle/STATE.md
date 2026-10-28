@@ -1,3 +1,17 @@
+# Batch 3 — complete locally, strict stress-pixel limit open
+
+Only batches1–3 are authorized/completed locally; stop before batch4. Isolated `/private/tmp/rust-next-render-cycle-3`, branch `codex/next-render-cycle-3`, parent `1afcd015787a3bff3fb58afd54126a6c7728a512`. This containing commit is a local candidate checkpoint. No push, main merge, deployment or shared8443 restart; current served bytes were not re-audited.
+
+Final release source `e8b39fcf650592b36a9e5897e8c4f9e85f131ab4782307ff36f5657dedfcd2dd`, WASM `bdae44e11cd107177241ec19de3d44137399603cb42f2f5de2dc4513a1c553ea`; completedB2af2905cc7d71 is baseline. Compatibility/data/view separation, canonical Uniforms, bounded layout reservations and current selected-item admission preserve static reuse during sparse/camera motion. [Report](batch-3/REPORT.md), [results](batch-3/RESULTS.json), [manifest](batch-3/MANIFEST.json), [verification](batch-3/VERIFICATION.json).
+
+108clean8s/25s runs,3alternating pairs/backend;131,673frame records audited. Camera2048 callbacks WG26.884→23.167ms/GL30.153→23.180ms, cadence36.92→42.73/31.68→32.78FPS. One-moving-root1024 callbacks20.416→14.442/22.248→16.408ms, cadence48.44→59.20/40.20→41.01FPS. Fully-moving/static controls approximately neutral; ordinary/small/native/Neon stay60Hz. Fresh culling/group selection remains; no draw reduction or general Quest/Three superiority claim. Reservations increase capacity; union GPU uploads stay large. All-moving warm API still allocates~0.870WG/0.957GLbuffers per frame, not global zero allocation.
+
+**Strict primary pixels:40/42exact,2FAIL.** Additional fixed-pose baseline repeat instability is demonstrated; candidate variants already occur in baseline. Candidate independent stress oracle is2/3exact. Exact repeatability/frequency/shared older bug remains unresolved. No reference/tolerance/quality reduction. Deterministic motion/cache/actual-eye tests are separate passing evidence.
+
+Final project gate423native/141browser plus SDK/harness/XR/types/strictWASM PASS;2manual timing tests ignored;44unchanged helper units PASS.16separate diagnostics and24actual-worker replays/144jobs/72installation events pass functional/backend/hash checks; both halves visible in both simulated eyes. Worker timing is grouped descriptive evidence, not causal improvement or physicalQuest. Final source/pkg identity and matching receipt verified. Evidence archive59,753,125B/1,391entries and every hardlink/member SHA verified; archive identity is in the manifest. Rejected/adverse candidates, hash-coordinator error and completed-own-CLI cleanup remain archived. No foreign processes terminated.
+
+Next: stop. Any batch4or further pixel-repeatability investigation requires its own instruction. Previous batch states below are historical.
+
 # Batch 2 — complete locally
 
 Only batches1–2 are complete; stop before batch3. Isolated `codex/next-render-cycle-2`, parent40b2a4ccc. Bounded64-slot/16MiB exact opaque-plan cache reuses prepared rows and skips warm selection/group/basis/payload/record rebuilds. Exact view/input/pipeline and mutable-buffer content epochs protect pass/eye ownership. Transparent ordering remains uncached. [Report](batch-2/REPORT.md), [results](batch-2/RESULTS.json), [manifest](batch-2/MANIFEST.json), [verification](batch-2/VERIFICATION.json).

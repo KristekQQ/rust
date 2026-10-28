@@ -739,10 +739,19 @@ impl SceneRenderer {
     pub fn finish_scene_updates(&mut self) {
         let _cpu_scope = super::profiler::cpu_scope("scene.gpuUpdates");
         self.sync_triangle_meshes();
-        let model_count = self.gltf_models.len();
+        let removed: std::collections::HashSet<_> = self
+            .gltf_models
+            .iter()
+            .filter(|(id, _)| !self.scene.mesh_exists(**id))
+            .map(|(_, m)| super::gltf_gpu::GltfGpu::model_generation(m))
+            .collect();
         self.gltf_models.retain(|id, _| self.scene.mesh_exists(*id));
-        if self.gltf_models.len() != model_count {
-            self.gltf_gpu.clear_instance_pages();
+        if !removed.is_empty() {
+            if self.gltf_models.is_empty() {
+                self.gltf_gpu.clear_instance_pages();
+            } else {
+                self.gltf_gpu.models_removed(&removed);
+            }
         }
         for (id, gpu) in &mut self.gltf_models {
             if let (Some(model), Some(object)) =
@@ -1274,6 +1283,7 @@ impl SceneRenderer {
         let gltf = self.gltf_gpu.stats();
         let stats = self.render_stats();
         let bvh = self.passes[self.last_main_cache].queue.culling_stats;
+        let fine_values = serde_json::json!({"fineGroupsVisited":gltf.fine_groups_visited,"fineGroupMembershipHits":gltf.fine_group_membership_hits,"fineGroupMembershipMisses":gltf.fine_group_membership_misses,"finePreparedRowsReused":gltf.fine_prepared_rows_reused,"finePreparedRowsCreated":gltf.fine_prepared_rows_created,"finePayloadGroupsReused":gltf.fine_payload_groups_reused,"finePayloadGroupsRebuilt":gltf.fine_payload_groups_rebuilt,"finePayloadRecordsWritten":gltf.fine_payload_records_written,"finePayloadBytesWritten":gltf.fine_payload_bytes_written,"fineBasisComparisons":gltf.fine_basis_comparisons,"fineWorldDataUpdates":gltf.fine_world_data_updates,"fineFullRecordPacks":gltf.fine_full_record_packs,"fineCompatibilityHits":gltf.fine_compatibility_hits,"fineCacheBudgetFallbacks":gltf.fine_cache_budget_fallbacks,"fineDynamicFallbacks":gltf.fine_dynamic_fallbacks,"fineNoInstanceFallbacks":gltf.fine_no_instance_fallbacks,"fineCacheBytes":gltf.fine_cache_bytes,"fineLayoutActiveBytes":gltf.fine_layout_active_bytes,"fineLayoutReservedBytes":gltf.fine_layout_reserved_bytes});
         let prepare_values = serde_json::json!({
                 "preparedPlanCache": self.gltf_gpu.plan_cache_stats(),
                 "prepareEligibleRebuilds": gltf.prepare_eligible_rebuilds,
@@ -1341,6 +1351,9 @@ impl SceneRenderer {
                 "materialResources": gltf.material_resources,
                 "cachedAssets": gltf.cached_assets,
         });
+        if let serde_json::Value::Object(values) = fine_values {
+            gltf_values.as_object_mut().unwrap().extend(values);
+        }
         if let serde_json::Value::Object(values) = prepare_values {
             gltf_values.as_object_mut().unwrap().extend(values);
         }

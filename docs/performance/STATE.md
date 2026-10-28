@@ -1,5 +1,9 @@
 # Renderer performance — current state
 
+## Next renderer cycle — batch3 local checkpoint, 2026-10-28
+
+[Current state](next-render-cycle/STATE.md), [batch3 report](next-render-cycle/batch-3/REPORT.md). Fine compatibility/data/view reuse preserves static rows during camera/sparse motion, with measured dynamic fallback and unchanged quality/content.108clean paired runs/131,673frame records; camera2048WG36.92→42.73FPS, GL31.68→32.78; one-moving1024WG48.44→59.20,GL40.20→41.01.423native/141browser gate PASS,16diagnostics/24real-worker replays; desktop/simulatedXR only. Strict primary pixels40/42exact,2FAIL: baseline temporal instability demonstrated, candidate stress oracle2/3exact; exact repeatability unresolved, not universal parity. Local candidate checkpoint only: no push/merge/deployment/shared8443 change, no physicalQuest/freshThree. Stop before batch4. Prior delivery/device facts below are historical.
+
 ## Next renderer cycle — batch1 evidence, 2026-10-27
 
 [Current baseline state](next-render-cycle/STATE.md), [report](next-render-cycle/REPORT.md), [manifest](next-render-cycle/MANIFEST.json). Isolated baselineGitHub mainb7de3be56/releaseWASMb5cc8eba;48 profiler-off8s/25s runs on both backends, separate diagnostics and actual worker replays. No renderer optimization/deployment/publication in this batch. Strong stress drift and observed backgroundGPU load limit comparative claims; no physicalQuest or freshThree comparison. Shared8443's declared older package is separate/unreachable on its historical bound IP. Earlier delivery, branch and LAN facts below are historical; consult the new state before using them.

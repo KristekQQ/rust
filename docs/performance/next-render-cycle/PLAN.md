@@ -1,13 +1,13 @@
 # Next renderer cycle
 
-Batches 1 and 2 have been separately authorized. Batch2 is complete locally; batches3–9 require separate requests.
+Batches1–3 have been separately authorized. Batch3 is complete locally with an unresolved strict stress-pixel-repeatability limit; batches4–9 require separate requests.
 Base source is the live GitHub main observed at start, not the historical commit in the task description. See MANIFEST.json and STATE.md.
 
 ## Nine batches
 
 1. Verified baseline, measurement coverage and optimization plan — complete; report, verified evidence and local checkpoint.
 2. Cache prepared batches for immutable scenes — complete locally; see [report](batch-2/REPORT.md) and [design](batch-2/DESIGN.md).
-3. Fine-grained invalidation during motion and VR — not started.
+3. Fine-grained invalidation during motion and VR — complete locally; [report](batch-3/REPORT.md), [design](batch-3/DESIGN.md); strict crowded-WebGPU repeatability remains a documented limit.
 4. Bounded GPU resource pools — not started.
 5. Omit exactly white vertex colors losslessly — not started.
 6. Lossless 16-bit indices where representable — not started.
@@ -33,10 +33,14 @@ Environment snapshots include hardware/browser/toolchain, power and foreign GPU 
 
 ## Storage and completion
 
-Keep PLAN/STATE/EXPERIMENTS/MANIFEST compact and versioned here. Large raw data, exact commands, request manifests and captures live in the owned ignored output directory and a compressed evidence archive linked from the final report. Do not copy historical reports into project memory. Local checkpoint includes only owned changes and the required source dump; run the project final gate once before that commit. Batch 1 ends after evidence, report and checkpoint; batch 2 remains blocked on a separate user instruction.
+Keep PLAN/STATE/EXPERIMENTS/MANIFEST compact and versioned here. Large raw data, exact commands, request manifests and captures live in the owned ignored output directory and a compressed evidence archive linked from the final report. Do not copy historical reports into project memory. Local checkpoint includes only owned changes and the required source dump; run the project final gate once before that commit. Each batch ends after evidence, report and checkpoint; the next requires its own user instruction.
 
 ## Existing groundwork; do not repeat it blindly
 
 The accepted spatial-batching and Three-transfer reports remain linked from [the prior state index](../STATE.md). Current source already has opaque reorder permission, depth-bounded grouping, pose-stamped bounds/active lists, exact shared-basis instance records, material-used rigid layouts, retained per-view instance streams, scene/view revision caches, cached static shadows and light-class shader selection. The depth4/107-call policy was rejected for worse WebGL throughput. These are baseline features, not improvements from this cycle.
 
 Source audit found `prepare_draws` still reconstructs prepared groups (`src/render/gltf_gpu.rs:1574`), while existing streams/pages grow/reuse storage (`:1793`, `:1878`). Future batches2–4 must distinguish persistent prepared-group retention from those existing caches and pools. Native `gltf.queue` combines group preparation and packing; `scene.prepare` is broader. Separate durations for grouping versus instance packing are currently unavailable, so do not attribute all queue time to either substage. Warm glTF event counters and whole-API diagnostic windows have different coverage. Exactly-white attribute omission and legal u16 indices remain future work; neither is implemented in batch1. WebGL XR context-copy has simulator correctness coverage but no new physical Quest timing in this cycle.
+
+## Batch3 fixed measurement extension
+
+Keep original workload functions and1s/2.5s pilot labels. FrozenB2 release is baseline; all pilots and rejected first candidate retained. Baseline1024 camera stress reached60Hz on WebGPU, so the bounded final static/camera stress probe is2048 actual drones (same maximum already used in batch2). Mixed one-root and all-moving stress remain1024. Small clustered16 and ordinary camera/native-gameplay, native cut64 and Neon controls remain. Fresh baseline-only exact-load configurations freeze1280×720/DPR1, seed1337, spatial order, effects unchanged. Primary comparisons use8s/25s, threeAB/BA/AB pairs independently per backend; backend order alternates across cases. No CPU compilation or other owned GPU runner during measurement. Desktop GPU contention remains a limitation; do not call capped controls throughput evidence.

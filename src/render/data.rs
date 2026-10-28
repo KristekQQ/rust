@@ -504,3 +504,160 @@ impl Default for EffectsUniforms {
         }
     }
 }
+
+/// Equivalent to both directed glTF shared-basis checks plus the old affine
+/// validity comparison. Equal bases and two finite affine translations already
+/// imply equal affine validity; do not rescan all matrix entries twice.
+#[inline]
+pub(crate) fn instance_basis_unchanged(
+    a_model: &[[f32; 4]; 4],
+    a_normal: &[[f32; 4]; 4],
+    a_transform: &[f32; 4],
+    b_model: &[[f32; 4]; 4],
+    b_normal: &[[f32; 4]; 4],
+    b_transform: &[f32; 4],
+) -> bool {
+    a_model[3][3] == 1.0
+        && b_model[3][3] == 1.0
+        && a_model[3][..3].iter().all(|v| v.is_finite())
+        && b_model[3][..3].iter().all(|v| v.is_finite())
+        && a_model[..3] == b_model[..3]
+        && (0..3).all(|i| a_normal[i][..3] == b_normal[i][..3])
+        && a_transform[..2] == b_transform[..2]
+}
+
+#[cfg(test)]
+mod basis_revision_tests {
+    use super::instance_basis_unchanged;
+    type Matrix = [[f32; 4]; 4];
+    #[derive(Clone, Copy)]
+    struct State(Matrix, Matrix, [f32; 4]);
+    fn identity() -> State {
+        State(
+            glam::Mat4::IDENTITY.to_cols_array_2d(),
+            glam::Mat4::IDENTITY.to_cols_array_2d(),
+            [1., 1., 0., 0.],
+        )
+    }
+    // Independent literal oracle from the previous update path. Retain its
+    // redundant scans so this test can detect mistakes in the reduced proof.
+    fn affine(s: &State) -> bool {
+        s.0[0][3] == 0.
+            && s.0[1][3] == 0.
+            && s.0[2][3] == 0.
+            && s.0[3][3] == 1.
+            && s.0.iter().flatten().all(|v| v.is_finite())
+            && s.1[..3]
+                .iter()
+                .all(|n| n[..3].iter().all(|v| v.is_finite()))
+    }
+    fn directed(a: &State, b: &State) -> bool {
+        b.0[3][3] == 1.
+            && b.0[3][..3].iter().all(|v| v.is_finite())
+            && a.0[..3] == b.0[..3]
+            && (0..3).all(|i| a.1[i][..3] == b.1[i][..3])
+            && a.2[..2] == b.2[..2]
+    }
+    fn check(a: State, b: State) -> bool {
+        let legacy = affine(&a) == affine(&b) && directed(&a, &b) && directed(&b, &a);
+        let reduced = instance_basis_unchanged(&a.0, &a.1, &a.2, &b.0, &b.1, &b.2);
+        assert_eq!(legacy, reduced, "basis revision proof diverged");
+        reduced
+    }
+    #[test]
+    fn translations_do_not_change_basis_but_mirrors_and_scale_do() {
+        let a = identity();
+        let mut b = a;
+        b.0[3] = [31., -0., -0.001, 1.];
+        assert!(check(a, b));
+        b.0[0][0] = -1.;
+        assert!(!check(a, b));
+        b = a;
+        b.1[1][1] = 0.5;
+        assert!(!check(a, b));
+        b = a;
+        b.2[0] = -1.;
+        assert!(!check(a, b));
+    }
+    #[test]
+    fn equal_projective_and_infinite_bases_keep_legacy_semantics() {
+        for value in [0.25, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut a = identity();
+            a.0[0][3] = value;
+            let mut b = a;
+            b.0[3][0] = 2.;
+            assert!(check(a, b));
+            a = identity();
+            a.1[0][0] = value;
+            b = a;
+            b.0[3][2] = 3.;
+            assert!(check(a, b));
+        }
+    }
+    #[test]
+    fn nonfinite_translations_nan_and_signed_zero_match_legacy() {
+        let a = identity();
+        let mut b = a;
+        b.0[0][1] = -0.;
+        assert!(check(a, b));
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            b = a;
+            b.0[3][0] = value;
+            assert!(!check(a, b));
+            assert!(!check(b, a));
+        }
+        for slot in 0..36 {
+            let mut a = identity();
+            if slot < 16 {
+                a.0[slot / 4][slot % 4] = f32::NAN;
+            } else if slot < 32 {
+                a.1[(slot - 16) / 4][(slot - 16) % 4] = f32::NAN;
+            } else {
+                a.2[slot - 32] = f32::NAN;
+            }
+            check(a, a);
+        }
+    }
+    #[test]
+    fn seeded_legacy_equivalence_including_all_ieee_components() {
+        let mut seed = 0x9e3779b9u32;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            f32::from_bits(seed)
+        };
+        for n in 0..20000 {
+            let mut a = identity();
+            for col in &mut a.0[..3] {
+                for v in col {
+                    *v = next();
+                }
+            }
+            for col in &mut a.1 {
+                for v in col {
+                    *v = next();
+                }
+            }
+            a.2 = [next(), next(), next(), next()];
+            let mut b = a;
+            b.0[3] = [(n % 71) as f32, -0., 3., 1.];
+            if n % 2 == 0 {
+                b.0[n % 3][n % 4] = next();
+            }
+            if n % 3 == 0 {
+                b.1[n % 4][(n / 3) % 4] = next();
+            }
+            if n % 5 == 0 {
+                b.2[n % 4] = next();
+            }
+            if n % 7 == 0 {
+                a.0[3][n % 4] = next();
+            }
+            if n % 11 == 0 {
+                b.0[3][n % 4] = next();
+            }
+            check(a, b);
+        }
+    }
+}
