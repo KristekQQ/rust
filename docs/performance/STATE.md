@@ -1,4 +1,8 @@
-# Latest — next cycle batch5, local only
+# Latest — next cycle batch6, local only
+
+[Current state](next-render-cycle/STATE.md), [B6 report](next-render-cycle/batch-6/REPORT.md). Portable lossless16-bit glTF GPU indices for actual normalized max≤65534; Uint32 fallback, explicit strip pipeline keys, alignment/count separation, original CPU/cutting indices retained. Rome258shared index buffers1,479,384→739,692B (−50%); initial rigid vertex+index payload−10.37%.24clean paired runs/30,049RAF;12baseline+4original-U32 pairs exact, unchanged primitives. No demonstrated FPS gain; adverse tails/contention retained.428native/147browser PASS, final frozen/served/source/pkg identity and archive verified. Local isolated checkpoint only; no push/main merge/deployment/shared8443 change/physicalQuest/CI/freshThree. Inherited B4 moving-stress image issue open. Stop before7. Historical sections below are not current runtime claims.
+
+# Historical — next cycle batch5, local only
 
 [Current next-cycle state](next-render-cycle/STATE.md), [B5 report](next-render-cycle/batch-5/REPORT.md). Exact-white rigid vertex attribute omission saves40% of requested Rome rigid vertex-buffer bytes/initial vertex payload,34.57% of initial rigid vertex+index payload. Original color interpolator retained after strict XR rejection of its removal.24clean paired runs,30,020RAF rows; no proven FPS gain.12baseline/candidate+4original-layout pairs exact;424native/145browser PASS. Local isolated checkpoint, no push/main merge/deployment/shared-server change, no physicalQuest/CI/freshThree evidence. Inherited B4 moving-stress image issue remains open. Stop before batch6; historical sections below are not current runtime claims.
 

@@ -1,0 +1,218 @@
+{
+  "batch": 6,
+  "status": "complete-local-checkpoint",
+  "parent": "4969d9f984f152101dc4bf2d930442be535f9c7e",
+  "branch": "codex/next-render-cycle-6",
+  "checkout": "/private/tmp/rust-next-render-cycle-6",
+  "baseline": {
+    "source": "9736ff3694f439208013fb89171b572aa328296a0bd8ffd2950501a59a5b8975",
+    "wasm": "6227a15c98cbff6e636db399a542ecb2c367435a889be5dbb885a103ba865452",
+    "bindings": "dc9837c70b5966128a92e6926bf604d4353febb50bc3eced0f32a943e3dfb118",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "candidate": {
+    "source": "48d3f3189f54b82781658a93b8f8395ba0b2fe89a5f0077ef00812cd411af5f7",
+    "wasm": "845f7ea2098ff0529cc6b94ae724b81d9f7e93cd61f469f9abc58911e96403d7",
+    "bindings": "b41af79b1c02664a43b6a32bf7459762470173ce8c2ecebe65150624e23fca96",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "selectedConfigurations": [
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-6/cal-rim-static-1-webgpu/config.json"
+    },
+    {
+      "family": "rim-stress",
+      "load": 2048,
+      "backend": "webgpu",
+      "file": "output/next-render-cycle-6/cal-rim-stress-2048-webgpu/config.json"
+    },
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-6/cal-rim-static-1-webgl/config.json"
+    },
+    {
+      "family": "rim-stress",
+      "load": 1024,
+      "backend": "webgl",
+      "file": "output/next-render-cycle-6/cal-rim-stress-1024-webgl/config.json"
+    }
+  ],
+  "protocol": {
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "pairs": 3,
+    "order": "AB/BA/AB",
+    "width": 1280,
+    "height": 720,
+    "DPR": 1,
+    "profiling": false
+  },
+  "environment": {
+    "browser": "Chrome/156.0.8078.48",
+    "hardware": {
+      "devices": [
+        {
+          "vendorId": 4203,
+          "deviceId": 0,
+          "vendorString": "Google Inc. (Apple)",
+          "deviceString": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+          "driverVendor": "Apple",
+          "driverVersion": "26.6.1"
+        }
+      ],
+      "auxAttributes": {
+        "amdSwitchable": false,
+        "canSupportThreadedTextureMailbox": false,
+        "directRenderingVersion": "",
+        "displayType": "ANGLE_METAL",
+        "glExtensions": "GL_AMD_performance_monitor GL_ANGLE_base_vertex_base_instance_shader_builtin GL_ANGLE_blob_cache GL_ANGLE_client_arrays GL_ANGLE_clip_cull_distance GL_ANGLE_compressed_texture_etc GL_ANGLE_depth_texture GL_ANGLE_framebuffer_blit GL_ANGLE_framebuffer_multisample GL_ANGLE_get_serialized_context_string GL_ANGLE_get_tex_level_parameter GL_ANGLE_instanced_arrays GL_ANGLE_memory_size GL_ANGLE_pack_reverse_row_order GL_ANGLE_polygon_mode GL_ANGLE_program_binary_readiness_query GL_ANGLE_program_cache_control GL_ANGLE_provoking_vertex GL_ANGLE_renderability_validation GL_ANGLE_request_extension GL_ANGLE_rgbx_internal_format GL_ANGLE_robust_client_memory GL_ANGLE_shader_pixel_local_storage GL_ANGLE_shader_pixel_local_storage_coherent GL_ANGLE_stencil_texturing GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_ANGLE_texture_multisample GL_ANGLE_translated_shader_source GL_APPLE_clip_distance GL_ARM_rgba8 GL_CHROMIUM_bind_generates_resource GL_CHROMIUM_bind_uniform_location GL_CHROMIUM_copy_texture GL_CHROMIUM_lose_context GL_EXT_base_instance GL_EXT_blend_func_extended GL_EXT_blend_minmax GL_EXT_clip_control GL_EXT_color_buffer_float GL_EXT_color_buffer_half_float GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_conservative_depth GL_EXT_debug_label GL_EXT_debug_marker GL_EXT_depth_clamp GL_EXT_discard_framebuffer GL_EXT_disjoint_timer_query GL_EXT_draw_buffers GL_EXT_draw_buffers_indexed GL_EXT_draw_elements_base_vertex GL_EXT_float_blend GL_EXT_frag_depth GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_multisampled_render_to_texture GL_EXT_occlusion_query_boolean GL_EXT_polygon_offset_clamp GL_EXT_pvrtc_sRGB GL_EXT_read_format_bgra GL_EXT_render_snorm GL_EXT_robustness GL_EXT_sRGB GL_EXT_shader_texture_lod GL_EXT_texture_compression_bptc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_compression_s3tc_srgb GL_EXT_texture_filter_anisotropic GL_EXT_texture_format_BGRA8888 GL_EXT_texture_mirror_clamp_to_edge GL_EXT_texture_norm16 GL_EXT_texture_rg GL_EXT_texture_sRGB_R8 GL_EXT_texture_sRGB_RG8 GL_EXT_texture_shadow_lod GL_EXT_texture_storage GL_IMG_texture_compression_pvrtc GL_KHR_debug GL_KHR_parallel_shader_compile GL_KHR_robustness GL_KHR_texture_compression_astc_hdr GL_KHR_texture_compression_astc_ldr GL_KHR_texture_compression_astc_sliced_3d GL_MESA_framebuffer_flip_y GL_NV_fence GL_NV_framebuffer_blit GL_NV_pixel_buffer_object GL_NV_shader_noperspective_interpolation GL_OES_EGL_image GL_OES_EGL_sync GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_depth32 GL_OES_depth_texture GL_OES_draw_buffers_indexed GL_OES_draw_elements_base_vertex GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_get_program_binary GL_OES_mapbuffer GL_OES_packed_depth_stencil GL_OES_required_internalformat GL_OES_rgb8_rgba8 GL_OES_sample_variables GL_OES_shader_multisample_interpolation GL_OES_standard_derivatives GL_OES_surfaceless_context GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_texture_stencil8 GL_OES_vertex_array_object GL_QCOM_render_shared_exponent ",
+        "glImplementationParts": "(gl=egl-angle,angle=metal)",
+        "glRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Version 26.6.1 (Build 25G76))",
+        "glResetNotificationStrategy": 33362,
+        "glVendor": "Google Inc. (Apple)",
+        "glVersion": "OpenGL ES 3.0 (ANGLE 2.1.28973 git hash: 3b89d84e9d59)",
+        "glWsExtensions": "",
+        "glWsVendor": "",
+        "glWsVersion": "",
+        "inProcessGpu": false,
+        "initializationTime": 0.048442,
+        "isAsan": false,
+        "isClangCoverage": false,
+        "jpegDecodeAcceleratorSupported": false,
+        "maxMsaaSamples": "4",
+        "optimus": false,
+        "passthroughCmdDecoder": true,
+        "pixelShaderVersion": "3.00",
+        "processCrashCount": 0,
+        "sandboxed": true,
+        "skiaBackendType": "GraphiteDawnMetal",
+        "subpixelFontRendering": true,
+        "targetCpuBits": 64,
+        "vertexShaderVersion": "3.00",
+        "visibilityCallbackCallCount": 0
+      },
+      "featureStatus": {
+        "2d_canvas": "enabled",
+        "direct_rendering_display_compositor": "disabled_off_ok",
+        "gpu_compositing": "enabled",
+        "multiple_raster_threads": "enabled_on",
+        "opengl": "enabled_on",
+        "rasterization": "enabled",
+        "raw_draw": "disabled_off_ok",
+        "skia_graphite": "enabled_on",
+        "trees_in_viz": "disabled_off",
+        "video_decode": "enabled",
+        "video_encode": "enabled",
+        "webgl": "enabled",
+        "webgpu": "enabled",
+        "webnn": "disabled_off"
+      },
+      "driverBugWorkarounds": [
+        "disable_2d_canvas_auto_flush",
+        "enable_webgl_timer_query_extensions",
+        "disabled_extension_GL_KHR_blend_equation_advanced",
+        "disabled_extension_GL_KHR_blend_equation_advanced_coherent"
+      ],
+      "videoDecoding": [],
+      "videoEncoding": []
+    },
+    "node": "v24.22.1",
+    "foreignGpuProcessObserved": 30816,
+    "powerAndProcesses": "evidence primary-environment.jsonl; no foreign termination"
+  },
+  "driver": {
+    "capturedAt": "2026-10-28T19:34:24.692Z",
+    "nodeVersion": "v24.22.1",
+    "v8Version": "13.6.233.17-node.58",
+    "files": {
+      "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+      "scripts/render-performance.mjs": "56f12c820969b123487a00c16493435575ac8965258358550c9332b3e2788618",
+      "scripts/render-performance-lib.mjs": "d6d635483b7b6453c0ffb25f118d520406bcb7844075ac6c80493422a10612c3",
+      "scripts/render-performance-api.mjs": "ef4b7f218e38426ad0061ceba91cd75e3cca6208c247106c1098404ee4246992",
+      "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+      "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+      "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+      "tests/render-performance.js": "ba29236d55b2b019c87afafacba31df6f4f512bf94e7d1ab8a2c21282a50125a",
+      "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+    },
+    "sha256": "0eb786d2bd00faa4edac9657c914303b1005052505766518e66282e0df2be2c1"
+  },
+  "physicalQuest": false,
+  "freshThreeComparison": false,
+  "push": false,
+  "merge": false,
+  "deployment": false,
+  "sharedServerChanged": false,
+  "primaryFrames": 30049,
+  "candidateSdkSha256": "f14b89f90a00e5332683d769d5ec702d07910ef1ada2388c4c1d71c099b81009",
+  "inputAudit": {
+    "frozenFiles": 5016,
+    "servedPayloadRecords": 176,
+    "primaryReports": 4,
+    "driverFileChecks": 36,
+    "allPassed": true,
+    "finalBuild": {
+      "source": "48d3f3189f54b82781658a93b8f8395ba0b2fe89a5f0077ef00812cd411af5f7",
+      "wasm": "845f7ea2098ff0529cc6b94ae724b81d9f7e93cd61f469f9abc58911e96403d7",
+      "bindings": "b41af79b1c02664a43b6a32bf7459762470173ce8c2ecebe65150624e23fca96",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "finalSdkSha256": "f14b89f90a00e5332683d769d5ec702d07910ef1ada2388c4c1d71c099b81009",
+    "sourceDumpSha256": "bbf90a1e3701923c27989622c5a9bf5f7c196d64767991c1f82283efe1f8c265",
+    "frozenVsFinalRuntimeSourceEqual": true
+  },
+  "verification": "VERIFICATION.json",
+  "evidenceArchive": {
+    "path": "docs/performance/next-render-cycle/batch-6/evidence.tar.gz",
+    "bytes": 18631245,
+    "sha256": "7842f9ca84a5250837a6b768c1a7f74904e8f4f6c391b4b2594cd4c6318b04b0",
+    "payloads": 362,
+    "storedEntries": 364,
+    "uniquePayloads": 245,
+    "exactContentHardlinks": 117,
+    "recordedUncompressedBytes": 80048327,
+    "everyPayloadAndHardlinkReadBack": true,
+    "frozenChangedInputsIncluded": [
+      "docs/performance/next-render-cycle/batch-6/DESIGN.md",
+      "js/engine.d.ts",
+      "js/engine.js",
+      "pkg/verification-build.json",
+      "pkg/webgpu_wasm.d.ts",
+      "pkg/webgpu_wasm.js",
+      "pkg/webgpu_wasm_bg.wasm",
+      "pkg/webgpu_wasm_bg.wasm.d.ts",
+      "scripts/test-browser.mjs",
+      "src/gltf_indices.rs",
+      "src/lib.rs",
+      "src/render/gltf_gpu.rs",
+      "src/render/renderer.rs",
+      "src/web.rs",
+      "tests/gltf-batching.js",
+      "tests/gltf-indices.html",
+      "tests/gltf-indices.js",
+      "tests/render-performance.js",
+      "tests/xr/gltf-instance-checks.js"
+    ],
+    "unchangedBaseAssetsExcluded": true
+  }
+}

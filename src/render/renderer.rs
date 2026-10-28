@@ -1276,6 +1276,12 @@ impl SceneRenderer {
         }
         stats
     }
+    pub fn gltf_index_layouts(&self) -> serde_json::Value {
+        self.gltf_gpu.index_layouts()
+    }
+    pub fn set_gltf_compact_indices_enabled(&mut self, enabled: bool) -> bool {
+        self.gltf_gpu.set_compact_indices_enabled(enabled)
+    }
     pub fn gltf_vertex_layouts(&self) -> serde_json::Value {
         self.gltf_gpu.vertex_layouts()
     }
@@ -1351,6 +1357,7 @@ impl SceneRenderer {
                 },
                 "instancePool": self.gltf_gpu.instance_pool_stats(),
                 "vertexColors": self.gltf_gpu.vertex_color_stats(),
+                "indices": self.gltf_gpu.index_stats(),
                 "instancePagesCreated": gltf.instance_pages_created,
                 "instanceBuffersCreated": gltf.instance_buffers_created,
                 "instanceBindGroupsCreated": gltf.instance_bind_groups_created,

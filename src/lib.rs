@@ -12,6 +12,8 @@ pub mod frame_graph;
 pub mod frame_metrics;
 pub mod gltf_animation;
 mod gltf_bounds;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod gltf_indices;
 pub mod gltf_loader;
 pub mod gltf_model;
 pub mod info_panel;

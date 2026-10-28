@@ -146,8 +146,16 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
     test.assert(originalRepeat.every((image,eye)=>pixelDifference(originalEyes[eye],image,0)===0) && colorlessRepeat.every((image,eye)=>pixelDifference(colorlessEyes[eye],image,0)===0), 'both XR layout reload controls are exactly repeatable', layoutEvidence);
     test.assert(originalEyes.every((image,eye)=>pixelDifference(colorlessEyes[eye],image,0)===0), 'omitted and original color layout reproduce exact pixels in both XR eyes', layoutEvidence);
 
+    const compactIndexLayouts=engine.gltfIndexLayouts();
+    engine.scene.clear();frame();
+    test.assert(engine.setGltfCompactIndicesEnabled(false), 'XR empty scene selects original Uint32 indices');
+    const uint32Eyes=await reloadEyes(true);
+    test.assert(engine.gltfIndexLayouts().every(l=>l.format==='Uint32'), 'XR original path binds Uint32 geometry');
+    test.assert(uint32Eyes.every((image,eye)=>pixelDifference(colorlessEyes[eye],image,0)===0), 'both XR eyes match independent original Uint32 geometry exactly');
+    test.assert(compactIndexLayouts.some(l=>l.format==='Uint16'), 'XR optimized path exercised real Uint16 indices');
     engine.scene.clear();
     frame();
+    test.assert(engine.setGltfCompactIndicesEnabled(true), 'XR restores default index format policy');
     test.assert(engine.debugStats().gltf.instancePool?.liveBytes===0 && engine.debugStats().gltf.instanceBufferBytes===0, 'scene.clear releases glTF XR instance buffers', engine.debugStats().gltf);
     test.assert(engine.setGltfWhiteColorOmissionEnabled(true), 'XR restores default rigid layout policy');
 }

@@ -1,0 +1,1138 @@
+{
+  "scope": "median per-run means/quantiles; maxima across runs; three independent AB/BA/AB pairs; adjacent frames are not independent replicates",
+  "primary": [
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "webgpu",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 4505,
+          "fps": 60.002318543954374,
+          "callbackMeanMs": 0.7839547240146785,
+          "callbackP95Ms": 1.3000001907348633,
+          "callbackP99Ms": 1.7000000476837158,
+          "callbackMaxMs": 3.0999999046325684,
+          "intervalMeanMs": 16.66602265156563,
+          "intervalP95Ms": 16.700000000000728,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "rigidInitialUploadBytes": [
+            7130144,
+            7130144,
+            7130144
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "trianglesPerFrame": [
+            67292,
+            67292,
+            67292
+          ],
+          "instancesPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 4505,
+          "fps": 60.002318543954345,
+          "callbackMeanMs": 0.7463382152361813,
+          "callbackP95Ms": 1.3999998569488525,
+          "callbackP99Ms": 1.7000000476837158,
+          "callbackMaxMs": 3.0999999046325684,
+          "intervalMeanMs": 16.666022651565637,
+          "intervalP95Ms": 16.799999999999272,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "rigidInitialUploadBytes": [
+            6390452,
+            6390452,
+            6390452
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "trianglesPerFrame": [
+            67292,
+            67292,
+            67292
+          ],
+          "instancesPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "baselineFps": 60.00216007776274,
+          "candidateFps": 60.00231854395433,
+          "fpsRatio": 1.0000026410081135,
+          "callbackRatio": 0.9467515032756894
+        },
+        {
+          "pair": 1,
+          "baselineFps": 60.002318543954374,
+          "candidateFps": 60.002318543954345,
+          "fpsRatio": 0.9999999999999996,
+          "callbackRatio": 0.952016988193067
+        },
+        {
+          "pair": 2,
+          "baselineFps": 60.00255840355617,
+          "candidateFps": 60.002400096003804,
+          "fpsRatio": 0.9999973616532931,
+          "callbackRatio": 1.0353389866502505
+        }
+      ],
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "0eb786d2bd00faa4edac9657c914303b1005052505766518e66282e0df2be2c1",
+      "checks": [
+        {
+          "id": "baseline-rim-static-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-static-1-pair0",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-static-1-pair1",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-static-1-pair1",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-static-1-pair2",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-static-1-pair2",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-stress",
+      "load": 2048,
+      "backend": "webgpu",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 2825,
+          "fps": 37.616226544823625,
+          "callbackMeanMs": 14.796390661514994,
+          "callbackP95Ms": 30.299999952316284,
+          "callbackP99Ms": 31.700000047683716,
+          "callbackMaxMs": 39.299999952316284,
+          "intervalMeanMs": 26.5842720510096,
+          "intervalP95Ms": 33.400000000001455,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 50,
+          "rigidInitialUploadBytes": [
+            7130144,
+            7130144,
+            7130144
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            307,
+            307,
+            307
+          ],
+          "trianglesPerFrame": [
+            39067116,
+            39067116,
+            39067116
+          ],
+          "instancesPerFrame": [
+            126823,
+            126823,
+            126823
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 2828,
+          "fps": 37.73630160259351,
+          "callbackMeanMs": 14.977037036481988,
+          "callbackP95Ms": 30.699999809265137,
+          "callbackP99Ms": 33.10000014305115,
+          "callbackMaxMs": 44.60000014305115,
+          "intervalMeanMs": 26.499682203389874,
+          "intervalP95Ms": 33.400000000001455,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 66.60000000000218,
+          "rigidInitialUploadBytes": [
+            6390452,
+            6390452,
+            6390452
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            307,
+            307,
+            307
+          ],
+          "trianglesPerFrame": [
+            39067116,
+            39067116,
+            39067116
+          ],
+          "instancesPerFrame": [
+            126823,
+            126823,
+            126823
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "baselineFps": 37.616226544823625,
+          "candidateFps": 37.81625139412442,
+          "fpsRatio": 1.0053175150107747,
+          "callbackRatio": 0.9962045914456522
+        },
+        {
+          "pair": 1,
+          "baselineFps": 37.736452453668846,
+          "candidateFps": 37.376676953580905,
+          "fpsRatio": 0.9904661016949152,
+          "callbackRatio": 1.0386770781777352
+        },
+        {
+          "pair": 2,
+          "baselineFps": 37.43163832328626,
+          "candidateFps": 37.73630160259351,
+          "fpsRatio": 1.0081391916826072,
+          "callbackRatio": 0.9886180867381162
+        }
+      ],
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "0eb786d2bd00faa4edac9657c914303b1005052505766518e66282e0df2be2c1",
+      "checks": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 942,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair0",
+          "frames": 947,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair1",
+          "frames": 936,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair1",
+          "frames": 945,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair2",
+          "frames": 938,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair2",
+          "frames": 945,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "webgl",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 4504,
+          "fps": 60.002400096003825,
+          "callbackMeanMs": 1.2527962730981697,
+          "callbackP95Ms": 2,
+          "callbackP99Ms": 2.3999998569488525,
+          "callbackMaxMs": 2.9000000953674316,
+          "intervalMeanMs": 16.666000000000004,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "rigidInitialUploadBytes": [
+            7130144,
+            7130144,
+            7130144
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "trianglesPerFrame": [
+            67292,
+            67292,
+            67292
+          ],
+          "instancesPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 4504,
+          "fps": 60.002400096003804,
+          "callbackMeanMs": 1.2615589612646947,
+          "callbackP95Ms": 2,
+          "callbackP99Ms": 2.3999998569488525,
+          "callbackMaxMs": 3.5,
+          "intervalMeanMs": 16.66600000000001,
+          "intervalP95Ms": 16.700000000004366,
+          "intervalP99Ms": 16.80000000000109,
+          "intervalMaxMs": 16.80000000000291,
+          "rigidInitialUploadBytes": [
+            6390452,
+            6390452,
+            6390452
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "trianglesPerFrame": [
+            67292,
+            67292,
+            67292
+          ],
+          "instancesPerFrame": [
+            39,
+            39,
+            39
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "baselineFps": 60.002400096003804,
+          "candidateFps": 60.002400096003804,
+          "fpsRatio": 1,
+          "callbackRatio": 1.0453449619970294
+        },
+        {
+          "pair": 1,
+          "baselineFps": 60.002400096003825,
+          "candidateFps": 60.002400096003804,
+          "fpsRatio": 0.9999999999999996,
+          "callbackRatio": 0.8959969698462983
+        },
+        {
+          "pair": 2,
+          "baselineFps": 60.002558403556144,
+          "candidateFps": 60.00255840355617,
+          "fpsRatio": 1.0000000000000004,
+          "callbackRatio": 1.0953393210198663
+        }
+      ],
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "0eb786d2bd00faa4edac9657c914303b1005052505766518e66282e0df2be2c1",
+      "checks": [
+        {
+          "id": "baseline-rim-static-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-static-1-pair0",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-static-1-pair1",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-static-1-pair1",
+          "frames": 1501,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-static-1-pair2",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-static-1-pair2",
+          "frames": 1502,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    },
+    {
+      "family": "rim-stress",
+      "load": 1024,
+      "backend": "webgl",
+      "byLabel": {
+        "baseline": {
+          "runs": 3,
+          "frames": 3188,
+          "fps": 42.42501717773742,
+          "callbackMeanMs": 8.221710527749886,
+          "callbackP95Ms": 15.5,
+          "callbackP99Ms": 17.100000143051147,
+          "callbackMaxMs": 23.299999952316284,
+          "intervalMeanMs": 23.570998116760954,
+          "intervalP95Ms": 33.400000000001455,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 33.5,
+          "rigidInitialUploadBytes": [
+            7130144,
+            7130144,
+            7130144
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            240,
+            240,
+            240
+          ],
+          "trianglesPerFrame": [
+            20714924,
+            20714924,
+            20714924
+          ],
+          "instancesPerFrame": [
+            66783,
+            66783,
+            66783
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        },
+        "candidate": {
+          "runs": 3,
+          "frames": 3190,
+          "fps": 42.56170246809854,
+          "callbackMeanMs": 8.215009378000227,
+          "callbackP95Ms": 15.600000143051147,
+          "callbackP99Ms": 17.5,
+          "callbackMaxMs": 26.799999952316284,
+          "intervalMeanMs": 23.495300751879803,
+          "intervalP95Ms": 33.400000000001455,
+          "intervalP99Ms": 33.400000000001455,
+          "intervalMaxMs": 33.5,
+          "rigidInitialUploadBytes": [
+            6390452,
+            6390452,
+            6390452
+          ],
+          "rigidSteadyUploadBytes": [
+            0,
+            0,
+            0
+          ],
+          "drawsPerFrame": [
+            240,
+            240,
+            240
+          ],
+          "trianglesPerFrame": [
+            20714924,
+            20714924,
+            20714924
+          ],
+          "instancesPerFrame": [
+            66783,
+            66783,
+            66783
+          ],
+          "instanceBuffersCreated": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "pairs": [
+        {
+          "pair": 0,
+          "baselineFps": 42.42501717773742,
+          "candidateFps": 42.573263990213974,
+          "fpsRatio": 1.0034943253377004,
+          "callbackRatio": 0.9931483674764134
+        },
+        {
+          "pair": 1,
+          "baselineFps": 42.49314433278148,
+          "candidateFps": 42.3215235748485,
+          "fpsRatio": 0.9959612130232361,
+          "callbackRatio": 1.0190435880770525
+        },
+        {
+          "pair": 2,
+          "baselineFps": 42.373389511386684,
+          "candidateFps": 42.56170246809854,
+          "fpsRatio": 1.00444413248228,
+          "callbackRatio": 1.0017442535344383
+        }
+      ],
+      "pixelPairs": [
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        },
+        {
+          "pass": true,
+          "exact": true,
+          "width": 1280,
+          "height": 720,
+          "maxChannelDelta": 0,
+          "meanAbsoluteChannelDelta": 0,
+          "changedPixels": 0,
+          "changedFraction": 0,
+          "channelTolerance": 0,
+          "pixelFractionTolerance": 0
+        }
+      ],
+      "driver": "0eb786d2bd00faa4edac9657c914303b1005052505766518e66282e0df2be2c1",
+      "checks": [
+        {
+          "id": "baseline-rim-stress-1024-pair0",
+          "frames": 1063,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-1024-pair0",
+          "frames": 1066,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-1024-pair1",
+          "frames": 1059,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-stress-1024-pair1",
+          "frames": 1064,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "baseline-rim-stress-1024-pair2",
+          "frames": 1061,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        },
+        {
+          "id": "candidate-rim-stress-1024-pair2",
+          "frames": 1065,
+          "profileOff": true,
+          "distributionsRecomputed": true
+        }
+      ]
+    }
+  ],
+  "primaryFrames": 30049,
+  "primaryRuns": 24,
+  "primaryExactPixelPairs": 12,
+  "independentOriginalUint32Pairs": 4,
+  "indexProof": [
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "BrowserWebGpu",
+      "original": true,
+      "file": "indices-rim-static-1-webgpu-original.png",
+      "sha256": "97ae8a8f077b594f3517876925627d339b4d35fb48040f962c1c46bd35e63cb2",
+      "indices": {
+        "allocatedBytes": 1479384,
+        "bufferBytes": 1479384,
+        "enabled": false,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 1479384,
+        "uint16Primitives": 0,
+        "uint32Primitives": 258,
+        "uploadBytes": 1479384
+      },
+      "rigidUploadBytes": 7130144,
+      "pixelDifference": null,
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint32"
+        ],
+        "payloadBytes": 1479384,
+        "bufferBytes": 1479384
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 258,
+        "webgpuRequestedIndexBufferBytes": 1479384,
+        "webgpuIndexFormatBindings": {
+          "uint32": 1780
+        },
+        "webglDrawTypes": {}
+      }
+    },
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "BrowserWebGpu",
+      "original": false,
+      "file": "indices-rim-static-1-webgpu-compact.png",
+      "sha256": "97ae8a8f077b594f3517876925627d339b4d35fb48040f962c1c46bd35e63cb2",
+      "indices": {
+        "allocatedBytes": 739692,
+        "bufferBytes": 739692,
+        "enabled": true,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 739692,
+        "uint16Primitives": 258,
+        "uint32Primitives": 0,
+        "uploadBytes": 739692
+      },
+      "rigidUploadBytes": 6390452,
+      "pixelDifference": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint16"
+        ],
+        "payloadBytes": 739692,
+        "bufferBytes": 739692
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 258,
+        "webgpuRequestedIndexBufferBytes": 739692,
+        "webgpuIndexFormatBindings": {
+          "uint16": 1716
+        },
+        "webglDrawTypes": {}
+      }
+    },
+    {
+      "family": "rim-stress",
+      "load": 2048,
+      "backend": "BrowserWebGpu",
+      "original": true,
+      "file": "indices-rim-stress-2048-webgpu-original.png",
+      "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f",
+      "indices": {
+        "allocatedBytes": 1479384,
+        "bufferBytes": 1479384,
+        "enabled": false,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 1479384,
+        "uint16Primitives": 0,
+        "uint32Primitives": 258,
+        "uploadBytes": 1479384
+      },
+      "rigidUploadBytes": 7130144,
+      "pixelDifference": null,
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint32"
+        ],
+        "payloadBytes": 1479384,
+        "bufferBytes": 1479384
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 258,
+        "webgpuRequestedIndexBufferBytes": 1479384,
+        "webgpuIndexFormatBindings": {
+          "uint32": 3892
+        },
+        "webglDrawTypes": {}
+      }
+    },
+    {
+      "family": "rim-stress",
+      "load": 2048,
+      "backend": "BrowserWebGpu",
+      "original": false,
+      "file": "indices-rim-stress-2048-webgpu-compact.png",
+      "sha256": "d2df340bd81f1b55930cc3b7fcf285b90d116c924e7ace69cb0f02afb8c1476f",
+      "indices": {
+        "allocatedBytes": 739692,
+        "bufferBytes": 739692,
+        "enabled": true,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 739692,
+        "uint16Primitives": 258,
+        "uint32Primitives": 0,
+        "uploadBytes": 739692
+      },
+      "rigidUploadBytes": 6390452,
+      "pixelDifference": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint16"
+        ],
+        "payloadBytes": 739692,
+        "bufferBytes": 739692
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 258,
+        "webgpuRequestedIndexBufferBytes": 739692,
+        "webgpuIndexFormatBindings": {
+          "uint16": 2534
+        },
+        "webglDrawTypes": {}
+      }
+    },
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "Gl",
+      "original": true,
+      "file": "indices-rim-static-1-webgl-original.png",
+      "sha256": "823f4c9c77745f4aa580ea746493132c7392fa91ace98fdb05cec03e539c3454",
+      "indices": {
+        "allocatedBytes": 1479384,
+        "bufferBytes": 1479384,
+        "enabled": false,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 1479384,
+        "uint16Primitives": 0,
+        "uint32Primitives": 258,
+        "uploadBytes": 1479384
+      },
+      "rigidUploadBytes": 7130144,
+      "pixelDifference": null,
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint32"
+        ],
+        "payloadBytes": 1479384,
+        "bufferBytes": 1479384
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 0,
+        "webgpuRequestedIndexBufferBytes": 0,
+        "webgpuIndexFormatBindings": {},
+        "webglDrawTypes": {
+          "drawElementsInstanced:5125": 1987
+        }
+      }
+    },
+    {
+      "family": "rim-static",
+      "load": 1,
+      "backend": "Gl",
+      "original": false,
+      "file": "indices-rim-static-1-webgl-compact.png",
+      "sha256": "823f4c9c77745f4aa580ea746493132c7392fa91ace98fdb05cec03e539c3454",
+      "indices": {
+        "allocatedBytes": 739692,
+        "bufferBytes": 739692,
+        "enabled": true,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 739692,
+        "uint16Primitives": 258,
+        "uint32Primitives": 0,
+        "uploadBytes": 739692
+      },
+      "rigidUploadBytes": 6390452,
+      "pixelDifference": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint16"
+        ],
+        "payloadBytes": 739692,
+        "bufferBytes": 739692
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 0,
+        "webgpuRequestedIndexBufferBytes": 0,
+        "webgpuIndexFormatBindings": {},
+        "webglDrawTypes": {
+          "drawElementsInstanced:5123": 1755
+        }
+      }
+    },
+    {
+      "family": "rim-stress",
+      "load": 1024,
+      "backend": "Gl",
+      "original": true,
+      "file": "indices-rim-stress-1024-webgl-original.png",
+      "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792",
+      "indices": {
+        "allocatedBytes": 1479384,
+        "bufferBytes": 1479384,
+        "enabled": false,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 1479384,
+        "uint16Primitives": 0,
+        "uint32Primitives": 258,
+        "uploadBytes": 1479384
+      },
+      "rigidUploadBytes": 7130144,
+      "pixelDifference": null,
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint32"
+        ],
+        "payloadBytes": 1479384,
+        "bufferBytes": 1479384
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 0,
+        "webgpuRequestedIndexBufferBytes": 0,
+        "webgpuIndexFormatBindings": {},
+        "webglDrawTypes": {
+          "drawElementsInstanced:5125": 3480
+        }
+      }
+    },
+    {
+      "family": "rim-stress",
+      "load": 1024,
+      "backend": "Gl",
+      "original": false,
+      "file": "indices-rim-stress-1024-webgl-compact.png",
+      "sha256": "a79d711edf3e1bdb2db9ebc884c88efa3fa46a67cddf4b43434063aad261d792",
+      "indices": {
+        "allocatedBytes": 739692,
+        "bufferBytes": 739692,
+        "enabled": true,
+        "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+        "paddingBytes": 0,
+        "payloadBytes": 739692,
+        "uint16Primitives": 258,
+        "uint32Primitives": 0,
+        "uploadBytes": 739692
+      },
+      "rigidUploadBytes": 6390452,
+      "pixelDifference": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "layoutsSummary": {
+        "primitives": 258,
+        "count": 369846,
+        "formats": [
+          "Uint16"
+        ],
+        "payloadBytes": 739692,
+        "bufferBytes": 739692
+      },
+      "apiSummary": {
+        "webgpuIndexBufferCreates": 0,
+        "webgpuRequestedIndexBufferBytes": 0,
+        "webgpuIndexFormatBindings": {},
+        "webglDrawTypes": {
+          "drawElementsInstanced:5123": 3980
+        }
+      }
+    }
+  ],
+  "gpuTimes": null,
+  "gpuTimesReason": "profiling and GL timer queries disabled by clean protocol; not inferred from submit",
+  "physicalQuest": false,
+  "freshThreeComparison": false,
+  "inheritedOpenLimit": "B4 crowded-moving-WebGPU strict image issue remains unresolved",
+  "speedVerdict": "No demonstrated steady-state speed improvement; small mixed differences with foreign GPU contention; ordinary controls capped at60Hz",
+  "detailedProof": "Full per-primitive layouts, API buffer/pipeline descriptors and screenshots in archived INDEX-PROOF.json and output/next-render-cycle-6."
+}

@@ -550,10 +550,13 @@
     "scope": "descriptive aggregation; archived raw evidence authoritative"
   },
   "latestBatch": {
-    "batch": 5,
-    "status": "complete local checkpoint; inherited moving-stress image limit open",
-    "manifest": "batch-5/MANIFEST.json",
-    "report": "batch-5/REPORT.md",
+    "number": 6,
+    "status": "complete-local-checkpoint",
+    "manifest": "batch-6/MANIFEST.json",
+    "sha256": "c521dda8d8da4a995cf64513283aaed8df580e671cd08c3e4220115211d40631",
+    "report": "batch-6/REPORT.md",
+    "verification": "batch-6/VERIFICATION.json",
+    "evidenceArchiveSha256": "7842f9ca84a5250837a6b768c1a7f74904e8f4f6c391b4b2594cd4c6318b04b0",
     "nextBatchAuthorized": false
   }
 }

@@ -26,7 +26,7 @@ try{
    models.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
    const pixels=await capturePixels(canvas);assertForeground(pixels,'three actual model instances',300);
    const stats=engine.debugStats();
-   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*24+6*4,'exact-white normal-map-free geometry uploads24-byte vertices and original indices');
+   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*24+6*2,'exact-white normal-map-free geometry uploads24-byte vertices and lossless16-bit indices');
    evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
    assert(stats.mainDrawCalls===(cpu?3:1),`${cpu?'CPU reference':'rigid instances'} ${mirrored}: ${stats.mainDrawCalls} draws`);
    if(cpu)assert(stats.gltf.batchBreaks.rootBounds>0&&stats.gltf.batchBreaks.drawDeformed===0,'morph fallback stops at unavailable bounds before draw-merge checks '+JSON.stringify(stats.gltf.batchBreaks));
@@ -46,7 +46,7 @@ try{
   originalModels.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
   const image=await capturePixels(canvas),difference=delta(captures[index],image);
   assert(difference.max===0,'original40B and omitted24B vertex layouts have exact instanced pixels '+JSON.stringify(difference));
-  assert(engine.debugStats().gltf.rigidUploadBytes-originalBefore===4*40+6*4,'original layout still uploads40-byte vertices and unchanged indices');
+  assert(engine.debugStats().gltf.rigidUploadBytes-originalBefore===4*40+6*2,'original layout still uploads40-byte vertices and lossless16-bit indices');
   const layouts=engine.gltfVertexLayouts();assert(layouts.length===1&&layouts[0].stride===40&&layouts[0].bufferBytes===160&&!layouts[0].omitColor,'actual original rigid buffer is40B per vertex');
  }
  reset();await frames(2);assert(engine.setGltfWhiteColorOmissionEnabled(true),'restore default layout after independent reference');

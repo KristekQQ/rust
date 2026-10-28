@@ -1,0 +1,127 @@
+{
+  "projectGate": {
+    "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+    "pass": true,
+    "nativePassed": 428,
+    "nativeIgnoredManualTiming": 2,
+    "browserPassed": 147,
+    "browserFailed": 0,
+    "strictWasmSdkHarnessTypes": "PASS",
+    "receipt": {
+      "passed": true,
+      "key": "61fc5db7b7c07f821cde5d385c558619cf57af1399650e62e4d4fc39667b59a5",
+      "mode": "all",
+      "args": [],
+      "build": {
+        "source": "48d3f3189f54b82781658a93b8f8395ba0b2fe89a5f0077ef00812cd411af5f7",
+        "wasm": "845f7ea2098ff0529cc6b94ae724b81d9f7e93cd61f469f9abc58911e96403d7",
+        "bindings": "b41af79b1c02664a43b6a32bf7459762470173ce8c2ecebe65150624e23fca96",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "types": "3cbe679fe542168ee2666b6265bb3647592479be613ebe7dabeeacd5c7e05f8b",
+      "finished": "2026-10-28T19:57:52.267Z"
+    }
+  },
+  "inputAudit": {
+    "frozenFiles": 5016,
+    "servedPayloadRecords": 176,
+    "primaryReports": 4,
+    "driverFileChecks": 36,
+    "allPassed": true,
+    "finalBuild": {
+      "source": "48d3f3189f54b82781658a93b8f8395ba0b2fe89a5f0077ef00812cd411af5f7",
+      "wasm": "845f7ea2098ff0529cc6b94ae724b81d9f7e93cd61f469f9abc58911e96403d7",
+      "bindings": "b41af79b1c02664a43b6a32bf7459762470173ce8c2ecebe65150624e23fca96",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "finalSdkSha256": "f14b89f90a00e5332683d769d5ec702d07910ef1ada2388c4c1d71c099b81009",
+    "sourceDumpSha256": "bbf90a1e3701923c27989622c5a9bf5f7c196d64767991c1f82283efe1f8c265",
+    "frozenVsFinalRuntimeSourceEqual": true
+  },
+  "indexTopologyAudit": [
+    {
+      "backend": "webgpu",
+      "stages": 16,
+      "independentExpectedTopologySequence": true,
+      "actualMaxAndPaddingVerified": true
+    },
+    {
+      "backend": "webgl",
+      "stages": 16,
+      "independentExpectedTopologySequence": true,
+      "actualMaxAndPaddingVerified": true
+    }
+  ],
+  "independentReview": "REVIEW.md; no actionable findings in scoped source review",
+  "probeCleanup": {
+    "cleanup": [
+      {
+        "label": "owned browser",
+        "complete": true,
+        "forced": false
+      },
+      {
+        "label": "server",
+        "complete": true,
+        "forced": false
+      }
+    ],
+    "activeResourcesBeforeExplicitExit": [
+      "FSReqCallback",
+      "TCPServerWrap",
+      "PipeWrap"
+    ],
+    "exit": "explicit after persisted results and bounded owned cleanup"
+  },
+  "primaryRuns": 24,
+  "primaryFrames": 30049,
+  "primaryExactPairs": 12,
+  "independentUint32ExactPairs": 4,
+  "physicalQuest": false,
+  "freshThree": false,
+  "CI": false,
+  "publication": false,
+  "evidenceArchive": {
+    "path": "docs/performance/next-render-cycle/batch-6/evidence.tar.gz",
+    "bytes": 18631245,
+    "sha256": "7842f9ca84a5250837a6b768c1a7f74904e8f4f6c391b4b2594cd4c6318b04b0",
+    "payloads": 362,
+    "storedEntries": 364,
+    "uniquePayloads": 245,
+    "exactContentHardlinks": 117,
+    "recordedUncompressedBytes": 80048327,
+    "everyPayloadAndHardlinkReadBack": true,
+    "frozenChangedInputsIncluded": [
+      "docs/performance/next-render-cycle/batch-6/DESIGN.md",
+      "js/engine.d.ts",
+      "js/engine.js",
+      "pkg/verification-build.json",
+      "pkg/webgpu_wasm.d.ts",
+      "pkg/webgpu_wasm.js",
+      "pkg/webgpu_wasm_bg.wasm",
+      "pkg/webgpu_wasm_bg.wasm.d.ts",
+      "scripts/test-browser.mjs",
+      "src/gltf_indices.rs",
+      "src/lib.rs",
+      "src/render/gltf_gpu.rs",
+      "src/render/renderer.rs",
+      "src/web.rs",
+      "tests/gltf-batching.js",
+      "tests/gltf-indices.html",
+      "tests/gltf-indices.js",
+      "tests/render-performance.js",
+      "tests/xr/gltf-instance-checks.js"
+    ],
+    "unchangedBaseAssetsExcluded": true
+  }
+}

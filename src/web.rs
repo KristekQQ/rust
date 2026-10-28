@@ -660,6 +660,24 @@ pub fn configure_gltf_instance_pool(
     })
 }
 
+#[wasm_bindgen]
+pub fn gltf_index_layouts() -> String {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .map(|state| state.borrow().gltf_index_layouts())
+            .unwrap_or_else(|| serde_json::json!([]))
+            .to_string()
+    })
+}
+#[wasm_bindgen]
+pub fn set_gltf_compact_indices_enabled(enabled: bool) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().set_gltf_compact_indices_enabled(enabled))
+    })
+}
 /// On-demand details; keep regular frame diagnostics compact.
 #[wasm_bindgen]
 pub fn gltf_vertex_layouts() -> String {

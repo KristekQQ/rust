@@ -23,6 +23,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:"gltf-indices",path:"tests/gltf-indices.html",status:"#result"},
     {name:"gltf-white-colors",path:"tests/gltf-white-colors.html",status:"#result"},
     {name:'gltf-instance-pool',path:'/tests/gltf-instance-pool.html',status:'#result'},
     {name:'rim-three-stress',path:'examples/rim-three/?verify=1',status:'#three-stress-result',backends:['webgl'],softwareTimeoutMs:600000},
@@ -544,6 +545,7 @@ try {
                 result.threeStressControls={refresh:true,mobileHitTargets:true,removal:true,walkingVrEntry:vrChecks,physicalClickReachedRequestSession:true,requestScope:'controlled rejected request only; not an immersive XR session'};
             }
             if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);
+            if (suite.name === 'gltf-indices') result.indexEvidence = await page.evaluate(() => window.indexEvidence);
             if (suite.name === 'gltf-white-colors') result.whiteColorEvidence = await page.evaluate(() => window.whiteColorEvidence);
             if (suite.name === 'gltf-instance-pool') result.instancePoolEvidence = await page.evaluate(() => window.instancePoolEvidence);
             if (suite.name === 'gltf-material-cache') result.materialCacheEvidence = await page.evaluate(() => window.materialCacheEvidence);

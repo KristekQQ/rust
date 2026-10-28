@@ -189,6 +189,7 @@ struct PreparedDraw {
     bind: wgpu::BindGroup,
     vertex: wgpu::Buffer,
     index: wgpu::Buffer,
+    index_format: wgpu::IndexFormat,
     skin: Option<wgpu::Buffer>,
     instance: Option<InstanceBinding>,
     count: u32,
@@ -727,9 +728,11 @@ struct SkinPalette {
 struct Geometry {
     omit_color: bool,
     vertex_stride: u64,
+    index_max: Option<u32>,
     vertex: Option<wgpu::Buffer>,
     skin: Option<Rc<SharedSkin>>,
     index: wgpu::Buffer,
+    index_format: wgpu::IndexFormat,
     count: u32,
     topology: wgpu::PrimitiveTopology,
     center: Vec3,
@@ -853,6 +856,7 @@ struct Draw {
     material: usize,
     vertex: wgpu::Buffer,
     index: wgpu::Buffer,
+    index_format: wgpu::IndexFormat,
     count: u32,
     topology: wgpu::PrimitiveTopology,
     uniform: wgpu::Buffer,
@@ -911,6 +915,7 @@ struct Variant {
     texture_mask: u8,
     opaque_unclipped: bool,
     topology: wgpu::PrimitiveTopology,
+    strip_index_format: Option<wgpu::IndexFormat>,
     blend: bool,
     double_sided: bool,
     negative: bool,
@@ -960,6 +965,9 @@ pub struct GltfGpu {
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
     assets: RefCell<HashMap<usize, Weak<SharedAsset>>>,
     omit_white_colors: bool,
+    compact_indices: bool,
+    index_upload_bytes: Cell<u64>,
+    index_allocated_bytes: Cell<u64>,
     counters: Cell<GltfGpuStats>,
     diagnostics: Cell<bool>,
     draw_records: RefCell<Vec<DrawRecord>>,
@@ -1081,6 +1089,9 @@ impl GltfGpu {
             pipelines: HashMap::new(),
             assets: RefCell::new(HashMap::new()),
             omit_white_colors: true,
+            compact_indices: true,
+            index_upload_bytes: Cell::new(0),
+            index_allocated_bytes: Cell::new(0),
             counters: Cell::new(GltfGpuStats::default()),
             diagnostics: Cell::new(false),
             draw_records: RefCell::new(Vec::new()),
@@ -1514,7 +1525,18 @@ impl GltfGpu {
                 geometry.push(None);
                 continue;
             }
-            let (indices, topology) = indices(p);
+            let (indices, mode, index_max) = crate::gltf_indices::prepare(
+                &p.indices,
+                p.vertices.len(),
+                p.mode,
+                self.compact_indices,
+            );
+            let topology = topology(mode);
+            let index_format = if indices.is_u16() {
+                wgpu::IndexFormat::Uint16
+            } else {
+                wgpu::IndexFormat::Uint32
+            };
             let has_rigid_node = p.morph_targets.is_empty()
                 && asset.nodes.iter().any(|n| {
                     n.skin.is_none()
@@ -1551,7 +1573,7 @@ impl GltfGpu {
                 if omit_color {
                     stats.rigid_color_omitted_bytes += (vertices.len() * 16) as u64;
                 }
-                stats.rigid_upload_bytes += (packed.len() + indices.len() * 4) as u64;
+                stats.rigid_upload_bytes += (packed.len() + indices.bytes().len()) as u64;
                 Some(
                     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("glTF shared rigid vertices"),
@@ -1564,9 +1586,13 @@ impl GltfGpu {
             };
             let index = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("glTF shared indices"),
-                contents: as_bytes(&indices),
+                contents: indices.bytes(),
                 usage: wgpu::BufferUsages::INDEX,
             });
+            self.index_upload_bytes
+                .set(self.index_upload_bytes.get() + indices.bytes().len() as u64);
+            self.index_allocated_bytes
+                .set(self.index_allocated_bytes.get() + index.size());
             let has_skin_node = self.skin_material.is_some()
                 && p.morph_targets.is_empty()
                 && asset.nodes.iter().any(|n| {
@@ -1588,7 +1614,7 @@ impl GltfGpu {
                         + influences.len() * std::mem::size_of::<SkinInfluences>())
                         as u64;
                     if vertex.is_none() {
-                        stats.skin_upload_bytes += (indices.len() * 4) as u64;
+                        stats.skin_upload_bytes += (indices.bytes().len()) as u64;
                     }
                     Rc::new(SharedSkin {
                         vertex: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -1611,9 +1637,11 @@ impl GltfGpu {
             geometry.push(Some(Geometry {
                 omit_color,
                 vertex_stride,
+                index_max,
                 vertex,
                 skin,
                 index,
+                index_format,
                 count: indices.len() as u32,
                 topology,
                 center,
@@ -1715,6 +1743,47 @@ impl GltfGpu {
         self.invalidate_plan_inputs();
         self.omit_white_colors = enabled;
         true
+    }
+    /// Original Uint32 oracle. Never mutate immutable geometry held by live models.
+    pub fn set_compact_indices_enabled(&mut self, enabled: bool) -> bool {
+        if self.compact_indices == enabled {
+            return true;
+        }
+        if self.assets.borrow().values().any(|a| a.strong_count() > 0) {
+            return false;
+        }
+        self.invalidate_plan_inputs();
+        self.compact_indices = enabled;
+        true
+    }
+    pub fn index_layouts(&self) -> serde_json::Value {
+        let mut layouts = Vec::new();
+        for asset in self.assets.borrow().values().filter_map(Weak::upgrade) {
+            for (primitive, g) in asset
+                .geometry
+                .iter()
+                .enumerate()
+                .filter_map(|(i, g)| g.as_ref().map(|g| (i, g)))
+            {
+                layouts.push(serde_json::json!({"primitive":primitive,"format":format!("{:?}",g.index_format),"topology":format!("{:?}",g.topology),"count":g.count,"max":g.index_max,"payloadBytes":u64::from(g.count)*u64::from(g.index_format.byte_size()),"bufferBytes":g.index.size()}));
+            }
+        }
+        serde_json::Value::Array(layouts)
+    }
+    pub fn index_stats(&self) -> serde_json::Value {
+        let (mut u16_count, mut u32_count, mut bytes, mut payload) = (0usize, 0usize, 0u64, 0u64);
+        for asset in self.assets.borrow().values().filter_map(Weak::upgrade) {
+            for g in asset.geometry.iter().flatten() {
+                if g.index_format == wgpu::IndexFormat::Uint16 {
+                    u16_count += 1;
+                } else {
+                    u32_count += 1;
+                }
+                bytes += g.index.size();
+                payload += u64::from(g.count) * u64::from(g.index_format.byte_size());
+            }
+        }
+        serde_json::json!({"enabled":self.compact_indices,"uint16Primitives":u16_count,"uint32Primitives":u32_count,"bufferBytes":bytes,"payloadBytes":payload,"paddingBytes":bytes-payload,"uploadBytes":self.index_upload_bytes.get(),"allocatedBytes":self.index_allocated_bytes.get(),"memoryScope":"requested live shared index buffers; excludes driver overhead; upload/allocated cumulative"})
     }
     /// Detailed diagnostics are deliberately separate from regularly polled stats.
     pub fn vertex_layouts(&self) -> serde_json::Value {
@@ -1858,6 +1927,7 @@ impl GltfGpu {
                     material,
                     vertex,
                     index: geometry.index.clone(),
+                    index_format: geometry.index_format,
                     count: geometry.count,
                     topology: geometry.topology,
                     uniform,
@@ -2222,14 +2292,7 @@ impl GltfGpu {
             }),
             primitive: wgpu::PrimitiveState {
                 topology: variant.topology,
-                strip_index_format: if matches!(
-                    variant.topology,
-                    wgpu::PrimitiveTopology::LineStrip | wgpu::PrimitiveTopology::TriangleStrip
-                ) {
-                    Some(wgpu::IndexFormat::Uint32)
-                } else {
-                    None
-                },
+                strip_index_format: variant.strip_index_format,
                 cull_mode: if variant.double_sided || variant.key.shadow {
                     None
                 } else {
@@ -2246,7 +2309,12 @@ impl GltfGpu {
                 depth_write_enabled: Some(variant.key.shadow || !variant.blend),
                 depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: Default::default(),
-                bias: if variant.key.shadow {
+                bias: if variant.key.shadow
+                    && matches!(
+                        variant.topology,
+                        wgpu::PrimitiveTopology::TriangleList
+                            | wgpu::PrimitiveTopology::TriangleStrip
+                    ) {
                     wgpu::DepthBiasState {
                         constant: 2,
                         slope_scale: 2.0,
@@ -2942,6 +3010,11 @@ impl GltfGpu {
                     && !key.clipped
                     && !key.shadow,
                 topology: d.topology,
+                strip_index_format: matches!(
+                    d.topology,
+                    wgpu::PrimitiveTopology::LineStrip | wgpu::PrimitiveTopology::TriangleStrip
+                )
+                .then_some(d.index_format),
                 blend,
                 double_sided: material.double_sided,
                 negative: d.negative,
@@ -3200,6 +3273,7 @@ impl GltfGpu {
                     _material_lease: material_lease,
                     vertex: d.vertex.clone(),
                     index: d.index.clone(),
+                    index_format: d.index_format,
                     skin: d.skin.as_ref().map(|s| s.influences.clone()),
                     instance,
                     count: d.count,
@@ -3364,7 +3438,7 @@ impl GltfGpu {
             } else if let Some(buffer) = &d.skin {
                 pass.set_vertex_buffer(1, buffer.slice(..));
             }
-            pass.set_index_buffer(d.index.slice(..), wgpu::IndexFormat::Uint32);
+            pass.set_index_buffer(d.index.slice(..), d.index_format);
             pass.draw_indexed(0..d.count, 0, 0..d.instances);
             stats.draw_calls += 1;
             stats.instances_drawn += d.instances as u64;
@@ -3598,32 +3672,15 @@ fn wrap(mode: Option<WrapMode>) -> wgpu::AddressMode {
         WrapMode::Repeat => wgpu::AddressMode::Repeat,
     }
 }
-fn indices(p: &ModelPrimitive) -> (Vec<u32>, wgpu::PrimitiveTopology) {
-    let input = if p.indices.is_empty() {
-        (0..p.vertices.len() as u32).collect()
-    } else {
-        p.indices.clone()
-    };
-    match p.mode {
-        PrimitiveMode::Points => (input, wgpu::PrimitiveTopology::PointList),
-        PrimitiveMode::Lines => (input, wgpu::PrimitiveTopology::LineList),
-        PrimitiveMode::LineStrip => (input, wgpu::PrimitiveTopology::LineStrip),
-        PrimitiveMode::Triangles => (input, wgpu::PrimitiveTopology::TriangleList),
-        PrimitiveMode::TriangleStrip => (input, wgpu::PrimitiveTopology::TriangleStrip),
-        PrimitiveMode::LineLoop => {
-            let mut out = Vec::new();
-            for i in 0..input.len() {
-                out.push(input[i]);
-                out.push(input[(i + 1) % input.len()]);
-            }
-            (out, wgpu::PrimitiveTopology::LineList)
-        }
-        PrimitiveMode::TriangleFan => {
-            let mut out = Vec::new();
-            for i in 1..input.len().saturating_sub(1) {
-                out.extend_from_slice(&[input[0], input[i], input[i + 1]]);
-            }
-            (out, wgpu::PrimitiveTopology::TriangleList)
+fn topology(mode: PrimitiveMode) -> wgpu::PrimitiveTopology {
+    match mode {
+        PrimitiveMode::Points => wgpu::PrimitiveTopology::PointList,
+        PrimitiveMode::Lines => wgpu::PrimitiveTopology::LineList,
+        PrimitiveMode::LineStrip => wgpu::PrimitiveTopology::LineStrip,
+        PrimitiveMode::Triangles => wgpu::PrimitiveTopology::TriangleList,
+        PrimitiveMode::TriangleStrip => wgpu::PrimitiveTopology::TriangleStrip,
+        PrimitiveMode::LineLoop | PrimitiveMode::TriangleFan => {
+            unreachable!("normalized index topology")
         }
     }
 }

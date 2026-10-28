@@ -6,6 +6,7 @@ const width=Number(q.get('width')||960),height=Number(q.get('height')||640);if(!
 const order=q.get('order')||'spatial',seed=Number(q.get('seed')??1337),overlap=Number(q.get('overlap')??0),insertion=insertionOrder(load,order,seed);if(!Number.isFinite(overlap)||overlap<0||overlap>1)throw Error('Invalid overlap');
 const startupAt=performance.now();window.benchProgress={phase:'engine initialization',requestedObjects:load,createdObjects:0,createdModels:0,lastLogicalId:null,elapsedMs:0,yieldEveryObjects:128};
 const engine=await initEngine(document.querySelector('canvas'),{backend:q.get('backend')==='webgl'?'webgl':'auto',profiling:q.get('profile')!=='0'});
+if(q.get('indices')==='original' && engine.setGltfCompactIndicesEnabled?.(false)!==true)throw Error('Original Uint32 index control unavailable');
 if(q.get('vertexColors')==='original' && engine.setGltfWhiteColorOmissionEnabled?.(false)!==true)throw Error('Original rigid vertex layout control unavailable');
 window.benchStartupEngine=engine;engine.resize(width,height);engine.setDebugOverlay(false);engine.set_camera_mode('free');engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_simulation_paused(true);engine.set_render_effects(false,false);engine.setCameraView([0,2,9],[0,0,0]);
 window.benchProgress.phase='scene setup';

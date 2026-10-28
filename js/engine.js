@@ -714,6 +714,9 @@ async function initializeEngine(canvas, backend, initialization) {
         /** @param {boolean} enabled */
         setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },
         /** Detailed native rigid buffer layouts; query outside clean timing windows. */
+        gltfIndexLayouts() { return JSON.parse(wasm.gltf_index_layouts()); },
+        /** Original Uint32 reference; rejects live-asset changes. @param {boolean} enabled */
+        setGltfCompactIndicesEnabled(enabled) { return wasm.set_gltf_compact_indices_enabled(enabled); },
         gltfVertexLayouts() { return JSON.parse(wasm.gltf_vertex_layouts()); },
         /** Immutable rigid layout reference; rejects changes while assets are live. @param {boolean} enabled */
         setGltfWhiteColorOmissionEnabled(enabled) { return wasm.set_gltf_white_color_omission_enabled(enabled); },
