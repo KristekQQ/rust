@@ -1,3 +1,7 @@
+# Latest — next cycle batch5, local only
+
+[Current next-cycle state](next-render-cycle/STATE.md), [B5 report](next-render-cycle/batch-5/REPORT.md). Exact-white rigid vertex attribute omission saves40% of requested Rome rigid vertex-buffer bytes/initial vertex payload,34.57% of initial rigid vertex+index payload. Original color interpolator retained after strict XR rejection of its removal.24clean paired runs,30,020RAF rows; no proven FPS gain.12baseline/candidate+4original-layout pairs exact;424native/145browser PASS. Local isolated checkpoint, no push/main merge/deployment/shared-server change, no physicalQuest/CI/freshThree evidence. Inherited B4 moving-stress image issue remains open. Stop before batch6; historical sections below are not current runtime claims.
+
 # Renderer performance — current state
 
 ## Next renderer cycle — batch4 local checkpoint, 2026-10-28

@@ -1276,6 +1276,12 @@ impl SceneRenderer {
         }
         stats
     }
+    pub fn gltf_vertex_layouts(&self) -> serde_json::Value {
+        self.gltf_gpu.vertex_layouts()
+    }
+    pub fn set_gltf_white_color_omission_enabled(&mut self, enabled: bool) -> bool {
+        self.gltf_gpu.set_white_color_omission_enabled(enabled)
+    }
     pub fn set_prepared_plan_cache_enabled(&self, enabled: bool) {
         self.gltf_gpu.set_plan_cache_enabled(enabled);
     }
@@ -1344,6 +1350,7 @@ impl SceneRenderer {
                     "drawOptions": gltf.draw_batch_breaks[7],
                 },
                 "instancePool": self.gltf_gpu.instance_pool_stats(),
+                "vertexColors": self.gltf_gpu.vertex_color_stats(),
                 "instancePagesCreated": gltf.instance_pages_created,
                 "instanceBuffersCreated": gltf.instance_buffers_created,
                 "instanceBindGroupsCreated": gltf.instance_bind_groups_created,

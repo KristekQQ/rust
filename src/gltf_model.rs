@@ -16,6 +16,15 @@ pub struct ModelVertex {
     pub influences: Vec<(u16, f32)>,
     pub tex_coords: Vec<[f32; 2]>,
 }
+/// Exact identity only: retained CPU colors remain authoritative for cutting/deformation.
+/// Test all vertices, including unindexed ones. NaN/infinity are never identities.
+#[cfg(any(target_arch = "wasm32", test))]
+pub(crate) fn exact_white_vertex_colors(vertices: &[ModelVertex]) -> bool {
+    !vertices.is_empty()
+        && vertices
+            .iter()
+            .all(|v| v.color.iter().all(|c| c.is_finite() && *c == 1.0))
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PrimitiveMode {
     Points,
@@ -243,4 +252,47 @@ pub struct ModelInstance {
     pub last_error: Option<String>,
     /// Manual weights persist for properties not targeted by the active animation.
     pub morph_overrides: std::collections::BTreeMap<usize, Vec<f32>>,
+}
+
+#[cfg(test)]
+mod vertex_color_tests {
+    use super::*;
+    fn vertex(color: [f32; 4]) -> ModelVertex {
+        ModelVertex {
+            position: [0.; 3],
+            normal: [0., 1., 0.],
+            tangent: [0.; 4],
+            uv0: [0.; 2],
+            uv1: [0.; 2],
+            color,
+            joints: [0; 4],
+            weights: [0.; 4],
+            influences: vec![],
+            tex_coords: vec![],
+        }
+    }
+    #[test]
+    fn exact_white_requires_every_finite_component_in_every_vertex() {
+        assert!(!exact_white_vertex_colors(&[]));
+        assert!(exact_white_vertex_colors(&[
+            vertex([1.; 4]),
+            vertex([1.; 4])
+        ]));
+        for c in [
+            f32::from_bits(1.0f32.to_bits() - 1),
+            0.0,
+            f32::NAN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+        ] {
+            for channel in 0..4 {
+                let mut color = [1.; 4];
+                color[channel] = c;
+                assert!(!exact_white_vertex_colors(&[
+                    vertex([1.; 4]),
+                    vertex(color)
+                ]));
+            }
+        }
+    }
 }

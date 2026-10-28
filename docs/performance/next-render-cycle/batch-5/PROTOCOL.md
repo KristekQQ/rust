@@ -1,0 +1,7 @@
+# Batch 5 fixed protocol
+
+Baseline: local checkpoint 6e80f3270f17621f292790c03867563dbdb9686e, release source f3e185262040df47bd7d3c5c7e2a12a06c3ba761cd935ed44ceb06df5f40b5bf. Frozen before edits under output/next-render-cycle-5/baseline. Candidate freezes after focused correctness/preflight.
+
+Baseline-only pilots: 1s warmup / 2.5s sample, 1280x720 DPR1, seed1337, spatial order, same effects/content; ordinary rim-static and bounded actual-model rim-stress probes 1024 then 2048 only if required by 60Hz cap. Select once independently per backend before matched comparisons. Primary ordinary and chosen stress: three AB/BA/AB pairs per backend, 8s warmup / 25s sample, explicitly profiling off and no API wrappers. Do not compile or run other owned GPU jobs concurrently. Collect power/process/GPU-utilization snapshots without terminating foreign activity. Contended desktop and capped controls cannot prove small throughput gains.
+
+Initial geometry upload and live requested rigid buffer bytes are separate from warm frame intervals and RAF CPU wall time. Dedicated instrumented diagnostic pages may wrap actual API buffer/shader events; exclude them from primary timing. Missing GPU timing in clean runs remains unavailable by protocol. Preserve all runs, raw series, p95/p99/max, served input manifests and driver identities. Pixel reads occur outside timing. Strict fixture original-layout comparison uses zero tolerance. Prior moving1024-WebGPU stress repeatability failure remains open; it is not converted to a pass by this batch.

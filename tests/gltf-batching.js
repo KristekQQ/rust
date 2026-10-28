@@ -26,7 +26,7 @@ try{
    models.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
    const pixels=await capturePixels(canvas);assertForeground(pixels,'three actual model instances',300);
    const stats=engine.debugStats();
-   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*40+6*4,'normal-map-free shared geometry uploads40-byte vertices and original indices');
+   if(!cpu)assert(stats.gltf.rigidUploadBytes-rigidBytesBefore===4*24+6*4,'exact-white normal-map-free geometry uploads24-byte vertices and original indices');
    evidence.push({cpu,mirrored,draws:stats.mainDrawCalls,gltf:stats.gltf});captures.push(pixels);
    assert(stats.mainDrawCalls===(cpu?3:1),`${cpu?'CPU reference':'rigid instances'} ${mirrored}: ${stats.mainDrawCalls} draws`);
    if(cpu)assert(stats.gltf.batchBreaks.rootBounds>0&&stats.gltf.batchBreaks.drawDeformed===0,'morph fallback stops at unavailable bounds before draw-merge checks '+JSON.stringify(stats.gltf.batchBreaks));
@@ -37,6 +37,19 @@ try{
   }
  }
  for(let i=0;i<2;i++){const d=delta(captures[i],captures[i+2]);assert(d.changed<15&&d.max<8,'instanced/CPU pixel parity '+JSON.stringify(d));evidence.push({pixelDelta:d});}
+ // Independent original layout preserves the historical40B contract and exact
+ // images; the default exact-white path above deliberately uses24B instead.
+ reset();await frames(2);assert(engine.setGltfWhiteColorOmissionEnabled(false),'empty scene selects original vertex layout');
+ const originalBefore=engine.debugStats().gltf.rigidUploadBytes,originalUrl=fixture(),originalSource=await engine.scene.loadModel(originalUrl);URL.revokeObjectURL(originalUrl);
+ const originalModels=[originalSource,originalSource.createInstance(),originalSource.createInstance()];
+ for(const [index,mirrored] of [false,true].entries()){
+  originalModels.forEach((m,i)=>m.setPosition([(i-1)*1.4,0,0]).setScale([mirrored?-.9:.9,1.2,.8]).setRotation([.1,i*.13,0]));
+  const image=await capturePixels(canvas),difference=delta(captures[index],image);
+  assert(difference.max===0,'original40B and omitted24B vertex layouts have exact instanced pixels '+JSON.stringify(difference));
+  assert(engine.debugStats().gltf.rigidUploadBytes-originalBefore===4*40+6*4,'original layout still uploads40-byte vertices and unchanged indices');
+  const layouts=engine.gltfVertexLayouts();assert(layouts.length===1&&layouts[0].stride===40&&layouts[0].bufferBytes===160&&!layouts[0].omitColor,'actual original rigid buffer is40B per vertex');
+ }
+ reset();await frames(2);assert(engine.setGltfWhiteColorOmissionEnabled(true),'restore default layout after independent reference');
  reset();const url=fixture({far:true}),model=await engine.scene.loadModel(url);URL.revokeObjectURL(url);
  engine.set_frustum_culling(false);const unculled=await capturePixels(canvas);assert(engine.debugStats().mainDrawCalls===2,'whole object submits both nodes with culling disabled');
  const before=engine.debugStats().gltf;engine.set_frustum_culling(true);const culled=await capturePixels(canvas);const after=engine.debugStats();

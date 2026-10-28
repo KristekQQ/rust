@@ -19,14 +19,14 @@ struct Vertex {
     color: [f32; 4],
 }
 impl Vertex {
-    fn attributes(texture_mask: u8, compact: bool) -> Vec<wgpu::VertexAttribute> {
+    fn attributes(texture_mask: u8, compact: bool, omit_color: bool) -> Vec<wgpu::VertexAttribute> {
         const A: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![0=>Float32x3,1=>Float32x3,2=>Float32x4,3=>Float32x2,4=>Float32x2,5=>Float32x2,6=>Float32x2,7=>Float32x2,8=>Float32x4];
         let mut offset = 0;
         A.into_iter()
             .filter(|a| {
                 a.shader_location < 2
                     || (a.shader_location == 2 && texture_mask & (1 << 2) != 0)
-                    || a.shader_location == 8
+                    || (a.shader_location == 8 && !omit_color)
                     || (a.shader_location >= 3
                         && texture_mask & (1 << (a.shader_location - 3)) != 0)
             })
@@ -41,8 +41,8 @@ impl Vertex {
     }
     /// Lossless immutable GPU storage: omit only attributes the material's
     /// existing pipeline already omits. CPU query/deformation vertices stay 96B.
-    fn compact(vertices: &[Self], texture_mask: u8) -> Vec<u8> {
-        let attributes = Self::attributes(texture_mask, false);
+    fn compact(vertices: &[Self], texture_mask: u8, omit_color: bool) -> Vec<u8> {
+        let attributes = Self::attributes(texture_mask, false, omit_color);
         let stride = attributes
             .iter()
             .map(|a| a.format.size() as usize)
@@ -725,6 +725,8 @@ struct SkinPalette {
     last: Vec<[[f32; 4]; 4]>,
 }
 struct Geometry {
+    omit_color: bool,
+    vertex_stride: u64,
     vertex: Option<wgpu::Buffer>,
     skin: Option<Rc<SharedSkin>>,
     index: wgpu::Buffer,
@@ -774,6 +776,8 @@ struct SharedAsset {
 pub struct GltfGpuStats {
     pub cpu_deformed_vertices: u64,
     pub rigid_upload_bytes: u64,
+    pub rigid_vertex_upload_bytes: u64,
+    pub rigid_color_omitted_bytes: u64,
     pub skin_upload_bytes: u64,
     /// Included in uniform_upload_bytes as well.
     pub skin_palette_upload_bytes: u64,
@@ -856,6 +860,7 @@ struct Draw {
     center: Vec3,
     negative: bool,
     rigid: bool,
+    omit_color: bool,
     skin: Option<Rc<SharedSkin>>,
     local_center: Vec3,
     last_uniform: Uniform,
@@ -913,9 +918,11 @@ struct Variant {
     instanced: bool,
     translated: bool,
     compact_vertex: bool,
+    omit_color: bool,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct ShaderKey {
+    omit_color: bool,
     texture_mask: u8,
     shadow: bool,
     opaque_unclipped: bool,
@@ -952,6 +959,7 @@ pub struct GltfGpu {
     empty_bind: wgpu::BindGroup,
     pipelines: HashMap<Variant, wgpu::RenderPipeline>,
     assets: RefCell<HashMap<usize, Weak<SharedAsset>>>,
+    omit_white_colors: bool,
     counters: Cell<GltfGpuStats>,
     diagnostics: Cell<bool>,
     draw_records: RefCell<Vec<DrawRecord>>,
@@ -1072,6 +1080,7 @@ impl GltfGpu {
             empty_bind,
             pipelines: HashMap::new(),
             assets: RefCell::new(HashMap::new()),
+            omit_white_colors: true,
             counters: Cell::new(GltfGpuStats::default()),
             diagnostics: Cell::new(false),
             draw_records: RefCell::new(Vec::new()),
@@ -1514,6 +1523,14 @@ impl GltfGpu {
                 });
             let slots = material_slots(asset, p);
             let mut center = Vec3::ZERO;
+            let omit_color = has_rigid_node
+                && self.omit_white_colors
+                && exact_white_vertex_colors(&asset.vertices[p.vertices.clone()]);
+            let texture_mask = materials[p.material.unwrap_or(asset.materials.len())].texture_mask;
+            let vertex_stride = Vertex::attributes(texture_mask, true, omit_color)
+                .iter()
+                .map(|a| a.format.size())
+                .sum();
             let vertex = if has_rigid_node {
                 let vertices: Vec<_> = asset.vertices[p.vertices.clone()]
                     .iter()
@@ -1529,7 +1546,11 @@ impl GltfGpu {
                 center /= vertices.len().max(1) as f32;
                 let texture_mask =
                     materials[p.material.unwrap_or(asset.materials.len())].texture_mask;
-                let packed = Vertex::compact(&vertices, texture_mask);
+                let packed = Vertex::compact(&vertices, texture_mask, omit_color);
+                stats.rigid_vertex_upload_bytes += packed.len() as u64;
+                if omit_color {
+                    stats.rigid_color_omitted_bytes += (vertices.len() * 16) as u64;
+                }
                 stats.rigid_upload_bytes += (packed.len() + indices.len() * 4) as u64;
                 Some(
                     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -1588,6 +1609,8 @@ impl GltfGpu {
                 None
             };
             geometry.push(Some(Geometry {
+                omit_color,
+                vertex_stride,
                 vertex,
                 skin,
                 index,
@@ -1680,6 +1703,56 @@ impl GltfGpu {
                 }
             }
         }
+    }
+    /// Reference control. Existing immutable GPU assets never change layout in place.
+    pub fn set_white_color_omission_enabled(&mut self, enabled: bool) -> bool {
+        if self.omit_white_colors == enabled {
+            return true;
+        }
+        if self.assets.borrow().values().any(|a| a.strong_count() > 0) {
+            return false;
+        }
+        self.invalidate_plan_inputs();
+        self.omit_white_colors = enabled;
+        true
+    }
+    /// Detailed diagnostics are deliberately separate from regularly polled stats.
+    pub fn vertex_layouts(&self) -> serde_json::Value {
+        let mut layouts = Vec::new();
+        for asset in self.assets.borrow().values().filter_map(Weak::upgrade) {
+            for (primitive, g) in asset
+                .geometry
+                .iter()
+                .enumerate()
+                .filter_map(|(i, g)| g.as_ref().map(|g| (i, g)))
+            {
+                if let Some(vertex) = &g.vertex {
+                    layouts.push(serde_json::json!({"primitive":primitive,"stride":g.vertex_stride,"bufferBytes":vertex.size(),"omitColor":g.omit_color}));
+                }
+            }
+        }
+        serde_json::Value::Array(layouts)
+    }
+    pub fn vertex_color_stats(&self) -> serde_json::Value {
+        let (mut bytes, mut primitives, mut colorless) = (0u64, 0usize, 0usize);
+        for asset in self.assets.borrow().values().filter_map(Weak::upgrade) {
+            for g in asset.geometry.iter().flatten() {
+                if let Some(vertex) = &g.vertex {
+                    bytes += vertex.size();
+                    primitives += 1;
+                    colorless += usize::from(g.omit_color);
+                }
+            }
+        }
+        let counters = self.counters.get();
+        serde_json::json!({"enabled":self.omit_white_colors,"rigidVertexBufferBytes":bytes,
+            "rigidPrimitives":primitives,"colorlessPrimitives":colorless,
+            "colorlessShaders":self.shaders.keys().filter(|k|k.omit_color).count(),
+            "coloredShaders":self.shaders.keys().filter(|k|!k.omit_color).count(),
+            "colorlessPipelines":self.pipelines.keys().filter(|k|k.omit_color).count(),
+            "rigidVertexUploadBytes":counters.rigid_vertex_upload_bytes,
+            "omittedColorBytes":counters.rigid_color_omitted_bytes,
+            "memoryScope":"requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead"})
     }
     pub fn set_plan_cache_enabled(&self, enabled: bool) {
         let mut cache = self.plan_cache.borrow_mut();
@@ -1792,6 +1865,7 @@ impl GltfGpu {
                     center: Vec3::ZERO,
                     negative: false,
                     rigid,
+                    omit_color: rigid && geometry.omit_color,
                     skin,
                     local_center: geometry.center,
                     last_uniform: initial,
@@ -2069,6 +2143,7 @@ impl GltfGpu {
             immediate_size: 0,
         });
         let shader_key = ShaderKey {
+            omit_color: variant.omit_color,
             texture_mask: variant.texture_mask,
             shadow: variant.key.shadow,
             opaque_unclipped: variant.opaque_unclipped,
@@ -2103,7 +2178,11 @@ impl GltfGpu {
                 }));
             }
         }
-        let attributes = Vertex::attributes(variant.texture_mask, variant.compact_vertex);
+        let attributes = Vertex::attributes(
+            variant.texture_mask,
+            variant.compact_vertex,
+            variant.omit_color,
+        );
         let vertex_buffers = [
             Some(Vertex::layout(&attributes, variant.compact_vertex)),
             Some(if variant.translated {
@@ -2870,6 +2949,7 @@ impl GltfGpu {
                 instanced,
                 translated,
                 compact_vertex: d.rigid,
+                omit_color: d.omit_color,
             };
             let mut stats = self.counters.get();
             if !instanced && d.uploaded_uniform.get() != d.last_uniform {
@@ -3328,6 +3408,7 @@ impl GltfGpu {
 // operation on either backend. Raw fallback texels preserve the original decoder.
 fn material_shader_source(key: ShaderKey) -> String {
     let ShaderKey {
+        omit_color,
         texture_mask,
         shadow,
         opaque_unclipped,
@@ -3456,6 +3537,15 @@ fn material_shader_source(key: ShaderKey) -> String {
             .expect("rigid transform");
         let b = a + source[a..].find("    o.pos=").expect("vertex projection");
         source.replace_range(a..b,"    let model=mat4x4<f32>(v.model0,v.model1,v.model2,v.model3);\n    let normal=mat3x3<f32>(v.normal0.xyz,v.normal1.xyz,v.normal2.xyz);\n    o.world=(model*vec4(local_position,1.0)).xyz;\n    o.normal=transform_unit(normal*local_normal);\n    o.tangent=vec4(transform_unit((model*vec4(local_tangent.xyz,0.0)).xyz),local_tangent.w*v.normal0.w);\n");
+    }
+    if omit_color {
+        assert!(!skinned, "color omission is rigid-only");
+        // Do this after skin/instance declarations have been injected. Omit the
+        // input fetch, but retain the color interpolator: replacing its smooth
+        // perspective result with fragment constant 1 changed a repeatable XR
+        // pixel (max 2/255). Keep the original finite-precision fragment path.
+        source = source.replacen(", @location(8) color:vec4<f32>", "", 1);
+        source = source.replace("o.color=v.color;", "o.color=vec4<f32>(1.0);");
     }
     if opaque_unclipped && !shadow {
         // Remove only the color entrypoints' discard call. fs_shadow continues

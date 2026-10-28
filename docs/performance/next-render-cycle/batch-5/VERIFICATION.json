@@ -1,0 +1,101 @@
+{
+  "projectGate": {
+    "pass": true,
+    "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+    "nativePassed": 424,
+    "nativeIgnoredManualTiming": 2,
+    "browserPassed": 145,
+    "browserFailed": 0,
+    "sdkHarnessXrTypesFormatStrictClippy": "PASS",
+    "releaseBuildReusedAfterMatchingInputs": true,
+    "receipt": {
+      "passed": true,
+      "key": "44ed9cae897dc989589340b81aa726c9c80e95b2ac1754c8662d9676cc994042",
+      "mode": "all",
+      "args": [],
+      "build": {
+        "source": "9736ff3694f439208013fb89171b572aa328296a0bd8ffd2950501a59a5b8975",
+        "wasm": "6227a15c98cbff6e636db399a542ecb2c367435a889be5dbb885a103ba865452",
+        "bindings": "dc9837c70b5966128a92e6926bf604d4353febb50bc3eced0f32a943e3dfb118",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "types": "57e81fd82e4b087a548037f6edcec0dcf7019bf2b48f6c5012fe2b10e2efb88a",
+      "finished": "2026-10-28T16:39:40.461Z"
+    }
+  },
+  "performanceHelper": {
+    "passed": 35,
+    "command": "node --test --test-isolation=none scripts/render-performance.test.mjs"
+  },
+  "primary": {
+    "runs": 24,
+    "frames": 30020,
+    "allDistributionsRecomputed": true,
+    "profilingOffAsserted": true,
+    "strictImagePairs": 12,
+    "exactImagePairs": 12,
+    "unchangedSubmittedGltfWork": true,
+    "zeroSteadyRigidGeometryUploads": true
+  },
+  "geometryProbe": {
+    "pages": 8,
+    "originalLayoutPairs": 4,
+    "allExact": true,
+    "actualWebGpuBufferModulePipelineDescriptors": true,
+    "glNativeActualBufferSizeStrideAndPixels": true,
+    "cleanupLimit": "browser.close remained pending after browser exited; all data saved; own idle Node terminated with no GPU children"
+  },
+  "dedicatedWhiteFixture": {
+    "backends": [
+      "webgpu",
+      "webgl"
+    ],
+    "fiveStrictPairsPerBackend": true,
+    "actualShadowReflectionUpdatesAsserted": true,
+    "actualBufferSizeStrideAsserted": true,
+    "mixedColoredColorlessAndCpuFallback": true,
+    "clearDisposeReinitialize": true
+  },
+  "batchingReference": {
+    "backends": [
+      "webgpu",
+      "webgl"
+    ],
+    "original40B": true,
+    "default24B": true,
+    "strictPixels": true,
+    "existingCpuToleranceUnchanged": true
+  },
+  "simulatedXr": {
+    "directWebGpu": true,
+    "webGlHostPath": true,
+    "actualEyeAttachments": true,
+    "originalInitialCrossAndSelfRepeatsExact": true,
+    "asymmetryReentryAndLifecycle": true
+  },
+  "rejectedVaryingRemoval": {
+    "strictPass": false,
+    "changedRightEyePixels": 1,
+    "maxChannelDelta": 2,
+    "bothSelfRepeatsExact": true,
+    "sourceReconstructionExact": true,
+    "binaryAndRawEyeBuffersRetained": false,
+    "fallback": "retain Output varying and original fragment arithmetic"
+  },
+  "priorGateAttempt": {
+    "pass": false,
+    "cause": "historical40B assertion obsolete under intended24B attribute layout",
+    "intentionallyInterruptedAfterKnownFailure": true,
+    "cuttingTargetClosedBecauseInterruptedNotRegressionVerdict": true,
+    "logsAndPartialReportRetained": true
+  },
+  "inheritedB4MovingStressImageLimitStillOpen": true,
+  "physicalQuest": false,
+  "ci": false,
+  "published": false
+}

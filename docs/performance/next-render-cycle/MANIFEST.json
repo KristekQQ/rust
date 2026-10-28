@@ -550,9 +550,10 @@
     "scope": "descriptive aggregation; archived raw evidence authoritative"
   },
   "latestBatch": {
-    "number": 4,
-    "status": "complete local checkpoint with open strict stress-pixel limit",
-    "manifest": "batch-4/MANIFEST.json",
-    "state": "STATE.md"
+    "batch": 5,
+    "status": "complete local checkpoint; inherited moving-stress image limit open",
+    "manifest": "batch-5/MANIFEST.json",
+    "report": "batch-5/REPORT.md",
+    "nextBatchAuthorized": false
   }
 }

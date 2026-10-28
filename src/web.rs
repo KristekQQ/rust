@@ -660,6 +660,30 @@ pub fn configure_gltf_instance_pool(
     })
 }
 
+/// On-demand details; keep regular frame diagnostics compact.
+#[wasm_bindgen]
+pub fn gltf_vertex_layouts() -> String {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .map(|state| state.borrow().gltf_vertex_layouts())
+            .unwrap_or_else(|| serde_json::json!([]))
+            .to_string()
+    })
+}
+
+/// Lossless rigid-layout reference control; rejects changes while GPU assets are live.
+#[wasm_bindgen]
+pub fn set_gltf_white_color_omission_enabled(enabled: bool) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|state| {
+            state
+                .borrow_mut()
+                .set_gltf_white_color_omission_enabled(enabled)
+        })
+    })
+}
+
 #[wasm_bindgen]
 pub fn set_prepared_plan_cache_enabled(enabled: bool) {
     STATE.with(|state| {

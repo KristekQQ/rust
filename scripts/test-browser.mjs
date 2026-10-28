@@ -23,6 +23,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:"gltf-white-colors",path:"tests/gltf-white-colors.html",status:"#result"},
     {name:'gltf-instance-pool',path:'/tests/gltf-instance-pool.html',status:'#result'},
     {name:'rim-three-stress',path:'examples/rim-three/?verify=1',status:'#three-stress-result',backends:['webgl'],softwareTimeoutMs:600000},
     ...['basic','culling','cutting','cynatar','fox-control','gltf','lights','mirror','monkey','neon-arena','neon-enemies','neon-font-preview','neon-robot','postprocessing','projectiles','rim','shadows','webxr','forest-arena','crystal-cave','monster-room','table-tennis'].map(scene=>({name:'info-'+scene,path:'tests/runtime-info-example.html?scene='+scene,status:'#result',backends:['webgl'],xrReport:true})),
@@ -543,6 +544,7 @@ try {
                 result.threeStressControls={refresh:true,mobileHitTargets:true,removal:true,walkingVrEntry:vrChecks,physicalClickReachedRequestSession:true,requestScope:'controlled rejected request only; not an immersive XR session'};
             }
             if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);
+            if (suite.name === 'gltf-white-colors') result.whiteColorEvidence = await page.evaluate(() => window.whiteColorEvidence);
             if (suite.name === 'gltf-instance-pool') result.instancePoolEvidence = await page.evaluate(() => window.instancePoolEvidence);
             if (suite.name === 'gltf-material-cache') result.materialCacheEvidence = await page.evaluate(() => window.materialCacheEvidence);
             if (suite.name === 'gltf-light-classes') result.lightClassEvidence = await page.evaluate(() => window.lightClassEvidence);

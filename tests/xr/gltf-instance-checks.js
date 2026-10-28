@@ -126,7 +126,28 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
         }
     }
 
+    // Independent original vertex-layout control, through real per-eye targets.
+    const optimizedLayout={...engine.debugStats().gltf.vertexColors,rigidLayouts:engine.gltfVertexLayouts()};
+    test.assert(optimizedLayout.rigidLayouts.some(l=>l.omitColor), 'XR exercised omitted rigid color attributes', optimizedLayout);
+    const reloadEyes = async enabled => {
+        engine.scene.clear();frame();
+        test.assert(engine.setGltfWhiteColorOmissionEnabled(enabled), 'XR clear permits explicit layout control '+enabled);
+        engine.scene.createLight({position:[-2,4,0],color:[12,12,12]});
+        const original=await engine.scene.loadModel(new URL('../../assets/models/damaged-helmet/DamagedHelmet.glb', import.meta.url));
+        [original,original.createInstance(),original.createInstance()].forEach((m,i)=>m.setPosition([baseline[i],1.6,-2]).setScale([.18,.18,.18]));
+        frame();frame();return await readEyes();
+    };
+    const originalEyes=await reloadEyes(false), originalRepeat=await reloadEyes(false);
+    const colorlessEyes=await reloadEyes(true), colorlessRepeat=await reloadEyes(true);
+    const changes=(a,b)=>b.map((image,eye)=>({changed:pixelDifference(a[eye],image,0),max:image.data.reduce((m,v,i)=>Math.max(m,Math.abs(v-a[eye].data[i])),0)}));
+    const layoutEvidence={firstVsOriginal:changes(first,originalEyes),originalRepeat:changes(originalEyes,originalRepeat),colorlessRepeat:changes(colorlessEyes,colorlessRepeat),referenceVsColorless:changes(originalEyes,colorlessEyes)};
+    window.xrWhiteLayoutEvidence=layoutEvidence;
+    test.assert(originalEyes.every((image,eye)=>pixelDifference(first[eye],image,0)===0), 'original layout reproduces the initial optimized XR image', layoutEvidence);
+    test.assert(originalRepeat.every((image,eye)=>pixelDifference(originalEyes[eye],image,0)===0) && colorlessRepeat.every((image,eye)=>pixelDifference(colorlessEyes[eye],image,0)===0), 'both XR layout reload controls are exactly repeatable', layoutEvidence);
+    test.assert(originalEyes.every((image,eye)=>pixelDifference(colorlessEyes[eye],image,0)===0), 'omitted and original color layout reproduce exact pixels in both XR eyes', layoutEvidence);
+
     engine.scene.clear();
     frame();
     test.assert(engine.debugStats().gltf.instancePool?.liveBytes===0 && engine.debugStats().gltf.instanceBufferBytes===0, 'scene.clear releases glTF XR instance buffers', engine.debugStats().gltf);
+    test.assert(engine.setGltfWhiteColorOmissionEnabled(true), 'XR restores default rigid layout policy');
 }
