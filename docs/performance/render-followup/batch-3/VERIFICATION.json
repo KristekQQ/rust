@@ -1,0 +1,111 @@
+{
+  "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+  "exitCode": 0,
+  "fresh": true,
+  "native": {
+    "passed": 429,
+    "failed": 0,
+    "ignored": 2
+  },
+  "browser": {
+    "passed": 153,
+    "webgpu": 57,
+    "webgl": 96,
+    "failed": 0,
+    "started": "2026-10-29T14:30:13.037Z",
+    "finished": "2026-10-29T14:42:15.142Z",
+    "sandboxDisabled": false,
+    "build": {
+      "source": "d44d29f28fd00eaf08f2551fe4c2673059dad1211e8ba39381741b3c517fabdc",
+      "wasm": "bb3e3bf93d1483ef2ee010a5887008ecf8f48748fea90ee62d905a6c25869290",
+      "bindings": "33f7c4ef0074300d54b7b2b64478efb764d400cc01ee28084e37a0cbc7e93d64",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "application": "f5381dccc40165a56f6f79b1bb4b103d15eef065e556c5fcb319f508164d1061"
+  },
+  "sdk": {
+    "passed": 32
+  },
+  "xrPlatform": {
+    "passed": 71
+  },
+  "harness": {
+    "nodePassed": 14,
+    "pythonPassed": 13
+  },
+  "other": [
+    "rust format",
+    "native clippy",
+    "wasm check",
+    "wasm clippy",
+    "SDK types",
+    "source dump generated"
+  ],
+  "focusedPanelFixture": {
+    "exactWebGPUStates": 59,
+    "exactWebGLStates": 72,
+    "simulatedAsymmetricXR": true,
+    "physicalQuest": false
+  },
+  "alignedLifecycle": {
+    "script": "measurements/aligned-lifecycle.mjs",
+    "report": "measurements/aligned-lifecycle/report.json",
+    "backends": [
+      "WebGPU opt-in",
+      "WebGL2 default"
+    ],
+    "cyclesPerBackend": 20,
+    "publishedChecksPerBackend": 100,
+    "clearZeroChecksPerBackend": 20,
+    "allPassed": true,
+    "wait": "four RAF turns after each mutation, no GPU fence",
+    "scope": "engine-owned logical capacity/shadow/handles, not physical GPU residency"
+  },
+  "independentPngPairs": 12,
+  "receiptCheck": {
+    "command": "VERIFY_WASM_PROFILE=release npm exec -- node scripts/verification-cache.mjs check all",
+    "exitCode": 0,
+    "result": "PASS reused: all  (unchanged inputs)"
+  },
+  "finalBuild": {
+    "source": "d44d29f28fd00eaf08f2551fe4c2673059dad1211e8ba39381741b3c517fabdc",
+    "wasm": "bb3e3bf93d1483ef2ee010a5887008ecf8f48748fea90ee62d905a6c25869290",
+    "bindings": "33f7c4ef0074300d54b7b2b64478efb764d400cc01ee28084e37a0cbc7e93d64",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "logHashes": {
+    "output/followup-3/final-gate.log": "5a84f8ed4c0925f72fab4d9c52adb47e37f12f2a1d978ca1fed85a7dc353b890",
+    "output/verification/browser-report.json": "2f2873c476d924172e73da12bc16f12fb178c0707c63b7c4b6a10687daf8f07b",
+    "output/verification/rust-tests.log": "9ff748aed85e8b91c1720686c570a3026001eb10a8e0cb0e971da942a97c7d61",
+    "output/verification/sdk.log": "3adc42c86ecdaf295b599b4f8aa4d569c3aa964b3aac0e45e65981fbae26e611",
+    "output/verification/xr-platform.log": "0ee941310416c353b6bedf8d5c704980aae4bea505c0c0a6f564b6d0e416e19b",
+    "output/verification/harness.log": "92b070e6c1eafdda2a6f9426ce2960e142e5d68741c77d8434adc0c51be9664d",
+    "all_sources.txt": "e8bf3429db0432abf13777a75a4d0c7a2aa2d8b804ba51cafa8a0b5743540f95"
+  },
+  "archive": {
+    "archive": "docs/performance/render-followup/batch-3/EVIDENCE.tar.gz",
+    "sha256": "7cd1df5db6a03aca79d5e082c8b0ecd37961ec73703fdee9132d7b9547b0e980",
+    "bytes": 80369191,
+    "aliases": 2762,
+    "objects": 1124,
+    "logicalBytes": 379993519,
+    "uniqueBytes": 167826527,
+    "verifiedObjects": 1124,
+    "verifiedAliases": 2762,
+    "restore": {
+      "files": 2762,
+      "objects": 1124,
+      "independentFiles": true
+    }
+  }
+}

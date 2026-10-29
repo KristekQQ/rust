@@ -710,6 +710,35 @@ pub fn set_gltf_white_color_omission_enabled(enabled: bool) -> bool {
     })
 }
 
+/// Explicit original-path control for allocation and exact-image diagnostics.
+#[wasm_bindgen]
+pub fn set_panel_buffer_reuse(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_panel_buffer_reuse(enabled);
+        }
+    });
+}
+/// Deterministic bitmap fixture input. Only opt-in debug-text panels; never
+/// replaces automatic gameplay/diagnostics text or changes its refresh rate.
+#[wasm_bindgen]
+pub fn diagnostic_panel_text(id: u32, value: &str) -> Result<(), JsValue> {
+    if value.len() > 64 || !value.is_ascii() || value.chars().any(char::is_control) {
+        return Err(JsValue::from_str(
+            "Diagnostic panel text needs 0..64 printable ASCII characters",
+        ));
+    }
+    cutting_command(|scene| {
+        let panel = scene
+            .info_panels
+            .get_mut(&id)
+            .filter(|p| p.kind == crate::info_panel::PanelKind::DebugText && !p.font3d_bound)
+            .ok_or_else(|| "Diagnostic text requires an unbound debug-text panel".to_string())?;
+        panel.update(vec![("", value.into())]);
+        Ok(())
+    })
+}
+
 #[wasm_bindgen]
 pub fn set_overlay_selection_reference(enabled: bool) {
     STATE.with(|state| {

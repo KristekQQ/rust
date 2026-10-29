@@ -1,0 +1,113 @@
+{
+  "exactPngPairs": 12,
+  "pairs": [
+    {
+      "run": "compare-panel-events-webgl",
+      "pair": 0,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair0.png",
+        "candidate-panel-events-16-pair0.png"
+      ]
+    },
+    {
+      "run": "compare-panel-events-webgl",
+      "pair": 1,
+      "byteIdenticalPng": true,
+      "files": [
+        "candidate-panel-events-16-pair1.png",
+        "baseline-panel-events-16-pair1.png"
+      ]
+    },
+    {
+      "run": "compare-panel-events-webgl",
+      "pair": 2,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair2.png",
+        "candidate-panel-events-16-pair2.png"
+      ]
+    },
+    {
+      "run": "compare-panel-events-webgpu",
+      "pair": 0,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair0.png",
+        "candidate-panel-events-16-pair0.png"
+      ]
+    },
+    {
+      "run": "compare-panel-events-webgpu",
+      "pair": 1,
+      "byteIdenticalPng": true,
+      "files": [
+        "candidate-panel-events-16-pair1.png",
+        "baseline-panel-events-16-pair1.png"
+      ]
+    },
+    {
+      "run": "compare-panel-events-webgpu",
+      "pair": 2,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair2.png",
+        "candidate-panel-events-16-pair2.png"
+      ]
+    },
+    {
+      "run": "final-compare-panel-events-webgl",
+      "pair": 0,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair0.png",
+        "candidate-panel-events-16-pair0.png"
+      ]
+    },
+    {
+      "run": "final-compare-panel-events-webgl",
+      "pair": 1,
+      "byteIdenticalPng": true,
+      "files": [
+        "candidate-panel-events-16-pair1.png",
+        "baseline-panel-events-16-pair1.png"
+      ]
+    },
+    {
+      "run": "final-compare-panel-events-webgl",
+      "pair": 2,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair2.png",
+        "candidate-panel-events-16-pair2.png"
+      ]
+    },
+    {
+      "run": "final-compare-panel-events-webgpu",
+      "pair": 0,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair0.png",
+        "candidate-panel-events-16-pair0.png"
+      ]
+    },
+    {
+      "run": "final-compare-panel-events-webgpu",
+      "pair": 1,
+      "byteIdenticalPng": true,
+      "files": [
+        "candidate-panel-events-16-pair1.png",
+        "baseline-panel-events-16-pair1.png"
+      ]
+    },
+    {
+      "run": "final-compare-panel-events-webgpu",
+      "pair": 2,
+      "byteIdenticalPng": true,
+      "files": [
+        "baseline-panel-events-16-pair2.png",
+        "candidate-panel-events-16-pair2.png"
+      ]
+    }
+  ]
+}

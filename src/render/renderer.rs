@@ -305,6 +305,8 @@ struct Mesh {
     index_buffer: wgpu::Buffer,
     index_count: u32,
     index_format: wgpu::IndexFormat,
+    panel_dynamic: bool,
+    panel_indices: Vec<u32>,
 }
 
 impl Mesh {
@@ -326,9 +328,121 @@ impl Mesh {
             index_buffer,
             index_count: indices.len() as u32,
             index_format: wgpu::IndexFormat::Uint16,
+            panel_dynamic: false,
+            panel_indices: Vec::new(),
         }
     }
+    fn panel_buffer(device: &wgpu::Device, bytes: u64, vertex: bool) -> wgpu::Buffer {
+        device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some(if vertex {
+                "panel bitmap vertices"
+            } else {
+                "panel bitmap indices"
+            }),
+            size: bytes,
+            usage: (if vertex {
+                wgpu::BufferUsages::VERTEX
+            } else {
+                wgpu::BufferUsages::INDEX
+            }) | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
+    }
+    fn update_panel(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        model: &crate::gltf_loader::ImportedMesh,
+        stats: &mut PanelMeshStats,
+    ) {
+        let _scope = super::profiler::cpu_scope("panel.upload");
+        let vertices: Vec<Vertex> = model
+            .vertices
+            .iter()
+            .map(|v| Vertex {
+                position: v.position,
+                color: v.color,
+                normal: v.normal,
+            })
+            .collect();
+        for (buffer, bytes, vertex) in [
+            (&mut self.vertex_buffer, data::as_bytes(&vertices), true),
+            (
+                &mut self.index_buffer,
+                data::as_bytes(&model.indices),
+                false,
+            ),
+        ] {
+            let old = buffer.size();
+            let capacity = crate::info_panel::buffer_capacity(
+                bytes.len() as u64,
+                old,
+                device.limits().max_buffer_size,
+            );
+            if capacity != old {
+                *buffer = Self::panel_buffer(device, capacity, vertex);
+                stats.buffers_created += 1;
+                stats.created_bytes += capacity;
+                stats.replacements += 1;
+                stats.growths += u64::from(capacity > old);
+                stats.shrinks += u64::from(capacity < old);
+            }
+            // Only reuse bytes proven equal to this buffer's last publication.
+            // A smaller draw may use an unchanged prefix; buffer replacement
+            // invalidates it even when the CPU prefix still matches.
+            if !vertex && capacity == old && self.panel_indices.starts_with(&model.indices) {
+                stats.index_upload_reuses += 1;
+                continue;
+            }
+            if !bytes.is_empty() {
+                queue.write_buffer(buffer, 0, bytes);
+                stats.write_calls += 1;
+                stats.write_bytes += bytes.len() as u64;
+            }
+            if !vertex {
+                self.panel_indices = model.indices.clone();
+            }
+        }
+        self.index_count = model.indices.len() as u32;
+    }
+    fn panel(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        model: &crate::gltf_loader::ImportedMesh,
+        stats: &mut PanelMeshStats,
+    ) -> Self {
+        let v = crate::info_panel::buffer_capacity(
+            (model.vertices.len() * 36) as u64,
+            0,
+            device.limits().max_buffer_size,
+        );
+        let i = crate::info_panel::buffer_capacity(
+            (model.indices.len() * 4) as u64,
+            0,
+            device.limits().max_buffer_size,
+        );
+        let mut mesh = Self {
+            vertex_buffer: Self::panel_buffer(device, v, true),
+            index_buffer: Self::panel_buffer(device, i, false),
+            index_count: 0,
+            index_format: wgpu::IndexFormat::Uint32,
+            panel_dynamic: true,
+            panel_indices: Vec::new(),
+        };
+        stats.buffers_created += 2;
+        stats.created_bytes += v + i;
+        mesh.update_panel(device, queue, model, stats);
+        mesh
+    }
     fn imported(device: &wgpu::Device, model: &crate::gltf_loader::ImportedMesh) -> Self {
+        Self::imported_labeled(device, model, "glTF vertices", "glTF u32 indices")
+    }
+    fn imported_labeled(
+        device: &wgpu::Device,
+        model: &crate::gltf_loader::ImportedMesh,
+        vertex_label: &str,
+        index_label: &str,
+    ) -> Self {
         let vertices: Vec<Vertex> = model
             .vertices
             .iter()
@@ -339,12 +453,12 @@ impl Mesh {
             })
             .collect();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("glTF vertices"),
+            label: Some(vertex_label),
             contents: data::as_bytes(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("glTF u32 indices"),
+            label: Some(index_label),
             contents: data::as_bytes(&model.indices),
             usage: wgpu::BufferUsages::INDEX,
         });
@@ -353,6 +467,8 @@ impl Mesh {
             index_buffer,
             index_count: model.indices.len() as u32,
             index_format: wgpu::IndexFormat::Uint32,
+            panel_dynamic: false,
+            panel_indices: Vec::new(),
         }
     }
 }
@@ -427,6 +543,22 @@ struct OverlaySelectionStats {
     stage_ms: [f64; 4],
 }
 
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PanelMeshStats {
+    updates: u64,
+    buffers_created: u64,
+    created_bytes: u64,
+    replacements: u64,
+    growths: u64,
+    shrinks: u64,
+    write_calls: u64,
+    index_upload_reuses: u64,
+    write_bytes: u64,
+    initial_payload_bytes: u64,
+    by_kind: std::collections::BTreeMap<String, u64>,
+}
+
 pub struct SceneRenderer {
     grid_vertex_buffer: wgpu::Buffer,
     grid_vertex_count: u32,
@@ -447,6 +579,8 @@ pub struct SceneRenderer {
     translucent_indices: std::cell::Cell<usize>,
     translucent_full_indices: std::cell::Cell<usize>,
     translucent_draws: std::cell::Cell<usize>,
+    panel_buffer_reuse: bool,
+    panel_mesh_stats: PanelMeshStats,
     overlay_selection_reference: bool,
     overlay_selection: OverlaySelectionStats,
     neon_glow: Option<super::neon_glow::NeonGlow>,
@@ -594,6 +728,8 @@ impl SceneRenderer {
             translucent_draws: std::cell::Cell::new(0),
             // The cheaper eligibility query remains an explicit diagnostic
             // experiment: repeated stress pairs did not improve frame cadence.
+            panel_buffer_reuse: false,
+            panel_mesh_stats: PanelMeshStats::default(),
             overlay_selection_reference: true,
             overlay_selection: OverlaySelectionStats::default(),
             neon_glow: None,
@@ -678,6 +814,8 @@ impl SceneRenderer {
                 index_buffer: piece.indices,
                 index_count: piece.vertex_count,
                 index_format: wgpu::IndexFormat::Uint32,
+                panel_dynamic: false,
+                panel_indices: Vec::new(),
             },
         );
         piece.source
@@ -723,9 +861,56 @@ impl SceneRenderer {
                 continue;
             }
             if panel.dirty {
-                self.imported_meshes
-                    .insert(id, Mesh::imported(&self.device, &panel.mesh));
-                self.upload_bytes += panel.mesh.vertices.len() * 36 + panel.mesh.indices.len() * 4;
+                let _scope = super::profiler::cpu_scope("panel.prepare");
+                let upload_before =
+                    self.panel_mesh_stats.write_bytes + self.panel_mesh_stats.initial_payload_bytes;
+                self.panel_mesh_stats.updates += 1;
+                *self
+                    .panel_mesh_stats
+                    .by_kind
+                    .entry(format!("{:?}", panel.kind))
+                    .or_default() += 1;
+                if self.panel_buffer_reuse && panel.kind != crate::info_panel::PanelKind::Text {
+                    if let Some(mesh) = self
+                        .imported_meshes
+                        .get_mut(&id)
+                        .filter(|mesh| mesh.panel_dynamic)
+                    {
+                        mesh.update_panel(
+                            &self.device,
+                            &self.queue,
+                            &panel.mesh,
+                            &mut self.panel_mesh_stats,
+                        );
+                    } else {
+                        self.imported_meshes.insert(
+                            id,
+                            Mesh::panel(
+                                &self.device,
+                                &self.queue,
+                                &panel.mesh,
+                                &mut self.panel_mesh_stats,
+                            ),
+                        );
+                    }
+                } else {
+                    // Independent original allocation/upload path, also used by the diagnostic baseline.
+                    let mesh = Mesh::imported_labeled(
+                        &self.device,
+                        &panel.mesh,
+                        "panel bitmap vertices (reference)",
+                        "panel bitmap indices (reference)",
+                    );
+                    self.panel_mesh_stats.buffers_created += 2;
+                    self.panel_mesh_stats.created_bytes +=
+                        mesh.vertex_buffer.size() + mesh.index_buffer.size();
+                    self.panel_mesh_stats.initial_payload_bytes +=
+                        (panel.mesh.vertices.len() * 36 + panel.mesh.indices.len() * 4) as u64;
+                    self.imported_meshes.insert(id, mesh);
+                }
+                self.upload_bytes += (self.panel_mesh_stats.write_bytes
+                    + self.panel_mesh_stats.initial_payload_bytes
+                    - upload_before) as usize;
                 if panel.kind.neon() {
                     if self.neon_glow.as_ref().is_some_and(|glow| glow.enabled()) {
                         self.neon_meshes.insert(
@@ -1317,6 +1502,13 @@ impl SceneRenderer {
     pub fn set_gltf_white_color_omission_enabled(&mut self, enabled: bool) -> bool {
         self.gltf_gpu.set_white_color_omission_enabled(enabled)
     }
+    pub fn set_panel_buffer_reuse(&mut self, enabled: bool) {
+        self.panel_buffer_reuse = enabled;
+        // Force a real upload for the independent original/candidate pixel oracle.
+        for panel in self.scene.info_panels.values_mut() {
+            panel.dirty = true;
+        }
+    }
     pub fn set_overlay_selection_reference(&mut self, enabled: bool) {
         self.overlay_selection_reference = enabled;
     }
@@ -1436,6 +1628,15 @@ impl SceneRenderer {
             },
             "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
                 "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>() + mesh.indices as usize * 4).sum::<usize>()},
+            "panelBufferReuse": self.panel_buffer_reuse,
+            "panelMeshes": {
+                "events":self.panel_mesh_stats,
+                "liveBuffers":self.scene.info_panels.keys().filter(|id|self.imported_meshes.contains_key(id)).count()*2,
+                "capacityBytes":self.scene.info_panels.keys().filter_map(|id|self.imported_meshes.get(id)).map(|m|m.vertex_buffer.size()+m.index_buffer.size()).sum::<u64>(),
+                "payloadBytes":self.scene.info_panels.iter().filter(|(id,_)|self.imported_meshes.contains_key(id)).map(|(_,p)|(p.mesh.vertices.len()*36+p.mesh.indices.len()*4) as u64).sum::<u64>(),
+                "indexShadowBytes":self.imported_meshes.values().map(|m|m.panel_indices.capacity()*4).sum::<usize>(),
+                "inactivePoolBytes":0,
+            },
             "overlaySelection": self.overlay_selection,
             "overlaySelectionReference": self.overlay_selection_reference,
             "translucency": {

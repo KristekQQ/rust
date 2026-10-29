@@ -1,4 +1,8 @@
-# Latest — render followup2, local evidence checkpoint
+# Latest — render followup3, local checkpoint
+
+[State](render-followup/STATE.md), [report](render-followup/batch-3/REPORT.md). Actual Neon warm buffer owner is changing bitmap Diagnostics panel. Bounded per-live-panel storage/index reuse accepted onWebGL2:186→0API creates/25s, unchanged update cadence/content. WebGPU retains original default after adverse preparation/tails.48clean runs/54064RAFrows,12exact/12Neon-unavailable pairs; no proven FPS gain.120ssoaks plateau, aligned20clear/reloadcycles/API pass.429native/153browser plus SDK/XR/harness fresh gate PASS; final WASMbb3e3bf9, source/pkg/receipt match. Battery/cadence and mixed-phase gauge limitations preserved. No push/merge/deploy/sharedrestart/Quest/CI/freshThree; priorA/B/C/D remainopen. Stop before followup4.
+
+# Historical — render followup2, local evidence checkpoint
 
 [State](render-followup/STATE.md), [report](render-followup/batch-2/REPORT.md). Proven redundant overlay-presence scans (WG stress130287 primitive visits/call); explicit immutable guard removes them, but automatic enablement rejected after adverse/mixed whole-frame stress results. Original selector remains default on both backends; experiment opt-in only.90clean runs/102137RAF rows,32exact/1FAIL/12unavailable pairs. New clustered4pixel/max1 caseD occurs in both original and candidate image variants; cause unresolved, separate from prior A/B/C. Final restored-default WASMd0677791; one fresh428native/151browser gate plus SDK/XR/harness PASS, same-npm receipt/source/pkg verified. Desktop/simulatedXR only, no push/merge/deploy/shared restart/Quest/CI/freshThree. Stop before followup3; historical sections retain their original scope.
 

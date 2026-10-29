@@ -1,0 +1,112 @@
+{
+  "batch": "render-followup 3/6",
+  "baseCheckpoint": "bcd774eb5761c201777c9b8892017e1be494b9af",
+  "branch": "codex/render-followup-3",
+  "checkout": "/private/tmp/rust-render-followup-2",
+  "baseline": {
+    "source": "7cd160e788ece6dfd78b6d913957ba758cb19dc8ad4abae0d52c6114d263ca4f",
+    "wasm": "d0677791488085cb26b7423a4c062fb4411044e90f55d958193558bd7c5f0798",
+    "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "v1": {
+    "source": "a1d0a1471c97d3330ac9dce2eb97bb4370d1571ca2ab38880c19fb72c2c7bf02",
+    "wasm": "3b0bb9e4064c0358e257134e2e8d9466853bbe68c01353e266acb652715b3268",
+    "bindings": "33f7c4ef0074300d54b7b2b64478efb764d400cc01ee28084e37a0cbc7e93d64",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "final": {
+    "source": "d44d29f28fd00eaf08f2551fe4c2673059dad1211e8ba39381741b3c517fabdc",
+    "wasm": "bb3e3bf93d1483ef2ee010a5887008ecf8f48748fea90ee62d905a6c25869290",
+    "bindings": "33f7c4ef0074300d54b7b2b64478efb764d400cc01ee28084e37a0cbc7e93d64",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "default": {
+    "WebGL2": "per-live-mutable-panel capacity reuse with exact uploaded index-prefix proof",
+    "WebGPU": "original mapped-init, reuse diagnostic opt-in only"
+  },
+  "environment": {
+    "os": "macOS 26.6.1",
+    "hardware": "Apple M1 / 16GiB",
+    "chrome": "156.0.8078.48",
+    "node": "24.22.1",
+    "rust": "1.99.0",
+    "isolation": "not isolated; foreign browser/Codex processes preserved",
+    "power": "battery during clean matrices; final unchanged baseline and candidate both30Hz vs V1both60Hz, lowpowermode0; cause not isolated. AC reported during gate, no performance claim from gate."
+  },
+  "protocol": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "dpr": 1,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "pairs": 3,
+    "alternatingOrder": [
+      "AB",
+      "BA",
+      "AB"
+    ],
+    "profile": false,
+    "families": [
+      "arena-active",
+      "panel-events"
+    ],
+    "panelCount": 16,
+    "cleanRuns": 48,
+    "cleanRafRows": 54064,
+    "soakMs": 120000,
+    "throughput": "not established; bounded1..16 real-panel calibration remained capped",
+    "gpuTimes": "unavailable in clean runs; separate async query diagnostics preserved",
+    "physicalQuest": "not tested"
+  },
+  "instrumentationLayers": "Logical wgpu resources and observed backend API calls are separate, never summed. GL createBuffer and bufferData refer to same resources.",
+  "evidence": "EVIDENCE_INDEX.json aliases immutable SHA256 objects; full served manifests and raw frame rows inside EVIDENCE.tar.gz",
+  "files": {
+    "src/render/renderer.rs": "9fc83b04558308bc6a90ac044d696b3dd91de8de35b2729b9c822f9887e8c6b2",
+    "src/render/state.rs": "e310b39ea428f1539695891575ec6df05535072a7ac09c2578af122224fc3994",
+    "src/info_panel.rs": "48e3ec74c5c04dccf68ef375d68f0dbe5b3cb396b84aa089c8379b57f9e32c75",
+    "src/web.rs": "5d4e1cf1c7c2386d9ef7c0a6c5901d0825144bfc81b76f9a0f14c949c3a86605",
+    "js/engine.js": "d23046161a2325090da2526903aa65e692202691ad8cc67e5e85ccc0fe5aa398",
+    "js/engine.d.ts": "61e26914fa04b4e820c6ee3bd65a30c393435133b4d83b4991257ae71efc8026",
+    "scripts/render-performance.mjs": "fd4d2725dee2b0da23aa987f2268a99c8e02fb22bf3fb84c219f915e864c1f2e",
+    "scripts/render-performance-lib.mjs": "fa76b46755f46bb7d44004744ab8e5842802091177486c405d472f5c4a48cce6",
+    "scripts/test-browser.mjs": "90b1dabea802d8bc61406cdb059b63bfadb87c8ffbf9412414a045988852b0ba",
+    "tests/render-performance.js": "5f553e0ccf7f97bd5b90b1c79bf59cac4ce5e3fdbd5335d680642274bc69f7b9",
+    "tests/render-performance-panels.js": "8a09367d6e0fff4d261233bcb5e4a98735125b749c154b7265350d487f2f5909",
+    "tests/panel-buffers.js": "3f2c65cec5f08ebc4d43ad5e21bd59ab147de1fa09a2322dd86a9dc1a292ae1a",
+    "tests/panel-buffers.html": "3e58df860593271a7e0d3e74e02d8983c8bcf4ac176acadf2c1dd30f9abad0ee"
+  },
+  "archive": {
+    "archive": "docs/performance/render-followup/batch-3/EVIDENCE.tar.gz",
+    "sha256": "7cd1df5db6a03aca79d5e082c8b0ecd37961ec73703fdee9132d7b9547b0e980",
+    "bytes": 80369191,
+    "aliases": 2762,
+    "objects": 1124,
+    "logicalBytes": 379993519,
+    "uniqueBytes": 167826527,
+    "verifiedObjects": 1124,
+    "verifiedAliases": 2762,
+    "restore": {
+      "files": 2762,
+      "objects": 1124,
+      "independentFiles": true
+    }
+  }
+}

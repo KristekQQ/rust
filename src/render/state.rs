@@ -79,7 +79,11 @@ impl State {
         if canvas.get_attribute("data-frame-profile").as_deref() == Some("true") {
             super::profiler::initialize(&device);
         }
-        let renderer = SceneRenderer::new(device, queue);
+        let mut renderer = SceneRenderer::new(device, queue);
+        // Measured WebGL panel reuse avoids allocation churn. WebGPU writes
+        // regressed preparation in the paired event workload: retain original
+        // mapped-init uploads there (explicit diagnostic opt-in stays available).
+        renderer.set_panel_buffer_reuse(backend == "Gl");
         let mut postprocess = PostProcessor::new(&renderer.device, output.color_format());
         let (static_map, dynamic_map) = renderer.shadow_maps();
         postprocess.set_shadow_maps(&renderer.device, static_map, dynamic_map);

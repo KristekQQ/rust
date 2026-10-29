@@ -725,6 +725,8 @@ async function initializeEngine(canvas, backend, initialization) {
         /** Rust-owned bounded instance resources. @param {{byteLimit?:number,resourceLimit?:number,streamByteLimit?:number}} [options] */
         configureGltfInstancePool({byteLimit,resourceLimit,streamByteLimit} = {}) { return wasm.configure_gltf_instance_pool(byteLimit,resourceLimit,streamByteLimit); },
         /** Diagnostic only: true preserves the default original scan; false opts into the experimental immutable guard. @param {boolean} enabled */
+        setPanelBufferReuse(enabled) { wasm.set_panel_buffer_reuse(enabled); },
+        diagnosticPanelText(id,value) { wasm.diagnostic_panel_text(id,value); },
         setOverlaySelectionReference(enabled) { wasm.set_overlay_selection_reference(enabled); },
         /** Exact opaque prepared-plan reuse; disable for independent comparison. @param {boolean} enabled */
         setPreparedPlanCacheEnabled(enabled) { wasm.set_prepared_plan_cache_enabled(enabled); },

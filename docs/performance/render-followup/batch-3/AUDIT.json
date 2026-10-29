@@ -1,0 +1,995 @@
+{
+  "soaks": [
+    {
+      "run": "final-soak-webgl",
+      "elapsedMs": 120023,
+      "frames": 3602,
+      "operations": {
+        "transforms": 0,
+        "spawns": 541,
+        "removes": 663,
+        "cuts": 61,
+        "cutAttempts": 61,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0,
+        "panelTextChanges": 7696
+      },
+      "windows": [
+        {
+          "seconds": [
+            0,
+            30
+          ],
+          "samples": 255,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        },
+        {
+          "seconds": [
+            30,
+            60
+          ],
+          "samples": 254,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        },
+        {
+          "seconds": [
+            60,
+            90
+          ],
+          "samples": 254,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        },
+        {
+          "seconds": [
+            90,
+            120
+          ],
+          "samples": 255,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        }
+      ],
+      "samePeakCapacity": true,
+      "samePeakLiveBuffers": true,
+      "boundedEverySample": false,
+      "memoryScope": "logical live panel GPU capacity and CPU index shadow, not physical driver residency; JS measurement arrays grow intentionally",
+      "mixedPhaseRatioFailures": {
+        "count": 29,
+        "allCpuPayloadZero": true,
+        "explanation": "Arbitrary samples can fall between JS geometry/membership mutation and next engine publication. payloadBytes describes latest CPU geometry; live capacity filters current scene membership; shadow includes pending cleanup. Instantaneous ratio is not a valid aligned bound. Original false verdict retained; separate after-publication test required."
+      }
+    },
+    {
+      "run": "final-soak-webgpu",
+      "elapsedMs": 120006,
+      "frames": 3601,
+      "operations": {
+        "transforms": 0,
+        "spawns": 541,
+        "removes": 663,
+        "cuts": 61,
+        "cutAttempts": 61,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0,
+        "panelTextChanges": 7696
+      },
+      "windows": [
+        {
+          "seconds": [
+            0,
+            30
+          ],
+          "samples": 255,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        },
+        {
+          "seconds": [
+            30,
+            60
+          ],
+          "samples": 257,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        },
+        {
+          "seconds": [
+            60,
+            90
+          ],
+          "samples": 253,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        },
+        {
+          "seconds": [
+            90,
+            120
+          ],
+          "samples": 255,
+          "peakCapacityBytes": 2359296,
+          "peakPayloadBytes": 1347696,
+          "peakIndexShadowBytes": 192528,
+          "peakLiveBuffers": 32
+        }
+      ],
+      "samePeakCapacity": true,
+      "samePeakLiveBuffers": true,
+      "boundedEverySample": false,
+      "memoryScope": "logical live panel GPU capacity and CPU index shadow, not physical driver residency; JS measurement arrays grow intentionally",
+      "mixedPhaseRatioFailures": {
+        "count": 26,
+        "allCpuPayloadZero": true,
+        "explanation": "Arbitrary samples can fall between JS geometry/membership mutation and next engine publication. payloadBytes describes latest CPU geometry; live capacity filters current scene membership; shadow includes pending cleanup. Instantaneous ratio is not a valid aligned bound. Original false verdict retained; separate after-publication test required."
+      }
+    }
+  ],
+  "api": [
+    {
+      "run": "final-diagnostic-webgl-original",
+      "elapsedMs": 25004.39999985695,
+      "observedCallbacks": 750,
+      "submittedDelta": {
+        "drawCalls": 36750,
+        "instances": 42750,
+        "triangles": 12956250
+      },
+      "perObservedCallback": {
+        "drawCalls": 49.0,
+        "instances": 57.0,
+        "triangles": 17275.0
+      },
+      "submittedComplete": true,
+      "instrumentedCallbacksByAllocation": {
+        "allocation": {
+          "count": 93,
+          "p95": 4.400000095367432,
+          "p99": 4.700000047683716,
+          "max": 4.700000047683716
+        },
+        "noAllocation": {
+          "count": 657,
+          "p95": 3.8000001907348633,
+          "p99": 4,
+          "max": 4.299999952316284
+        }
+      },
+      "initialPlus1sAllocationLabels": {
+        "createBuffer:unlabeled": {
+          "calls": 268,
+          "knownBytes": 0,
+          "unknownSizeCalls": 268
+        },
+        "bufferData:unlabeled": {
+          "calls": 268,
+          "knownBytes": 14928580,
+          "unknownSizeCalls": 0
+        }
+      },
+      "panelKindsDelta": {
+        "ComboAward": 0,
+        "DebugText": 0,
+        "Diagnostics": 93,
+        "Text": 0
+      },
+      "limit": "API instrumentation is not clean timing; allocation coincidence does not establish a stall cause"
+    },
+    {
+      "run": "final-diagnostic-webgl-reuse",
+      "elapsedMs": 25002.799999952316,
+      "observedCallbacks": 750,
+      "submittedDelta": {
+        "drawCalls": 36750,
+        "instances": 42750,
+        "triangles": 12956250
+      },
+      "perObservedCallback": {
+        "drawCalls": 49.0,
+        "instances": 57.0,
+        "triangles": 17275.0
+      },
+      "submittedComplete": true,
+      "instrumentedCallbacksByAllocation": {
+        "allocation": null,
+        "noAllocation": {
+          "count": 750,
+          "p95": 3.799999952316284,
+          "p99": 4.099999904632568,
+          "max": 4.799999952316284
+        }
+      },
+      "initialPlus1sAllocationLabels": {
+        "createBuffer:unlabeled": {
+          "calls": 262,
+          "knownBytes": 0,
+          "unknownSizeCalls": 262
+        },
+        "bufferData:unlabeled": {
+          "calls": 262,
+          "knownBytes": 14355108,
+          "unknownSizeCalls": 0
+        }
+      },
+      "panelKindsDelta": {
+        "ComboAward": 0,
+        "DebugText": 0,
+        "Diagnostics": 92,
+        "Text": 0
+      },
+      "limit": "API instrumentation is not clean timing; allocation coincidence does not establish a stall cause"
+    },
+    {
+      "run": "final-diagnostic-webgpu-original",
+      "elapsedMs": 25004.200000047684,
+      "observedCallbacks": 750,
+      "submittedDelta": {
+        "drawCalls": 36000,
+        "instances": 42000,
+        "triangles": 12955500
+      },
+      "perObservedCallback": {
+        "drawCalls": 48.0,
+        "instances": 56.0,
+        "triangles": 17274.0
+      },
+      "submittedComplete": true,
+      "instrumentedCallbacksByAllocation": {
+        "allocation": {
+          "count": 90,
+          "p95": 2.299999952316284,
+          "p99": 2.8999998569488525,
+          "max": 2.8999998569488525
+        },
+        "noAllocation": {
+          "count": 660,
+          "p95": 1.7000000476837158,
+          "p99": 2,
+          "max": 4.6000001430511475
+        }
+      },
+      "initialPlus1sAllocationLabels": {
+        "createBuffer:cube vertex buffer": {
+          "calls": 1,
+          "knownBytes": 864,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:cube index buffer": {
+          "calls": 1,
+          "knownBytes": 72,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:plane vertex buffer": {
+          "calls": 1,
+          "knownBytes": 288,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:plane index buffer": {
+          "calls": 1,
+          "knownBytes": 24,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:sphere vertex buffer": {
+          "calls": 1,
+          "knownBytes": 15300,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:sphere index buffer": {
+          "calls": 1,
+          "knownBytes": 4608,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:grid vertex buffer": {
+          "calls": 1,
+          "knownBytes": 3024,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:light vertex buffer": {
+          "calls": 1,
+          "knownBytes": 14976,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:grid uniform buffer": {
+          "calls": 1,
+          "knownBytes": 352,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:scene and shared variant colors": {
+          "calls": 29,
+          "knownBytes": 0,
+          "unknownSizeCalls": 29
+        },
+        "createBuffer:primitive instance buffer": {
+          "calls": 66,
+          "knownBytes": 11616,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:effects uniforms": {
+          "calls": 1,
+          "knownBytes": 368,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:scene effects": {
+          "calls": 2,
+          "knownBytes": 0,
+          "unknownSizeCalls": 2
+        },
+        "createBindGroup:glTF empty shadow effects": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBindGroup:volume first-light shadows": {
+          "calls": 2,
+          "knownBytes": 0,
+          "unknownSizeCalls": 2
+        },
+        "createBuffer:environment": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:ssr": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:godRays": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:bloom": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:fxaa": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF vertices": {
+          "calls": 40,
+          "knownBytes": 10940184,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF u32 indices": {
+          "calls": 40,
+          "knownBytes": 1215576,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:panel bitmap vertices (reference)": {
+          "calls": 31,
+          "knownBytes": 1401696,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:panel bitmap indices (reference)": {
+          "calls": 31,
+          "knownBytes": 233616,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:imported instance page": {
+          "calls": 2,
+          "knownBytes": 22704,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:glTF maps": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBuffer:glTF shared rigid vertices": {
+          "calls": 2,
+          "knownBytes": 23040,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF shared indices": {
+          "calls": 2,
+          "knownBytes": 1920,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF material and transform": {
+          "calls": 2,
+          "knownBytes": 480,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:glTF model material": {
+          "calls": 2,
+          "knownBytes": 0,
+          "unknownSizeCalls": 2
+        },
+        "createBuffer:neon glow view uniform": {
+          "calls": 1,
+          "knownBytes": 96,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:neon glow view": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBindGroup:ssr": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBindGroup:SSR trace composite": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBuffer:neon glow edge capsules": {
+          "calls": 12,
+          "knownBytes": 472032,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:neon glow capsule indices": {
+          "calls": 12,
+          "knownBytes": 78672,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:translucent subset indices": {
+          "calls": 11,
+          "knownBytes": 14496,
+          "unknownSizeCalls": 0
+        }
+      },
+      "panelKindsDelta": {
+        "ComboAward": 0,
+        "DebugText": 0,
+        "Diagnostics": 90,
+        "Text": 0
+      },
+      "limit": "API instrumentation is not clean timing; allocation coincidence does not establish a stall cause"
+    },
+    {
+      "run": "final-diagnostic-webgpu-reuse",
+      "elapsedMs": 25002.200000047684,
+      "observedCallbacks": 750,
+      "submittedDelta": {
+        "drawCalls": 36000,
+        "instances": 42000,
+        "triangles": 12955500
+      },
+      "perObservedCallback": {
+        "drawCalls": 48.0,
+        "instances": 56.0,
+        "triangles": 17274.0
+      },
+      "submittedComplete": true,
+      "instrumentedCallbacksByAllocation": {
+        "allocation": null,
+        "noAllocation": {
+          "count": 750,
+          "p95": 1.8000001907348633,
+          "p99": 2.4000000953674316,
+          "max": 2.8999998569488525
+        }
+      },
+      "initialPlus1sAllocationLabels": {
+        "createBuffer:cube vertex buffer": {
+          "calls": 1,
+          "knownBytes": 864,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:cube index buffer": {
+          "calls": 1,
+          "knownBytes": 72,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:plane vertex buffer": {
+          "calls": 1,
+          "knownBytes": 288,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:plane index buffer": {
+          "calls": 1,
+          "knownBytes": 24,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:sphere vertex buffer": {
+          "calls": 1,
+          "knownBytes": 15300,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:sphere index buffer": {
+          "calls": 1,
+          "knownBytes": 4608,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:grid vertex buffer": {
+          "calls": 1,
+          "knownBytes": 3024,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:light vertex buffer": {
+          "calls": 1,
+          "knownBytes": 14976,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:grid uniform buffer": {
+          "calls": 1,
+          "knownBytes": 352,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:scene and shared variant colors": {
+          "calls": 29,
+          "knownBytes": 0,
+          "unknownSizeCalls": 29
+        },
+        "createBuffer:primitive instance buffer": {
+          "calls": 66,
+          "knownBytes": 11616,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:effects uniforms": {
+          "calls": 1,
+          "knownBytes": 368,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:scene effects": {
+          "calls": 2,
+          "knownBytes": 0,
+          "unknownSizeCalls": 2
+        },
+        "createBindGroup:glTF empty shadow effects": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBindGroup:volume first-light shadows": {
+          "calls": 2,
+          "knownBytes": 0,
+          "unknownSizeCalls": 2
+        },
+        "createBuffer:environment": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:ssr": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:godRays": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:bloom": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:fxaa": {
+          "calls": 1,
+          "knownBytes": 1536,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF vertices": {
+          "calls": 40,
+          "knownBytes": 10940184,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF u32 indices": {
+          "calls": 40,
+          "knownBytes": 1215576,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:panel bitmap vertices (reference)": {
+          "calls": 21,
+          "knownBytes": 381024,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:panel bitmap indices (reference)": {
+          "calls": 21,
+          "knownBytes": 63504,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:imported instance page": {
+          "calls": 2,
+          "knownBytes": 22704,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:glTF maps": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBuffer:glTF shared rigid vertices": {
+          "calls": 2,
+          "knownBytes": 23040,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF shared indices": {
+          "calls": 2,
+          "knownBytes": 1920,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:glTF material and transform": {
+          "calls": 2,
+          "knownBytes": 480,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:glTF model material": {
+          "calls": 2,
+          "knownBytes": 0,
+          "unknownSizeCalls": 2
+        },
+        "createBuffer:panel bitmap vertices": {
+          "calls": 6,
+          "knownBytes": 262164,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:panel bitmap indices": {
+          "calls": 6,
+          "knownBytes": 65556,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:neon glow view uniform": {
+          "calls": 1,
+          "knownBytes": 96,
+          "unknownSizeCalls": 0
+        },
+        "createBindGroup:neon glow view": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBindGroup:ssr": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBindGroup:SSR trace composite": {
+          "calls": 1,
+          "knownBytes": 0,
+          "unknownSizeCalls": 1
+        },
+        "createBuffer:neon glow edge capsules": {
+          "calls": 12,
+          "knownBytes": 472032,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:neon glow capsule indices": {
+          "calls": 12,
+          "knownBytes": 78672,
+          "unknownSizeCalls": 0
+        },
+        "createBuffer:translucent subset indices": {
+          "calls": 11,
+          "knownBytes": 14496,
+          "unknownSizeCalls": 0
+        }
+      },
+      "panelKindsDelta": {
+        "ComboAward": 0,
+        "DebugText": 0,
+        "Diagnostics": 90,
+        "Text": 0
+      },
+      "limit": "API instrumentation is not clean timing; allocation coincidence does not establish a stall cause"
+    }
+  ],
+  "pixelVerdicts": [
+    {
+      "run": "compare-arena-active-webgl",
+      "pair": 0,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "compare-arena-active-webgl",
+      "pair": 1,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "compare-arena-active-webgl",
+      "pair": 2,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "compare-arena-active-webgpu",
+      "pair": 0,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "compare-arena-active-webgpu",
+      "pair": 1,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "compare-arena-active-webgpu",
+      "pair": 2,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "compare-panel-events-webgl",
+      "pair": 0,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "compare-panel-events-webgl",
+      "pair": 1,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "compare-panel-events-webgl",
+      "pair": 2,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "compare-panel-events-webgpu",
+      "pair": 0,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "compare-panel-events-webgpu",
+      "pair": 1,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "compare-panel-events-webgpu",
+      "pair": 2,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "final-compare-arena-active-webgl",
+      "pair": 0,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "final-compare-arena-active-webgl",
+      "pair": 1,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "final-compare-arena-active-webgl",
+      "pair": 2,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "final-compare-arena-active-webgpu",
+      "pair": 0,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "final-compare-arena-active-webgpu",
+      "pair": 1,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "final-compare-arena-active-webgpu",
+      "pair": 2,
+      "verdict": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "run": "final-compare-panel-events-webgl",
+      "pair": 0,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "final-compare-panel-events-webgl",
+      "pair": 1,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "final-compare-panel-events-webgl",
+      "pair": 2,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "final-compare-panel-events-webgpu",
+      "pair": 0,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "final-compare-panel-events-webgpu",
+      "pair": 1,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "run": "final-compare-panel-events-webgpu",
+      "pair": 2,
+      "verdict": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    }
+  ],
+  "exactPairs": 12,
+  "unavailablePairs": 12,
+  "failedPairs": 0
+}

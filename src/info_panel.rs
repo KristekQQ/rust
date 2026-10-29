@@ -127,6 +127,8 @@ impl InfoPanel {
             return false;
         }
         if !self.font3d_bound {
+            #[cfg(target_arch = "wasm32")]
+            let _scope = crate::render::profiler::cpu_scope("panel.geometry");
             self.mesh = geometry(self.kind, self.width, self.height, &rows);
         }
         self.rows = rows;
@@ -1180,5 +1182,34 @@ mod numeric_tube_tests {
             let layout = numeric_layout("0", 1.2, 0.3);
             assert!((layout[0].3 / layout[0].2 - 1.16).abs() < 1e-6);
         }
+    }
+}
+
+// Active panel storage only: geometric growth, shrink below one quarter, no
+// inactive pool. All current payloads are 4-byte aligned. Device limit is kept.
+#[cfg(any(target_arch = "wasm32", test))]
+pub(crate) fn buffer_capacity(required: u64, current: u64, limit: u64) -> u64 {
+    let needed = required.max(4);
+    if needed > current || needed < current / 4 {
+        needed.next_power_of_two().min(limit).max(needed)
+    } else {
+        current
+    }
+}
+#[cfg(test)]
+mod buffer_capacity_tests {
+    use super::buffer_capacity;
+    #[test]
+    fn grows_shrinks_and_keeps_active_capacity_bounded() {
+        let mut capacity = 0;
+        for size in [0, 4, 36, 1000, 500, 100, 0, 1000, 4] {
+            capacity = buffer_capacity(size, capacity, 4096);
+            assert!(capacity >= size.max(4));
+            assert!(capacity <= size.max(4) * 4);
+            assert_eq!(capacity % 4, 0);
+        }
+        assert_eq!(buffer_capacity(3000, 0, 3072), 3072);
+        assert_eq!(buffer_capacity(1024, 4096, 8192), 4096);
+        assert_eq!(buffer_capacity(1020, 4096, 8192), 1024);
     }
 }
