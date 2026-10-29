@@ -1,4 +1,8 @@
-# Latest — render followup3, local checkpoint
+# Latest — render followup4, local checkpoint
+
+[State](render-followup/STATE.md), [report](render-followup/batch-4/REPORT.md), [results](render-followup/batch-4/RESULTS.md). Dynamic upload experiments completed; union stays default on both APIs. Sparse1.08MB→1KB costs1→67writes and regresses WebGL2; WebGPU gains/tails mixed. No production FPS gain accepted.218completed runs/208768RAF,102exact deterministic pairs/0new failure/6authored unavailable; prior image A/B/C/D remain open. Twelve real worker simulated-XR replays and two120s bounded-capacity soaks pass. Final431native/163browser plus SDK/XR/harness PASS after JSDoc correction; WASM7829658f, matching receipt/source/pkg. Host campaigns/nonisolated controls and clean frame-context limits explicit. No push/merge/deploy/sharedrestart/Quest/CI/freshThree. Stop before followup5.
+
+# Historical — render followup3, local checkpoint
 
 [State](render-followup/STATE.md), [report](render-followup/batch-3/REPORT.md). Actual Neon warm buffer owner is changing bitmap Diagnostics panel. Bounded per-live-panel storage/index reuse accepted onWebGL2:186→0API creates/25s, unchanged update cadence/content. WebGPU retains original default after adverse preparation/tails.48clean runs/54064RAFrows,12exact/12Neon-unavailable pairs; no proven FPS gain.120ssoaks plateau, aligned20clear/reloadcycles/API pass.429native/153browser plus SDK/XR/harness fresh gate PASS; final WASMbb3e3bf9, source/pkg/receipt match. Battery/cadence and mixed-phase gauge limitations preserved. No push/merge/deploy/sharedrestart/Quest/CI/freshThree; priorA/B/C/D remainopen. Stop before followup4.
 

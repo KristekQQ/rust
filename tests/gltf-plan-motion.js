@@ -39,6 +39,7 @@ const exactPixels=(a,b,label)=>{
 const evidence=[];let e;
 try{
  e=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+ if(new URLSearchParams(location.search).has('uploadPolicy'))assert(e.setInstanceUploadPolicy(Number(new URLSearchParams(location.search).get('uploadPolicy')),0,true),'upload policy accepted');
  document.documentElement.dataset.rendererBackend=e.renderer_backend();
  e.resize(640,400);e.set_camera_mode('free');e.set_render_effects(false,false);
  e.set_grid_visible(false);e.set_light_helpers_visible(false);e.set_simulation_paused(true);

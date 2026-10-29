@@ -10,7 +10,7 @@ import {XRTestRun,publishXRReport} from './xr/testkit.js';
 import {assertForeground,assertChanged} from './pixels.js';
 const query=new URLSearchParams(location.search),gpu=query.get('backend')!=='webgl';
 const hz=Number(query.get('hz')||(query.has('measureCuts')?72:90));
-const sim=installXRSimulator({profile:{id:'aurelia-'+hz,hz,eyeWidth:320,eyeHeight:320},clockTimers:false});
+const sim=installXRSimulator({profile:{id:'aurelia-'+hz,hz,eyeWidth:320,eyeHeight:320,...(query.has('uploadAsymmetric')?{viewports:[{x:0,y:0,width:320,height:320},{x:320,y:4,width:288,height:300}]}:{})},clockTimers:false});
 const projection=gpu?installGPUProjection():null;
 const pixels=eye=>projection?projection.pixels(eye):Promise.resolve(sim.pixels(eye));
 const run=new XRTestRun('rim-gameplay',sim,publishXRReport);let engine,stop,info;
@@ -21,6 +21,7 @@ const xrOptions={resolutionScale:1,...(query.get('presentation')==='shared-frame
 const cutTiming={acceptMs:[],prepareMs:[],framesMs:[],frameEvents:[]};let cutMeasuring=false,deathAt=0,cutRequestedAt=0,cutPublishedAt=0;
 await run.execute(async test=>{
  engine=await initEngine(document.querySelector('#gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ if(query.has('uploadPolicy'))test.assert(engine.setInstanceUploadPolicy(Number(query.get('uploadPolicy')),0,false),'explicit instance upload policy accepted');
  document.documentElement.dataset.rendererBackend=engine.renderer_backend();engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
  configureAppearance(engine);
  const content=await createScene(engine.scene);const game=await createGameplay(engine,content);

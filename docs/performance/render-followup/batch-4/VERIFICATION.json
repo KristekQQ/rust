@@ -1,0 +1,85 @@
+{
+  "status": "PASS",
+  "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+  "attempts": 2,
+  "firstAttempt": "431 native and pre-type checks passed; misplaced JSDoc parameter stopped gate before browser; comment-only correction; failed logs preserved",
+  "finalAttempt": "Complete maintained gate succeeded, source dump generated, matching PASS receipt independently checked without rerunning tests",
+  "native": {
+    "passed": 431,
+    "failed": 0,
+    "ignored": 2
+  },
+  "browser": {
+    "passed": 163,
+    "failed": 0,
+    "byBackend": {
+      "webgpu": 62,
+      "webgl": 101
+    },
+    "finished": "2026-10-29T19:00:52.136Z"
+  },
+  "sdk": {
+    "passed": 32
+  },
+  "xrPlatform": {
+    "passed": 71
+  },
+  "harness": {
+    "nodePassed": 14,
+    "pythonPassed": 13
+  },
+  "targetedPerformanceHelpers": {
+    "passed": 54,
+    "log": "measurements/harness-profile-override.log"
+  },
+  "format": true,
+  "nativeClippy": true,
+  "wasmCheck": true,
+  "wasmClippy": true,
+  "types": true,
+  "rangeClearScratch": {
+    "webgpu": {
+      "label": "clear-range-scratch",
+      "bytes": 0
+    },
+    "webgl": {
+      "label": "clear-range-scratch",
+      "bytes": 0
+    }
+  },
+  "build": {
+    "source": "a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118",
+    "wasm": "7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63",
+    "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "receipt": {
+    "passed": true,
+    "key": "dcc1efdd45c154da6f448897c78f8f27c1f37bcfc14f96f73a4792739234db44",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118",
+      "wasm": "7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63",
+      "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "e97ec62a5542c28a9f1bbcdf322cc2a8152928a62aa0891e60f5f848f518f261",
+    "finished": "2026-10-29T19:00:52.667Z"
+  },
+  "receiptCheckLog": "measurements/receipt-check.log",
+  "testReportSha256": "9cf71955995fe856384911ffb79626b1c6fc28d7c48001dc9fa8c8653c8e503b",
+  "sourceDumpSha256": "89547f81122dc018bd232f3b213ddaf71899a0788b2386a733f11fb8aa86b9be",
+  "physicalQuest": "not tested",
+  "ci": "not run"
+}

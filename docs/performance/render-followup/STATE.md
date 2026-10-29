@@ -1,4 +1,18 @@
-# Followup3 — complete, local checkpoint only
+# Followup4 — complete, local checkpoint only
+
+Only batch4 was authorized. Checkout `/private/tmp/rust-render-followup-2`, branch `codex/render-followup-4`, base `237279b6a39d7843fa47258faf9d09ae6dfb34d3`. [Report](batch-4/REPORT.md), [three-pair results](batch-4/RESULTS.md), [manifest](batch-4/MANIFEST.json), [verification](batch-4/VERIFICATION.json), [commands](batch-4/COMMANDS.md).
+
+Union remains the default on BOTH APIs. Explicit bounded coalesced/full-active experiments, exact-byte diagnostic counters and regression fixtures are retained; no new production FPS gain claimed. Sparse2048 traffic1,081,616→1,072B/RAF costs1→67writes. All three long WebGL2 sparse FPS pairs regress; WebGPU quiet gains are small/mixed and do not improve every tail/workload. No magic threshold or new mapping/pool introduced. Original→probe-union controls have mixed signs, so zero instrumentation overhead is not proven.
+
+218 completed runs/208768RAF (198 profiler-off runs including40short pilots);102 exact independently checked deterministic PNG pairs,0new failure,6authored-active equality-unavailable. Two partial pool sides/6333RAF excluded from completed-campaign counts. Preclosure, home and control campaigns remain separate. Detailed20run-side frame context is exact; clean sparse profiler-frame alignment is unavailable, not invented. No clean GPU timing; diagnostic queries separate.
+
+Twelve actual worker-cut simulated-XR replays pass; three publication events per policy/API are not a latency-gain proof. Both120s pool soaks keep622512B accounted live instance capacity,0warm buffer/bind-group creates/evictions; range scratch32B WG/512B GL, explicit clear→0 verified. Driver residency and physical Quest unverified.
+
+Release WASM `7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63`, source `a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118`, bindings `62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea`. Probe/final executable behavior matches; final SDK has a JSDoc-only correction, both byte identities recorded. Final gate431native(2ignored)/163browser(62WG,101GL),SDK32,XR71,harness14Node+13Python PASS; targeted54performance helper tests PASS. Gate attempt1 rejected JSDoc; corrected attempt2 and current receipt pass. No changed tolerance/golden.
+
+Prior A/B/C/D image cases remain separately open. No push/merge/deploy/shared-server restart/CI/Quest/freshThree. Batch5 NOT started. Next authorized batch must reread this state; possible exact payload sharing is only an unimplemented hypothesis.
+
+## Historical followup3 — complete, local checkpoint only
 
 2026-10-29. Isolated `/private/tmp/rust-render-followup-2`, branch `codex/render-followup-3`, base `bcd774eb5761c201777c9b8892017e1be494b9af`. This checkpoint contains only owned batch3 work. [Report](batch-3/REPORT.md), [owners](batch-3/OWNERS.md), [runs](batch-3/RUNS.md), [manifest](batch-3/MANIFEST.json), [verification](batch-3/VERIFICATION.json), [commands](batch-3/COMMANDS.md).
 

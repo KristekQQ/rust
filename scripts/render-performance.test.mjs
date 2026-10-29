@@ -154,3 +154,15 @@ test('common Rome is scalable and respects actual instance budget',()=>{assert.e
 test('diagnostic axes are bounded and production remains default',()=>{assert.equal(parseArgs(['smoke']).experiment,'production');for(const experiment of ['cheap-fragment','no-shadows','no-fxaa','depth-order'])assert.equal(parseArgs(['smoke','--experiment',experiment]).experiment,experiment);assert.throws(()=>parseArgs(['smoke','--experiment','arbitrary-wgsl']));});
 
 test('paired diagnostic axis is explicit and rejects unsupported/Three combinations',()=>{assert.equal(parseArgs(['compare','--candidate-experiment','depth-order']).candidateExperiment,'depth-order');assert.throws(()=>parseArgs(['compare','--candidate-experiment','unsafe']));assert.throws(()=>parseArgs(['compare','--candidate-experiment','depth-order','--three-root','x']));});
+
+test('upload diagnostics distinguish disabled exact-byte accounting from zero',()=>{
+ const base={profile:{frame:1},debug:{gltf:{instanceChangedBytes:0,instanceDiffScannedBytes:0,instanceRangeCpuMs:0,instanceUploadPolicy:{diagnostic:false}}}};
+ const d=workDeltas({boundaryStart:base,boundaryEnd:base,frames:[],elapsedMs:1000});
+ assert.equal(d.gltf.instanceChangedBytes.delta,null);assert.equal(d.gltf.instanceRangeCpuMs.delta,null);
+});
+
+test('explicit profile switch is independent from upload diagnostic selection',()=>{
+ assert.equal(parseArgs(['compare','--profile','--upload-policy','coalesced','--upload-gap','256']).profiling,true);
+ assert.equal(parseArgs(['compare','--no-profile','--upload-diagnostic','1']).profiling,false);
+ assert.throws(()=>parseArgs(['compare','--upload-gap','3']),/Invalid/);
+});

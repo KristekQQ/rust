@@ -1,0 +1,19 @@
+{
+  "files": 3348,
+  "objects": 1386,
+  "independentFiles": true,
+  "rereadRestoredFilesVerified": 3348,
+  "archive": {
+    "archive": "docs/performance/render-followup/batch-4/EVIDENCE.tar.gz",
+    "sha256": "29b9e215b5034e5e27d85675eb8156a49156ca3ed81d57f89e7c613f4e7dff1e",
+    "bytes": 101113289,
+    "aliases": 3348,
+    "objects": 1386,
+    "logicalBytes": 688733249,
+    "uniqueBytes": 241807299,
+    "verifiedObjects": 1386,
+    "verifiedAliases": 3348
+  },
+  "disposableRestorePath": "/private/tmp/rust-followup4-evidence-restore-final",
+  "cleanup": "Verified disposable restore copy removed; source/worktrees, frozen runtimes and archive retained"
+}

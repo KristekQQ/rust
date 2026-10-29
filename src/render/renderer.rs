@@ -1487,6 +1487,10 @@ impl SceneRenderer {
         }
         stats
     }
+    pub fn set_instance_upload_policy(&mut self, mode: u32, gap: u32, diagnostic: bool) -> bool {
+        self.gltf_gpu
+            .set_instance_upload_policy(mode, gap, diagnostic)
+    }
     pub fn set_renderer_experiment(&mut self, mode: u32) -> bool {
         self.gltf_gpu.set_experiment(mode)
     }
@@ -1588,6 +1592,7 @@ impl SceneRenderer {
                 "instancePagesActive": gltf.instance_pages_active,
                 "instancePagesRetained": gltf.instance_pages_retained,
                 "instanceUploadBytes": gltf.instance_upload_bytes,
+
                 "instanceBufferBytes": gltf.instance_buffer_bytes,
                 "queueScratchGrowths": gltf.queue_scratch_growths,
                 "queueScratchBytes": gltf.queue_scratch_bytes,
@@ -1599,6 +1604,20 @@ impl SceneRenderer {
                 "materialResources": gltf.material_resources,
                 "cachedAssets": gltf.cached_assets,
         });
+        let upload_values = serde_json::json!({
+                "instanceUploadPolicy": self.gltf_gpu.instance_upload_policy(),
+                "instanceUploadCalls": gltf.instance_upload_calls,
+                "instanceChangedBytes": gltf.instance_changed_bytes,
+                "instanceDiffScannedBytes": gltf.instance_diff_scanned_bytes,
+                "instanceDirtyRecordBytes": gltf.instance_dirty_record_bytes,
+                "instanceGapUploadBytes": gltf.instance_gap_upload_bytes,
+                "instanceRangeOverflows": gltf.instance_range_overflows,
+                "instanceRangeCpuMs": gltf.instance_range_cpu_ms,
+        });
+        gltf_values
+            .as_object_mut()
+            .unwrap()
+            .extend(upload_values.as_object().unwrap().clone());
         if let serde_json::Value::Object(values) = fine_values {
             gltf_values.as_object_mut().unwrap().extend(values);
         }

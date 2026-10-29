@@ -1,5 +1,5 @@
 // Headless, simulated-XR cut benchmark using the maintained gameplay scenario.
-// Usage: node scripts/benchmark-rim-cuts.mjs <label> <frozen-pkg-dir> [webgl|webgpu] [stressCount=0]
+// Usage: node scripts/benchmark-rim-cuts.mjs <label> <frozen-pkg-dir> [webgl|webgpu] [stressCount=0] [repetitions=3] [uploadPolicy=0|1|2]
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
@@ -9,17 +9,20 @@ import {browserArgs} from './browser-options.mjs';
 
 const repo=process.cwd(), label=process.argv[2], pkg=path.resolve(process.argv[3]||'pkg');
 if(!label||!/^[-a-zA-Z0-9_]+$/.test(label)||!process.argv[3]) {
- throw Error('Usage: node scripts/benchmark-rim-cuts.mjs <safe-label> <frozen-pkg-dir> [webgl|webgpu] [stressCount=0]');
+ throw Error('Usage: node scripts/benchmark-rim-cuts.mjs <safe-label> <frozen-pkg-dir> [webgl|webgpu] [stressCount=0] [repetitions=3] [uploadPolicy=0|1|2]');
 }
 const backend=process.argv[4]||'webgl';
 if(!['webgl','webgpu'].includes(backend))throw Error('Backend must be webgl or webgpu');
 const stressCount=Number(process.argv[5]??0);
 if(!Number.isInteger(stressCount)||stressCount<0||stressCount>2048)throw Error('Stress count must be an integer from 0 to 2048');
+const repetitions=Number(process.argv[6]??3),uploadPolicy=process.argv[7]??null;
+if(!Number.isInteger(repetitions)||repetitions<1||repetitions>3)throw Error('Repetitions must be1..3');
+if(uploadPolicy!==null&&!['0','1','2'].includes(uploadPolicy))throw Error('Invalid upload policy');
 const packageRoot=path.dirname(pkg);
 const sourceOverlay=await fs.stat(path.join(packageRoot,'js')).then(s=>s.isDirectory()?packageRoot:path.join(packageRoot,'source')).catch(()=>path.join(packageRoot,'source'));
 const output=path.join(repo,'output/review-optimization',`${label}-cuts`);
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
-const report={label,date:new Date().toISOString(),pkg,sourceOverlay,requestedBackend:backend,stressCount,
+const report={label,date:new Date().toISOString(),pkg,sourceOverlay,requestedBackend:backend,stressCount,repetitions,uploadPolicy,
  evidenceType:'headless browser with simulated XR; no physical Quest measurement',
  browser:null,gpuDevice:null,hashes:{},runs:[],summary:null,status:'RUNNING'};
 const served=new Map();
@@ -77,7 +80,8 @@ const server=http.createServer(async(req,res)=>{
  }catch(error){res.writeHead(404);res.end(String(error));}
 });
 let browser;
-await fs.mkdir(output,{recursive:true});
+await fs.mkdir(path.dirname(output),{recursive:true});
+await fs.mkdir(output); // Refuse overwriting prior evidence.
 const save=()=>fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
 try{
  for(const name of ['webgpu_wasm.js','webgpu_wasm_bg.wasm']){
@@ -96,7 +100,7 @@ try{
    ({vendorString,deviceString,driverVendor,driverVersion})=>({vendorString,deviceString,driverVendor,driverVersion}));}
   finally{await session.detach();}
  }catch{/* Hardware detail is optional; backend acceptance is mandatory. */}
- for(let index=0;index<3;index++){
+ for(let index=0;index<repetitions;index++){
   const page=await browser.newPage(), errors=[];
   const abortedRequests=[];
   const run={index:index+1,status:'RUNNING',backend:null,errors,abortedRequests,evidence:null,metrics:null};
@@ -109,7 +113,7 @@ try{
   page.on('response',response=>{if(response.status()>=400)errors.push(`HTTP ${response.status()}: ${response.url()}`);});
   try{
    await page.setViewport({width:960,height:640,deviceScaleFactor:1});
-   await page.goto(`${origin}/tests/rim-gameplay.html?backend=${backend}&measureCuts=1&stress=${stressCount}`,{waitUntil:'load',timeout:120000});
+   await page.goto(`${origin}/tests/rim-gameplay.html?backend=${backend}&measureCuts=1&stress=${stressCount}${uploadPolicy===null?'':'&uploadPolicy='+uploadPolicy}`,{waitUntil:'load',timeout:120000});
    await page.waitForFunction(()=>['PASS','FAIL'].includes(window.xrTestReport?.status),{timeout:120000,polling:100});
    const data=await page.evaluate(()=>({backend:document.documentElement.dataset.rendererBackend,
     xrReport:window.xrTestReport,evidence:window.rimCutEvidence||null}));
@@ -141,7 +145,7 @@ try{
   const current=digest(await fs.readFile(file));
   report.inputs.push({file,sha256:hash,stable:current===hash});
  }
- report.status=report.runs.length===3&&report.runs.every(r=>r.status==='PASS')&&report.inputs.every(i=>i.stable)?'PASS':'FAIL';
+ report.status=report.runs.length===repetitions&&report.runs.every(r=>r.status==='PASS')&&report.inputs.every(i=>i.stable)?'PASS':'FAIL';
 }catch(error){report.status='FAIL';report.error=String(error.stack||error);}
 finally{
  if(browser)await browser.close().catch(error=>{report.cleanupError=String(error);report.status='FAIL';});

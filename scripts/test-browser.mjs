@@ -46,6 +46,11 @@ const suites = [
     {name:"monster-combat",path:"tests/monster-combat.html",status:"#result",backends:["webgl"],xrReport:true},
     {name:"gltf-batching",path:"tests/gltf-batching.html",status:"#result"},
     {name:"gltf-plan-motion",path:"tests/gltf-plan-motion.html",status:"#result"},
+    {name:"gltf-upload-ranges",path:"tests/gltf-upload-ranges.html",status:"#result"},
+    {name:"gltf-upload-motion",path:"tests/gltf-plan-motion.html?uploadPolicy=1",status:"#result"},
+    {name:"gltf-upload-full-motion",path:"tests/gltf-plan-motion.html?uploadPolicy=2",status:"#result"},
+    {name:"gltf-upload-passes",path:"tests/gltf-plan-cache.html?uploadPolicy=1",status:"#result"},
+    {name:"rim-upload-xr",path:"tests/rim-gameplay.html?stress=256&uploadPolicy=1&uploadAsymmetric=1",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"gltf-plan-cache",path:"tests/gltf-plan-cache.html",status:"#result"},
     {name:"gltf-opaque-batching",path:"tests/gltf-opaque-batching.html",status:"#result"},
     {name:"gltf-light-classes",path:"tests/gltf-light-classes.html",status:"#result"},
@@ -548,6 +553,7 @@ try {
                 await page.waitForFunction(()=>window.threeVrRequestProbe===1&&document.getElementById('status').textContent.includes('Controlled VR request rejection'));
                 result.threeStressControls={refresh:true,mobileHitTargets:true,removal:true,walkingVrEntry:vrChecks,physicalClickReachedRequestSession:true,requestScope:'controlled rejected request only; not an immersive XR session'};
             }
+            if (suite.name === 'gltf-upload-ranges') result.uploadRangeEvidence = await page.evaluate(() => window.uploadRangeEvidence);
             if (suite.name === 'panel-buffers') result.panelBufferEvidence = await page.evaluate(() => window.panelBufferEvidence);
             if (suite.name === 'overlay-selection') result.overlaySelectionEvidence = await page.evaluate(() => window.overlaySelectionEvidence);
             if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);

@@ -18,6 +18,8 @@ pub mod gltf_loader;
 pub mod gltf_model;
 pub mod info_panel;
 pub mod input;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod instance_upload;
 pub mod melee_encounter;
 pub mod postprocess_plan;
 mod projectile;

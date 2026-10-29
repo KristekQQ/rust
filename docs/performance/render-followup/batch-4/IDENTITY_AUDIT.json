@@ -1,0 +1,39 @@
+{
+  "frozenFinalComplete": true,
+  "buildIdentityEqual": true,
+  "rustSourceUnchanged": true,
+  "sdkExactAfterOnlyTwoSpecifiedCommentEdits": true,
+  "commentEdits": {
+    "replaceOnce": {
+      "before": "        /** Diagnostic only: true preserves the default original scan; false opts into the experimental immutable guard. @param {boolean} enabled */\n",
+      "after": "        /** Diagnostic upload experiment: 0=union (default), 1=coalesced, 2=full active span. @param {number} mode @param {number} [gapBytes] @param {boolean} [diagnostic] */\n"
+    },
+    "insertOnceBeforeAnchor": {
+      "text": "        /** Diagnostic only: true preserves the default original scan; false opts into the experimental immutable guard. @param {boolean} enabled */\n",
+      "anchor": "        setOverlaySelectionReference(enabled) { wasm.set_overlay_selection_reference(enabled); },"
+    }
+  },
+  "probeVsFinalChangedFiles": [
+    "docs/performance/STATE.md",
+    "docs/performance/render-followup/EXPERIMENTS.md",
+    "docs/performance/render-followup/PLAN.md",
+    "docs/performance/render-followup/STATE.md",
+    "js/engine.js",
+    "scripts/benchmark-rim-cuts.mjs",
+    "scripts/render-performance-api.mjs",
+    "scripts/render-performance-api.test.mjs",
+    "scripts/render-performance-lib.mjs",
+    "scripts/render-performance.mjs",
+    "scripts/render-performance.test.mjs",
+    "scripts/test-browser.mjs",
+    "tests/gltf-plan-cache.js",
+    "tests/gltf-plan-motion.js",
+    "tests/gltf-upload-ranges.js",
+    "tests/rim-gameplay.js"
+  ],
+  "auditNotes": [
+    "Initial comment-stripped text equality rejected the added blank line; no runtime change.",
+    "Optional TypeScript scanner unavailable in installed package; not used as evidence.",
+    "Exact whole-file equality after these two explicit JSDoc edits passes; no whitespace normalization or tolerance."
+  ]
+}

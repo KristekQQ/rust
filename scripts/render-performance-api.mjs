@@ -2,14 +2,22 @@
 // actual browser API, never inferred Rust capacities. Unsupported APIs stay null.
 export function installApiCounters(){
  let allocationLabelCount=0;
- const output={allocationEventsEnabled:false,allocationTotals:{},allocationLabels:{},allocationEvents:[],allocationEventLimit:50000,allocationEventOverflow:0,webgpu:null,webgl:null,webglContexts:[],errors:[]};window.renderApiCounters=output;
+ const output={uploadTimingTotals:{},uploadEvents:[],uploadEventLimit:50000,uploadEventOverflow:0,allocationEventsEnabled:false,allocationTotals:{},allocationLabels:{},allocationEvents:[],allocationEventLimit:50000,allocationEventOverflow:0,webgpu:null,webgl:null,webglContexts:[],errors:[]};window.renderApiCounters=output;
  const metrics=()=>({drawCalls:0,instances:0,primitives:0,triangles:0,lines:0,points:0,complete:true,incompleteReasons:[],topologies:{}});
  function incomplete(target,reason){target.complete=false;if(!target.incompleteReasons.includes(reason))target.incompleteReasons.push(reason);}
  function countPrimitives(target,topology,count,instances=1){target.drawCalls++;target.instances+=instances;const n=Math.max(0,Math.floor(count));let primitiveCount,kind;if(topology==='triangle-list'){primitiveCount=Math.floor(n/3);kind='triangles';}else if(topology==='triangle-strip'||topology==='triangle-fan'){primitiveCount=Math.max(0,n-2);kind='triangles';}else if(topology==='line-list'){primitiveCount=Math.floor(n/2);kind='lines';}else if(topology==='line-strip'){primitiveCount=Math.max(0,n-1);kind='lines';}else if(topology==='line-loop'){primitiveCount=n>=2?n:0;kind='lines';}else if(topology==='point-list'){primitiveCount=n;kind='points';}else{incomplete(target,'unknown topology: '+String(topology));return;}
   const submitted=primitiveCount*instances;target.primitives+=submitted;target[kind]+=submitted;target.topologies[topology]=(target.topologies[topology]||0)+submitted;
  }
  function countUnproven(target,instances,reason){target.drawCalls++;target.instances+=instances;incomplete(target,reason);}
- function wrap(prototype,name,counters,onSuccess,onBefore){if(!prototype||typeof prototype[name]!=='function'){counters[name]=null;return;}const original=prototype[name];counters[name]=0;try{prototype[name]=function(...args){let captured;try{captured=onBefore?.(args);}catch(e){output.errors.push(name+' instrumentation: '+e.message);}const result=original.apply(this,args);const succeeded=value=>{counters[name]++;
+ function wrap(prototype,name,counters,onSuccess,onBefore){if(!prototype||typeof prototype[name]!=='function'){counters[name]=null;return;}const original=prototype[name];counters[name]=0;try{prototype[name]=function(...args){let captured;try{captured=onBefore?.(args);}catch(e){output.errors.push(name+' instrumentation: '+e.message);}const timeUpload=output.allocationEventsEnabled&&(name==='writeBuffer'||name==='bufferSubData');const uploadStart=timeUpload?performance.now():null;const result=original.apply(this,args);const uploadMs=timeUpload?performance.now()-uploadStart:null;const succeeded=value=>{counters[name]++;
+ if(timeUpload){
+  const data=args[2],unit=ArrayBuffer.isView(data)?(data.BYTES_PER_ELEMENT||1):1,offset=args[3]??0;
+  const count=args[4]===undefined||(name==='bufferSubData'&&args[4]===0)?data?.byteLength/unit-offset:args[4];
+  const bytes=Number.isInteger(count)&&Number.isInteger(offset)&&count>=0&&offset>=0&&(offset+count)*unit<=data?.byteLength?count*unit:null;
+  const total=output.uploadTimingTotals[name]??={calls:0,knownBytes:0,unknownBytesCalls:0,wallMs:0,maxWallMs:0};total.calls++;total.wallMs+=uploadMs;total.maxWallMs=Math.max(total.maxWallMs,uploadMs);if(bytes===null)total.unknownBytesCalls++;else total.knownBytes+=bytes;
+  if(output.uploadEvents.length<output.uploadEventLimit)output.uploadEvents.push({atMs:uploadStart,api:name,bytes,wallMs:uploadMs,label:name==='writeBuffer'?(args[0]?.label??null):null});else output.uploadEventOverflow++;
+ }
+
  if(['createBuffer','createBindGroup','bufferData'].includes(name)) {
   const bytes=name==='createBindGroup'?null:name==='createBuffer'?(args[0]?.size??null):captured?.allocationBytes??null;
   const label=typeof args[0]?.label==='string'?args[0].label.slice(0,160):null;

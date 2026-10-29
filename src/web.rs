@@ -660,6 +660,17 @@ pub fn configure_gltf_instance_pool(
     })
 }
 
+/// Diagnostic upload axis. Production union policy remains mode0.
+#[wasm_bindgen]
+pub fn set_instance_upload_policy(mode: u32, gap_bytes: u32, diagnostic: bool) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|state| {
+            state
+                .borrow_mut()
+                .set_instance_upload_policy(mode, gap_bytes, diagnostic)
+        })
+    })
+}
 #[wasm_bindgen]
 pub fn set_renderer_experiment(mode: u32) -> bool {
     STATE.with(|s| {

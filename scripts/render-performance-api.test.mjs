@@ -76,3 +76,17 @@ test('API return and throw behavior is preserved and failed draw calls are not c
  globalThis.window={};const marker={};globalThis.GPURenderPassEncoder=class{setPipeline(){}draw(){return marker;}drawIndexed(){throw Error('original draw failure');}};
  globalThis.GPUCommandEncoder=class{};globalThis.GPUDevice=class{createRenderPipeline(){return {}};};installApiCounters();const pass=new GPURenderPassEncoder();assert.equal(pass.draw(3),marker);assert.throws(()=>pass.drawIndexed(3),/original draw failure/);const c=window.renderApiCounters.webgpu;assert.equal(c.draw,1);assert.equal(c.drawIndexed,0);assert.equal(c.submitted.drawCalls,1);assert.equal(c.submitted.complete,false);
 }));
+
+test('upload wall observations are separate, bounded and honor typed-array units',()=>globals(()=>{
+ globalThis.window={};globalThis.GPUDevice=class{};globalThis.GPUQueue=class{writeBuffer(){}};
+ installApiCounters();const q=new GPUQueue(),c=window.renderApiCounters;
+ q.writeBuffer({label:'instances'},0,new Uint32Array(8),2,3);assert.equal(c.uploadEvents.length,0);
+ c.allocationEventsEnabled=true;q.writeBuffer({label:'instances'},0,new Uint32Array(8),2,3);q.writeBuffer({},0,new ArrayBuffer(16),4,0);
+ assert.deepEqual(c.uploadEvents.map(e=>e.bytes),[12,0]);assert.equal(c.uploadTimingTotals.writeBuffer.knownBytes,12);assert.ok(c.uploadTimingTotals.writeBuffer.wallMs>=0);
+ c.uploadEventLimit=2;q.writeBuffer({},0,new Uint8Array(4));assert.equal(c.uploadEventOverflow,1);assert.equal(c.uploadEvents.length,2);
+}));
+test('GL diagnostic zero length means remaining elements',()=>globals(()=>{
+ const gl=installWebGL(),c=window.renderApiCounters;c.allocationEventsEnabled=true;
+ gl.bufferSubData(gl.ARRAY_BUFFER,0,new Uint16Array(8),2,0);
+ assert.equal(c.uploadEvents[0].bytes,12);assert.equal(c.uploadTimingTotals.bufferSubData.calls,1);
+}));

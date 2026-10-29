@@ -450,6 +450,7 @@ impl FineGroup {
     // The retained stream/page mirror owns actual bytes. A record is copied only
     // after source revision or layout changes. World uniforms are already canonical;
     // pack a full record only inside the dirty full112B branch.
+    #[allow(clippy::too_many_arguments)]
     fn patch(
         &mut self,
         target: &mut [u8],
@@ -458,10 +459,10 @@ impl FineGroup {
         items: &[QueueItem],
         models: &[(u32, &GpuModel)],
         stats: &mut GltfGpuStats,
-    ) -> Option<(usize, usize)> {
+        uploads: &mut crate::instance_upload::DirtyRanges,
+    ) {
         let stride = if self.translated { 16 } else { 112 };
         let full = self.payload_slot != Some((storage, offset, stride)) || !self.members_same;
-        let mut dirty = None;
         let mut rebuilt = full;
         for (index, (source, i)) in self.sources.iter_mut().zip(items).enumerate() {
             let d = &models[i.model].1.draws[i.draw];
@@ -478,13 +479,27 @@ impl FineGroup {
                 let start = offset + index * stride;
                 let end = start + stride;
                 if target[start..end] != *bytes {
+                    // Expensive exact-byte accounting/timing is opt-in, never clean timing.
+                    let clock = uploads
+                        .diagnostic
+                        .then(|| web_sys::window().and_then(|w| w.performance()))
+                        .flatten();
+                    let began = clock.as_ref().map(|p| p.now());
+                    if uploads.diagnostic {
+                        stats.instance_changed_bytes += target[start..end]
+                            .iter()
+                            .zip(bytes)
+                            .filter(|(a, b)| a != b)
+                            .count() as u64;
+                        stats.instance_diff_scanned_bytes += stride as u64;
+                    }
+                    uploads.mark(start, end);
+                    if let (Some(clock), Some(began)) = (clock, began) {
+                        stats.instance_range_cpu_ms += clock.now() - began;
+                    }
                     target[start..end].copy_from_slice(bytes);
                     stats.fine_payload_records_written += 1;
                     stats.fine_payload_bytes_written += stride as u64;
-                    dirty = Some(match dirty {
-                        Some((a, b)) => (start.min(a), end.max(b)),
-                        None => (start, end),
-                    });
                 }
                 source.data = d.data_revision;
             }
@@ -496,7 +511,6 @@ impl FineGroup {
         } else {
             stats.fine_payload_groups_reused += 1;
         }
-        dirty
     }
     fn bytes(&self) -> usize {
         self.sources.capacity() * std::mem::size_of::<FineSource>()
@@ -535,6 +549,7 @@ struct QueueScratch {
     payload: Vec<u8>,
     translated: Vec<bool>,
     compatibility_hits: u64,
+    uploads: crate::instance_upload::DirtyRanges,
 }
 impl QueueScratch {
     fn clear(&mut self) {
@@ -547,6 +562,7 @@ impl QueueScratch {
         self.payload.clear();
         self.translated.clear();
         self.compatibility_hits = 0;
+        self.uploads.clear();
     }
     fn capacities(&self) -> [usize; 8] {
         [
@@ -577,6 +593,7 @@ impl QueueScratch {
             .map(|(n, size)| n * size)
             .sum::<usize>()
             + self.occupied.bytes()
+            + self.uploads.retained_bytes()
     }
     fn singleton(&mut self, item: QueueItem) {
         let start = self.ordered.len();
@@ -815,6 +832,13 @@ pub struct GltfGpuStats {
     pub instance_pages_active: usize,
     pub instance_pages_retained: usize,
     pub instance_upload_bytes: u64,
+    pub instance_upload_calls: u64,
+    pub instance_changed_bytes: u64,
+    pub instance_diff_scanned_bytes: u64,
+    pub instance_dirty_record_bytes: u64,
+    pub instance_gap_upload_bytes: u64,
+    pub instance_range_overflows: u64,
+    pub instance_range_cpu_ms: f64,
     pub instance_buffer_bytes: usize,
     pub queue_scratch_growths: u64,
     pub queue_scratch_bytes: usize,
@@ -990,6 +1014,7 @@ pub struct GltfGpu {
     used_streams: HashSet<InstanceOwner>,
     instancing_supported: bool,
     queue_scratch: QueueScratch,
+    upload_policy: (u32, usize, bool),
     plan_cache: RefCell<PlanCache>,
     input_epoch: Cell<u64>,
     content_epoch: Cell<u64>,
@@ -1114,6 +1139,7 @@ impl GltfGpu {
             pool_clock: 0,
             used_streams: HashSet::new(),
             queue_scratch: QueueScratch::default(),
+            upload_policy: (0, 0, false),
             plan_cache: RefCell::new(PlanCache::default()),
             input_epoch: Cell::new(0),
             content_epoch: Cell::new(0),
@@ -1749,6 +1775,19 @@ impl GltfGpu {
         self.invalidate_plan_inputs();
         self.omit_white_colors = enabled;
         true
+    }
+    pub fn set_instance_upload_policy(&mut self, mode: u32, gap: u32, diagnostic: bool) -> bool {
+        if mode > 2 || gap > 65536 || !gap.is_multiple_of(4) {
+            return false;
+        }
+        if self.upload_policy != (mode, gap as usize, diagnostic) {
+            self.invalidate_plan_inputs();
+            self.upload_policy = (mode, gap as usize, diagnostic);
+        }
+        true
+    }
+    pub fn instance_upload_policy(&self) -> serde_json::Value {
+        serde_json::json!({"mode":self.upload_policy.0,"gapBytes":self.upload_policy.1,"diagnostic":self.upload_policy.2,"scratchBytes":self.queue_scratch.uploads.retained_bytes(),"rangeLimit":4096})
     }
     /// Bounded diagnostic controls. Production remains mode0; no arbitrary shaders.
     pub fn set_experiment(&mut self, mode: u32) -> bool {
@@ -2645,6 +2684,9 @@ impl GltfGpu {
         let frustum = crate::visibility::Frustum::from_view_projection(view_projection);
         let mut stats = self.counters.get();
         let mut scratch = std::mem::take(&mut self.queue_scratch);
+        scratch.uploads.mode = self.upload_policy.0;
+        scratch.uploads.gap = self.upload_policy.1;
+        scratch.uploads.diagnostic = self.upload_policy.2;
         let capacities_before = scratch.capacities();
         scratch.clear();
         for (model_index, &(_, model)) in models.iter().enumerate() {
@@ -3017,7 +3059,7 @@ impl GltfGpu {
         }
         let mut page_index = 0;
         let mut stream_offset = 0usize;
-        let mut stream_dirty: Option<(usize, usize)> = None;
+        scratch.uploads.clear();
         for (group_index, group) in scratch.groups.iter().enumerate() {
             let translated = scratch.translated[group_index];
             let first = scratch.ordered[group.start];
@@ -3178,19 +3220,15 @@ impl GltfGpu {
                     };
                     stages.switch(Some(3));
                     if let Some(view) = fine.as_mut() {
-                        if let Some((start, end)) = view.groups[group_index].patch(
+                        view.groups[group_index].patch(
                             &mut s.last,
                             s.generation,
                             offset,
                             &scratch.ordered[group.clone()],
                             &models,
                             &mut stats,
-                        ) {
-                            stream_dirty = Some(match stream_dirty {
-                                Some((a, b)) => (a.min(start), b.max(end)),
-                                None => (start, end),
-                            });
-                        }
+                            &mut scratch.uploads,
+                        );
                     } else {
                         s.scratch.extend_from_slice(&scratch.payload);
                     }
@@ -3212,26 +3250,44 @@ impl GltfGpu {
                     }
                 } else {
                     let buffer = page.buffer.as_ref().expect("standalone instance buffer");
-                    let dirty = if let Some(view) = fine.as_mut() {
+                    scratch.uploads.clear();
+                    if let Some(view) = fine.as_mut() {
                         stages.switch(Some(3));
                         page.last.resize(payload_bytes, 0);
-                        let dirty = view.groups[group_index].patch(
+                        view.groups[group_index].patch(
                             &mut page.last,
                             page.generation,
                             0,
                             &scratch.ordered[group.clone()],
                             &models,
                             &mut stats,
+                            &mut scratch.uploads,
                         );
                         stages.switch(Some(5));
-                        dirty
                     } else if page.last != scratch.payload {
+                        if scratch.uploads.diagnostic {
+                            let clock = web_sys::window().and_then(|w| w.performance());
+                            let start = clock.as_ref().map(|p| p.now());
+                            stats.instance_changed_bytes += scratch
+                                .payload
+                                .iter()
+                                .enumerate()
+                                .filter(|(i, b)| page.last.get(*i).copied().unwrap_or(0) != **b)
+                                .count()
+                                as u64;
+                            stats.instance_diff_scanned_bytes += scratch.payload.len() as u64;
+                            if let (Some(clock), Some(start)) = (clock, start) {
+                                stats.instance_range_cpu_ms += clock.now() - start;
+                            }
+                        }
                         page.last.clone_from(&scratch.payload);
-                        Some((0, payload_bytes))
-                    } else {
-                        None
-                    };
-                    if let Some((start, end)) = dirty {
+                        scratch.uploads.mark(0, payload_bytes);
+                    }
+                    let dirty_bytes = scratch.uploads.changed_records_bytes as u64;
+                    stats.instance_dirty_record_bytes += dirty_bytes;
+                    stats.instance_range_overflows += u64::from(scratch.uploads.overflow);
+                    let mut sent = 0;
+                    for &(start, end) in scratch.uploads.writes(payload_bytes) {
                         queue.write_buffer(buffer, start as u64, &page.last[start..end]);
                         self.content_epoch.set(
                             self.content_epoch
@@ -3240,9 +3296,12 @@ impl GltfGpu {
                                 .expect("glTF content epoch exhausted"),
                         );
                         stats.buffer_upload_calls += 1;
+                        stats.instance_upload_calls += 1;
                         stats.uniform_upload_bytes += (end - start) as u64;
                         stats.instance_upload_bytes += (end - start) as u64;
+                        sent += (end - start) as u64;
                     }
+                    stats.instance_gap_upload_bytes += sent - dirty_bytes;
                     row_storage = (page.generation, 0, 0, payload_bytes as u64);
                     InstanceBinding {
                         buffer: buffer.clone(),
@@ -3327,34 +3386,49 @@ impl GltfGpu {
             stages.switch(Some(5));
         }
         if let Some(mut s) = stream {
-            let dirty = if fine.is_some() {
-                stream_dirty
-            } else if s.last != s.scratch {
-                Some((0, s.scratch.len()))
-            } else {
-                None
-            };
-            if let Some((start, end)) = dirty {
-                let bytes = if fine.is_some() {
-                    &s.last[start..end]
-                } else {
-                    &s.scratch[start..end]
-                };
-                queue.write_buffer(&s.buffer, start as u64, bytes);
+            if fine.is_none() && s.last != s.scratch && !s.scratch.is_empty() {
+                if scratch.uploads.diagnostic {
+                    let mut stats = self.counters.get();
+                    let clock = web_sys::window().and_then(|w| w.performance());
+                    let start = clock.as_ref().map(|p| p.now());
+                    stats.instance_changed_bytes += s
+                        .scratch
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, b)| s.last.get(*i).copied().unwrap_or(0) != **b)
+                        .count() as u64;
+                    stats.instance_diff_scanned_bytes += s.scratch.len() as u64;
+                    if let (Some(clock), Some(start)) = (clock, start) {
+                        stats.instance_range_cpu_ms += clock.now() - start;
+                    }
+                    self.counters.set(stats);
+                }
+                scratch.uploads.mark(0, s.scratch.len());
+            }
+            let data = if fine.is_some() { &s.last } else { &s.scratch };
+            let dirty_bytes = scratch.uploads.changed_records_bytes as u64;
+            let mut stats = self.counters.get();
+            stats.instance_dirty_record_bytes += dirty_bytes;
+            stats.instance_range_overflows += u64::from(scratch.uploads.overflow);
+            let mut sent = 0;
+            for &(start, end) in scratch.uploads.writes(data.len()) {
+                queue.write_buffer(&s.buffer, start as u64, &data[start..end]);
                 self.content_epoch.set(
                     self.content_epoch
                         .get()
                         .checked_add(1)
                         .expect("glTF content epoch exhausted"),
                 );
-                let mut stats = self.counters.get();
                 stats.buffer_upload_calls += 1;
+                stats.instance_upload_calls += 1;
                 stats.uniform_upload_bytes += (end - start) as u64;
                 stats.instance_upload_bytes += (end - start) as u64;
-                self.counters.set(stats);
-                if fine.is_none() {
-                    std::mem::swap(&mut s.last, &mut s.scratch);
-                }
+                sent += (end - start) as u64;
+            }
+            stats.instance_gap_upload_bytes += sent - dirty_bytes;
+            self.counters.set(stats);
+            if fine.is_none() && sent > 0 {
+                std::mem::swap(&mut s.last, &mut s.scratch);
             }
             self.instance_streams.insert((storage_key, view_slot), s);
         }

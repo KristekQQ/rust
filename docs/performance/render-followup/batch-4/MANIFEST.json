@@ -1,0 +1,137 @@
+{
+  "batch": "render-followup4/6",
+  "baseCheckpoint": "237279b6a39d7843fa47258faf9d09ae6dfb34d3",
+  "branch": "codex/render-followup-4",
+  "checkout": "/private/tmp/rust-render-followup-2",
+  "baseline": {
+    "source": "d44d29f28fd00eaf08f2551fe4c2673059dad1211e8ba39381741b3c517fabdc",
+    "wasm": "bb3e3bf93d1483ef2ee010a5887008ecf8f48748fea90ee62d905a6c25869290",
+    "bindings": "33f7c4ef0074300d54b7b2b64478efb764d400cc01ee28084e37a0cbc7e93d64",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "probe": {
+    "source": "a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118",
+    "wasm": "7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63",
+    "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "final": {
+    "source": "a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118",
+    "wasm": "7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63",
+    "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "sdk": {
+    "baseline": "d23046161a2325090da2526903aa65e692202691ad8cc67e5e85ccc0fe5aa398",
+    "probe": "b9ebfc7b93d19a7e8145c3ba842796dedcf72141e807c9ba138478539290d801",
+    "final": "11b62bb04db5229c80d2ddd918c64da7ee8bbbe8ff36f6613696c512827906df",
+    "difference": "Only SDK JSDoc parameter documentation/comment placement changed after probe; executable SDK and WASM unchanged."
+  },
+  "defaults": {
+    "webgpu": "union (mode0)",
+    "webgl": "union (mode0)"
+  },
+  "environment": {
+    "os": "macOS26.6.1",
+    "hardware": "Apple M1 /16GiB",
+    "node": "24.19.0",
+    "chrome": "156.0.8078.48",
+    "rust": "1.99.0",
+    "isolation": "not isolated; user closed Storage windows, then transport/power pause; home resumed campaigns separate",
+    "power": "AC in all878 saved observations in wrapped campaigns; no recorded thermal/performance warning; junction temperature unknown",
+    "historicalNode": "B3 freeze records24.22.1; both current comparison sides use24.19.0"
+  },
+  "protocol": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "dpr": 1,
+    "seed": 1337,
+    "warmupMs": 8000,
+    "sampleMs": 25000,
+    "poolSampleMs": 60000,
+    "pairs": 3,
+    "order": [
+      "AB",
+      "BA",
+      "AB"
+    ],
+    "profiling": false,
+    "cameraLoad": 2048,
+    "sparseLoad": 2048,
+    "movingLoad": 1024,
+    "clusteredLoad": 1024,
+    "poolLoad": 256,
+    "staticStressLoad": 2048,
+    "soakMs": 120000,
+    "worker": "3 real-worker simulated-XR replays/policy/backend,960x640,nominal72Hz",
+    "gpuTimes": "Unavailable clean; separate diagnostic async queries only",
+    "physicalQuest": "not tested"
+  },
+  "evidenceCounts": {
+    "completedRuns": 218,
+    "cleanRuns": 198,
+    "completeRafRows": 208768,
+    "cleanRafRows": 203956,
+    "partialInterruptedRuns": 2,
+    "partialRafRowsExcluded": 6333,
+    "exactIndependentPixelPairs": 102,
+    "newDeterministicPixelFailures": 0,
+    "authoredCaptureEqualityUnavailable": 6,
+    "cleanProfilingOff": true,
+    "disabledDetailedMetricsAreNull": true
+  },
+  "acceptance": "No automatic policy change or production FPS gain; coalesced/full diagnostic only",
+  "limits": [
+    "No new stable record mapping or payload-sharing implementation.",
+    "Clean sparse sample to individual callback alignment unavailable; exact-context diagnostic records kept separately.",
+    "CPU-mirror byte difference is not physical GPU memory readback.",
+    "Instance upload bytes are already included in uniform bytes.",
+    "Prior image A/B/C/D cases remain separate and open.",
+    "Original-versus-probe union controls have mixed signs; do not claim zero instrumentation overhead."
+  ],
+  "publication": {
+    "pushed": false,
+    "merged": false,
+    "deployed": false,
+    "sharedServersChanged": false,
+    "ci": "not run"
+  },
+  "frozenRoots": {
+    "baseline": "measurements/baseline",
+    "probe": "measurements/probe",
+    "final": "measurements/final"
+  },
+  "finalFreeze": {
+    "complete": true,
+    "files": 2636,
+    "preCheckpointHead": "237279b6a39d7843fa47258faf9d09ae6dfb34d3"
+  },
+  "archive": {
+    "archive": "docs/performance/render-followup/batch-4/EVIDENCE.tar.gz",
+    "sha256": "29b9e215b5034e5e27d85675eb8156a49156ca3ed81d57f89e7c613f4e7dff1e",
+    "bytes": 101113289,
+    "aliases": 3348,
+    "objects": 1386,
+    "logicalBytes": 688733249,
+    "uniqueBytes": 241807299,
+    "verifiedObjects": 1386,
+    "verifiedAliases": 3348
+  }
+}

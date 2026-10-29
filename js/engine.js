@@ -724,9 +724,11 @@ async function initializeEngine(canvas, backend, initialization) {
         setGltfWhiteColorOmissionEnabled(enabled) { return wasm.set_gltf_white_color_omission_enabled(enabled); },
         /** Rust-owned bounded instance resources. @param {{byteLimit?:number,resourceLimit?:number,streamByteLimit?:number}} [options] */
         configureGltfInstancePool({byteLimit,resourceLimit,streamByteLimit} = {}) { return wasm.configure_gltf_instance_pool(byteLimit,resourceLimit,streamByteLimit); },
-        /** Diagnostic only: true preserves the default original scan; false opts into the experimental immutable guard. @param {boolean} enabled */
+        /** Diagnostic upload experiment: 0=union (default), 1=coalesced, 2=full active span. @param {number} mode @param {number} [gapBytes] @param {boolean} [diagnostic] */
+        setInstanceUploadPolicy(mode, gapBytes = 0, diagnostic = false) { return wasm.set_instance_upload_policy(mode, gapBytes, diagnostic); },
         setPanelBufferReuse(enabled) { wasm.set_panel_buffer_reuse(enabled); },
         diagnosticPanelText(id,value) { wasm.diagnostic_panel_text(id,value); },
+        /** Diagnostic only: true preserves the default original scan; false opts into the experimental immutable guard. @param {boolean} enabled */
         setOverlaySelectionReference(enabled) { wasm.set_overlay_selection_reference(enabled); },
         /** Exact opaque prepared-plan reuse; disable for independent comparison. @param {boolean} enabled */
         setPreparedPlanCacheEnabled(enabled) { wasm.set_prepared_plan_cache_enabled(enabled); },
