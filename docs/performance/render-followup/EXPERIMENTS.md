@@ -1,4 +1,4 @@
-# Followup1 experiment journal
+# Render followup experiment journal
 
 - E0 accepted evidence: original B9 archive1285objects/2142aliases and ten case files verified; B8 runtime source/WASM/served identities match. No inference of current deployment.
 - E1 source audit: legacy fifth-RAF capture lacks renderer acknowledgment. Timing remains a hypothesis, not identified failure mechanism. New callback acknowledgment is CPU submission only. Both methods return exact normal-path images; no capture repair justified.
@@ -11,3 +11,29 @@
 - Independent review: command-order digest omits bindings/offsets (raw stream retains them); final-session descriptor export misses earlier pipelines. Report limits corrected, no runtime defect established.
 - Verification interruption: disk full at wasm-check after native/SDK/harness/XR passed; only browser-mode remainder resumed. User explicitly authorized unused-target cleanup. Evidence compression checked losslessly.
 - A remains unresolved/not reproduced. B historical eight-pixel case remains separate/open; C reproduced but cause open. No repair, refactor, tolerance change or subsequent batch.
+
+## Followup2 — overlay selection
+
+- F2-E0 proven source cause: select asks for existence through a full glTF primitive count, including active-set lookups on immutable OPAQUE/MASK assets. No temporary allocation in that substage. Glow/rings/native transparency have separate boundaries; shadow/reflection/HUD outside this scope.
+- F2-E1 diagnostics: WG2048 945calls ×130287primitives, GL1024 1065calls ×68647primitives; no relevant overlays. Aggregate glTF stage7.611640/4.507981ms includes opt-in counter overhead. Not a clean-frame savings prediction.
+- F2-E2 candidate: one immutable BLEND-eligibility bit and live active-set existence query; does not use B7 published pose counts, change draw_count callers or maintain pose invalidation state.
+- F2-E3 universal default rejected provisionally from matched instrumented-control clean pairs: WebGL1024 FPS42.562→42.345,42.550→42.174,42.682→42.373, despite lower callback wall. WebGPU2048 mixed37.471→37.397,37.376→37.516,37.616→37.591. All6strict image pairs exact. Nonisolated host limits small effects, but adverse results are not discarded.
+- F2-E4 intermediate policy (subsequently rejected): original query on WebGL/unknown backend, new guard on WebGPU. Actual adapter backend drives initialization, diagnostic switch remains explicit. Independent source review found no material correctness defect. Original B8 primary comparisons later rejected this policy; see E5/E6.
+- F2 tool/fixture failures retained: stale profile guard, invalid open test mesh repaired to closed tetra, strict Rust borrow/unused-mut repairs, historical calibration SDK mismatch (fixed-load new manifest, no guard bypass), sandbox bindgen/opt denial followed by approved host build. These are separate from renderer/image failures.
+
+- F2-E5 direct original-runtime WebGPU2048 all3pairs adverse:37.497→37.014,37.632→37.292,37.736→37.452 FPS (−1.29%,−0.90%,−0.75%), although callback mean15.073/14.887/14.797→7.775/7.899/7.890ms. All3images exact. Thus automatic WebGPU enablement also lacks acceptance; remaining matrix determines breadth, not permission to discard the stress regression.
+
+- F2-E6 automatic enablement rejected on both backends based on repeat stress regressions. Sources restore original default; immutable guard retained only behind explicit diagnostic reference control (false), with exact oracles. No production/Quest speedup claim. The frozen intermediate candidate continues the predeclared matrix; restored-default build and checks must follow serially.
+- Independent review found missing BLEND on the new GPU XR oracle; fixed with shared OPAQUE/MASK/BLEND fixture, visible per-eye contribution and exact active/inactive/asymmetric comparisons. Source re-review confirms repair; five focused final-release browser/XR cases subsequently PASS.
+
+- F2-E7 new image case D: clustered1024WebGPU pair0 differs4pixels/max1 at(651,114),(652,115),(653,115),(653,116); pairs1/2exact. Six-image independent audit yields exactly twoPNG hashes, both occurring in original AND candidate runs. The optimization is not necessary to produce the variability, but mechanism remains unresolved; no GPU-noise assertion, tolerance change or attribution to A/B/C. Main runner stopped and FAIL retained. Finish other predeclared workloads separately.
+- Pixel-accounting correction: active-game captures have no deterministic equality verdict in maintained driver. They must be recorded unavailable, not counted asPASS. At that intermediate checkpoint:30pairs including controls,23exact/1FAIL/6unavailable (superseded by final totals). Initial analysis scripts failed loudly on the null verdict and were corrected; original data unchanged.
+
+- F2-E8 full main/control matrix completed: 78 clean runs, 90119 RAF rows, 26 exact/1FAIL/12unavailable pairs. Main runner failure retained; remaining workloads separately completed. Candidate clustered WG gain observed +5.79–7.74% but caseD remains unresolved; static stress prevents automatic default. Small Rome/Neon capped60, not a throughput win.
+- F2-E9 candidate diagnostics prove zero primitive/active-set visits in opaque stress, versus130287WG/68647GL before. glTF stage0.044527/0.039848ms versus7.611640/4.507981ms, profiling-on totals. Neon visits no glTF models and cannot benefit from this guard. Do not equate scope savings with GPU/whole-frame improvement.
+- F2-E10 restored-default release d0677791 built/frozen; focused overlay/XR21WG/25GL states and stereo BLEND/asymmetric controls PASS. Final restored-default clean controls and full verification gate pending. Diagnostic opt-in retained, default original both APIs.
+
+- F2-E11 restored-default original-selector controls: six exact pairs; WG2048 FPS37.551→37.497,37.642→37.551,37.337→37.671; GL1024 42.454→42.374,42.414→42.493,42.442→42.465. Small/mixed differences, no gain claim. Combined final clean matrix90runs/102137RAF rows;32exact/1FAIL/12unavailable. All frozen bytes and current runtime source/SDK/pkg/tests match; profiling verified false in every clean run. Full gate remains running.
+
+- F2-E12 final gate completed once, exit0:428native(2ignored),151browser(56WG/95GL),32SDK,71XR-platform,14Node+13Python harness PASS; release/source/SDK/tests hashes and same-npm PASS receipt verified. No full-suite rerun. All_sources regenerated. Image caseD remains failed; functional PASS is not strict benchmark signoff. Experimental full worker-cut/fade/dissolve pixel oracle not supplied, so opt-in remains diagnostic only.
+- Final decision: source diagnosis, instrumentation and independent oracles accepted; automatic query change rejected. Current original-selector default both APIs retained. No next batch, push, merge, deployment, shared restart, CI or physical Quest claim.

@@ -1,11 +1,11 @@
-# Followup state — batch1 diagnosis recorded, A unresolved
+# Followup2 — complete; automatic optimization rejected
 
-2026-10-29. Isolated `codex/render-followup-1`, base9986cd4f9; runtime B8/813a5abb, unchanged source54c6cde8 and release WASM f14c4beb. Local evidence only; shared servers/production/main unchanged. [Identities](BASELINE.json), [report](REPORT.md).
+2026-10-29. Isolated `codex/render-followup-2`, base `0b7af5b75`. [Report](batch-2/REPORT.md), [commands](batch-2/COMMANDS.md), [manifest](batch-2/MANIFEST.json), [verification](batch-2/VERIFICATION.json). Original B8/f14c4beb preserved.
 
-A: original six-pixel/max2 camera2048 candidate pair1 independently verified, **not reproduced or repaired**.67 new captures:61exact anchor,6known culling controls. Unchanged original protocol3/3exact pairs. Instrumented callback/resource observations cannot reconstruct all native revisions or original timing. No proven capture/renderer/numerical cause.
+Proven redundant opaque primitive scans; diagnostic immutable guard removes them (WG2048 130287→0 primitive visits/call). Automatic default rejected on BOTH APIs: lower CPU wall time did not consistently improve whole-frame stress cadence/tails. Large dynamic WG workload improved in these runs, but has a strict image failure. Original selection remains default; `setOverlaySelectionReference(false)` is experimental opt-in only. No production FPS gain claimed.
 
-B: historical B4 eight-pixel/max2 remains separately open, not replayed here. C:5014/max79 culling-off reproduced, mechanism open; switch also affects shadow selection. No tolerance/golden/runtime changes, no rollback of prior optimizations.
+Final release WASM `d0677791488085cb26b7423a4c062fb4411044e90f55d958193558bd7c5f0798`, source `7cd160e788ece6dfd78b6d913957ba758cb19dc8ad4abae0d52c6114d263ca4f`, bindings `504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe`. Current isolated pkg/source/SDK/tests match. One fresh full gate:428native(2ignored),151browser(56WG/95GL),SDK32,XR71,harness14Node+13Python PASS. New exact overlay states21WG/25GL plus per-eye BLEND/asymmetric simulatedXR PASS. Full-cut regressions cover delivered default; no complete worker-cut/fade/dissolve pixel oracle for experimental opt-in.
 
-[Experiments](EXPERIMENTS.md), [verification](VERIFICATION.json), [commands](COMMANDS.md), [archive](ARCHIVE_VERIFICATION.json). Own checkpoint contains this directory only. User-requested unused target cleanup recorded in evidence; sources/packages/measurements preserved.
+90clean runs/102137RAF rows, three alternating pairs/config:32exact/1FAIL/12unavailable. Six original→restored-default controls exact, small mixed timing differences. Profiling verified off; clean GPU times unavailable. Nonisolated desktop, no physical Quest. CaseD clustered1024WG:four pixels/max1; both variants also occur in original runtime. Mechanism unresolved, FAIL retained independently of A/B/C. No tolerance/golden change.
 
-STOP: only batch1 authorized. Further image diagnosis or batch2 requires separate instruction. No unconditional image signoff or physical Quest evidence.
+Local checkpoint/evidence only. No push/merge/deploy/shared restart. Batch2 stops here; batch3 requires separate authorization. Prior batch1 [report](REPORT.md): A unresolved/not reproduced, B and C separate/open.

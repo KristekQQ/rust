@@ -1,5 +1,6 @@
 import {pixelDifference} from './testkit.js';
 import {assertForeground} from '../pixels.js';
+import {createOverlayFixture} from '../gltf-overlay-fixture.js';
 
 // Exercises real rigid glTF instances through the XR per-view render path.
 export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftLeft} = {}) {
@@ -153,6 +154,39 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
     test.assert(engine.gltfIndexLayouts().every(l=>l.format==='Uint32'), 'XR original path binds Uint32 geometry');
     test.assert(uint32Eyes.every((image,eye)=>pixelDifference(colorlessEyes[eye],image,0)===0), 'both XR eyes match independent original Uint32 geometry exactly');
     test.assert(compactIndexLayouts.some(l=>l.format==='Uint16'), 'XR optimized path exercised real Uint16 indices');
+
+    // Overlay selection is exercised through actual eye targets, not a shared
+    // desktop visibility list. Readback remains a correctness-only operation.
+    const selectionReference=engine.debugStats().overlaySelectionReference;
+    engine.postprocessing.enable('fxaa',{strength:.6});
+    const blendUrl=URL.createObjectURL(new Blob([JSON.stringify(createOverlayFixture())],{type:'model/gltf+json'}));
+    let blendModel;
+    try{blendModel=await engine.scene.loadModel(blendUrl);}finally{URL.revokeObjectURL(blendUrl);}
+    blendModel.setPosition([0,1.6,-1.65]).setScale([.6,.6,.6]);
+    engine.setOverlaySelectionReference(true);
+    blendModel.selectScene(1);frame();const noBlend=await readEyes();
+    blendModel.selectScene(0);frame();const visibleBlend=await readEyes();
+    test.assert(visibleBlend.every((image,eye)=>pixelDifference(noBlend[eye],image,0)>0),'BLEND primitive genuinely contributes pixels in both XR eyes');
+    const overlayEyes=async(label)=>{
+        engine.setOverlaySelectionReference(true);frame();const reference=await readEyes();
+        const before=engine.debugStats().overlaySelection.calls;
+        engine.setOverlaySelectionReference(false);frame();const optimized=await readEyes();
+        test.assert(engine.debugStats().overlaySelection.calls-before===2,label+' selects separately for both eyes');
+        engine.setOverlaySelectionReference(true);frame();const restored=await readEyes();
+        for(let eye=0;eye<2;eye++){
+            assertForeground(reference[eye],label+' eye '+eye);
+            test.assert(pixelDifference(reference[eye],optimized[eye],0)===0&&pixelDifference(reference[eye],restored[eye],0)===0,label+' exact original/optimized/restored eye '+eye);
+        }
+    };
+    try{
+        await overlayEyes('XR mixed alpha overlay presence');
+        blendModel.selectScene(1);await overlayEyes('XR inactive BLEND presence');blendModel.selectScene(0);
+        if(shiftLeft){shiftLeft(.07);await overlayEyes('asymmetric left-eye overlay presence');shiftLeft(0);}
+    }finally{
+        engine.setOverlaySelectionReference(selectionReference);
+        engine.postprocessing.disable('fxaa');
+        if(shiftLeft)shiftLeft(0);
+    }
     engine.scene.clear();
     frame();
     test.assert(engine.setGltfCompactIndicesEnabled(true), 'XR restores default index format policy');

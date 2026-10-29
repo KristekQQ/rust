@@ -1,0 +1,73 @@
+{
+  "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+  "exit": 0,
+  "fullGateRuns": 1,
+  "started": "2026-10-29T12:37:52.849851+00:00",
+  "finished": "2026-10-29T12:46:23.455270+00:00",
+  "native": {
+    "passed": 428,
+    "failed": 0,
+    "ignored": 2
+  },
+  "sdk": {
+    "passed": 32,
+    "failed": 0
+  },
+  "harness": {
+    "nodePassed": 14,
+    "pythonPassed": 13
+  },
+  "xrPlatform": {
+    "passed": 71,
+    "failed": 0
+  },
+  "browser": {
+    "webgpu": 56,
+    "webgl": 95
+  },
+  "browserStatuses": {
+    "PASS": 151
+  },
+  "browserVersion": "Chrome/156.0.8078.48",
+  "sandboxDisabled": false,
+  "releaseBuildReusedMatchingSource": true,
+  "receipt": {
+    "passed": true,
+    "key": "b315de2444c30584df0a6af6b02d5630bdfeeebb21478407dce61ecc5511bee1",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "7cd160e788ece6dfd78b6d913957ba758cb19dc8ad4abae0d52c6114d263ca4f",
+      "wasm": "d0677791488085cb26b7423a4c062fb4411044e90f55d958193558bd7c5f0798",
+      "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "7506d44103fe52c7b371d21700e5fad0652b2a9c5a711bb462f7ef2aa20fc9be",
+    "finished": "2026-10-29T12:46:22.482Z"
+  },
+  "receiptFile": "output/verification/pass-all-4f53cda18c2b.json",
+  "receiptSha256": "0ae53f33763b89977374143ce908cbc9b4efefb5fa6177bd1c020ee131c924ed",
+  "allSourcesSha256": "d853e7ffc38a23d141106a1ee462104d41b36cb24dd3071d34384800d8b16eec",
+  "focused": {
+    "cases": 5,
+    "overlayWebGPUExactStates": 21,
+    "overlayWebGLExactStates": 25,
+    "simulatedXrPerEyeBlendContribution": true
+  },
+  "limits": [
+    "Default/reference path covered by full cutting/gameplay/lifecycle/shadow/XR suite. Experimental selector has fixed-state exact alpha/glow/lifecycle/stereo tests, not an independently pixel-compared complete worker-cut/fade/dissolve sequence.",
+    "New clustered image case D remains FAIL; full functional gate passing does not erase benchmark image failure.",
+    "Physical Quest, CI, push, merge, deployment and shared-server restart not performed."
+  ],
+  "receiptRevalidation": {
+    "command": "VERIFY_WASM_PROFILE=release npm exec -- node scripts/verification-cache.mjs check all",
+    "exit": 0,
+    "output": "PASS reused: all (unchanged inputs)",
+    "note": "Direct non-npm invocation produced a different key because existing environment-object serialization preserves insertion order. Same npm environment revalidates the unchanged inputs/build; receipt was not modified or synthesized."
+  }
+}

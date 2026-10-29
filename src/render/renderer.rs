@@ -407,6 +407,26 @@ impl PassCache {
     }
 }
 
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OverlaySelectionStats {
+    calls: u64,
+    diagnostic_calls: u64,
+    #[serde(flatten)]
+    gltf: super::gltf_gpu::BlendSelectionStats,
+    mesh_batches_visited: u64,
+    mesh_imported_visited: u64,
+    mesh_instances_visited: u64,
+    neon_preparation_calls: u64,
+    ring_preparation_calls: u64,
+    with_gltf: u64,
+    with_mesh: u64,
+    with_neon: u64,
+    with_rings: u64,
+    with_helpers: u64,
+    stage_ms: [f64; 4],
+}
+
 pub struct SceneRenderer {
     grid_vertex_buffer: wgpu::Buffer,
     grid_vertex_count: u32,
@@ -427,6 +447,8 @@ pub struct SceneRenderer {
     translucent_indices: std::cell::Cell<usize>,
     translucent_full_indices: std::cell::Cell<usize>,
     translucent_draws: std::cell::Cell<usize>,
+    overlay_selection_reference: bool,
+    overlay_selection: OverlaySelectionStats,
     neon_glow: Option<super::neon_glow::NeonGlow>,
     neon_meshes: HashMap<u32, Option<super::neon_glow::GlowMesh>>,
     neon_draws: usize,
@@ -570,6 +592,10 @@ impl SceneRenderer {
             translucent_indices: std::cell::Cell::new(0),
             translucent_full_indices: std::cell::Cell::new(0),
             translucent_draws: std::cell::Cell::new(0),
+            // The cheaper eligibility query remains an explicit diagnostic
+            // experiment: repeated stress pairs did not improve frame cadence.
+            overlay_selection_reference: true,
+            overlay_selection: OverlaySelectionStats::default(),
             neon_glow: None,
             neon_meshes: HashMap::new(),
             neon_draws: 0,
@@ -1291,6 +1317,9 @@ impl SceneRenderer {
     pub fn set_gltf_white_color_omission_enabled(&mut self, enabled: bool) -> bool {
         self.gltf_gpu.set_white_color_omission_enabled(enabled)
     }
+    pub fn set_overlay_selection_reference(&mut self, enabled: bool) {
+        self.overlay_selection_reference = enabled;
+    }
     pub fn set_prepared_plan_cache_enabled(&self, enabled: bool) {
         self.gltf_gpu.set_plan_cache_enabled(enabled);
     }
@@ -1407,6 +1436,8 @@ impl SceneRenderer {
             },
             "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
                 "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>() + mesh.indices as usize * 4).sum::<usize>()},
+            "overlaySelection": self.overlay_selection,
+            "overlaySelectionReference": self.overlay_selection_reference,
             "translucency": {
                 "cachedMeshes": self.alpha_indices.len(),
                 "indexBufferBytes": self.alpha_indices.values().map(|entry| entry.count as usize * 4).sum::<usize>(),
@@ -2376,12 +2407,56 @@ impl SceneRenderer {
         let rings = self.cut_feedback_rings(cache_index);
         let has_rings = rings.iter().any(Option::is_some);
         let select_scope = super::profiler::cpu_scope("render.overlays.select");
-        let has_transparent = self.passes[self.last_main_cache]
-            .queue
-            .visible_imported_ids()
-            .filter_map(|id| self.gltf_models.get(id))
-            .any(|model| super::gltf_gpu::draw_count(model, true) > 0);
-        let has_mesh_transparency = self.has_translucent(cache_index);
+        let mut stages = super::profiler::CpuStages::new([
+            "render.overlays.gltf",
+            "render.overlays.mesh",
+            "render.overlays.neon",
+            "render.overlays.rings",
+        ]);
+        let detailed = stages.enabled();
+        self.overlay_selection.calls += 1;
+        stages.switch(Some(0));
+        let reference = self.overlay_selection_reference;
+        let stats = &mut self.overlay_selection.gltf;
+        let has_transparent = {
+            let mut models = self.passes[cache_index]
+                .queue
+                .visible_imported_ids()
+                .filter_map(|id| self.gltf_models.get(id));
+            if detailed {
+                models.any(|model| super::gltf_gpu::has_blend_draw::<true>(model, reference, stats))
+            } else {
+                models
+                    .any(|model| super::gltf_gpu::has_blend_draw::<false>(model, reference, stats))
+            }
+        };
+        stages.switch(Some(1));
+        let has_mesh_transparency = if detailed {
+            let cache = &self.passes[cache_index];
+            let stats = &mut self.overlay_selection;
+            cache
+                .batches
+                .iter()
+                .chain(cache.mirrored_batches.iter())
+                .any(|batch| {
+                    stats.mesh_batches_visited += 1;
+                    batch.instances().iter().any(|instance| {
+                        stats.mesh_instances_visited += 1;
+                        instance.needs_translucent_overlay()
+                    })
+                })
+                || cache.queue.imported.iter().any(|(id, instances)| {
+                    stats.mesh_imported_visited += 1;
+                    self.imported_meshes.contains_key(id)
+                        && instances.iter().any(|instance| {
+                            stats.mesh_instances_visited += 1;
+                            instance.needs_translucent_overlay()
+                        })
+                })
+        } else {
+            self.has_translucent(cache_index)
+        };
+        stages.switch(Some(2));
         let has_helpers = self.draw_grid || self.draw_light_helpers;
         let may_have_neon =
             self.neon_glow.as_ref().is_some_and(|glow| glow.enabled())
@@ -2395,6 +2470,9 @@ impl SceneRenderer {
                     },
                 );
         if may_have_neon {
+            if detailed {
+                self.overlay_selection.neon_preparation_calls += 1;
+            }
             self.prepare_neon_glow(target);
         }
         let has_neon =
@@ -2409,8 +2487,24 @@ impl SceneRenderer {
                 );
         let has_overlays =
             has_transparent || has_mesh_transparency || has_rings || has_neon || has_helpers;
+        stages.switch(Some(3));
         if has_rings {
+            if detailed {
+                self.overlay_selection.ring_preparation_calls += 1;
+            }
             self.prepare_cut_feedback(target);
+        }
+        if let Some(ms) = stages.finish() {
+            let stats = &mut self.overlay_selection;
+            stats.diagnostic_calls += 1;
+            stats.with_gltf += u64::from(has_transparent);
+            stats.with_mesh += u64::from(has_mesh_transparency);
+            stats.with_neon += u64::from(has_neon);
+            stats.with_rings += u64::from(has_rings);
+            stats.with_helpers += u64::from(has_helpers);
+            for (total, elapsed) in stats.stage_ms.iter_mut().zip(ms) {
+                *total += elapsed;
+            }
         }
         drop(select_scope);
         let helper_key = (target.color_format, target.depth_format);

@@ -1,0 +1,312 @@
+{
+  "builds": {
+    "original": {
+      "files": 2594,
+      "bytes": 676478509,
+      "allFrozenHashesMatch": true,
+      "build": {
+        "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+        "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+        "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "diagnostic-baseline": {
+      "files": 2596,
+      "bytes": 676502913,
+      "allFrozenHashesMatch": true,
+      "build": {
+        "source": "f35108252897017f07016710295228da72afdd2d9b1753b46a1f6f070d044347",
+        "wasm": "6753390c1c621afa36d44d619d45d05717268f2b7f7daee8955736f3e198001e",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "candidate": {
+      "files": 2597,
+      "bytes": 676506314,
+      "allFrozenHashesMatch": true,
+      "build": {
+        "source": "2bf4a0636a0b00839373369360dbc10eb6b9e9e4087eb9878a4361d0a9476572",
+        "wasm": "7dbf5cf28bbe33d873fa5915c0981c7545e107bc490549f36420b184da4abb9f",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "final-candidate": {
+      "files": 2597,
+      "bytes": 676508440,
+      "allFrozenHashesMatch": true,
+      "build": {
+        "source": "2138381393bc8810625567fb36c803de37d280e9a076142810ae525cbb346213",
+        "wasm": "8824d3dbe2e2f6167ee41dbdbb7197fb163316f05e613dadd1da7292d3e5ee63",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      }
+    },
+    "restored-default": {
+      "files": 2600,
+      "bytes": 676529740,
+      "allFrozenHashesMatch": true,
+      "build": {
+        "source": "7cd160e788ece6dfd78b6d913957ba758cb19dc8ad4abae0d52c6114d263ca4f",
+        "wasm": "d0677791488085cb26b7423a4c062fb4411044e90f55d958193558bd7c5f0798",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "currentRuntimeSourceSdkTestsMatch": 475
+    }
+  },
+  "cleanRuns": 90,
+  "profilingFalseInEveryCleanRun": true,
+  "cleanGpuUnavailableNotZero": true,
+  "pairedDatasets": [
+    {
+      "dataset": "final-arena-active-1-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1502,
+        1501,
+        1501,
+        1501,
+        1501,
+        1501
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "final-arena-active-1-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1502,
+        1502,
+        1501,
+        1502,
+        1502,
+        1502
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "dataset": "final-rim-active-1-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1502,
+        1501,
+        1501,
+        1501,
+        1501,
+        1501
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "final-rim-active-1-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1501,
+        1502,
+        1502,
+        1501,
+        1501,
+        1502
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "dataset": "final-rim-clustered-1024-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        627,
+        631,
+        628,
+        623,
+        625,
+        608
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "final-rim-clustered-1024-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        637,
+        677,
+        683,
+        634,
+        640,
+        677
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "dataset": "final-rim-static-1-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1501,
+        1502,
+        1501,
+        1502,
+        1501,
+        1502
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "final-rim-static-1-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1501,
+        1501,
+        1502,
+        1502,
+        1501,
+        1501
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "dataset": "final-rim-stress-1024-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1065,
+        1067,
+        1062,
+        1069,
+        1057,
+        1066
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "final-rim-stress-2048-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        724,
+        723,
+        722,
+        725,
+        725,
+        723
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "final-rim-stress-2048-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        939,
+        930,
+        937,
+        943,
+        945,
+        941
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "dataset": "paired-rim-stress-1024-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1065,
+        1061,
+        1056,
+        1064,
+        1068,
+        1061
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "paired-rim-stress-2048-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        939,
+        939,
+        942,
+        936,
+        942,
+        942
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "dataset": "restored-rim-stress-1024-webgl",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        1063,
+        1061,
+        1064,
+        1062,
+        1062,
+        1064
+      ],
+      "backend": "webgl"
+    },
+    {
+      "dataset": "restored-rim-stress-2048-webgpu",
+      "driverSha256": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+      "runs": 6,
+      "sampleCounts": [
+        941,
+        939,
+        941,
+        942,
+        935,
+        944
+      ],
+      "backend": "webgpu"
+    }
+  ],
+  "singleProtocol": [
+    1280,
+    720,
+    8000,
+    25000,
+    3,
+    false,
+    0,
+    0
+  ],
+  "singleDriverHash": "6170317c0a52786d3cab69b31353fd880033cf257894355c2e8316293b34c881",
+  "scope": "All frozen file hashes checked including docs; current source/SDK/pkg/tests/driver checked against restored default, docs may change for final report. Driver manifests retain served runtime bytes. No current production check or deployment."
+}

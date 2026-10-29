@@ -1,0 +1,212 @@
+{
+  "task": "render-followup batch2 only",
+  "baseCommit": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+  "checkout": "/private/tmp/rust-render-followup-2",
+  "branch": "codex/render-followup-2",
+  "builds": {
+    "original": {
+      "manifestSha256": "53d0bdbb7ad3eace3f65442ebe85f7728cdf5196728b4db6c68c03757df266ad",
+      "head": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+      "build": {
+        "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+        "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+        "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "defaultSelector": "reference"
+    },
+    "diagnostic-baseline": {
+      "manifestSha256": "38c29b59ac98559e28881d833d919c96af448e551c86db7b88567e0b07a03c4d",
+      "head": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+      "build": {
+        "source": "f35108252897017f07016710295228da72afdd2d9b1753b46a1f6f070d044347",
+        "wasm": "6753390c1c621afa36d44d619d45d05717268f2b7f7daee8955736f3e198001e",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "defaultSelector": "reference"
+    },
+    "candidate": {
+      "manifestSha256": "b8631866091dca5a0e07e694bee3a0a91ebfb4cd49dbfc3643bf98b5fe11a90f",
+      "head": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+      "build": {
+        "source": "2bf4a0636a0b00839373369360dbc10eb6b9e9e4087eb9878a4361d0a9476572",
+        "wasm": "7dbf5cf28bbe33d873fa5915c0981c7545e107bc490549f36420b184da4abb9f",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "defaultSelector": "immutable-guard"
+    },
+    "final-candidate": {
+      "manifestSha256": "15488b01b6fb88ce52edbb1cd782a05a77ffd7344c0456b3bf8a842741aa6915",
+      "head": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+      "build": {
+        "source": "2138381393bc8810625567fb36c803de37d280e9a076142810ae525cbb346213",
+        "wasm": "8824d3dbe2e2f6167ee41dbdbb7197fb163316f05e613dadd1da7292d3e5ee63",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "defaultSelector": "WebGPU immutable guard; WebGL and unknown backends original reference"
+    },
+    "restored-default": {
+      "manifestSha256": "f9e53a51d9fa29e9b01cda45db24a114baf5c9c5f3abfb352e253f9fd9255233",
+      "head": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+      "build": {
+        "source": "7cd160e788ece6dfd78b6d913957ba758cb19dc8ad4abae0d52c6114d263ca4f",
+        "wasm": "d0677791488085cb26b7423a4c062fb4411044e90f55d958193558bd7c5f0798",
+        "bindings": "504f0f506ebe4e1839bf3dfc4b169109b35b8ba8c490fdf1c99f5665827080fe",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "defaultSelector": "original reference on both backends; immutable guard diagnostic opt-in only"
+    }
+  },
+  "protocol": {
+    "status": "frozen before candidate observations",
+    "protocol": {
+      "warmup": 8000,
+      "sample": 25000,
+      "pairs": 3,
+      "profiling": false,
+      "width": 1280,
+      "height": 720,
+      "pixelChannel": 0,
+      "pixelFraction": 0
+    },
+    "primary": [
+      {
+        "family": "rim-static",
+        "backend": "webgpu",
+        "load": 1
+      },
+      {
+        "family": "rim-static",
+        "backend": "webgl",
+        "load": 1
+      },
+      {
+        "family": "rim-active",
+        "backend": "webgpu",
+        "load": 1
+      },
+      {
+        "family": "rim-active",
+        "backend": "webgl",
+        "load": 1
+      },
+      {
+        "family": "rim-stress",
+        "backend": "webgpu",
+        "load": 2048
+      },
+      {
+        "family": "rim-stress",
+        "backend": "webgl",
+        "load": 2048
+      },
+      {
+        "family": "rim-clustered",
+        "backend": "webgpu",
+        "load": 1024
+      },
+      {
+        "family": "rim-clustered",
+        "backend": "webgl",
+        "load": 1024
+      },
+      {
+        "family": "arena-active",
+        "backend": "webgpu",
+        "load": 1
+      },
+      {
+        "family": "arena-active",
+        "backend": "webgl",
+        "load": 1
+      },
+      {
+        "family": "rim-stress",
+        "backend": "webgl",
+        "load": 1024,
+        "purpose": "B7 original rejected-candidate regression workload"
+      }
+    ],
+    "rules": "No quality/resolution/content reduction. Primary matrix compares original B8 against intermediate candidate (optimized WebGPU, original WebGL); final restored-default controls are separate. Cuts and asymmetric XR use maintained acceptance scenarios. Desktop frame distributions only.",
+    "baselinePolicy": {
+      "primary": "original frozen B8 runtime f14c4beb, fixed historical workload loads with newly verified original-SDK calibration manifests; old B7 SDK guard failed before browser",
+      "control": "two B7 stress workloads additionally compare matched instrumented original-selector build against candidate; keep separate from original-runtime primary"
+    }
+  },
+  "host": {
+    "processRoleCounts": {
+      "other": 496,
+      "chrome": 286,
+      "crashpad": 18
+    },
+    "power": {
+      "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23593059)\t64%; charging; (no estimate) present: true\n",
+      "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+    },
+    "isolated": false,
+    "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.1\nBuildVersion:\t\t25G76",
+    "cpu": "Apple M1",
+    "memoryBytes": 17179869184,
+    "gpuEvidence": "Headless real local Chrome backend reported BrowserWebGpu/Gl; device feature/query data retained per raw report. Concurrent system GPU work not isolated."
+  },
+  "publication": {
+    "push": false,
+    "merge": false,
+    "deployment": false,
+    "sharedServerRestart": false,
+    "physicalQuest": false
+  },
+  "status": "batch2 completed; automatic candidate rejected, original selector default both backends; diagnostic opt-in retained; strict caseD unresolved",
+  "cleanMeasurementSummary": {
+    "cleanRuns": 90,
+    "frames": 102137,
+    "exactPairs": 32,
+    "pairs": 45,
+    "failedPairs": 1,
+    "unavailablePairs": 12
+  },
+  "verification": {
+    "fullGateExit": 0,
+    "nativePassed": 428,
+    "nativeIgnored": 2,
+    "browserPassed": 151,
+    "receiptSha256": "0ae53f33763b89977374143ce908cbc9b4efefb5fa6177bd1c020ee131c924ed",
+    "allSourcesSha256": "d853e7ffc38a23d141106a1ee462104d41b36cb24dd3071d34384800d8b16eec"
+  },
+  "evidence": {
+    "archive": "docs/performance/render-followup/batch-2/EVIDENCE.tar.gz",
+    "sha256": "f6373e23790933dc4ae680bc5ae3700e0067d5a61c4e6f2acfc268c7edfd82d5",
+    "bytes": 91713093,
+    "aliases": 4399,
+    "objects": 1185,
+    "restoredFilesVerified": 4399
+  }
+}

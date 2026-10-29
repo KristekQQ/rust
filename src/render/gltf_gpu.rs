@@ -883,6 +883,8 @@ pub struct GpuModel {
     active: HashSet<usize>,
     pub opaque_reorderable: bool,
     reorderable_draws: bool,
+    // Immutable material/draw membership, independent of pose and visibility.
+    has_blend_draws: bool,
     // Union of all active draw bounds, invalidated by the existing pose stamp.
     bounds: Option<(Vec3, Vec3)>,
     // Per-pose draw classification; not rebuilt for each eye/pass/frame.
@@ -1983,6 +1985,9 @@ impl GltfGpu {
             active_draws,
             opaque_reorderable: false,
             reorderable_draws,
+            has_blend_draws: draws
+                .iter()
+                .any(|d| materials[d.material].alpha == AlphaMode::Blend),
             draws,
             materials,
             _shared: shared,
@@ -3679,6 +3684,71 @@ fn material_shader_source(key: ShaderKey) -> String {
 
     source
 }
+/// Optional diagnostic work counts. No per-primitive writes in clean runs.
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlendSelectionStats {
+    pub gltf_models_visited: u64,
+    pub gltf_primitives_visited: u64,
+    pub gltf_active_tests: u64,
+    pub gltf_immutable_rejects: u64,
+    pub gltf_no_pose_rejects: u64,
+}
+
+/// Presence, not a published pose count. The rejection class is immutable;
+/// models containing BLEND still consult the live active set, including after
+/// a failed pose update. Visibility and transparent ordering stay downstream.
+pub fn has_blend_draw<const DIAGNOSTICS: bool>(
+    model: &GpuModel,
+    reference: bool,
+    stats: &mut BlendSelectionStats,
+) -> bool {
+    if DIAGNOSTICS {
+        stats.gltf_models_visited += 1;
+    }
+    if model.last_pose.is_none() {
+        if DIAGNOSTICS {
+            stats.gltf_no_pose_rejects += 1;
+        }
+        return false;
+    }
+    if reference {
+        if !DIAGNOSTICS {
+            return draw_count(model, true) > 0;
+        }
+        // Match the original full-count traversal and active-before-alpha order.
+        let mut count = 0;
+        for draw in &model.draws {
+            stats.gltf_primitives_visited += 1;
+            stats.gltf_active_tests += 1;
+            if model.active.contains(&draw.node)
+                && model.materials[draw.material].alpha == AlphaMode::Blend
+            {
+                count += 1;
+            }
+        }
+        return count > 0;
+    }
+    if !model.has_blend_draws {
+        if DIAGNOSTICS {
+            stats.gltf_immutable_rejects += 1;
+        }
+        return false;
+    }
+    model.draws.iter().any(|draw| {
+        if DIAGNOSTICS {
+            stats.gltf_primitives_visited += 1;
+        }
+        if model.materials[draw.material].alpha != AlphaMode::Blend {
+            return false;
+        }
+        if DIAGNOSTICS {
+            stats.gltf_active_tests += 1;
+        }
+        model.active.contains(&draw.node)
+    })
+}
+
 pub fn draw_count(model: &GpuModel, blend: bool) -> usize {
     model
         .last_pose

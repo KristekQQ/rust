@@ -711,6 +711,15 @@ pub fn set_gltf_white_color_omission_enabled(enabled: bool) -> bool {
 }
 
 #[wasm_bindgen]
+pub fn set_overlay_selection_reference(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_overlay_selection_reference(enabled);
+        }
+    });
+}
+
+#[wasm_bindgen]
 pub fn set_prepared_plan_cache_enabled(enabled: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {

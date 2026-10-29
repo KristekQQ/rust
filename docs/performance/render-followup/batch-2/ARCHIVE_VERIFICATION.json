@@ -1,0 +1,21 @@
+{
+  "archive": "docs/performance/render-followup/batch-2/EVIDENCE.tar.gz",
+  "sha256": "f6373e23790933dc4ae680bc5ae3700e0067d5a61c4e6f2acfc268c7edfd82d5",
+  "bytes": 91713093,
+  "aliases": 4399,
+  "objects": 1185,
+  "logicalBytes": 661703530,
+  "uniqueBytes": 187143875,
+  "verifiedObjects": 1185,
+  "verifiedAliases": 4399,
+  "restoredFilesVerified": 4399,
+  "restoredRoot": "/private/tmp/rust-followup2-evidence-restore",
+  "independentRestoredFiles": true,
+  "historicalFrozenDocsOmitted": true,
+  "scope": "Archive preserves every recorded clean/diagnostic run, failure, runtime/source/assets, manifest and verification log. Intermediate notes are historical; current REPORT/STATE govern final acceptance.",
+  "restoredCalibrationIdentityChecks": [
+    "rim-stress-2048-webgpu",
+    "rim-stress-1024-webgl"
+  ],
+  "localMarkdownLinksChecked": 12
+}

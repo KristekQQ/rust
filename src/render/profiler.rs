@@ -260,6 +260,9 @@ pub struct CpuStages<const N: usize> {
     last: Option<f64>,
 }
 impl<const N: usize> CpuStages<N> {
+    pub fn enabled(&self) -> bool {
+        self.collector.is_some()
+    }
     pub fn new(labels: [&'static str; N]) -> Self {
         let collector = CURRENT.with(|current| current.borrow().as_ref().cloned());
         let frame = collector.as_ref().map_or(0, |c| c.borrow().frame);

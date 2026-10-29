@@ -65,6 +65,7 @@ const suites = [
     { name: 'gltf-material-cache', path: 'tests/gltf-material-cache.html', status: '#result' },
     { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
     { name: 'neon-robot', path: 'examples/neon-robot/?verify=1', status: '#result', button: '#verify' },
+    {name:"overlay-selection",path:"tests/overlay-selection.html",status:"#result"},
     { name: 'postprocess-fusion', path: 'tests/postprocess-fusion.html', status: '#result' },
     { name: 'cynatar', path: 'examples/cynatar/?verify=1', status: '#result', button: '#verify' },
     { name: 'monkey', path: 'examples/monkey/?verify=1', status: '#result', button: '#verify' },
@@ -546,6 +547,7 @@ try {
                 await page.waitForFunction(()=>window.threeVrRequestProbe===1&&document.getElementById('status').textContent.includes('Controlled VR request rejection'));
                 result.threeStressControls={refresh:true,mobileHitTargets:true,removal:true,walkingVrEntry:vrChecks,physicalClickReachedRequestSession:true,requestScope:'controlled rejected request only; not an immersive XR session'};
             }
+            if (suite.name === 'overlay-selection') result.overlaySelectionEvidence = await page.evaluate(() => window.overlaySelectionEvidence);
             if (suite.name === 'shadow-cache') result.shadowCacheEvidence = await page.evaluate(() => window.shadowCacheEvidence);
             if (suite.name === 'gltf-indices') result.indexEvidence = await page.evaluate(() => window.indexEvidence);
             if (suite.name === 'gltf-white-colors') result.whiteColorEvidence = await page.evaluate(() => window.whiteColorEvidence);
