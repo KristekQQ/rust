@@ -1,6 +1,6 @@
 # Next renderer cycle
 
-Batches1–8 have been separately authorized and completed locally. Batch8 adds an explicit WebGL shared-context prototype and measured limits; the original route remains default because symmetric eyes regress callback wall time. The inherited B4 moving-stress image limit remains open. Batch9 requires a separate request.
+Batches1–8 have been separately authorized and completed locally. Batch8 adds an explicit WebGL shared-context prototype and measured limits; the original route remains default because symmetric eyes regress callback wall time. The inherited B4 moving-stress image limit remains open. Batch9 is separately authorized and in progress.
 Base source is the live GitHub main observed at start, not the historical commit in the task description. See MANIFEST.json and STATE.md.
 
 ## Nine batches
@@ -13,7 +13,7 @@ Base source is the live GitHub main observed at start, not the historical commit
 6. Lossless 16-bit indices where representable — complete locally; [report](batch-6/REPORT.md).
 7. Isolate GPU costs and deliver one demonstrated optimization stage — complete locally; [fixed protocol](batch-7/PROTOCOL.md).
 8. WebGL XR presentation between contexts — complete locally; [fixed protocol](batch-8/PROTOCOL.md).
-9. Integration, regressions, results and skill update — not started.
+9. Integration, regressions, results and skill update — in progress; [fixed protocol](batch-9/PROTOCOL.md).
 
 ## Invariants and decisions
 

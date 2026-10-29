@@ -1,0 +1,169 @@
+{
+  "batch": 9,
+  "status": "INCOMPLETE performance / power hold; stable code fully verified",
+  "at": "2026-10-29T01:32:32.810911+00:00",
+  "checkout": "/private/tmp/rust-next-render-cycle-9",
+  "branch": "codex/next-render-cycle-9",
+  "parent": "813a5abb266609cceea644e4b1086129a89ca535",
+  "rendererChangedInB9": false,
+  "runtimeReuse": "B8 release reused after matching Rust/pkg and frozen file hashes",
+  "runtime": {
+    "baseline": {
+      "root": "/private/tmp/rust-next-render-cycle-1/output/next-render-cycle/baseline",
+      "snapshotHead": "b7de3be56ad2a8a79a30e7b4fe927fa6822e33c7",
+      "snapshotDirty": [
+        "?? node_modules"
+      ],
+      "build": {
+        "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+        "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+        "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "frozenFiles": 2461,
+      "sdkFiles": {
+        "js/app.js": {
+          "sha256": "caeca1542151a8a155ed929a4ed0a3457c5c7bec8127d6ce500a6b811734f322",
+          "bytes": 2668
+        },
+        "js/engine.d.ts": {
+          "sha256": "408171435dbbd0db9bba04b8d647df63e4e4693f6a1ce4ad1cfe73dad7d2293f",
+          "bytes": 29564
+        },
+        "js/engine.js": {
+          "sha256": "78a71b170d528928b3e5671b7a5db263fb37c95d335f1f3311a1dc832d436530",
+          "bytes": 46129
+        },
+        "js/scene.js": {
+          "sha256": "756482b945ea74ff03fa034a88097c5b01ae250b253f50bc3644d6b6df9ef466",
+          "bytes": 285
+        },
+        "js/webxr.js": {
+          "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+          "bytes": 31081
+        }
+      },
+      "sdkManifestSha256": "116f4d35fca17e5353ddd4cff7eb99cd32e83d93bb336cc463fe6915f04517f6",
+      "sdkManifestHashAlgorithm": "SHA256 of UTF8 compact JSON sorted [[relativePath,fileSha256,bytes],...]"
+    },
+    "final": {
+      "root": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/candidate",
+      "snapshotHead": "0711e024e48fc61b418831cd645aee92b27677ba",
+      "snapshotDirty": [
+        "M Cargo.toml",
+        " M docs/WEBXR.md",
+        " M docs/performance/next-render-cycle/PLAN.md",
+        " M docs/performance/next-render-cycle/STATE.md",
+        " M js/engine.d.ts",
+        " M js/webxr.js",
+        " M package.json",
+        " M scripts/render-performance-lib.mjs",
+        " M scripts/test-browser.mjs",
+        " M src/render/mod.rs",
+        " M src/render/state.rs",
+        " M src/web.rs",
+        " M tests/rim-gameplay.js",
+        " M tests/xr-simulator-unit.test.mjs",
+        " M tests/xr/simulator.js",
+        "?? docs/performance/next-render-cycle/batch-8/",
+        "?? js/xr-presentation-profile.js",
+        "?? node_modules",
+        "?? scripts/benchmark-xr-presentation.mjs",
+        "?? src/render/xr_gl_output.rs",
+        "?? src/render/xr_gl_present.wgsl",
+        "?? tests/xr-gl-presentation.html",
+        "?? tests/xr-gl-presentation.js",
+        "?? tests/xr-presentation-profile-unit.test.mjs",
+        "?? tests/xr/presentation-benchmark.html",
+        "?? tests/xr/presentation-benchmark.js"
+      ],
+      "build": {
+        "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+        "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+        "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+        "configuration": {
+          "rustflags": "--cfg=web_sys_unstable_apis",
+          "cargo": {},
+          "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+          "profile": "release"
+        }
+      },
+      "frozenFiles": 2541,
+      "sdkFiles": {
+        "js/app.js": {
+          "sha256": "caeca1542151a8a155ed929a4ed0a3457c5c7bec8127d6ce500a6b811734f322",
+          "bytes": 2668
+        },
+        "js/engine.d.ts": {
+          "sha256": "4d23e754abce42753cf168605bcf4515911eeb0d6e618e10250cf352c69b50e2",
+          "bytes": 32763
+        },
+        "js/engine.js": {
+          "sha256": "b241f136503ff95a34b7fb700efa5b0681d4d645e1a7ab75bd8846b7e119b748",
+          "bytes": 47537
+        },
+        "js/scene.js": {
+          "sha256": "756482b945ea74ff03fa034a88097c5b01ae250b253f50bc3644d6b6df9ef466",
+          "bytes": 285
+        },
+        "js/webxr.js": {
+          "sha256": "05ecdf720089d64e13cb1a27f605a62c3f4c10282b78c282583045d1b7d4b02d",
+          "bytes": 36055
+        },
+        "js/xr-presentation-profile.js": {
+          "sha256": "84917c61bd7e0a01b774e569a5ed1cb53abaa4a86b62d81d1d31f1e12401d905",
+          "bytes": 9882
+        }
+      },
+      "sdkManifestSha256": "d7ac16772c961c026cbbb50b7c9b152b4c1a809a38de500f55e1115491d6ef08",
+      "sdkManifestHashAlgorithm": "SHA256 of UTF8 compact JSON sorted [[relativePath,fileSha256,bytes],...]"
+    }
+  },
+  "freshPrimary": {
+    "runs": 72,
+    "fullFrameRecords": 70716,
+    "exactDeterministicPairs": 24,
+    "deterministicFailures": 0,
+    "profiling": false,
+    "gpuTimes": "unavailable by clean protocol"
+  },
+  "cold": {
+    "repairedRuns": 12,
+    "status": "PASS",
+    "profileEnabled": false,
+    "observedQueryCreates": 0,
+    "initialFailedAttempt": "retained; capture timing repaired, no fixture/threshold changes",
+    "scope": "instrumented page/engine cold-use; not OS/driver cold or A/B pixel equality"
+  },
+  "missing": [
+    "dynamic64 long primary",
+    "pool256 120s primary/plateau",
+    "fresh Three common and production controls",
+    "real-worker latency replays",
+    "separate profiler/API diagnostics",
+    "final end-to-end report/checkpoint"
+  ],
+  "power": "host runner snapshots authoritative; contradictory sandbox AC inference retracted",
+  "backup": "/Users/Honza/WebstormProjects/rust/output/next-render-cycle-9-power-backup",
+  "publication": false,
+  "physicalQuest": "unverified",
+  "ci": "not run",
+  "verification": {
+    "status": "PASS stable code",
+    "details": "VERIFICATION.json",
+    "nativePassed": 428,
+    "browserPassed": 149,
+    "helperPassed": 49
+  },
+  "postGateRuntimeAudit": {
+    "runtimeFiles": 297,
+    "additionalFixtures": 5,
+    "mismatches": 0
+  },
+  "checkpoint": "this local recovery commit; not B9 completion"
+}

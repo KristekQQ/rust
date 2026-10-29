@@ -1,0 +1,85 @@
+{
+  "status": "PASS for final stable code; performance batch still INCOMPLETE",
+  "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+  "invocations": 1,
+  "exitCode": 0,
+  "native": {
+    "passed": 428,
+    "failed": 0,
+    "ignored": 2
+  },
+  "sdk": {
+    "passed": 32
+  },
+  "xrPlatform": {
+    "passed": 71
+  },
+  "harness": {
+    "nodePassed": 14,
+    "pythonPassed": 13
+  },
+  "performanceHelperUnits": {
+    "passed": 49,
+    "command": "node --test scripts/render-performance.test.mjs scripts/render-performance-api.test.mjs"
+  },
+  "newScriptSyntax": "node --check on cold driver/page and performance driver/lib PASS",
+  "skillValidation": {
+    "status": "PASS",
+    "command": "PYTHONPATH=/private/tmp/b9-skill-validation-site python3 /Users/Honza/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/wasm-render-performance",
+    "dependency": "PyYAML installed only to isolated temporary target; system/bundled Python lacked it"
+  },
+  "browser": {
+    "passed": 149,
+    "failed": 0,
+    "backends": {
+      "webgpu": 55,
+      "webgl": 94
+    },
+    "browser": "Chrome/156.0.8078.48",
+    "software": false,
+    "sandboxDisabled": false,
+    "started": "2026-10-29T01:27:22.025Z",
+    "finished": "2026-10-29T01:37:57.859Z",
+    "scope": "desktop hardware and simulated XR; no physical Quest"
+  },
+  "releaseBuild": {
+    "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+    "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+    "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "receipt": "PASS reused: all  (unchanged inputs)",
+  "sourceDump": {
+    "regeneratedByGate": true,
+    "sha256": "37abc0cb38ab2210ed9f29b83a4ce0da6379b4cbfc780ae04db5abcfc95f61c2",
+    "byteIdenticalToParent": true
+  },
+  "physicalQuest": "not tested",
+  "ci": "not run",
+  "published": false,
+  "performanceMissing": [
+    "long dynamic64",
+    "pool256 plateau",
+    "fresh Three",
+    "worker latency replays",
+    "separate GPU/API diagnostics"
+  ],
+  "logs": "task-owned durable backup post-gate snapshots / isolated output/verification",
+  "postGateRuntimeAudit": {
+    "runtimeFiles": 297,
+    "additionalFixtures": 5,
+    "totalCompared": 302,
+    "mismatches": 0,
+    "source": "post-gate-input-audit.json"
+  },
+  "localReferenceValidation": {
+    "targets": 43,
+    "missing": 0
+  },
+  "checkpointScope": "Local recovery checkpoint only; performance evidence INCOMPLETE"
+}

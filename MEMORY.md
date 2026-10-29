@@ -1,4 +1,8 @@
-# Current project map — 2026-10-19
+# Current renderer cycle — 2026-10-29
+
+Batch9 integration remains incomplete and power-limited: [cycle state](docs/performance/next-render-cycle/STATE.md), [explicitly partial final report](docs/performance/next-render-cycle/FINAL_REPORT.md). Final B8 release is hash-verified/reused; fresh ordinary/static/camera/cluster/Neon controls exist, but long cut/pool, fresh Three and final diagnostics remain pending. [Fresh stable-code verification](docs/performance/next-render-cycle/batch-9/VERIFICATION.json) passes; it does not replace missing performance evidence. No push/deployment/CI or physical Quest acceptance; shared-GL XR stays opt-in/default-off. The historical B4 strict-image investigation remains open. Owned recovery backup and exact next steps are in STATE/report.
+
+# Historical project map — 2026-10-19
 
 Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current code before relying on this dated map. Read only the relevant source/doc; historical evidence is in [the archive](docs/history/MEMORY-2026-10-13.md), not required context.
 
@@ -23,7 +27,7 @@ Browser `webgpu_wasm`: Rust/WASM + wgpu/WGSL; not a native app. Check current co
 - God-ray example density=.055, exposure=40, strength=.8; engine defaults .035/2.5. Helpers stay outside reflection/postprocess depth. Server sends no-store to avoid mismatched cached modules.
 - Engine review milestone `c1b3ef00`: 59 native tests; detailed dated evidence is in `docs/CODE_REVIEW.md`. New harness entry points and runtime dispose/reinit contracts are in `docs/DEVELOPMENT.md` and README. Use a current verification report rather than historical counts as proof for changes.
 
-## Current Quest / neon decisions — 2026-10-19
+## Historical Quest / neon decisions — 2026-10-19
 
 - Stable XR baseline `b07ae09b`: user confirmed SSR artifacts fixed on Quest 3 / Browser 152.1 with owned per-eye color/depth staging and one final stereo submit. Keep that presentation boundary; Browser 149.1's zero-color-metadata normalization is an earlier, separate workaround. New frame-pipeline code has desktop GPU/WebGL and simulated XR checks; actual headset validation is pending. No headset performance or WebGPU/WebGL color-parity measurement is established. Route XR support through [quest-webgpu-xr](.agents/skills/quest-webgpu-xr/SKILL.md); details: [WEBXR.md](docs/WEBXR.md).
 - Generic frame planning uses single-writer logical resources and exact-descriptor transient aliasing. Rust encodes actual passes; JS exposes graph/profile diagnostics. See [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md) for extension and invalidation rules. GPU physics migration and fixed-step simulation changes are not part of this implementation.
