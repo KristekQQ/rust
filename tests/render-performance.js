@@ -16,8 +16,8 @@ const cutMesh={color:[.9,.15,.08],positions:[-1,-1,-1,1,-1,-1,1,1,-1,-1,1,-1,-1,
 let operationStage='setup';
 const objects=[],operations={transforms:0,spawns:0,removes:0,cuts:0,cutAttempts:0,clusteredRootUpdates:0,separatedRootUpdates:0,frustumDriftUpdates:0,cameraUpdates:0,clusteredModelUpdates:0,animationSeeks:0,mixedModelUpdates:0},scene=engine.scene;
 const experiment=q.get('experiment')||'production';
-if(!['production','cheap-fragment','no-shadows','no-fxaa','depth-order'].includes(experiment))throw Error('Unknown experiment');
-if(['cheap-fragment','depth-order'].includes(experiment)&&engine.setRendererExperiment?.(experiment==='cheap-fragment'?1:2)!==true)throw Error('Renderer experiment control unavailable');
+if(!['production','cheap-fragment','no-shadows','no-fxaa','depth-order','ordinal-merge'].includes(experiment))throw Error('Unknown experiment');
+if(['cheap-fragment','depth-order','ordinal-merge'].includes(experiment)&&engine.setRendererExperiment?.(experiment==='cheap-fragment'?1:experiment==='ordinal-merge'?3:2)!==true)throw Error('Renderer experiment control unavailable');
 let panels=null;let common=null;
 let lastPoseSeconds=0;
 let poolPhase=-1;let epoch=performance.now(),active=false,lastEvent=-1,arena=null,rome=null,stress=null,stressPosition=null,stressModels=[];let quality={renderEffects:[false,false],camera:{position:[0,2,9],target:[0,0,0]},profile:'diagnostic'};

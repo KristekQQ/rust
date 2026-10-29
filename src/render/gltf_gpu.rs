@@ -543,6 +543,8 @@ struct QueueScratch {
     eligible: Vec<QueueItem>,
     model_ranges: Vec<std::ops::Range<usize>>,
     cursors: Vec<usize>,
+    ordinal_offsets: Vec<usize>,
+    ordinal_items: Vec<QueueItem>,
     ordered: Vec<QueueItem>,
     groups: Vec<std::ops::Range<usize>>,
     occupied: crate::render_overlap::OrderedBounds,
@@ -556,6 +558,8 @@ impl QueueScratch {
         self.eligible.clear();
         self.model_ranges.clear();
         self.cursors.clear();
+        self.ordinal_offsets.clear();
+        self.ordinal_items.clear();
         self.ordered.clear();
         self.groups.clear();
         self.occupied.clear();
@@ -594,6 +598,8 @@ impl QueueScratch {
             .sum::<usize>()
             + self.occupied.bytes()
             + self.uploads.retained_bytes()
+            + self.ordinal_offsets.capacity() * std::mem::size_of::<usize>()
+            + self.ordinal_items.capacity() * std::mem::size_of::<QueueItem>()
     }
     fn singleton(&mut self, item: QueueItem) {
         let start = self.ordered.len();
@@ -833,6 +839,9 @@ pub struct GltfGpuStats {
     pub instance_pages_retained: usize,
     pub instance_upload_bytes: u64,
     pub instance_upload_calls: u64,
+    pub ordinal_model_probes: u64,
+    pub ordinal_merged_items: u64,
+    pub ordinal_fallbacks: u64,
     pub instance_changed_bytes: u64,
     pub instance_diff_scanned_bytes: u64,
     pub instance_dirty_record_bytes: u64,
@@ -1791,7 +1800,7 @@ impl GltfGpu {
     }
     /// Bounded diagnostic controls. Production remains mode0; no arbitrary shaders.
     pub fn set_experiment(&mut self, mode: u32) -> bool {
-        if mode > 1 {
+        if ![0, 1, 3].contains(&mode) {
             return false;
         }
         if self.experiment != mode {
@@ -2737,6 +2746,9 @@ impl GltfGpu {
         let mut overlap_node_tests = 0;
         let mut root_batch_breaks = [0; 6];
         let mut draw_batch_breaks = [0; 8];
+        let mut ordinal_model_probes = 0u64;
+        let mut ordinal_merged_items = 0u64;
+        let mut ordinal_fallbacks = 0u64;
         let mut start = 0;
         while start < models.len() {
             let mut end = start + 1;
@@ -2797,13 +2809,34 @@ impl GltfGpu {
                     end += 1;
                 }
             }
-            if end - start > 1 {
+            let merged = self.experiment == 3
+                && end - start > 1
+                && crate::ordinal_merge::merge(
+                    &scratch.eligible
+                        [scratch.model_ranges[start].start..scratch.model_ranges[end - 1].end],
+                    models[start].1.draws.len(),
+                    |item| item.draw,
+                    &mut scratch.ordinal_offsets,
+                    &mut scratch.ordinal_items,
+                );
+            if merged {
+                ordinal_merged_items += scratch.ordinal_items.len() as u64;
+                for i in 0..scratch.ordinal_items.len() {
+                    if let Some(reason) =
+                        scratch.append_compatible(scratch.ordinal_items[i], &models, cache_enabled)
+                    {
+                        draw_batch_breaks[reason] += 1;
+                    }
+                }
+            } else if end - start > 1 {
+                ordinal_fallbacks += u64::from(self.experiment == 3);
                 // Shared assets create identical draw ordinals. Merge the already
                 // ordered per-model lists by ordinal, then model, without a tree
                 // or an allocation per column/group. Gaps from culling stay gaps.
                 let mut ordinal = 0;
                 loop {
                     let mut next = usize::MAX;
+                    ordinal_model_probes += (end - start) as u64;
                     for model in start..end {
                         let cursor = scratch.cursors[model];
                         if cursor < scratch.model_ranges[model].end {
@@ -2849,6 +2882,9 @@ impl GltfGpu {
             });
         }
         let mut stats = self.counters.get();
+        stats.ordinal_model_probes += ordinal_model_probes;
+        stats.ordinal_merged_items += ordinal_merged_items;
+        stats.ordinal_fallbacks += ordinal_fallbacks;
         stats.fine_compatibility_hits += scratch.compatibility_hits;
         stats.overlap_tests += overlap_tests;
         stats.overlap_node_tests += overlap_node_tests;

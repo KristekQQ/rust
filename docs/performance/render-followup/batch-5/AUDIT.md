@@ -1,0 +1,37 @@
+# Independent whole-frame/source audit
+
+Sources inspected at base503502250 and the controlled mode3 diff; earlier timings are hypotheses, not current deployment evidence. A read-only independent reference audit found real but small light/model Vec creation and warned against treating duplicate WGSL source as duplicate compiled GPU instructions. Parent selected stable ordinal transpose because F4 dynamic group preparation is material and the output sequence has a direct independent oracle.
+
+| Area | Confirmed source path / evidence | Interpretation and experiment boundary |
+|---|---|---|
+|Simulation, animation, transforms|`renderer.rs` simulation then scene.gpuUpdates, glTF pose/upload updates; native Rim owns gameplay. F4 clustered diagnostic tails include these scopes.|Static stress says nothing about active gameplay. Dynamic test fixtures retain updates; no lowered simulation rate or animation freeze for a performance win.|
+|Culling, command preparation|`prepare_draws` constructs eligible lists from each model's active_draws and current frustum. Active lists are draw-ordinal ascending by enumeration at load/update. Root asset/barrier/depth-window grouping precedes cursor merge.|New mode3 changes only how already-selected eligible records are transposed into exactly the same ordinal/model order. It does not change culling, depth windows,1024 cap, compatibility or batching.|
+|WASM/browser boundary|SDK sends IDs/commands. Native frame is not one JS draw per vertex/model. Dynamic benchmark issues deliberate model mutations; actual command counts retained.|No evidence that the programming language itself explains the difference. A faster static fixture cannot establish lower input/simulation overhead.|
+|State/encoding/uploads/resources|draw_prepared already suppresses repeated pipeline and texture bindings; material/vertex/index bindings remain per command. Prepared plans/pools have validated ownership/epochs. F4 showed67 tiny uploads can lose to one large span.|Do not reintroduce range policies, extra caches, shader approximations or state suppression without new evidence. Mode3 adds bounded CPU scratch only, no GPU buffers or changed upload mapping.|
+|GPU/shadows/postprocessing|Texture/light/shadow shader specializations already exist. Cached static shadows and per-pass GPU spans are available; F4 and B7 do not prove one universal bottleneck.|Fresh diagnostic anchors/common profile will separate limits; cheap shader/noFXAA/low resolution are explicitly reduced-quality diagnostics, never final changes.|
+|Desktop/XR presentation|`State::render_to` and output adapter own render/post/present. `js/webxr.js:#uploadCanvas` still transfers the fallback canvas with texSubImage2D. Shared-GL remains opt-in.|No new physical Quest evidence. Preserve WebGPU owned-eye staging/final stereo and WebGL context ownership; no presentation refactor.|
+|Serialization/diagnostics/outsideRAF|SDK debugStats/frameProfile parse WASM JSON. Maintained sampler polls them every100ms in clean runs (per-frame in diagnostics); its RAF wrapper includes callbacks/sampler wall time. Worker completion handlers have separate retained test evidence.|Clean means detailed profiler off, not zero observer overhead. Three stats are cheaper/differently structured; this limits absolute cross-engine callback attribution. No GPU timings inferred from queue.submit or texSubImage2D CPU wall time.|
+
+## Pinned Three and valid transfer
+
+`examples/rim-three/vendor/three.module.js` is revision170, with provenance in reference-origin.json. Existing stress.js clones one immutable template, freezes Idle@0, builds one InstancedMesh per source part (67 drone parts), and shares geometry/materials. We do not substitute per-enemy clones. Its representation is already part-major; our general renderer regenerates per-view selected part-major batches when visibility changes. This suggests a stable transpose algorithm, not borrowing Three's different culling or material approximations.
+
+A. Production: same authored assets, gate camera, load and1280×720. Three uses hardware MSAA, ACES/exposure1.25, sRGB, hemisphere/directional illumination, fog and cached PCFSoft2048 shadows; native uses custom PBR/FXAA/shadows. Record actual context samples/lights/settings. This is NOT matched-quality FPS superiority.
+
+B. Limited common: city+drone GLBs, same scale/layout/Idle@0/gate camera and viewport, base-color material profile, no AA/lights/shadows/fog/tone mapping/post. Three still has aggregate InstancedMesh bounds versus native primitive/root policies. Actual submitted triangle differences remain explicit, with no percentage normalization. Cross-engine exact pixel equality is not claimed.
+
+C. Original native versus mode3: same authored configuration, shaders, culling, alpha, normals, effects, update cadence and GPU draw sequence; strict same-backend pixels and repeated full-frame comparison decide acceptance. The original cursor path remains available.
+
+Three's GGX/Fresnel math is different (including exp2 Schlick approximation); it is not an exact replacement for our pow calls. Duplicate `unit(v.normal)` source may already be compiler-CSE. Neither observation justifies silently changing finite-precision rendering. Old depth reorder/published-count/color-interpolator experiments remain rejected.
+
+## Correctness preflight
+
+Independent review caught an obsolete invalid-mode3 assertion and loss of mode3 after a shader toggle in the existing pass fixture. Repaired both, and make the pass oracle switch to original mode0 with cache off, then restore mode3. First browser attempt then exposed the SDK's separate mode whitelist; fix that boundary and retain failed artifacts. Native algorithm oracle, six affected browser scenarios (both APIs, motion/passes/lifecycle and actual worker cut with asymmetric simulatedXR) pass before timing. No tolerance or golden modification.
+
+## Fresh audit qualifications
+
+The current `render.encode.color` scope includes `prepare_draws`; it is NOT a pure command-encoding measurement. CameraWG diagnostic histories show approximately10.09ms color versus9.79ms glTF queue, with nested preparation stages. Do not add these values or attribute10ms to API calls. Overlay glTF presence remains about4.30ms in that instrumented history: followup2 deliberately kept the original selector default after whole-frame regressions. Its immutable guard is still explicit-only; this batch does not quietly reactivate that rejected default.
+
+`renderer.rs:render_stats` still walks visible models and calls `draw_count(false)+draw_count(true)` for its legacy estimated count. The maintained sampler calls `renderer_stats()` every100ms in clean timing and every frame in detailed context. Three reads `renderer.info` directly. This is a concrete observer-work asymmetry, not evidence that Rust/JS itself is slow. Use native `debug.drawCalls`/`mainDrawCalls` and glTF work deltas for actual submitted counts; the legacy value (~130k in a common test) is NOT287 physical draw commands. No runtime stats rewrite/published-count reuse is introduced. The exact cost of the sampling asymmetry is not isolated by these runs; absolute cross-engine callback/cadence attribution remains limited.
+
+The requested supplemental production Three/nativeWG comparison is rejected by the existing driver guard before browser startup. Its failure is preserved. Do not bypass the guard or call it a completed run; supported common-profile WG and GL comparisons plus production GL are retained.

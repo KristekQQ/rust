@@ -1,3 +1,13 @@
+# Followup5 — complete, local checkpoint only
+
+Only batch5 authorized; `codex/render-followup-5`, isolated `/private/tmp/rust-render-followup-2`, base503502250. [Report](batch-5/REPORT.md), [paired results](batch-5/RESULTS.md), [manifest](batch-5/MANIFEST.json), [verification](batch-5/VERIFICATION.json), [commands](batch-5/COMMANDS.md).
+
+Exact-order bounded ordinal transpose is retained as explicit `setRendererExperiment(3)`; production stays mode0. Camera2048 paired FPS changes WG+3.08/+3.69/+6.65%, GL+0.22/+6.34/+3.86%; sparse/cluster/static results smaller/mixed, ordinary scenes60Hz-capped. No global/Quest/production-default gain claimed. Added camera scratch375876B; draw order/quality/uploads unchanged. New array bytes accounted; old vector-growth count does not cover them.
+
+134completed runs/102380RAF,116clean,34/34independent strict native pairs exact.12authored-gameplay and9Three pairs are non-strict; cross-engine differences retained. Common native287draws/39.06Mtri vsThree86/42.01Mtri; production profiles differ. Sampler legacy primitive walk and nested scopes limit CPU attribution. WG weak resolution sensitivity; GL stronger pixel/shader sensitivity in short separate diagnostics, not quality-preserving fixes. Unsupported productionWG/Three guard failure retained, not bypassed.
+
+Fresh gate433native(2ignored),169browser(65WG/104GL),SDK32,XR71,harness14Node+13Python PASS. Preflight2order/54helper/6browser PASS; receipt/source/SDK/harness/pkg match measured probe2. WASM34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d; source79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20. Prior imageA/B/C/D remain open. No push/merge/deployment/shared restart/CI/physicalQuest. Batch6 not started or authorized.
+
 # Followup4 — complete, local checkpoint only
 
 Only batch4 was authorized. Checkout `/private/tmp/rust-render-followup-2`, branch `codex/render-followup-4`, base `237279b6a39d7843fa47258faf9d09ae6dfb34d3`. [Report](batch-4/REPORT.md), [three-pair results](batch-4/RESULTS.md), [manifest](batch-4/MANIFEST.json), [verification](batch-4/VERIFICATION.json), [commands](batch-4/COMMANDS.md).
@@ -10,7 +20,7 @@ Twelve actual worker-cut simulated-XR replays pass; three publication events per
 
 Release WASM `7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63`, source `a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118`, bindings `62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea`. Probe/final executable behavior matches; final SDK has a JSDoc-only correction, both byte identities recorded. Final gate431native(2ignored)/163browser(62WG,101GL),SDK32,XR71,harness14Node+13Python PASS; targeted54performance helper tests PASS. Gate attempt1 rejected JSDoc; corrected attempt2 and current receipt pass. No changed tolerance/golden.
 
-Prior A/B/C/D image cases remain separately open. No push/merge/deploy/shared-server restart/CI/Quest/freshThree. Batch5 NOT started. Next authorized batch must reread this state; possible exact payload sharing is only an unimplemented hypothesis.
+Prior A/B/C/D image cases remain separately open. No push/merge/deploy/shared-server restart/CI/Quest/freshThree. At that F4 checkpoint, batch5 had NOT started. Next authorized batch must reread this state; possible exact payload sharing is only an unimplemented hypothesis.
 
 ## Historical followup3 — complete, local checkpoint only
 

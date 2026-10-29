@@ -21,12 +21,14 @@ function fixture({coplanar=false,alpha='OPAQUE',cpu=false}={}){
  nodes:[{mesh:0,translation:[-.17,0,coplanar?0:-.12]},{mesh:1,translation:[.17,0,coplanar?0:.12]}],scenes:[{nodes:[0,1]}],scene:0};
 }
 
+const mergeExperiment=new URLSearchParams(location.search).has("ordinalMerge");
 const evidence=[];
 const equal=(a,b,label)=>{assert(a.width===b.width&&a.height===b.height,label+' dimensions');let max=0;for(let i=0;i<a.data.length;i++)max=Math.max(max,Math.abs(a.data[i]-b.data[i]));assert(max===0,label+' exact pixels, max='+max);return max;};
 let e;
 try{
  const init=async()=>{
   e=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+  if(new URLSearchParams(location.search).has('ordinalMerge'))assert(e.setRendererExperiment(3),'stable ordinal merge accepted');
   if(new URLSearchParams(location.search).has('uploadPolicy'))assert(e.setInstanceUploadPolicy(Number(new URLSearchParams(location.search).get('uploadPolicy')),0,true),'upload policy accepted');
  document.documentElement.dataset.rendererBackend=e.renderer_backend();
   e.resize(640,400);e.set_camera_mode('free');e.set_render_effects(false,false);e.set_grid_visible(false);e.set_light_helpers_visible(false);e.set_simulation_paused(true);e.setCameraView([0,.1,3],[0,0,0]);
@@ -48,16 +50,19 @@ try{
    assert(after.preparePayloadRebuilds===before.preparePayloadRebuilds,label+' no payload rebuilds');
    assert(after.prepareRecordRebuilds===before.prepareRecordRebuilds,label+' no record rebuilds');
   }
+  if(mergeExperiment)assert(e.setRendererExperiment(0),"original ordinal cursor selected");
   e.setPreparedPlanCacheEnabled(false);const uncached=await capturePixels(canvas);
   assert(e.debugStats().mainDrawCalls===draws,label+' identical actual draws');equal(cached,uncached,label);
   assert(e.debugStats().gltf.preparedPlanCache.retainedBytes===0,label+' disabled releases plan');
+  if(mergeExperiment)assert(e.setRendererExperiment(3),"stable ordinal merge restored");
   e.setPreparedPlanCacheEnabled(true);await frames();equal(cached,await capturePixels(canvas),label+' reenabled');
   const cache=e.debugStats().gltf.preparedPlanCache;
   assert(cache.retainedBytes<=cache.byteLimit&&cache.retainedSlots<=cache.slotLimit,label+' bounded storage');
   evidence.push({label,draws,cache,before,after});return cached;
  };
- assert(!e.setRendererExperiment(2)&&!e.setRendererExperiment(3),'rejected depth prototype and invalid diagnostic mode');
+ assert(!e.setRendererExperiment(2)&&!e.setRendererExperiment(4),'rejected depth prototype and invalid diagnostic mode');
  const first=await check('warm immutable opaque',{warm:true});
+ if(mergeExperiment)assert(e.debugStats().gltf.ordinalMergedItems>0,'actual stable merge work executed');
  // Alpha/depth coverage is independently compared with the original production
  // shader. RGB must differ: this reduced shader is only a diagnostic control.
  const masked=await load(fixture({alpha:'MASK'}));masked.setPosition([0,.5,.4]).setScale([.6,.6,.6]).setRenderOptions(options(true));
@@ -66,7 +71,7 @@ try{
  const covered=(im,i)=>im.data[i]!==im.data[0]||im.data[i+1]!==im.data[1]||im.data[i+2]!==im.data[2];
  let coverageChanges=0;for(let i=0;i<lit.data.length;i+=4)if(covered(lit,i)!==covered(cheap,i))coverageChanges++;
  assert(coverageChanges===0,'cheap shader preserves opaque/MASK coverage: '+coverageChanges);
- assert(e.setRendererExperiment(0),'production selected');equal(lit,await capturePixels(canvas),'original shader restored');masked.remove();
+ assert(e.setRendererExperiment(mergeExperiment?3:0),'production shader selected');equal(lit,await capturePixels(canvas),'original shader restored');masked.remove();
  models[2].setPosition([.65,.2,.14]);assertChanged(first,await check('root transform',{warm:true}),'root transform');
  models[1].setRotation([.1,.22,.04]);await check('affine basis change',{warm:true});
  models[1].setScale([-.7,.8,.9]);await check('mirrored variant',{warm:true});

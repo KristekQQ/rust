@@ -16216,6 +16216,8 @@ pub mod input;
 #[cfg(any(test, target_arch = "wasm32"))]
 mod instance_upload;
 pub mod melee_encounter;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod ordinal_merge;
 pub mod postprocess_plan;
 mod projectile;
 #[cfg(target_arch = "wasm32")]
@@ -17293,6 +17295,118 @@ mod tests {
             .fold(Vec3::splat(f32::NEG_INFINITY), Vec3::max);
         assert!(min.abs_diff_eq(cpu_min, 1e-5), "{min:?} {cpu_min:?}");
         assert!(max.abs_diff_eq(cpu_max, 1e-5));
+    }
+}
+
+
+# File: src/ordinal_merge.rs
+//! Stable draw-ordinal transpose; does not choose visibility or batch boundaries.
+const ORDINAL_LIMIT: usize = 65536;
+const ITEM_BYTES_LIMIT: usize = 4 * 1024 * 1024;
+
+pub(crate) fn merge<T: Copy>(
+    items: &[T],
+    ordinals: usize,
+    ordinal: impl Fn(T) -> usize,
+    offsets: &mut Vec<usize>,
+    ordered: &mut Vec<T>,
+) -> bool {
+    if ordinals > ORDINAL_LIMIT
+        || items.len().saturating_mul(std::mem::size_of::<T>()) > ITEM_BYTES_LIMIT
+    {
+        return false;
+    }
+    offsets.clear();
+    offsets.reserve_exact(ordinals.saturating_sub(offsets.len()));
+    offsets.resize(ordinals, 0);
+    ordered.clear();
+    for &item in items {
+        let index = ordinal(item);
+        if index >= ordinals {
+            return false;
+        }
+        offsets[index] += 1;
+    }
+    let mut next = 0;
+    for count in offsets.iter_mut() {
+        let n = *count;
+        *count = next;
+        next += n;
+    }
+    if let Some(&first) = items.first() {
+        ordered.reserve_exact(items.len().saturating_sub(ordered.len()));
+        ordered.resize(items.len(), first);
+        // Input is model-major. Stable scatter preserves the original model
+        // order within each ordinal, including absent/culled primitives.
+        for &item in items {
+            let offset = &mut offsets[ordinal(item)];
+            ordered[*offset] = item;
+            *offset += 1;
+        }
+    }
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn same_as_cursor_merge_with_gaps_and_empty_models() {
+        let mut counts = Vec::new();
+        let mut ordered = Vec::new();
+        let mut random = 1337u32;
+        for roots in [0, 1, 7, 67, 1025] {
+            for width in [0, 1, 3, 67] {
+                let mut lists = vec![Vec::new(); roots];
+                for (model, list) in lists.iter_mut().enumerate() {
+                    for draw in 0..width {
+                        random = random.wrapping_mul(1664525).wrapping_add(1013904223);
+                        if !random.is_multiple_of(3) {
+                            list.push((model, draw));
+                        }
+                    }
+                }
+                let input: Vec<_> = lists.iter().flatten().copied().collect();
+                let mut reference = Vec::new();
+                let mut cursors = vec![0; roots];
+                let mut ordinal = 0;
+                loop {
+                    let mut next = usize::MAX;
+                    for (model, list) in lists.iter().enumerate() {
+                        if list.get(cursors[model]).is_some_and(|i| i.1 == ordinal) {
+                            reference.push(list[cursors[model]]);
+                            cursors[model] += 1;
+                        }
+                        if let Some(item) = list.get(cursors[model]) {
+                            next = next.min(item.1);
+                        }
+                    }
+                    if next == usize::MAX {
+                        break;
+                    }
+                    ordinal = next;
+                }
+                assert!(merge(&input, width, |i| i.1, &mut counts, &mut ordered));
+                assert_eq!(ordered, reference);
+            }
+        }
+    }
+    #[test]
+    fn bounded_fallback_and_reuse() {
+        let mut counts = Vec::new();
+        let mut ordered = Vec::new();
+        assert!(!merge(
+            &[0usize],
+            ORDINAL_LIMIT + 1,
+            |v| v,
+            &mut counts,
+            &mut ordered
+        ));
+        assert!(!merge(&[2usize], 2, |v| v, &mut counts, &mut ordered));
+        assert!(merge(&[1usize, 0, 1], 2, |v| v, &mut counts, &mut ordered));
+        assert_eq!(ordered, [0, 1, 1]);
+        assert!(merge(&[], 0, |v| v, &mut counts, &mut ordered));
+        assert!(ordered.is_empty());
     }
 }
 
@@ -21110,6 +21224,8 @@ struct QueueScratch {
     eligible: Vec<QueueItem>,
     model_ranges: Vec<std::ops::Range<usize>>,
     cursors: Vec<usize>,
+    ordinal_offsets: Vec<usize>,
+    ordinal_items: Vec<QueueItem>,
     ordered: Vec<QueueItem>,
     groups: Vec<std::ops::Range<usize>>,
     occupied: crate::render_overlap::OrderedBounds,
@@ -21123,6 +21239,8 @@ impl QueueScratch {
         self.eligible.clear();
         self.model_ranges.clear();
         self.cursors.clear();
+        self.ordinal_offsets.clear();
+        self.ordinal_items.clear();
         self.ordered.clear();
         self.groups.clear();
         self.occupied.clear();
@@ -21161,6 +21279,8 @@ impl QueueScratch {
             .sum::<usize>()
             + self.occupied.bytes()
             + self.uploads.retained_bytes()
+            + self.ordinal_offsets.capacity() * std::mem::size_of::<usize>()
+            + self.ordinal_items.capacity() * std::mem::size_of::<QueueItem>()
     }
     fn singleton(&mut self, item: QueueItem) {
         let start = self.ordered.len();
@@ -21400,6 +21520,9 @@ pub struct GltfGpuStats {
     pub instance_pages_retained: usize,
     pub instance_upload_bytes: u64,
     pub instance_upload_calls: u64,
+    pub ordinal_model_probes: u64,
+    pub ordinal_merged_items: u64,
+    pub ordinal_fallbacks: u64,
     pub instance_changed_bytes: u64,
     pub instance_diff_scanned_bytes: u64,
     pub instance_dirty_record_bytes: u64,
@@ -22358,7 +22481,7 @@ impl GltfGpu {
     }
     /// Bounded diagnostic controls. Production remains mode0; no arbitrary shaders.
     pub fn set_experiment(&mut self, mode: u32) -> bool {
-        if mode > 1 {
+        if ![0, 1, 3].contains(&mode) {
             return false;
         }
         if self.experiment != mode {
@@ -23304,6 +23427,9 @@ impl GltfGpu {
         let mut overlap_node_tests = 0;
         let mut root_batch_breaks = [0; 6];
         let mut draw_batch_breaks = [0; 8];
+        let mut ordinal_model_probes = 0u64;
+        let mut ordinal_merged_items = 0u64;
+        let mut ordinal_fallbacks = 0u64;
         let mut start = 0;
         while start < models.len() {
             let mut end = start + 1;
@@ -23364,13 +23490,34 @@ impl GltfGpu {
                     end += 1;
                 }
             }
-            if end - start > 1 {
+            let merged = self.experiment == 3
+                && end - start > 1
+                && crate::ordinal_merge::merge(
+                    &scratch.eligible
+                        [scratch.model_ranges[start].start..scratch.model_ranges[end - 1].end],
+                    models[start].1.draws.len(),
+                    |item| item.draw,
+                    &mut scratch.ordinal_offsets,
+                    &mut scratch.ordinal_items,
+                );
+            if merged {
+                ordinal_merged_items += scratch.ordinal_items.len() as u64;
+                for i in 0..scratch.ordinal_items.len() {
+                    if let Some(reason) =
+                        scratch.append_compatible(scratch.ordinal_items[i], &models, cache_enabled)
+                    {
+                        draw_batch_breaks[reason] += 1;
+                    }
+                }
+            } else if end - start > 1 {
+                ordinal_fallbacks += u64::from(self.experiment == 3);
                 // Shared assets create identical draw ordinals. Merge the already
                 // ordered per-model lists by ordinal, then model, without a tree
                 // or an allocation per column/group. Gaps from culling stay gaps.
                 let mut ordinal = 0;
                 loop {
                     let mut next = usize::MAX;
+                    ordinal_model_probes += (end - start) as u64;
                     for model in start..end {
                         let cursor = scratch.cursors[model];
                         if cursor < scratch.model_ranges[model].end {
@@ -23416,6 +23563,9 @@ impl GltfGpu {
             });
         }
         let mut stats = self.counters.get();
+        stats.ordinal_model_probes += ordinal_model_probes;
+        stats.ordinal_merged_items += ordinal_merged_items;
+        stats.ordinal_fallbacks += ordinal_fallbacks;
         stats.fine_compatibility_hits += scratch.compatibility_hits;
         stats.overlap_tests += overlap_tests;
         stats.overlap_node_tests += overlap_node_tests;
@@ -30466,6 +30616,9 @@ impl SceneRenderer {
                 "cachedAssets": gltf.cached_assets,
         });
         let upload_values = serde_json::json!({
+                "ordinalModelProbes": gltf.ordinal_model_probes,
+                "ordinalMergedItems": gltf.ordinal_merged_items,
+                "ordinalFallbacks": gltf.ordinal_fallbacks,
                 "instanceUploadPolicy": self.gltf_gpu.instance_upload_policy(),
                 "instanceUploadCalls": gltf.instance_upload_calls,
                 "instanceChangedBytes": gltf.instance_changed_bytes,

@@ -1605,6 +1605,9 @@ impl SceneRenderer {
                 "cachedAssets": gltf.cached_assets,
         });
         let upload_values = serde_json::json!({
+                "ordinalModelProbes": gltf.ordinal_model_probes,
+                "ordinalMergedItems": gltf.ordinal_merged_items,
+                "ordinalFallbacks": gltf.ordinal_fallbacks,
                 "instanceUploadPolicy": self.gltf_gpu.instance_upload_policy(),
                 "instanceUploadCalls": gltf.instance_upload_calls,
                 "instanceChangedBytes": gltf.instance_changed_bytes,

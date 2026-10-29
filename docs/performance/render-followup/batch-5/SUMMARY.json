@@ -1,0 +1,422 @@
+[
+  {
+    "campaign": "primary-arena-active-webgl",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 60.00264011616507,
+        "candidateFPS": 60.002318543954374,
+        "fpsChangePercent": -0.0005359301025298358,
+        "callbackMeanChangePercent": 0.14095356107033385,
+        "callbackP99DeltaMs": 0.09999990463256836,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 60.00216007776277,
+        "candidateFPS": 60.00240009600379,
+        "fpsChangePercent": 0.00040001600061234655,
+        "callbackMeanChangePercent": -0.6381516592534386,
+        "callbackP99DeltaMs": 0,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 60.002400096003804,
+        "candidateFPS": 60.002400096003804,
+        "fpsChangePercent": 0.0,
+        "callbackMeanChangePercent": 5.047178043096556,
+        "callbackP99DeltaMs": 0.0,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      }
+    ]
+  },
+  {
+    "campaign": "primary-arena-active-webgpu",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 60.00264011616509,
+        "candidateFPS": 60.002558403556144,
+        "fpsChangePercent": -0.0001361816893141743,
+        "callbackMeanChangePercent": -6.086103715301916,
+        "callbackP99DeltaMs": 0.0,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 60.00240009600384,
+        "candidateFPS": 60.002318543954374,
+        "fpsChangePercent": -0.00013591464563811329,
+        "callbackMeanChangePercent": 6.035037884815053,
+        "callbackP99DeltaMs": 0.09999990463256836,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 60.002318543954345,
+        "candidateFPS": 60.002400096003804,
+        "fpsChangePercent": 0.0001359148303459179,
+        "callbackMeanChangePercent": -2.6452102317386372,
+        "callbackP99DeltaMs": -0.09999990463256836,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-active-webgl",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 60.002558403556144,
+        "candidateFPS": 60.002558403556144,
+        "fpsChangePercent": 0.0,
+        "callbackMeanChangePercent": -9.328891163534525,
+        "callbackP99DeltaMs": -0.09999990463256836,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 60.002400096003804,
+        "candidateFPS": 60.002558403556144,
+        "fpsChangePercent": 0.0002638353667316906,
+        "callbackMeanChangePercent": 2.8434480855854094,
+        "callbackP99DeltaMs": 2.384185791015625e-07,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 60.00216007776277,
+        "candidateFPS": 60.00264011616509,
+        "fpsChangePercent": 0.0008000352015757883,
+        "callbackMeanChangePercent": 0.7981806947122694,
+        "callbackP99DeltaMs": 0.09999990463256836,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-active-webgpu",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 60.002318543954374,
+        "candidateFPS": 60.002318543954374,
+        "fpsChangePercent": 0.0,
+        "callbackMeanChangePercent": -1.0180316549834534,
+        "callbackP99DeltaMs": -0.09999990463256836,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 60.002400096003804,
+        "candidateFPS": 60.002558403556144,
+        "fpsChangePercent": 0.0002638353667316906,
+        "callbackMeanChangePercent": -4.773403422320655,
+        "callbackP99DeltaMs": -0.10000014305114746,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 60.002400096003804,
+        "candidateFPS": 60.00255840355613,
+        "fpsChangePercent": 0.00026383536670948615,
+        "callbackMeanChangePercent": 3.3004266280349803,
+        "callbackP99DeltaMs": 0.0,
+        "baselineFrameMaxMs": 16.80000000000291,
+        "candidateFrameMaxMs": 16.80000000000291
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-camera-stress-webgl",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 36.80147205888226,
+        "candidateFPS": 36.88147525901025,
+        "fpsChangePercent": 0.21739130434779153,
+        "callbackMeanChangePercent": -4.374201539787648,
+        "callbackP99DeltaMs": -0.7999999523162842,
+        "baselineFrameMaxMs": 50.10000000000218,
+        "candidateFrameMaxMs": 50
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 34.698486938098306,
+        "candidateFPS": 36.896976286796914,
+        "fpsChangePercent": 6.335980449581813,
+        "callbackMeanChangePercent": -16.807366594131757,
+        "callbackP99DeltaMs": -14.399999856948853,
+        "baselineFrameMaxMs": 83.29999999999927,
+        "candidateFrameMaxMs": 50.099999999998545
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 34.161366454658136,
+        "candidateFPS": 35.48127732598362,
+        "fpsChangePercent": 3.8637531466353403,
+        "callbackMeanChangePercent": -19.434151968084212,
+        "callbackP99DeltaMs": -12.199999809265137,
+        "baselineFrameMaxMs": 66.79999999999927,
+        "candidateFrameMaxMs": 50.10000000000582
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-camera-stress-webgpu",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 49.68899406770167,
+        "candidateFPS": 51.21940508840631,
+        "fpsChangePercent": 3.0799798817006563,
+        "callbackMeanChangePercent": -3.745537595362314,
+        "callbackP99DeltaMs": 0.10000014305114746,
+        "baselineFrameMaxMs": 50.099999999998545,
+        "candidateFrameMaxMs": 83.39999999999964
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 50.76811762213323,
+        "candidateFPS": 52.64210568422732,
+        "fpsChangePercent": 3.6912695405454388,
+        "callbackMeanChangePercent": -3.5792499953086865,
+        "callbackP99DeltaMs": -0.5,
+        "baselineFrameMaxMs": 50.099999999998545,
+        "candidateFrameMaxMs": 50
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 49.80872012376223,
+        "candidateFPS": 53.12191238884594,
+        "fpsChangePercent": 6.651831761288496,
+        "callbackMeanChangePercent": -6.531665404827402,
+        "callbackP99DeltaMs": -3.0999999046325684,
+        "baselineFrameMaxMs": 66.70000000000073,
+        "candidateFrameMaxMs": 50
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-clustered-webgl",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 25.13779756067297,
+        "candidateFPS": 25.137696938644826,
+        "fpsChangePercent": -0.0004002817983517204,
+        "callbackMeanChangePercent": 0.010838134209567585,
+        "callbackP99DeltaMs": 0.9000000953674316,
+        "baselineFrameMaxMs": 50.10000000000582,
+        "candidateFrameMaxMs": 66.70000000000073
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 25.33783783783785,
+        "candidateFPS": 25.458024281191104,
+        "fpsChangePercent": 0.47433582976750266,
+        "callbackMeanChangePercent": -0.39661215065135424,
+        "callbackP99DeltaMs": -1.8999998569488525,
+        "baselineFrameMaxMs": 66.70000000000073,
+        "candidateFrameMaxMs": 66.60000000000036
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 25.60102404096165,
+        "candidateFPS": 25.82378266448671,
+        "fpsChangePercent": 0.8701160671098496,
+        "callbackMeanChangePercent": -0.9325226912144768,
+        "callbackP99DeltaMs": 0.6999998092651367,
+        "baselineFrameMaxMs": 50.10000000000218,
+        "candidateFrameMaxMs": 66.69999999999891
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-clustered-webgpu",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 26.298514153964387,
+        "candidateFPS": 26.378570513641616,
+        "fpsChangePercent": 0.3044140030441955,
+        "callbackMeanChangePercent": -0.37913393703419285,
+        "callbackP99DeltaMs": -0.09999990463256836,
+        "baselineFrameMaxMs": 66.70000000000073,
+        "candidateFrameMaxMs": 66.70000000000073
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 26.361054442177693,
+        "candidateFPS": 26.463380996734042,
+        "fpsChangePercent": 0.38817322266375687,
+        "callbackMeanChangePercent": -0.46847478732768844,
+        "callbackP99DeltaMs": 0.20000004768371582,
+        "baselineFrameMaxMs": 50.10000000000582,
+        "candidateFrameMaxMs": 66.70000000000073
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 26.223636450854688,
+        "candidateFPS": 26.41859869348021,
+        "fpsChangePercent": 0.7434599811925402,
+        "callbackMeanChangePercent": -0.7184592353391306,
+        "callbackP99DeltaMs": -0.7000000476837158,
+        "baselineFrameMaxMs": 66.70000000000073,
+        "candidateFrameMaxMs": 50.10000000000218
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-mixed-webgl",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 30.00108003888141,
+        "candidateFPS": 29.981171824094474,
+        "fpsChangePercent": -0.06635832697067245,
+        "callbackMeanChangePercent": -2.7795051649129876,
+        "callbackP99DeltaMs": 1.7000000476837158,
+        "baselineFrameMaxMs": 50.10000000000218,
+        "candidateFrameMaxMs": 66.70000000000073
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 30.00120004800192,
+        "candidateFPS": 30.001200048001927,
+        "fpsChangePercent": 2.220446049250313e-14,
+        "callbackMeanChangePercent": -4.689454238579693,
+        "callbackP99DeltaMs": -3.0,
+        "baselineFrameMaxMs": 66.70000000000073,
+        "candidateFrameMaxMs": 66.70000000000073
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 29.961198447937928,
+        "candidateFPS": 30.00132005808256,
+        "fpsChangePercent": 0.1339119001342537,
+        "callbackMeanChangePercent": -5.090226736218629,
+        "callbackP99DeltaMs": -2.700000286102295,
+        "baselineFrameMaxMs": 50.10000000000582,
+        "candidateFrameMaxMs": 50.10000000000582
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-mixed-webgpu",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 34.99478673553768,
+        "candidateFPS": 35.097958482073274,
+        "fpsChangePercent": 0.29482033228345195,
+        "callbackMeanChangePercent": -0.604206960811815,
+        "callbackP99DeltaMs": 1.4000000953674316,
+        "baselineFrameMaxMs": 150,
+        "candidateFrameMaxMs": 83.39999999999418
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 36.9767785830498,
+        "candidateFPS": 38.5501931504496,
+        "fpsChangePercent": 4.255142356076025,
+        "callbackMeanChangePercent": -4.161994950947811,
+        "callbackP99DeltaMs": -2.299999952316284,
+        "baselineFrameMaxMs": 66.70000000000073,
+        "candidateFrameMaxMs": 66.60000000000036
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 36.88147525901034,
+        "candidateFPS": 38.57577441366818,
+        "fpsChangePercent": 4.593902881484957,
+        "callbackMeanChangePercent": -4.429811570530829,
+        "callbackP99DeltaMs": -2.700000047683716,
+        "baselineFrameMaxMs": 50.10000000000218,
+        "candidateFrameMaxMs": 50.10000000000582
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-stress-webgl",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 31.001364060018545,
+        "candidateFPS": 31.000071907383187,
+        "fpsChangePercent": -0.004168050905295484,
+        "callbackMeanChangePercent": 0.05017723736351343,
+        "callbackP99DeltaMs": -0.09999990463256836,
+        "baselineFrameMaxMs": 50,
+        "candidateFrameMaxMs": 50.099999999998545
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 31.00136406001853,
+        "candidateFPS": 30.959999680412803,
+        "fpsChangePercent": -0.13342761152589366,
+        "callbackMeanChangePercent": 1.0297036776873325,
+        "callbackP99DeltaMs": 0.9000003337860107,
+        "baselineFrameMaxMs": 50.10000000000218,
+        "candidateFrameMaxMs": 50
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 31.040020453655597,
+        "candidateFPS": 31.020519113996315,
+        "fpsChangePercent": -0.06282643946191602,
+        "callbackMeanChangePercent": -0.36002250672230174,
+        "callbackP99DeltaMs": -0.10000014305114746,
+        "baselineFrameMaxMs": 50,
+        "candidateFrameMaxMs": 50.100000000000364
+      }
+    ]
+  },
+  {
+    "campaign": "primary-rim-stress-webgpu",
+    "pairs": [
+      {
+        "pair": 0,
+        "baselineFPS": 39.46900604419082,
+        "candidateFPS": 39.29532253744642,
+        "fpsChangePercent": -0.4400503690159874,
+        "callbackMeanChangePercent": 2.082378462384815,
+        "callbackP99DeltaMs": 1.8999998569488525,
+        "baselineFrameMaxMs": 50,
+        "candidateFrameMaxMs": 66.70000000000073
+      },
+      {
+        "pair": 1,
+        "baselineFPS": 39.455222120508246,
+        "candidateFPS": 39.41540478741258,
+        "fpsChangePercent": -0.10091777705383276,
+        "callbackMeanChangePercent": 0.6136223305739374,
+        "callbackP99DeltaMs": 0.8000001907348633,
+        "baselineFrameMaxMs": 33.5,
+        "candidateFrameMaxMs": 50
+      },
+      {
+        "pair": 2,
+        "baselineFPS": 39.26926411076884,
+        "candidateFPS": 39.41524722474281,
+        "fpsChangePercent": 0.37174904414349896,
+        "callbackMeanChangePercent": -0.9880914194452806,
+        "callbackP99DeltaMs": -1.2000000476837158,
+        "baselineFrameMaxMs": 50,
+        "candidateFrameMaxMs": 33.5
+      }
+    ]
+  }
+]

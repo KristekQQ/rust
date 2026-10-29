@@ -1,0 +1,54 @@
+{
+  "command": "PATH=/Users/Honza/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH VERIFY_WASM_PROFILE=release npm run verify:push",
+  "exit": 0,
+  "attempts": 1,
+  "native": {
+    "passed": 433,
+    "ignored": 2,
+    "failed": 0
+  },
+  "sdk": 32,
+  "xrPlatform": 71,
+  "harness": {
+    "node": 14,
+    "python": 13
+  },
+  "browser": {
+    "total": 169,
+    "WebGPU": 65,
+    "WebGL2": 104,
+    "failed": 0
+  },
+  "otherChecks": [
+    "rust-format",
+    "native Clippy",
+    "wasm32 check/Clippy",
+    "SDK types",
+    "release source/pkg identity",
+    "source dump regenerated"
+  ],
+  "focusedBeforeGate": {
+    "nativeOrdinalTests": 2,
+    "performanceHelperTests": 54,
+    "browser": 6
+  },
+  "independentReview": "Read-only reviewer caught stale mode whitelist/oracle mode restore; fixed before timing, subsequent scoped review found no actionable defect.",
+  "receiptReused": true,
+  "runtimeBuild": {
+    "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+    "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+    "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "limits": [
+    "Native tests alone do not cover browser rendering.",
+    "Physical Quest and CI not run.",
+    "Prior image A/B/C/D remain open despite this gate.",
+    "Fresh browser-report identifies current cases; shared XR report basenames retain final backend trace, not every earlier trace."
+  ]
+}

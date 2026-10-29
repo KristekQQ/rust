@@ -1,0 +1,196 @@
+{
+  "batch": "render-followup5/6",
+  "baseCheckpoint": "503502250de09250db3c2a8710c8bc51b25b091d",
+  "branch": "codex/render-followup-5",
+  "checkout": "/private/tmp/rust-render-followup-2",
+  "baseline": {
+    "head": "237279b6a39d7843fa47258faf9d09ae6dfb34d3",
+    "branch": "codex/render-followup-4",
+    "build": {
+      "source": "a4c47fa969c154620f71df649b3ca9ecc80a3c0d2ced9799720263e8972f4118",
+      "wasm": "7829658f7705608ce2e4b445b36c375c010bec516f000f778414e8b61a9c0d63",
+      "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sdkSha256": "11b62bb04db5229c80d2ddd918c64da7ee8bbbe8ff36f6613696c512827906df"
+  },
+  "candidate": {
+    "head": "503502250de09250db3c2a8710c8bc51b25b091d",
+    "branch": "codex/render-followup-5",
+    "build": {
+      "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+      "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+      "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "sdkSha256": "ea9b80dc1fa218cf2ff55735e79f53a54fb9e67c00f46ef1665c0eff9eefdbf6"
+  },
+  "finalRuntime": "Measured probe2; source/SDK/runtime unchanged afterward. Final docs/checkpoint are later than frozen metadata HEAD. Integrity verified separately.",
+  "frozenRoots": {
+    "baseline": "measurements/baseline",
+    "candidate": "measurements/probe2",
+    "failedSDKPreflight": "measurements/probe"
+  },
+  "defaults": {
+    "experiment": 0,
+    "ordinalMerge": "explicit setRendererExperiment(3) only",
+    "sharedGLXR": "explicit opt-in; unchanged",
+    "WebGPUXR": "owned-eye staging/final stereo unchanged"
+  },
+  "protocol": {
+    "viewport": [
+      1280,
+      720
+    ],
+    "dpr": 1,
+    "seed": 1337,
+    "primaryWarmupMs": 8000,
+    "primarySampleMs": 25000,
+    "pairs": 3,
+    "order": [
+      "AB",
+      "BA",
+      "AB"
+    ],
+    "cleanProfiler": false,
+    "pilotWarmupMs": 1000,
+    "pilotSampleMs": 5000,
+    "diagnosticWarmupMs": 2000,
+    "diagnosticSampleMs": 8000,
+    "cameraSparseStaticLoad": 2048,
+    "clusteredLoad": 1024,
+    "ordinaryLoad": 1
+  },
+  "environment": {
+    "hardware": "Apple M1 /16GiB",
+    "os": "macOS26.6.1",
+    "browser": "Chrome156.0.8078.48",
+    "node": "24.19.0",
+    "rust": "1.99.0",
+    "GPU": "hardware ANGLE Metal / Apple M1; BrowserWebGpu and Gl asserted, no fallback",
+    "isolation": "not fully isolated; serialized owned GPU runs, foreign apps/processes preserved; actual concurrent GPU utilization unavailable",
+    "powerObservations": 461,
+    "powerTransitions": 0,
+    "power": "AC in retained coordinator observations; no recorded thermal/performance warnings; temperature/frequency unknown"
+  },
+  "evidence": {
+    "completedRuns": 134,
+    "cleanRuns": 116,
+    "rafRecords": 102380,
+    "primaryRuns": 72,
+    "strictNativePairs": 34,
+    "strictExact": 34,
+    "strictFailures": 0,
+    "nonStrictPairs": 21,
+    "pairedThreeRuns": 18,
+    "profilerOffVerified": true,
+    "rawStatisticsRecomputed": true,
+    "unsupportedAttempt": "production native WebGPU versus Three refused by existing guard before browser; not a run"
+  },
+  "decision": "Retain bounded exact-order mode3 as validated opt-in for camera-driven re-preparation. No blanket default promotion or production-wide FPS claim.",
+  "limits": [
+    "Native/Three sampler cost differs: native legacy render_stats scans primitives; exact overhead not isolated.",
+    "GPU pass spans and GL application query spans are different scopes; clean GPU time unavailable.",
+    "Authored gameplay capture not deterministic; Three exact-image gate intentionally unavailable, differences retained.",
+    "ColdReady includes navigation/assets/readiness; not isolated shader compilation.",
+    "Queue scratch byte accounting includes new arrays; old vector-growth counter does not count their allocations.",
+    "Prior image A/B/C/D cases remain separately open.",
+    "Physical Quest/comfort, driver-resident memory and performance of the new path in real XR are unverified."
+  ],
+  "publication": {
+    "pushed": false,
+    "merged": false,
+    "deployed": false,
+    "sharedServersChanged": false,
+    "CI": "not run"
+  },
+  "verification": {
+    "command": "PATH=/Users/Honza/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH VERIFY_WASM_PROFILE=release npm run verify:push",
+    "exit": 0,
+    "attempts": 1,
+    "native": {
+      "passed": 433,
+      "ignored": 2,
+      "failed": 0
+    },
+    "sdk": 32,
+    "xrPlatform": 71,
+    "harness": {
+      "node": 14,
+      "python": 13
+    },
+    "browser": {
+      "total": 169,
+      "WebGPU": 65,
+      "WebGL2": 104,
+      "failed": 0
+    },
+    "otherChecks": [
+      "rust-format",
+      "native Clippy",
+      "wasm32 check/Clippy",
+      "SDK types",
+      "release source/pkg identity",
+      "source dump regenerated"
+    ],
+    "focusedBeforeGate": {
+      "nativeOrdinalTests": 2,
+      "performanceHelperTests": 54,
+      "browser": 6
+    },
+    "independentReview": "Read-only reviewer caught stale mode whitelist/oracle mode restore; fixed before timing, subsequent scoped review found no actionable defect.",
+    "receiptReused": true,
+    "runtimeBuild": {
+      "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+      "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+      "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "limits": [
+      "Native tests alone do not cover browser rendering.",
+      "Physical Quest and CI not run.",
+      "Prior image A/B/C/D remain open despite this gate.",
+      "Fresh browser-report identifies current cases; shared XR report basenames retain final backend trace, not every earlier trace."
+    ]
+  },
+  "finalBuild": {
+    "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+    "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+    "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "archive": {
+    "archive": "docs/performance/render-followup/batch-5/EVIDENCE.tar.gz",
+    "sha256": "db629c893c51f9309357fd3f118405abf1e54972363a5be36d4809fddd86eba1",
+    "bytes": 97007317,
+    "aliases": 2903,
+    "objects": 1171,
+    "logicalBytes": 509799483,
+    "uniqueBytes": 207439414,
+    "verifiedObjects": 1171,
+    "verifiedAliases": 2903,
+    "independentlyRestoredFiles": 2903,
+    "allRestoredFilesRereadAndHashed": true,
+    "restoreCopy": "temporary verification-only directory removed after this check"
+  }
+}

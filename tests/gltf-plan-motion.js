@@ -36,10 +36,12 @@ const exactPixels=(a,b,label)=>{
  let max=0;for(let i=0;i<a.data.length;i++)max=Math.max(max,Math.abs(a.data[i]-b.data[i]));
  assert(max===0,label+' cache/culling independent pixels: max='+max);return max;
 };
+const mergeExperiment=new URLSearchParams(location.search).has('ordinalMerge');
 const evidence=[];let e;
 try{
  e=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
  if(new URLSearchParams(location.search).has('uploadPolicy'))assert(e.setInstanceUploadPolicy(Number(new URLSearchParams(location.search).get('uploadPolicy')),0,true),'upload policy accepted');
+ if(mergeExperiment)assert(e.setRendererExperiment(3),'stable ordinal merge accepted');
  document.documentElement.dataset.rendererBackend=e.renderer_backend();
  e.resize(640,400);e.set_camera_mode('free');e.set_render_effects(false,false);
  e.set_grid_visible(false);e.set_light_helpers_visible(false);e.set_simulation_paused(true);
@@ -68,10 +70,12 @@ try{
  };
  const oracle=async(label)=>{
   const cached=await capturePixels(canvas);assertForeground(cached,label,100);
+  if(mergeExperiment)assert(e.setRendererExperiment(0),'original cursor reference selected');
   e.setPreparedPlanCacheEnabled(false);e.set_frustum_culling(false);
   const uncached=await capturePixels(canvas);
   const off=snapshot(e);assert(off.fineCacheBytes===0,label+' disabling frees fine cache');
   exactPixels(cached,uncached,label);
+  if(mergeExperiment)assert(e.setRendererExperiment(3),'stable merge restored');
   e.set_frustum_culling(true);e.setPreparedPlanCacheEnabled(true);
   exactPixels(cached,await capturePixels(canvas),label+' restored');
   evidence.push({label,independentPixels:true});return cached;

@@ -17,7 +17,7 @@ node scripts/render-performance.mjs COMMAND --baseline-root FROZEN_ROOT [--candi
 Frozen roots must contain pkg/, js/, assets/, tests/fixtures and example source imports; no source overlay.
 --order spatial|shuffled|alternating --seed N (1337) --overlap 0..1 (0; synthetic root position contraction)
 --three-root FROZEN_THREE_ROOT (compare only; production Rome WebGL/no-profile or limited rim-common both native backends)
---experiment production|cheap-fragment|no-shadows|no-fxaa|depth-order (diagnostic only)
+--experiment production|cheap-fragment|no-shadows|no-fxaa|depth-order|ordinal-merge (diagnostic only)
 --panel-reuse original|reuse --candidate-panel-reuse original|reuse (explicit bitmap reference controls)
 --candidate-experiment NAME (same-renderer A/B diagnostic override; defaults to baseline experiment)
 --three-representation instanced|objects (default instanced; independent roots in objects mode)

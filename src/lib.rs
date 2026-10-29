@@ -21,6 +21,8 @@ pub mod input;
 #[cfg(any(test, target_arch = "wasm32"))]
 mod instance_upload;
 pub mod melee_encounter;
+#[cfg(any(test, target_arch = "wasm32"))]
+mod ordinal_merge;
 pub mod postprocess_plan;
 mod projectile;
 #[cfg(target_arch = "wasm32")]

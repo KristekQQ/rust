@@ -1,4 +1,8 @@
-# Latest — render followup4, local checkpoint
+# Latest — render followup5, local checkpoint
+
+[State](render-followup/STATE.md), [audit/report](render-followup/batch-5/REPORT.md), [pairs](render-followup/batch-5/RESULTS.md). Bounded stable ordinal transpose retained as explicit mode3; default0 unchanged. Camera2048WG three pairs+3.08/+3.69/+6.65%FPS; other workloads smaller/mixed, no global or Quest claim.134runs/102380RAF,34strict native image pairs exact; Three has explicit culling/triangle/quality/sampler differences.433native/169browser plus SDK/XR/harness fresh gate PASS, source/pkg/receipt match WASM34acb880. Prior A/B/C/D remain open. No push/merge/deploy/shared service change/CI/headset; stop before batch6.
+
+# Historical — render followup4, local checkpoint
 
 [State](render-followup/STATE.md), [report](render-followup/batch-4/REPORT.md), [results](render-followup/batch-4/RESULTS.md). Dynamic upload experiments completed; union stays default on both APIs. Sparse1.08MB→1KB costs1→67writes and regresses WebGL2; WebGPU gains/tails mixed. No production FPS gain accepted.218completed runs/208768RAF,102exact deterministic pairs/0new failure/6authored unavailable; prior image A/B/C/D remain open. Twelve real worker simulated-XR replays and two120s bounded-capacity soaks pass. Final431native/163browser plus SDK/XR/harness PASS after JSDoc correction; WASM7829658f, matching receipt/source/pkg. Host campaigns/nonisolated controls and clean frame-context limits explicit. No push/merge/deploy/sharedrestart/Quest/CI/freshThree. Stop before followup5.
 

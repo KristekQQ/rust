@@ -1,0 +1,14 @@
+{
+  "archive": "docs/performance/render-followup/batch-5/EVIDENCE.tar.gz",
+  "sha256": "db629c893c51f9309357fd3f118405abf1e54972363a5be36d4809fddd86eba1",
+  "bytes": 97007317,
+  "aliases": 2903,
+  "objects": 1171,
+  "logicalBytes": 509799483,
+  "uniqueBytes": 207439414,
+  "verifiedObjects": 1171,
+  "verifiedAliases": 2903,
+  "independentlyRestoredFiles": 2903,
+  "allRestoredFilesRereadAndHashed": true,
+  "restoreCopy": "temporary verification-only directory removed after this check"
+}

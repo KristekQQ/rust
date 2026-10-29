@@ -21,6 +21,7 @@ const xrOptions={resolutionScale:1,...(query.get('presentation')==='shared-frame
 const cutTiming={acceptMs:[],prepareMs:[],framesMs:[],frameEvents:[]};let cutMeasuring=false,deathAt=0,cutRequestedAt=0,cutPublishedAt=0;
 await run.execute(async test=>{
  engine=await initEngine(document.querySelector('#gpu-canvas'),{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ if(query.has('ordinalMerge'))test.assert(engine.setRendererExperiment(3),'stable ordinal merge accepted');
  if(query.has('uploadPolicy'))test.assert(engine.setInstanceUploadPolicy(Number(query.get('uploadPolicy')),0,false),'explicit instance upload policy accepted');
  document.documentElement.dataset.rendererBackend=engine.renderer_backend();engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
  configureAppearance(engine);

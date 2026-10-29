@@ -151,7 +151,7 @@ test('actual GL bufferData allocation events use the selected source range',asyn
 });
 
 test('common Rome is scalable and respects actual instance budget',()=>{assert.equal(fixedLoadFamily('rim-common'),false);assert.equal(parseArgs(['calibrate','--family','rim-common','--load','128']).load,128);assert.throws(()=>parseArgs(['smoke','--family','rim-common','--load','2049','--max-load','2049']));});
-test('diagnostic axes are bounded and production remains default',()=>{assert.equal(parseArgs(['smoke']).experiment,'production');for(const experiment of ['cheap-fragment','no-shadows','no-fxaa','depth-order'])assert.equal(parseArgs(['smoke','--experiment',experiment]).experiment,experiment);assert.throws(()=>parseArgs(['smoke','--experiment','arbitrary-wgsl']));});
+test('diagnostic axes are bounded and production remains default',()=>{assert.equal(parseArgs(['smoke']).experiment,'production');for(const experiment of ['cheap-fragment','no-shadows','no-fxaa','depth-order','ordinal-merge'])assert.equal(parseArgs(['smoke','--experiment',experiment]).experiment,experiment);assert.throws(()=>parseArgs(['smoke','--experiment','arbitrary-wgsl']));});
 
 test('paired diagnostic axis is explicit and rejects unsupported/Three combinations',()=>{assert.equal(parseArgs(['compare','--candidate-experiment','depth-order']).candidateExperiment,'depth-order');assert.throws(()=>parseArgs(['compare','--candidate-experiment','unsafe']));assert.throws(()=>parseArgs(['compare','--candidate-experiment','depth-order','--three-root','x']));});
 
