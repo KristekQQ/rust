@@ -1,0 +1,15 @@
+{
+  "fileChecks": 2377,
+  "distinctFilesHashed": 142,
+  "errors": [],
+  "commandRecords": 54,
+  "scope": "Rehashed all accepted served runtime/harness files plus primary/Three/diagnostic/current cold driver and worker inputs. Earlier failed capture-tool hashes retained without original source bytes; early calibration orchestration differs by documented output refusal/power observers, workload bytes rechecked.",
+  "commands": {
+    "primary-": 16,
+    "three-": 3,
+    "diag-": 14,
+    "cal-": 17,
+    "worker-": 4,
+    "power-confirm-": 0
+  }
+}

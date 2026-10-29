@@ -1,0 +1,5110 @@
+{
+  "status": "COMPLETE",
+  "scope": "Bounded axis isolation after reproducible oracle failure; same assets/quality/2048 load/1280x720,16 fixed camera steps. Diagnostic, no performance claim.",
+  "driverSha256": "71320df3e722e51118c9eddae27dab6562a93a257f4e488fd0a52ad8d2f7956b",
+  "runs": [
+    {
+      "label": "final",
+      "status": "COMPLETE",
+      "captures": [
+        {
+          "name": "cached1",
+          "file": "final-cached1.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 8.100000143051147,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 49.920127373982226,
+            "frameMs": 20.032000169157982,
+            "frameP95Ms": 35.50000116229057,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 5031,
+                "drawPrimitive": 0,
+                "rootAsset": 58,
+                "rootBlend": 5,
+                "rootBounds": 0,
+                "rootOverlap": 0,
+                "rootSpatial": 54,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 18966,
+              "bufferUploadCalls": 1570,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 18738,
+              "fineBasisComparisons": 652326,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 3739008,
+              "fineCompatibilityHits": 1613496,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3030,
+              "fineGroupMembershipMisses": 2172,
+              "fineGroupsVisited": 5202,
+              "fineLayoutActiveBytes": 1431712,
+              "fineLayoutReservedBytes": 1830912,
+              "fineNoInstanceFallbacks": 8,
+              "finePayloadBytesWritten": 8782208,
+              "finePayloadGroupsRebuilt": 2463,
+              "finePayloadGroupsReused": 2093,
+              "finePayloadRecordsWritten": 548888,
+              "finePreparedRowsCreated": 2501,
+              "finePreparedRowsReused": 2701,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 536,
+              "instanceBufferBytes": 4322944,
+              "instanceBuffersCreated": 539,
+              "instancePagesActive": 268,
+              "instancePagesCreated": 536,
+              "instancePagesRetained": 536,
+              "instancePool": {
+                "activeBytes": 2161472,
+                "activePages": 268,
+                "activeStreams": 1,
+                "bindGroupsCreated": 536,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 539,
+                "buffersReleased": 1,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  2097152,
+                  128640,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  1,
+                  536,
+                  0,
+                  0
+                ],
+                "createdBytes": 4339328,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 536,
+                "liveBuffers": 538,
+                "liveBytes": 4322944,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 4322944,
+                "peakLiveBytes": 4324688,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 16384,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 4511,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 24965728,
+              "instancedDrawCalls": 15483,
+              "instancesDrawn": 5088482,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 0,
+              "overlapTests": 0,
+              "pipelineChanges": 200,
+              "prepareEligibleRebuilds": 38,
+              "prepareGroupRebuilds": 38,
+              "prepareOpaqueGroupRebuilds": 31,
+              "preparePayloadRebuilds": 2938,
+              "prepareRecordRebuilds": 4029,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 1570,
+                "enabled": true,
+                "hits": 42,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 27,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  9,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "retainedBytes": 113560,
+                "retainedSlots": 1,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 103889,
+              "primitiveTests": 280452,
+              "queueScratchBytes": 2142816,
+              "queueScratchGrowths": 25,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 25790,
+              "rootFullyInside": 21568,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 15483,
+              "translatedInstances": 5085227,
+              "trianglesDrawn": 1584383480,
+              "uniformUploadBytes": 58512448,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 0,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 44,
+              "instanceUploadBytes": 0,
+              "misses": 27,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 0,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 0,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cached2",
+          "file": "final-cached2.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 8.700000047683716,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 39.87876916365028,
+            "frameMs": 25.07599961012602,
+            "frameP95Ms": 35.50000116229057,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 5031,
+                "drawPrimitive": 0,
+                "rootAsset": 58,
+                "rootBlend": 5,
+                "rootBounds": 0,
+                "rootOverlap": 0,
+                "rootSpatial": 54,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 22056,
+              "bufferUploadCalls": 1570,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 21798,
+              "fineBasisComparisons": 652326,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 3739008,
+              "fineCompatibilityHits": 1613496,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3030,
+              "fineGroupMembershipMisses": 2172,
+              "fineGroupsVisited": 5202,
+              "fineLayoutActiveBytes": 1431712,
+              "fineLayoutReservedBytes": 1830912,
+              "fineNoInstanceFallbacks": 8,
+              "finePayloadBytesWritten": 8782208,
+              "finePayloadGroupsRebuilt": 2463,
+              "finePayloadGroupsReused": 2093,
+              "finePayloadRecordsWritten": 548888,
+              "finePreparedRowsCreated": 2501,
+              "finePreparedRowsReused": 2701,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 536,
+              "instanceBufferBytes": 4322944,
+              "instanceBuffersCreated": 539,
+              "instancePagesActive": 268,
+              "instancePagesCreated": 536,
+              "instancePagesRetained": 536,
+              "instancePool": {
+                "activeBytes": 2161472,
+                "activePages": 268,
+                "activeStreams": 1,
+                "bindGroupsCreated": 536,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 539,
+                "buffersReleased": 1,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  2097152,
+                  128640,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  1,
+                  536,
+                  0,
+                  0
+                ],
+                "createdBytes": 4339328,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 536,
+                "liveBuffers": 538,
+                "liveBytes": 4322944,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 4322944,
+                "peakLiveBytes": 4324688,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 16384,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 4511,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 24965728,
+              "instancedDrawCalls": 18163,
+              "instancesDrawn": 5983682,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 0,
+              "overlapTests": 0,
+              "pipelineChanges": 230,
+              "prepareEligibleRebuilds": 38,
+              "prepareGroupRebuilds": 38,
+              "prepareOpaqueGroupRebuilds": 31,
+              "preparePayloadRebuilds": 2938,
+              "prepareRecordRebuilds": 4029,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 1570,
+                "enabled": true,
+                "hits": 52,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 27,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  9,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "retainedBytes": 113560,
+                "retainedSlots": 1,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 103889,
+              "primitiveTests": 280452,
+              "queueScratchBytes": 2142816,
+              "queueScratchGrowths": 25,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 25790,
+              "rootFullyInside": 21568,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 18163,
+              "translatedInstances": 5980047,
+              "trianglesDrawn": 1863104820,
+              "uniformUploadBytes": 58512448,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 0,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 54,
+              "instanceUploadBytes": 0,
+              "misses": 27,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 0,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 0,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cache-off1",
+          "file": "final-cache-off1.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 23.299999952316284,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 39.87876916365028,
+            "frameMs": 25.07599961012602,
+            "frameP95Ms": 35.50000116229057,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 6371,
+                "drawPrimitive": 0,
+                "rootAsset": 68,
+                "rootBlend": 5,
+                "rootBounds": 0,
+                "rootOverlap": 0,
+                "rootSpatial": 69,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 24837,
+              "bufferUploadCalls": 1571,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 24552,
+              "fineBasisComparisons": 652326,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 0,
+              "fineCompatibilityHits": 1613496,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3030,
+              "fineGroupMembershipMisses": 2172,
+              "fineGroupsVisited": 5202,
+              "fineLayoutActiveBytes": 0,
+              "fineLayoutReservedBytes": 0,
+              "fineNoInstanceFallbacks": 8,
+              "finePayloadBytesWritten": 8782208,
+              "finePayloadGroupsRebuilt": 2463,
+              "finePayloadGroupsReused": 2093,
+              "finePayloadRecordsWritten": 548888,
+              "finePreparedRowsCreated": 2501,
+              "finePreparedRowsReused": 2701,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 536,
+              "instanceBufferBytes": 4322944,
+              "instanceBuffersCreated": 539,
+              "instancePagesActive": 268,
+              "instancePagesCreated": 536,
+              "instancePagesRetained": 536,
+              "instancePool": {
+                "activeBytes": 2161472,
+                "activePages": 268,
+                "activeStreams": 1,
+                "bindGroupsCreated": 536,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 539,
+                "buffersReleased": 1,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  2097152,
+                  128640,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  1,
+                  536,
+                  0,
+                  0
+                ],
+                "createdBytes": 4339328,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 536,
+                "liveBuffers": 538,
+                "liveBytes": 4322944,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 4322944,
+                "peakLiveBytes": 4324688,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 16384,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 5856,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 26397440,
+              "instancedDrawCalls": 20575,
+              "instancesDrawn": 6789362,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 0,
+              "overlapTests": 0,
+              "pipelineChanges": 257,
+              "prepareEligibleRebuilds": 43,
+              "prepareGroupRebuilds": 43,
+              "prepareOpaqueGroupRebuilds": 36,
+              "preparePayloadRebuilds": 4278,
+              "prepareRecordRebuilds": 5559,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 1571,
+                "enabled": false,
+                "hits": 56,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 27,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  9,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "retainedBytes": 0,
+                "retainedSlots": 0,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 128164,
+              "primitiveTests": 372672,
+              "queueScratchBytes": 2142816,
+              "queueScratchGrowths": 25,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 32840,
+              "rootFullyInside": 27238,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 20575,
+              "translatedInstances": 6785385,
+              "trianglesDrawn": 2113954026,
+              "uniformUploadBytes": 59944160,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 0,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 63,
+              "instanceUploadBytes": 0,
+              "misses": 27,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 0,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 0,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cache-off2",
+          "file": "final-cache-off2.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 23.59999990463257,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 37.47534584007727,
+            "frameMs": 26.68421004751795,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 8783,
+                "drawPrimitive": 0,
+                "rootAsset": 86,
+                "rootBlend": 5,
+                "rootBounds": 0,
+                "rootOverlap": 0,
+                "rootSpatial": 96,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 27618,
+              "bufferUploadCalls": 1571,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 27306,
+              "fineBasisComparisons": 652326,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 0,
+              "fineCompatibilityHits": 1613496,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3030,
+              "fineGroupMembershipMisses": 2172,
+              "fineGroupsVisited": 5202,
+              "fineLayoutActiveBytes": 0,
+              "fineLayoutReservedBytes": 0,
+              "fineNoInstanceFallbacks": 8,
+              "finePayloadBytesWritten": 8782208,
+              "finePayloadGroupsRebuilt": 2463,
+              "finePayloadGroupsReused": 2093,
+              "finePayloadRecordsWritten": 548888,
+              "finePreparedRowsCreated": 2501,
+              "finePreparedRowsReused": 2701,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 536,
+              "instanceBufferBytes": 4322944,
+              "instanceBuffersCreated": 539,
+              "instancePagesActive": 268,
+              "instancePagesCreated": 536,
+              "instancePagesRetained": 536,
+              "instancePool": {
+                "activeBytes": 2161472,
+                "activePages": 268,
+                "activeStreams": 1,
+                "bindGroupsCreated": 536,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 539,
+                "buffersReleased": 1,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  2097152,
+                  128640,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  1,
+                  536,
+                  0,
+                  0
+                ],
+                "createdBytes": 4339328,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 536,
+                "liveBuffers": 538,
+                "liveBytes": 4322944,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 4322944,
+                "peakLiveBytes": 4324688,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 16384,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 8277,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 26397440,
+              "instancedDrawCalls": 22987,
+              "instancesDrawn": 7595042,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 0,
+              "overlapTests": 0,
+              "pipelineChanges": 284,
+              "prepareEligibleRebuilds": 52,
+              "prepareGroupRebuilds": 52,
+              "prepareOpaqueGroupRebuilds": 45,
+              "preparePayloadRebuilds": 6690,
+              "prepareRecordRebuilds": 8313,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 1571,
+                "enabled": false,
+                "hits": 56,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 27,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  9,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  1,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0
+                ],
+                "retainedBytes": 0,
+                "retainedSlots": 0,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 171859,
+              "primitiveTests": 538668,
+              "queueScratchBytes": 2142816,
+              "queueScratchGrowths": 25,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 45530,
+              "rootFullyInside": 37444,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 22987,
+              "translatedInstances": 7590723,
+              "trianglesDrawn": 2364803232,
+              "uniformUploadBytes": 59944160,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 0,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 72,
+              "instanceUploadBytes": 0,
+              "misses": 27,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 0,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 0,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cull-off1",
+          "file": "final-cull-off1.png",
+          "sha256": "6d115af31c00ff07539ba225e96fdb917717358e39c744a3493308ffa3cd1673",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 2.0999999046325684,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 0,
+            "drawCalls": 803,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 37.47534584007727,
+            "frameMs": 26.68421004751795,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 10537,
+                "drawPrimitive": 0,
+                "rootAsset": 112,
+                "rootBlend": 12,
+                "rootBounds": 0,
+                "rootOverlap": 2,
+                "rootSpatial": 111,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 33830,
+              "bufferUploadCalls": 2250,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 33402,
+              "fineBasisComparisons": 790291,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 5798664,
+              "fineCompatibilityHits": 1888476,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3763,
+              "fineGroupMembershipMisses": 2905,
+              "fineGroupsVisited": 6668,
+              "fineLayoutActiveBytes": 2207440,
+              "fineLayoutReservedBytes": 3031808,
+              "fineNoInstanceFallbacks": 9,
+              "finePayloadBytesWritten": 10989648,
+              "finePayloadGroupsRebuilt": 2938,
+              "finePayloadGroupsReused": 2568,
+              "finePayloadRecordsWritten": 686853,
+              "finePreparedRowsCreated": 3234,
+              "finePreparedRowsReused": 3434,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 475,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instancePool": {
+                "activeBytes": 4308304,
+                "activePages": 475,
+                "activeStreams": 1,
+                "bindGroupsCreated": 743,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 747,
+                "buffersReleased": 2,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  6291456,
+                  178320,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  2,
+                  743,
+                  0,
+                  0
+                ],
+                "createdBytes": 8583312,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 743,
+                "liveBuffers": 745,
+                "liveBytes": 6469776,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 6469776,
+                "peakLiveBytes": 8517248,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 2113536,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 9828,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 29424128,
+              "instancedDrawCalls": 27116,
+              "instancesDrawn": 8831210,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 2,
+              "overlapTests": 2,
+              "pipelineChanges": 343,
+              "prepareEligibleRebuilds": 65,
+              "prepareGroupRebuilds": 65,
+              "prepareOpaqueGroupRebuilds": 51,
+              "preparePayloadRebuilds": 7969,
+              "prepareRecordRebuilds": 10011,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 2250,
+                "enabled": true,
+                "hits": 61,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 30,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  11,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  2,
+                  0,
+                  0,
+                  2,
+                  0,
+                  0
+                ],
+                "retainedBytes": 245472,
+                "retainedSlots": 2,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 186424,
+              "primitiveTests": 594000,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 31,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 49760,
+              "rootFullyInside": 40846,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 27116,
+              "translatedInstances": 8824924,
+              "trianglesDrawn": 2744472300,
+              "uniformUploadBytes": 63133568,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 802,
+            "mainViewCache": {
+              "hits": 81,
+              "instanceUploadBytes": 20064,
+              "misses": 28,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 28,
+              "fullIndices": 10752,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 10752
+            },
+            "visible": 2181,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cull-off2",
+          "file": "final-cull-off2.png",
+          "sha256": "6d115af31c00ff07539ba225e96fdb917717358e39c744a3493308ffa3cd1673",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 2,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 0,
+            "drawCalls": 803,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 28.215028108951305,
+            "frameMs": 35.442105396405644,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 10537,
+                "drawPrimitive": 0,
+                "rootAsset": 112,
+                "rootBlend": 21,
+                "rootBounds": 0,
+                "rootOverlap": 2,
+                "rootSpatial": 111,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 40598,
+              "bufferUploadCalls": 2250,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 40035,
+              "fineBasisComparisons": 790291,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 5798664,
+              "fineCompatibilityHits": 1888476,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3763,
+              "fineGroupMembershipMisses": 2905,
+              "fineGroupsVisited": 6668,
+              "fineLayoutActiveBytes": 2207440,
+              "fineLayoutReservedBytes": 3031808,
+              "fineNoInstanceFallbacks": 9,
+              "finePayloadBytesWritten": 10989648,
+              "finePayloadGroupsRebuilt": 2938,
+              "finePayloadGroupsReused": 2568,
+              "finePayloadRecordsWritten": 686853,
+              "finePreparedRowsCreated": 3234,
+              "finePreparedRowsReused": 3434,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 475,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instancePool": {
+                "activeBytes": 4308304,
+                "activePages": 475,
+                "activeStreams": 1,
+                "bindGroupsCreated": 743,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 747,
+                "buffersReleased": 2,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  6291456,
+                  178320,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  2,
+                  743,
+                  0,
+                  0
+                ],
+                "createdBytes": 8583312,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 743,
+                "liveBuffers": 745,
+                "liveBytes": 6469776,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 6469776,
+                "peakLiveBytes": 8517248,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 2113536,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 9828,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 29424128,
+              "instancedDrawCalls": 31391,
+              "instancesDrawn": 10075253,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 2,
+              "overlapTests": 2,
+              "pipelineChanges": 406,
+              "prepareEligibleRebuilds": 74,
+              "prepareGroupRebuilds": 74,
+              "prepareOpaqueGroupRebuilds": 51,
+              "preparePayloadRebuilds": 7969,
+              "prepareRecordRebuilds": 10047,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 2250,
+                "enabled": true,
+                "hits": 70,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 30,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  11,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  2,
+                  0,
+                  0,
+                  2,
+                  0,
+                  0
+                ],
+                "retainedBytes": 245472,
+                "retainedSlots": 2,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 186424,
+              "primitiveTests": 594000,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 31,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 49760,
+              "rootFullyInside": 40846,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 31391,
+              "translatedInstances": 10066609,
+              "trianglesDrawn": 3125031630,
+              "uniformUploadBytes": 63133568,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 802,
+            "mainViewCache": {
+              "hits": 90,
+              "instanceUploadBytes": 20064,
+              "misses": 28,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 28,
+              "fullIndices": 10752,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 10752
+            },
+            "visible": 2181,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "both-off1",
+          "file": "final-both-off1.png",
+          "sha256": "6d115af31c00ff07539ba225e96fdb917717358e39c744a3493308ffa3cd1673",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 25.399999856948853,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 0,
+            "drawCalls": 803,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 35.523978569442356,
+            "frameMs": 28.15000009205606,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 12912,
+                "drawPrimitive": 0,
+                "rootAsset": 162,
+                "rootBlend": 31,
+                "rootBounds": 0,
+                "rootOverlap": 7,
+                "rootSpatial": 126,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 48118,
+              "bufferUploadCalls": 2251,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 47405,
+              "fineBasisComparisons": 790291,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 0,
+              "fineCompatibilityHits": 1888476,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3763,
+              "fineGroupMembershipMisses": 2905,
+              "fineGroupsVisited": 6668,
+              "fineLayoutActiveBytes": 0,
+              "fineLayoutReservedBytes": 0,
+              "fineNoInstanceFallbacks": 9,
+              "finePayloadBytesWritten": 10989648,
+              "finePayloadGroupsRebuilt": 2938,
+              "finePayloadGroupsReused": 2568,
+              "finePayloadRecordsWritten": 686853,
+              "finePreparedRowsCreated": 3234,
+              "finePreparedRowsReused": 3434,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 475,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instancePool": {
+                "activeBytes": 4308304,
+                "activePages": 475,
+                "activeStreams": 1,
+                "bindGroupsCreated": 743,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 747,
+                "buffersReleased": 2,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  6291456,
+                  178320,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  2,
+                  743,
+                  0,
+                  0
+                ],
+                "createdBytes": 8583312,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 743,
+                "liveBuffers": 745,
+                "liveBytes": 6469776,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 6469776,
+                "peakLiveBytes": 8517248,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 2113536,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 12208,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 31631568,
+              "instancedDrawCalls": 36141,
+              "instancesDrawn": 11457523,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 7,
+              "overlapTests": 7,
+              "pipelineChanges": 476,
+              "prepareEligibleRebuilds": 89,
+              "prepareGroupRebuilds": 89,
+              "prepareOpaqueGroupRebuilds": 56,
+              "preparePayloadRebuilds": 10344,
+              "prepareRecordRebuilds": 13752,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 2251,
+                "enabled": false,
+                "hits": 75,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 30,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  11,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  2,
+                  0,
+                  0,
+                  3,
+                  0,
+                  0
+                ],
+                "retainedBytes": 0,
+                "retainedSlots": 0,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 186424,
+              "primitiveTests": 594000,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 31,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 49760,
+              "rootFullyInside": 40846,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 36141,
+              "translatedInstances": 11446259,
+              "trianglesDrawn": 3547875330,
+              "uniformUploadBytes": 65341008,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 802,
+            "mainViewCache": {
+              "hits": 100,
+              "instanceUploadBytes": 20064,
+              "misses": 28,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 28,
+              "fullIndices": 10752,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 10752
+            },
+            "visible": 2181,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "both-off2",
+          "file": "final-both-off2.png",
+          "sha256": "6d115af31c00ff07539ba225e96fdb917717358e39c744a3493308ffa3cd1673",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 25.200000047683716,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 0,
+            "drawCalls": 803,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 35.523978569442356,
+            "frameMs": 28.15000009205606,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 17187,
+                "drawPrimitive": 0,
+                "rootAsset": 252,
+                "rootBlend": 40,
+                "rootBounds": 0,
+                "rootOverlap": 16,
+                "rootSpatial": 153,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 54886,
+              "bufferUploadCalls": 2251,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 54038,
+              "fineBasisComparisons": 790291,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 0,
+              "fineCompatibilityHits": 1888476,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3763,
+              "fineGroupMembershipMisses": 2905,
+              "fineGroupsVisited": 6668,
+              "fineLayoutActiveBytes": 0,
+              "fineLayoutReservedBytes": 0,
+              "fineNoInstanceFallbacks": 9,
+              "finePayloadBytesWritten": 10989648,
+              "finePayloadGroupsRebuilt": 2938,
+              "finePayloadGroupsReused": 2568,
+              "finePayloadRecordsWritten": 686853,
+              "finePreparedRowsCreated": 3234,
+              "finePreparedRowsReused": 3434,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 475,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instancePool": {
+                "activeBytes": 4308304,
+                "activePages": 475,
+                "activeStreams": 1,
+                "bindGroupsCreated": 743,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 747,
+                "buffersReleased": 2,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  6291456,
+                  178320,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  2,
+                  743,
+                  0,
+                  0
+                ],
+                "createdBytes": 8583312,
+                "evictions": 0,
+                "inactiveBytes": 2161472,
+                "inactivePages": 268,
+                "inactiveStreams": 1,
+                "liveBindGroups": 743,
+                "liveBuffers": 745,
+                "liveBytes": 6469776,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 6469776,
+                "peakLiveBytes": 8517248,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 2113536,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 16492,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 31631568,
+              "instancedDrawCalls": 40416,
+              "instancesDrawn": 12701566,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 16,
+              "overlapTests": 16,
+              "pipelineChanges": 539,
+              "prepareEligibleRebuilds": 107,
+              "prepareGroupRebuilds": 107,
+              "prepareOpaqueGroupRebuilds": 65,
+              "preparePayloadRebuilds": 14619,
+              "prepareRecordRebuilds": 20385,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 2251,
+                "enabled": false,
+                "hits": 75,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 30,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  11,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  2,
+                  0,
+                  0,
+                  3,
+                  0,
+                  0
+                ],
+                "retainedBytes": 0,
+                "retainedSlots": 0,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 186424,
+              "primitiveTests": 594000,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 31,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 49760,
+              "rootFullyInside": 40846,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 40416,
+              "translatedInstances": 12687944,
+              "trianglesDrawn": 3928434660,
+              "uniformUploadBytes": 65341008,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 802,
+            "mainViewCache": {
+              "hits": 109,
+              "instanceUploadBytes": 20064,
+              "misses": 28,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 28,
+              "fullIndices": 10752,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 10752
+            },
+            "visible": 2181,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "restored1",
+          "file": "final-restored1.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 6.699999809265137,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 19.36483290062604,
+            "frameMs": 51.640001498162746,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 18880,
+                "drawPrimitive": 0,
+                "rootAsset": 284,
+                "rootBlend": 43,
+                "rootBounds": 0,
+                "rootOverlap": 19,
+                "rootSpatial": 165,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 59326,
+              "bufferUploadCalls": 2500,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 58410,
+              "fineBasisComparisons": 879773,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 3693408,
+              "fineCompatibilityHits": 1977690,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3763,
+              "fineGroupMembershipMisses": 3211,
+              "fineGroupsVisited": 6974,
+              "fineLayoutActiveBytes": 1431712,
+              "fineLayoutReservedBytes": 1802240,
+              "fineNoInstanceFallbacks": 10,
+              "finePayloadBytesWritten": 12421248,
+              "finePayloadGroupsRebuilt": 3206,
+              "finePayloadGroupsReused": 2568,
+              "finePayloadRecordsWritten": 776328,
+              "finePreparedRowsCreated": 3540,
+              "finePreparedRowsReused": 3434,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 268,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instancePool": {
+                "activeBytes": 4258624,
+                "activePages": 268,
+                "activeStreams": 1,
+                "bindGroupsCreated": 743,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 747,
+                "buffersReleased": 2,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  6291456,
+                  178320,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  2,
+                  743,
+                  0,
+                  0
+                ],
+                "createdBytes": 8583312,
+                "evictions": 0,
+                "inactiveBytes": 2211152,
+                "inactivePages": 475,
+                "inactiveStreams": 1,
+                "liveBindGroups": 743,
+                "liveBuffers": 745,
+                "liveBytes": 6469776,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 6469776,
+                "peakLiveBytes": 8517248,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 2113536,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 18189,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 33432656,
+              "instancedDrawCalls": 43717,
+              "instancesDrawn": 13742906,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 19,
+              "overlapTests": 19,
+              "pipelineChanges": 582,
+              "prepareEligibleRebuilds": 115,
+              "prepareGroupRebuilds": 115,
+              "prepareOpaqueGroupRebuilds": 70,
+              "preparePayloadRebuilds": 16312,
+              "prepareRecordRebuilds": 22921,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 2500,
+                "enabled": true,
+                "hits": 81,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 32,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  13,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  2,
+                  0,
+                  0,
+                  4,
+                  0,
+                  0
+                ],
+                "retainedBytes": 118684,
+                "retainedSlots": 2,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 191279,
+              "primitiveTests": 612463,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 31,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 51171,
+              "rootFullyInside": 41980,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 43717,
+              "translatedInstances": 13728213,
+              "trianglesDrawn": 4250454784,
+              "uniformUploadBytes": 67201616,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 118,
+              "instanceUploadBytes": 20064,
+              "misses": 29,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "restored2",
+          "file": "final-restored2.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 8.399999856948853,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 19.36483290062604,
+            "frameMs": 51.640001498162746,
+            "frameP95Ms": 88.59999477863312,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 18880,
+                "drawPrimitive": 0,
+                "rootAsset": 284,
+                "rootBlend": 43,
+                "rootBounds": 0,
+                "rootOverlap": 19,
+                "rootSpatial": 165,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 62107,
+              "bufferUploadCalls": 2500,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 61164,
+              "fineBasisComparisons": 879773,
+              "fineCacheBudgetFallbacks": 0,
+              "fineCacheBytes": 3693408,
+              "fineCompatibilityHits": 1977690,
+              "fineDynamicFallbacks": 2,
+              "fineFullRecordPacks": 0,
+              "fineGroupMembershipHits": 3763,
+              "fineGroupMembershipMisses": 3211,
+              "fineGroupsVisited": 6974,
+              "fineLayoutActiveBytes": 1431712,
+              "fineLayoutReservedBytes": 1802240,
+              "fineNoInstanceFallbacks": 10,
+              "finePayloadBytesWritten": 12421248,
+              "finePayloadGroupsRebuilt": 3206,
+              "finePayloadGroupsReused": 2568,
+              "finePayloadRecordsWritten": 776328,
+              "finePreparedRowsCreated": 3540,
+              "finePreparedRowsReused": 3434,
+              "fineWorldDataUpdates": 277204,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "indices": {
+                "allocatedBytes": 739692,
+                "bufferBytes": 739692,
+                "enabled": true,
+                "experiment": 0,
+                "memoryScope": "requested live shared index buffers; excludes driver overhead; upload/allocated cumulative",
+                "paddingBytes": 0,
+                "payloadBytes": 739692,
+                "uint16Primitives": 258,
+                "uint32Primitives": 0,
+                "uploadBytes": 739692
+              },
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 268,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instancePool": {
+                "activeBytes": 4258624,
+                "activePages": 268,
+                "activeStreams": 1,
+                "bindGroupsCreated": 743,
+                "bindGroupsReleased": 0,
+                "buffersCreated": 747,
+                "buffersReleased": 2,
+                "byteLimit": 67108864,
+                "createReasonBytes": [
+                  2113536,
+                  6291456,
+                  178320,
+                  0,
+                  0
+                ],
+                "createReasons": [
+                  2,
+                  2,
+                  743,
+                  0,
+                  0
+                ],
+                "createdBytes": 8583312,
+                "evictions": 0,
+                "inactiveBytes": 2211152,
+                "inactivePages": 475,
+                "inactiveStreams": 1,
+                "liveBindGroups": 743,
+                "liveBuffers": 745,
+                "liveBytes": 6469776,
+                "memoryScope": "known instance buffer capacities and material uniforms; bind-group driver bytes unavailable; global handle limit; active/pinned working set and one-frame pass grace can exceed budget",
+                "overBudgetEvents": 0,
+                "ownedBytes": 6469776,
+                "peakLiveBytes": 8517248,
+                "reasonNames": [
+                  "streamCold",
+                  "streamGrowth",
+                  "pageMaterial",
+                  "standaloneCold",
+                  "standaloneGrowth"
+                ],
+                "releaseScope": "last engine lease dropped; GPU destruction may be deferred by wgpu",
+                "releasedBytes": 2113536,
+                "resourceLimit": 4096,
+                "retiredBytes": 0,
+                "reuses": 18189,
+                "streamByteLimit": 16777216
+              },
+              "instanceUploadBytes": 33432656,
+              "instancedDrawCalls": 46129,
+              "instancesDrawn": 14548586,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 19,
+              "overlapTests": 19,
+              "pipelineChanges": 609,
+              "prepareEligibleRebuilds": 115,
+              "prepareGroupRebuilds": 115,
+              "prepareOpaqueGroupRebuilds": 70,
+              "preparePayloadRebuilds": 16312,
+              "prepareRecordRebuilds": 22921,
+              "prepareStageMs": null,
+              "prepareTimedCalls": 0,
+              "preparedPlanCache": {
+                "byteLimit": 16777216,
+                "contentEpoch": 2500,
+                "enabled": true,
+                "hits": 90,
+                "inputEpoch": 2067,
+                "memoryScope": "CPU plan element storage; existing referenced GPU allocations reported separately",
+                "misses": 32,
+                "reasonNames": [
+                  "cold",
+                  "scene",
+                  "inputs",
+                  "membership",
+                  "view",
+                  "pipeline",
+                  "content",
+                  "diagnostics",
+                  "lifecycle",
+                  "toggle",
+                  "budget",
+                  "unsupportedSlot"
+                ],
+                "reasons": [
+                  13,
+                  0,
+                  2067,
+                  16,
+                  1,
+                  0,
+                  2,
+                  0,
+                  0,
+                  4,
+                  0,
+                  0
+                ],
+                "retainedBytes": 118684,
+                "retainedSlots": 2,
+                "slotLimit": 64
+              },
+              "primitiveCulled": 191279,
+              "primitiveTests": 612463,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 31,
+              "rigidUploadBytes": 6390452,
+              "rootBoundsTests": 51171,
+              "rootFullyInside": 41980,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 46129,
+              "translatedInstances": 14533551,
+              "trianglesDrawn": 4501303990,
+              "uniformUploadBytes": 67201616,
+              "vertexColors": {
+                "coloredShaders": 0,
+                "colorlessPipelines": 26,
+                "colorlessPrimitives": 258,
+                "colorlessShaders": 8,
+                "enabled": true,
+                "memoryScope": "requested live shared rigid vertex-buffer bytes; excludes indices, textures, skin/morph and driver overhead",
+                "omittedColorBytes": 3767088,
+                "rigidPrimitives": 258,
+                "rigidVertexBufferBytes": 5650760,
+                "rigidVertexUploadBytes": 5650760
+              }
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 127,
+              "instanceUploadBytes": 20064,
+              "misses": 29,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        }
+      ],
+      "comparisons": [
+        {
+          "a": "cached1",
+          "b": "cached2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cache-off1",
+          "b": "cache-off2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cached1",
+          "b": "cache-off1",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cull-off1",
+          "b": "cull-off2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cached1",
+          "b": "cull-off1",
+          "pixel": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 79,
+            "meanAbsoluteChannelDelta": 0.012350802951388889,
+            "changedPixels": 5014,
+            "changedFraction": 0.005440538194444444,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "both-off1",
+          "b": "both-off2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cached1",
+          "b": "both-off1",
+          "pixel": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 79,
+            "meanAbsoluteChannelDelta": 0.012350802951388889,
+            "changedPixels": 5014,
+            "changedFraction": 0.005440538194444444,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "restored1",
+          "b": "restored2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cached1",
+          "b": "restored1",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      ],
+      "errors": [],
+      "initial": {
+        "camera": {
+          "orbitTarget": null,
+          "position": [
+            0.23557229340076447,
+            1.7307186126708984,
+            42.06543731689453
+          ]
+        },
+        "metadata": {
+          "family": "rim-camera-stress",
+          "load": 2048,
+          "common": null,
+          "quality": {
+            "profile": "examples/rim/appearance.js unchanged",
+            "renderEffects": [
+              true,
+              false
+            ],
+            "fxaa": {
+              "enabled": true,
+              "strength": 0.6
+            },
+            "sceneAppearance": "shared configureAppearance commands",
+            "camera": {
+              "authoredLayoutIndex": 0
+            },
+            "staticPose": "explicit Idle clip time0 for every original/encounter model; loading time excluded",
+            "stress": {
+              "models": 2048,
+              "kind": "static shared drone model instances, no AI",
+              "castsShadow": false,
+              "receivesShadow": true,
+              "isStatic": true,
+              "mixedDynamicRoots": 0,
+              "opaqueReorderable": true,
+              "layout": "8x8 depth layers from gate camera"
+            },
+            "experiment": {
+              "name": "production",
+              "diagnosticOnly": false,
+              "qualityReduced": false,
+              "scope": "one diagnostic axis; not a final optimization"
+            }
+          },
+          "workloadPhases": {
+            "additionalStressModels": 2048,
+            "clock": "elapsed seconds from bench.start; native gameplay paused; models and effects fixed",
+            "cameraPath": {
+              "authoredCamera": "gate",
+              "origin": [
+                0,
+                1.7,
+                42
+              ],
+              "target": [
+                0,
+                1.7,
+                -20
+              ],
+              "position": "[1.8*sin(seconds*.35),1.7+.15*sin(seconds*.55),42+.5*sin(seconds*.35)]",
+              "targetPath": "[.35*sin(seconds*.35),1.7,-20]"
+            },
+            "scope": "deterministic camera-only path through actual authored Rome"
+          },
+          "viewport": {
+            "width": 1280,
+            "height": 720,
+            "deviceScaleFactor": 1
+          },
+          "order": "spatial",
+          "seed": 1337,
+          "overlap": 0,
+          "insertionApplied": false,
+          "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+          "firstLogicalIds": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "poseClock": "elapsed performance.now seconds",
+          "scene": "actual Rome scene and native gameplay",
+          "unmatchedThreeReference": false,
+          "loadUnit": "additional shared drone model instances in actual Rome"
+        },
+        "phase": {
+          "kind": "rim-camera-stress",
+          "actualHandles": 2048,
+          "elapsedSeconds": 0.375,
+          "camera": {
+            "position": [
+              0.23557228809732642,
+              1.730718624016985,
+              42.0654367466937
+            ],
+            "target": [
+              0.045805722685591244,
+              1.7,
+              -20
+            ]
+          },
+          "native": {
+            "stressModels": 2048,
+            "active": false,
+            "paused": true,
+            "frame": {
+              "simulation": 0,
+              "visual": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "label": "original",
+      "status": "COMPLETE",
+      "captures": [
+        {
+          "name": "cached1",
+          "file": "original-cached1.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 24.700000047683716,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 35.65062434213468,
+            "frameMs": 28.049999641047584,
+            "frameP95Ms": 33.50000083446503,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 16019,
+                "drawPrimitive": 0,
+                "rootAsset": 139,
+                "rootBlend": 5,
+                "rootBounds": 0,
+                "rootOverlap": 0,
+                "rootSpatial": 177,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 19416,
+              "bufferUploadCalls": 1422,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 19185,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "instanceBindGroupsCreated": 536,
+              "instanceBufferBytes": 4322944,
+              "instanceBuffersCreated": 539,
+              "instancePagesActive": 536,
+              "instancePagesCreated": 536,
+              "instancePagesRetained": 536,
+              "instanceUploadBytes": 25896432,
+              "instancedDrawCalls": 16019,
+              "instancesDrawn": 5267357,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 0,
+              "overlapTests": 0,
+              "pipelineChanges": 205,
+              "primitiveCulled": 337299,
+              "primitiveTests": 942961,
+              "queueScratchBytes": 2142816,
+              "queueScratchGrowths": 29,
+              "rigidUploadBytes": 10897232,
+              "rootBoundsTests": 83767,
+              "rootFullyInside": 69626,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 16019,
+              "translatedInstances": 5264191,
+              "trianglesDrawn": 1640021102,
+              "uniformUploadBytes": 59407632
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 0,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 44,
+              "instanceUploadBytes": 0,
+              "misses": 27,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 0,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 0,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cached2",
+          "file": "original-cached2.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 24.40000009536743,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 32.411820591085664,
+            "frameMs": 30.85294135791414,
+            "frameP95Ms": 33.70000049471855,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 18431,
+                "drawPrimitive": 0,
+                "rootAsset": 157,
+                "rootBlend": 5,
+                "rootBounds": 0,
+                "rootOverlap": 0,
+                "rootSpatial": 204,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 22197,
+              "bufferUploadCalls": 1422,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 21939,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "instanceBindGroupsCreated": 536,
+              "instanceBufferBytes": 4322944,
+              "instanceBuffersCreated": 539,
+              "instancePagesActive": 536,
+              "instancePagesCreated": 536,
+              "instancePagesRetained": 536,
+              "instanceUploadBytes": 25896432,
+              "instancedDrawCalls": 18431,
+              "instancesDrawn": 6073037,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 0,
+              "overlapTests": 0,
+              "pipelineChanges": 232,
+              "primitiveCulled": 380994,
+              "primitiveTests": 1108957,
+              "queueScratchBytes": 2142816,
+              "queueScratchGrowths": 29,
+              "rigidUploadBytes": 10897232,
+              "rootBoundsTests": 96457,
+              "rootFullyInside": 79832,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 18431,
+              "translatedInstances": 6069529,
+              "trianglesDrawn": 1890870308,
+              "uniformUploadBytes": 59407632
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 0,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 53,
+              "instanceUploadBytes": 0,
+              "misses": 27,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 0,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 0,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cull-off1",
+          "file": "original-cull-off1.png",
+          "sha256": "6d115af31c00ff07539ba225e96fdb917717358e39c744a3493308ffa3cd1673",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 25.5,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 0,
+            "drawCalls": 803,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 32.411820591085664,
+            "frameMs": 30.85294135791414,
+            "frameP95Ms": 33.70000049471855,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 22560,
+                "drawPrimitive": 0,
+                "rootAsset": 233,
+                "rootBlend": 12,
+                "rootBounds": 0,
+                "rootOverlap": 7,
+                "rootSpatial": 234,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 28409,
+              "bufferUploadCalls": 2101,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 28035,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 743,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instanceUploadBytes": 28103872,
+              "instancedDrawCalls": 22560,
+              "instancesDrawn": 7309205,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 7,
+              "overlapTests": 7,
+              "pipelineChanges": 291,
+              "primitiveCulled": 395559,
+              "primitiveTests": 1164289,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 35,
+              "rigidUploadBytes": 10897232,
+              "rootBoundsTests": 100687,
+              "rootFullyInside": 83234,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 22560,
+              "translatedInstances": 7303730,
+              "trianglesDrawn": 2270539376,
+              "uniformUploadBytes": 61777792
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 802,
+            "mainViewCache": {
+              "hits": 62,
+              "instanceUploadBytes": 20064,
+              "misses": 28,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 28,
+              "fullIndices": 10752,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 10752
+            },
+            "visible": 2181,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "cull-off2",
+          "file": "original-cull-off2.png",
+          "sha256": "6d115af31c00ff07539ba225e96fdb917717358e39c744a3493308ffa3cd1673",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 25.799999952316284,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 0,
+            "drawCalls": 803,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 23.49387491848583,
+            "frameMs": 42.564285519932,
+            "frameP95Ms": 100.80000013113022,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 26835,
+                "drawPrimitive": 0,
+                "rootAsset": 323,
+                "rootBlend": 21,
+                "rootBounds": 0,
+                "rootOverlap": 16,
+                "rootSpatial": 261,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 35177,
+              "bufferUploadCalls": 2101,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 34668,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6469776,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 743,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 743,
+              "instanceUploadBytes": 28103872,
+              "instancedDrawCalls": 26835,
+              "instancesDrawn": 8553248,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 16,
+              "overlapTests": 16,
+              "pipelineChanges": 354,
+              "primitiveCulled": 395559,
+              "primitiveTests": 1164289,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 35,
+              "rigidUploadBytes": 10897232,
+              "rootBoundsTests": 100687,
+              "rootFullyInside": 83234,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 26835,
+              "translatedInstances": 8545415,
+              "trianglesDrawn": 2651098706,
+              "uniformUploadBytes": 61777792
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 802,
+            "mainViewCache": {
+              "hits": 71,
+              "instanceUploadBytes": 20064,
+              "misses": 28,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 28,
+              "fullIndices": 10752,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 10752
+            },
+            "visible": 2181,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "restored1",
+          "file": "original-restored1.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 23.700000047683716,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 30.51687966657579,
+            "frameMs": 32.768749981187284,
+            "frameP95Ms": 100.80000013113022,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 30136,
+                "drawPrimitive": 0,
+                "rootAsset": 367,
+                "rootBlend": 24,
+                "rootBounds": 0,
+                "rootOverlap": 19,
+                "rootSpatial": 291,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 39617,
+              "bufferUploadCalls": 2350,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 39040,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6420096,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 536,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 536,
+              "instanceUploadBytes": 29535584,
+              "instancedDrawCalls": 30136,
+              "instancesDrawn": 9594588,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 19,
+              "overlapTests": 19,
+              "pipelineChanges": 397,
+              "primitiveCulled": 429544,
+              "primitiveTests": 1293416,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 35,
+              "rigidUploadBytes": 10897232,
+              "rootBoundsTests": 110558,
+              "rootFullyInside": 91172,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 30136,
+              "translatedInstances": 9585684,
+              "trianglesDrawn": 2973118830,
+              "uniformUploadBytes": 63269024
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 80,
+              "instanceUploadBytes": 20064,
+              "misses": 29,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        },
+        {
+          "name": "restored2",
+          "file": "original-restored2.png",
+          "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+          "camera": {
+            "orbitTarget": null,
+            "position": [
+              0.23557229340076447,
+              1.7307186126708984,
+              42.06543731689453
+            ]
+          },
+          "debug": {
+            "bvhNodes": 0,
+            "cpuMs": 29.100000143051147,
+            "cullCached": true,
+            "cullMs": 0,
+            "culled": 771,
+            "drawCalls": 307,
+            "dynamicRebuilds": 0,
+            "enabled": false,
+            "font3d": {
+              "geometryBytes": 0,
+              "instanceGeometryBytes": 0,
+              "runtime": {
+                "cachedGlyphs": 0,
+                "fonts": 0,
+                "layoutRebuilds": 0,
+                "liveGlyphs": 0,
+                "syncUpdates": 0,
+                "texts": 0
+              }
+            },
+            "fps": 30.51687966657579,
+            "frameMs": 32.768749981187284,
+            "frameP95Ms": 100.80000013113022,
+            "gltf": {
+              "activeDrawIndexBytes": 552908,
+              "batchBreaks": {
+                "drawAsset": 0,
+                "drawCap": 0,
+                "drawDeformed": 0,
+                "drawMaterial": 0,
+                "drawMirror": 0,
+                "drawOptions": 0,
+                "drawOrdinal": 32548,
+                "drawPrimitive": 0,
+                "rootAsset": 385,
+                "rootBlend": 24,
+                "rootBounds": 0,
+                "rootOverlap": 19,
+                "rootSpatial": 318,
+                "rootUnsupported": 0
+              },
+              "bindGroupChanges": 42398,
+              "bufferUploadCalls": 2350,
+              "cachedAssets": 7,
+              "cpuDeformedVertices": 0,
+              "drawCalls": 41794,
+              "geometryCacheHits": 137969,
+              "geometryResources": 258,
+              "instanceBindGroupsCreated": 743,
+              "instanceBufferBytes": 6420096,
+              "instanceBuffersCreated": 747,
+              "instancePagesActive": 536,
+              "instancePagesCreated": 743,
+              "instancePagesRetained": 536,
+              "instanceUploadBytes": 29535584,
+              "instancedDrawCalls": 32548,
+              "instancesDrawn": 10400268,
+              "materialCacheHits": 20592,
+              "materialResources": 74,
+              "overlapNodeTests": 19,
+              "overlapTests": 19,
+              "pipelineChanges": 424,
+              "primitiveCulled": 473239,
+              "primitiveTests": 1459412,
+              "queueScratchBytes": 4269152,
+              "queueScratchGrowths": 35,
+              "rigidUploadBytes": 10897232,
+              "rootBoundsTests": 123248,
+              "rootFullyInside": 101378,
+              "skinPaletteUploadBytes": 0,
+              "skinUploadBytes": 0,
+              "translatedDrawCalls": 32548,
+              "translatedInstances": 10391022,
+              "trianglesDrawn": 3223968036,
+              "uniformUploadBytes": 63269024
+            },
+            "gltfDraws": {
+              "draws": [],
+              "enabled": false,
+              "limit": 20000
+            },
+            "hudFrames": 0,
+            "hudRefreshes": 0,
+            "instanceUploadPages": 1,
+            "mainDrawCalls": 306,
+            "mainViewCache": {
+              "hits": 89,
+              "instanceUploadBytes": 20064,
+              "misses": 29,
+              "slot": 0,
+              "slots": 1
+            },
+            "neonGlow": {
+              "bufferBytes": 0,
+              "cachedMeshes": 0,
+              "draws": 0,
+              "enabled": false,
+              "segments": 0
+            },
+            "numericFont": {
+              "geometryBytes": 0,
+              "glyphMeshes": 0,
+              "instanceGeometryBytes": 0,
+              "liveGlyphs": 0,
+              "panels": 0
+            },
+            "objectTests": 0,
+            "sharedMeshes": {
+              "assets": 1,
+              "colorTableBytes": 16,
+              "geometryBytes": 15360,
+              "gpuMeshes": 1,
+              "instanceGeometryBytes": 215040,
+              "liveInstances": 14
+            },
+            "staticRebuilds": 0,
+            "total": 2181,
+            "translucency": {
+              "cachedMeshes": 1,
+              "draws": 0,
+              "fullIndices": 0,
+              "indexBufferBytes": 1536,
+              "submittedIndices": 0
+            },
+            "visible": 1410,
+            "xrCuts": 0,
+            "xrRoundRemaining": null
+          },
+          "phase": {
+            "kind": "rim-camera-stress",
+            "actualHandles": 2048,
+            "elapsedSeconds": 0.375,
+            "camera": {
+              "position": [
+                0.23557228809732642,
+                1.730718624016985,
+                42.0654367466937
+              ],
+              "target": [
+                0.045805722685591244,
+                1.7,
+                -20
+              ]
+            },
+            "native": {
+              "stressModels": 2048,
+              "active": false,
+              "paused": true,
+              "frame": {
+                "simulation": 0,
+                "visual": 0
+              }
+            }
+          },
+          "profile": {
+            "cpu": {},
+            "enabled": false,
+            "frame": null,
+            "gpu": {
+              "ageFrames": null,
+              "available": false,
+              "passesMs": null,
+              "sampleFrame": null,
+              "supported": false
+            }
+          }
+        }
+      ],
+      "comparisons": [
+        {
+          "a": "cached1",
+          "b": "cached2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cull-off1",
+          "b": "cull-off2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cached1",
+          "b": "cull-off1",
+          "pixel": {
+            "pass": false,
+            "exact": false,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 79,
+            "meanAbsoluteChannelDelta": 0.012350802951388889,
+            "changedPixels": 5014,
+            "changedFraction": 0.005440538194444444,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "restored1",
+          "b": "restored2",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        },
+        {
+          "a": "cached1",
+          "b": "restored1",
+          "pixel": {
+            "pass": true,
+            "exact": true,
+            "width": 1280,
+            "height": 720,
+            "maxChannelDelta": 0,
+            "meanAbsoluteChannelDelta": 0,
+            "changedPixels": 0,
+            "changedFraction": 0,
+            "channelTolerance": 0,
+            "pixelFractionTolerance": 0
+          }
+        }
+      ],
+      "errors": [],
+      "initial": {
+        "camera": {
+          "orbitTarget": null,
+          "position": [
+            0.23557229340076447,
+            1.7307186126708984,
+            42.06543731689453
+          ]
+        },
+        "metadata": {
+          "family": "rim-camera-stress",
+          "load": 2048,
+          "common": null,
+          "quality": {
+            "profile": "examples/rim/appearance.js unchanged",
+            "renderEffects": [
+              true,
+              false
+            ],
+            "fxaa": {
+              "enabled": true,
+              "strength": 0.6
+            },
+            "sceneAppearance": "shared configureAppearance commands",
+            "camera": {
+              "authoredLayoutIndex": 0
+            },
+            "staticPose": "explicit Idle clip time0 for every original/encounter model; loading time excluded",
+            "stress": {
+              "models": 2048,
+              "kind": "static shared drone model instances, no AI",
+              "castsShadow": false,
+              "receivesShadow": true,
+              "isStatic": true,
+              "mixedDynamicRoots": 0,
+              "opaqueReorderable": true,
+              "layout": "8x8 depth layers from gate camera"
+            },
+            "experiment": {
+              "name": "production",
+              "diagnosticOnly": false,
+              "qualityReduced": false,
+              "scope": "one diagnostic axis; not a final optimization"
+            }
+          },
+          "workloadPhases": {
+            "additionalStressModels": 2048,
+            "clock": "elapsed seconds from bench.start; native gameplay paused; models and effects fixed",
+            "cameraPath": {
+              "authoredCamera": "gate",
+              "origin": [
+                0,
+                1.7,
+                42
+              ],
+              "target": [
+                0,
+                1.7,
+                -20
+              ],
+              "position": "[1.8*sin(seconds*.35),1.7+.15*sin(seconds*.55),42+.5*sin(seconds*.35)]",
+              "targetPath": "[.35*sin(seconds*.35),1.7,-20]"
+            },
+            "scope": "deterministic camera-only path through actual authored Rome"
+          },
+          "viewport": {
+            "width": 1280,
+            "height": 720,
+            "deviceScaleFactor": 1
+          },
+          "order": "spatial",
+          "seed": 1337,
+          "overlap": 0,
+          "insertionApplied": false,
+          "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+          "firstLogicalIds": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "poseClock": "elapsed performance.now seconds",
+          "scene": "actual Rome scene and native gameplay",
+          "unmatchedThreeReference": false,
+          "loadUnit": "additional shared drone model instances in actual Rome"
+        },
+        "phase": {
+          "kind": "rim-camera-stress",
+          "actualHandles": 2048,
+          "elapsedSeconds": 0.375,
+          "camera": {
+            "position": [
+              0.23557228809732642,
+              1.730718624016985,
+              42.0654367466937
+            ],
+            "target": [
+              0.045805722685591244,
+              1.7,
+              -20
+            ]
+          },
+          "native": {
+            "stressModels": 2048,
+            "active": false,
+            "paused": true,
+            "frame": {
+              "simulation": 0,
+              "visual": 0
+            }
+          }
+        }
+      }
+    }
+  ],
+  "crossBuild": [
+    {
+      "mode": "cached1",
+      "pixel": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "mode": "cull-off1",
+      "pixel": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "mode": "restored1",
+      "pixel": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    }
+  ],
+  "errors": [],
+  "browser": "Chrome/156.0.8078.48",
+  "inputs": {
+    "final": {
+      "root": "/private/tmp/rust-next-render-cycle-8/output/next-render-cycle-8/candidate",
+      "servedFiles": [
+        {
+          "url": "/assets/models/rim/blade-wraith.glb",
+          "bytes": 627520,
+          "sha256": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/collisions.json",
+          "bytes": 456101,
+          "sha256": "c20159008b11408c517a11e7f86d6dd09cd0b42dc8a17db54fad8a688dd1a662",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/core-tank.glb",
+          "bytes": 1135396,
+          "sha256": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/drone-orbiter.glb",
+          "bytes": 905200,
+          "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/gladius.glb",
+          "bytes": 11024,
+          "sha256": "47abff59ec0652fd01e46f8356830bb49d9f2bd351c39dda02a095644361cd04",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/layout.json",
+          "bytes": 8646,
+          "sha256": "477fcc53649fc4d03e174ce37cec77cb176c3c6e1ba161b7d3647bc4313c2085",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/madmechanic.glb",
+          "bytes": 191896,
+          "sha256": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/rim-city.glb",
+          "bytes": 4485124,
+          "sha256": "73197d81c48db8a043b4c967b8d10dda35234954a338f6e0d8054bfa1e088a19",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/rim-decorations.glb",
+          "bytes": 43804,
+          "sha256": "8341e2f56268bfa98425cf79e081751f50d34a2642ed5b3cb044f1402cdc834d",
+          "source": "frozen"
+        },
+        {
+          "url": "/examples/rim/appearance.js",
+          "bytes": 852,
+          "sha256": "1f08cea530a1f60376492965a2f22585201b8d02392a5ad50807e039093f96b9",
+          "source": "frozen"
+        },
+        {
+          "url": "/examples/rim/scene.js",
+          "bytes": 6498,
+          "sha256": "012dd47e318218e71437338c6803eb85c5761591225198ddfc80be6bb4f28710",
+          "source": "frozen"
+        },
+        {
+          "url": "/examples/rim/stress.js",
+          "bytes": 4722,
+          "sha256": "debcc5ea1bb0c4e0319ef485b4be3951439c90fbf1e981ee5bbacae0caeb67ae",
+          "source": "frozen"
+        },
+        {
+          "url": "/js/engine.js",
+          "bytes": 47537,
+          "sha256": "b241f136503ff95a34b7fb700efa5b0681d4d645e1a7ab75bd8846b7e119b748",
+          "source": "frozen"
+        },
+        {
+          "url": "/js/webxr.js",
+          "bytes": 36055,
+          "sha256": "05ecdf720089d64e13cb1a27f605a62c3f4c10282b78c282583045d1b7d4b02d",
+          "source": "frozen"
+        },
+        {
+          "url": "/js/xr-presentation-profile.js",
+          "bytes": 9882,
+          "sha256": "84917c61bd7e0a01b774e569a5ed1cb53abaa4a86b62d81d1d31f1e12401d905",
+          "source": "frozen"
+        },
+        {
+          "url": "/pkg/webgpu_wasm_bg.wasm",
+          "bytes": 5953967,
+          "sha256": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+          "source": "frozen"
+        },
+        {
+          "url": "/pkg/webgpu_wasm.js",
+          "bytes": 194049,
+          "sha256": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+          "source": "frozen"
+        },
+        {
+          "url": "/scripts/render-performance-order.mjs",
+          "bytes": 680,
+          "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "source": "harness"
+        },
+        {
+          "url": "/tests/pixels.js",
+          "bytes": 1931,
+          "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+          "source": "harness"
+        },
+        {
+          "url": "/tests/render-performance.html",
+          "bytes": 318,
+          "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "source": "harness"
+        },
+        {
+          "url": "/tests/render-performance.js",
+          "bytes": 20473,
+          "sha256": "1d1843b1c258a2b466039dbdd41e21445d996883ec62da83c4add69decbfeec5",
+          "source": "harness"
+        }
+      ],
+      "errors": []
+    },
+    "original": {
+      "root": "/private/tmp/rust-next-render-cycle-1/output/next-render-cycle/baseline",
+      "servedFiles": [
+        {
+          "url": "/assets/models/rim/blade-wraith.glb",
+          "bytes": 627520,
+          "sha256": "14362460d4507c327de5aee286e15ed2652a38b2612af466ce7cab354bcbd755",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/collisions.json",
+          "bytes": 456101,
+          "sha256": "c20159008b11408c517a11e7f86d6dd09cd0b42dc8a17db54fad8a688dd1a662",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/core-tank.glb",
+          "bytes": 1135396,
+          "sha256": "365d24159b8eac281a1365cd9ab1a02fbe7e0f44da344993ecfa9fb9e8967cc7",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/drone-orbiter.glb",
+          "bytes": 905200,
+          "sha256": "361d496b0a996ef01b7a70b582da2ffc231e7d8aada1bc4cb395a86fdcce1438",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/gladius.glb",
+          "bytes": 11024,
+          "sha256": "47abff59ec0652fd01e46f8356830bb49d9f2bd351c39dda02a095644361cd04",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/layout.json",
+          "bytes": 8646,
+          "sha256": "477fcc53649fc4d03e174ce37cec77cb176c3c6e1ba161b7d3647bc4313c2085",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/madmechanic.glb",
+          "bytes": 191896,
+          "sha256": "222ce883b2c965fe8fa0f26d0f5ac64665b566da2a09be051e746aafca774e6f",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/rim-city.glb",
+          "bytes": 4485124,
+          "sha256": "73197d81c48db8a043b4c967b8d10dda35234954a338f6e0d8054bfa1e088a19",
+          "source": "frozen"
+        },
+        {
+          "url": "/assets/models/rim/rim-decorations.glb",
+          "bytes": 43804,
+          "sha256": "8341e2f56268bfa98425cf79e081751f50d34a2642ed5b3cb044f1402cdc834d",
+          "source": "frozen"
+        },
+        {
+          "url": "/examples/rim/appearance.js",
+          "bytes": 852,
+          "sha256": "1f08cea530a1f60376492965a2f22585201b8d02392a5ad50807e039093f96b9",
+          "source": "frozen"
+        },
+        {
+          "url": "/examples/rim/scene.js",
+          "bytes": 6498,
+          "sha256": "012dd47e318218e71437338c6803eb85c5761591225198ddfc80be6bb4f28710",
+          "source": "frozen"
+        },
+        {
+          "url": "/examples/rim/stress.js",
+          "bytes": 4722,
+          "sha256": "debcc5ea1bb0c4e0319ef485b4be3951439c90fbf1e981ee5bbacae0caeb67ae",
+          "source": "frozen"
+        },
+        {
+          "url": "/js/engine.js",
+          "bytes": 46129,
+          "sha256": "78a71b170d528928b3e5671b7a5db263fb37c95d335f1f3311a1dc832d436530",
+          "source": "frozen"
+        },
+        {
+          "url": "/js/webxr.js",
+          "bytes": 31081,
+          "sha256": "936128c0dee9704db518d2f519e8f559d236821132e4be48070ebe1dce0db61d",
+          "source": "frozen"
+        },
+        {
+          "url": "/pkg/webgpu_wasm_bg.wasm",
+          "bytes": 5845974,
+          "sha256": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+          "source": "frozen"
+        },
+        {
+          "url": "/pkg/webgpu_wasm.js",
+          "bytes": 189474,
+          "sha256": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+          "source": "frozen"
+        },
+        {
+          "url": "/scripts/render-performance-order.mjs",
+          "bytes": 680,
+          "sha256": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+          "source": "harness"
+        },
+        {
+          "url": "/tests/pixels.js",
+          "bytes": 1931,
+          "sha256": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+          "source": "harness"
+        },
+        {
+          "url": "/tests/render-performance.html",
+          "bytes": 318,
+          "sha256": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+          "source": "harness"
+        },
+        {
+          "url": "/tests/render-performance.js",
+          "bytes": 20473,
+          "sha256": "1d1843b1c258a2b466039dbdd41e21445d996883ec62da83c4add69decbfeec5",
+          "source": "harness"
+        }
+      ],
+      "errors": []
+    }
+  }
+}

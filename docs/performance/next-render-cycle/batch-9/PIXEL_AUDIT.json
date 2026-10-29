@@ -1,0 +1,1602 @@
+{
+  "scope": "Independent decode/recompute of actual PNGs; zero tolerance native gates, separate non-gating cross-renderer differences.",
+  "native": [
+    {
+      "case": "diag-dynamic-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-dynamic-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-rim-clustered-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-rim-clustered-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-rim-pool-cycle-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-rim-pool-cycle-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-rim-stress-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "diag-rim-stress-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-dynamic-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-dynamic-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-dynamic-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-dynamic-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-dynamic-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-dynamic-webgpu",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-camera-stress-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-camera-stress-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-camera-stress-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-camera-stress-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-camera-stress-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 2,
+        "meanAbsoluteChannelDelta": 0.0000029839409722222224,
+        "changedPixels": 6,
+        "changedFraction": 0.000006510416666666667,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 2,
+        "meanAbsoluteChannelDelta": 0.0000029839409722222224,
+        "changedPixels": 6,
+        "changedFraction": 0.000006510416666666667,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-camera-stress-webgpu",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-clustered-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-clustered-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-clustered-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-clustered-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-clustered-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-clustered-webgpu",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-pool-cycle-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-pool-cycle-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-static-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-static-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-static-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-static-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-static-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-static-webgpu",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-stress-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-stress-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-stress-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-stress-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-stress-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    },
+    {
+      "case": "primary-rim-stress-webgpu",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    }
+  ],
+  "crossRenderer": [
+    {
+      "case": "diag-three-common-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "diag-three-common-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-common-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-common-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-common-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-common-webgpu",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-common-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-common-webgpu",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": true,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 0.00005425347222222222,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-production-webgl",
+      "pair": 0,
+      "storedThreshold": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 218226,
+        "changedFraction": 0.23679036458333333,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 705262,
+        "changedFraction": 0.7652582465277777,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-production-webgl",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 218226,
+        "changedFraction": 0.23679036458333333,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 705262,
+        "changedFraction": 0.7652582465277777,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    },
+    {
+      "case": "three-production-webgl",
+      "pair": 2,
+      "storedThreshold": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 218226,
+        "changedFraction": 0.23679036458333333,
+        "channelTolerance": 8,
+        "pixelFractionTolerance": 0.001
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 705262,
+        "changedFraction": 0.7652582465277777,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": false
+    }
+  ],
+  "unavailable": [
+    {
+      "case": "diag-arena-active-webgl",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "diag-arena-active-webgpu",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "diag-rim-active-webgl",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "diag-rim-active-webgpu",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-arena-active-webgl",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-arena-active-webgl",
+      "pair": 1,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-arena-active-webgl",
+      "pair": 2,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-arena-active-webgpu",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-arena-active-webgpu",
+      "pair": 1,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-arena-active-webgpu",
+      "pair": 2,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-rim-active-webgl",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-rim-active-webgl",
+      "pair": 1,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-rim-active-webgl",
+      "pair": 2,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-rim-active-webgpu",
+      "pair": 0,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-rim-active-webgpu",
+      "pair": 1,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    },
+    {
+      "case": "primary-rim-active-webgpu",
+      "pair": 2,
+      "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+    }
+  ],
+  "metadataErrors": [],
+  "nativeExact": 39,
+  "nativeFailures": [
+    {
+      "case": "primary-rim-camera-stress-webgpu",
+      "pair": 1,
+      "storedThreshold": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 2,
+        "meanAbsoluteChannelDelta": 0.0000029839409722222224,
+        "changedPixels": 6,
+        "changedFraction": 0.000006510416666666667,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "zeroTolerance": {
+        "pass": false,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 2,
+        "meanAbsoluteChannelDelta": 0.0000029839409722222224,
+        "changedPixels": 6,
+        "changedFraction": 0.000006510416666666667,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      },
+      "gate": true
+    }
+  ],
+  "overallNativeStrictPixelPass": false
+}

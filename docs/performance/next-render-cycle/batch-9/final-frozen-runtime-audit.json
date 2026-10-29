@@ -1,0 +1,12 @@
+{
+  "baseline": {
+    "files": 296,
+    "mismatches": [],
+    "manifestSha256": "455087bbf96443701aba9abaf6ddd4e15d2532b9a25dcc9bd693d1c785a88c5f"
+  },
+  "final": {
+    "files": 297,
+    "mismatches": [],
+    "manifestSha256": "1da2fafb6a0f3ab3c2814759bd86dc6ee2b74c608fdf4a0da99db296472705d2"
+  }
+}

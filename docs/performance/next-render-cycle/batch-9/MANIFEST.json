@@ -1,6 +1,6 @@
 {
   "batch": 9,
-  "status": "INCOMPLETE performance / power hold; stable code fully verified",
+  "status": "Evidence delivered; unconditional exact-image signoff BLOCKED",
   "at": "2026-10-29T01:32:32.810911+00:00",
   "checkout": "/private/tmp/rust-next-render-cycle-9",
   "branch": "codex/next-render-cycle-9",
@@ -125,12 +125,14 @@
     }
   },
   "freshPrimary": {
-    "runs": 72,
-    "fullFrameRecords": 70716,
-    "exactDeterministicPairs": 24,
-    "deterministicFailures": 0,
+    "cases": 16,
+    "runs": 88,
+    "frameRecords": 142721,
     "profiling": false,
-    "gpuTimes": "unavailable by clean protocol"
+    "deterministicPairs": 32,
+    "exactPairs": 31,
+    "failedPairs": 1,
+    "failure": "camera2048-WebGPU pair1:6pixels/max2; earlier24/24prose corrected, original raw retained"
   },
   "cold": {
     "repairedRuns": 12,
@@ -141,29 +143,122 @@
     "scope": "instrumented page/engine cold-use; not OS/driver cold or A/B pixel equality"
   },
   "missing": [
-    "dynamic64 long primary",
-    "pool256 120s primary/plateau",
-    "fresh Three common and production controls",
-    "real-worker latency replays",
-    "separate profiler/API diagnostics",
-    "final end-to-end report/checkpoint"
+    "Physical Quest/opaque headset FBO validation",
+    "Exact camera6pixel root cause",
+    "Historical B4 crowded-motion strict pixel investigation",
+    "Physical VRAM/process/WASM memory plateau",
+    "Full production-quality Three equivalence and pure GPU busy/compositor latency",
+    "Original failed capture-tool source bytes and overwritten initial1024 pilot raw"
   ],
-  "power": "host runner snapshots authoritative; contradictory sandbox AC inference retracted",
+  "power": {
+    "scope": "Host context per-run endpoints; not continuous sampling",
+    "earlierPrimary": "Battery for ordinary/static/camera/cluster/Neon",
+    "resumed": "User resumed AC/charging before dynamic/pool/Three/worker/diagnostics",
+    "confirmationCases": 0,
+    "note": "No within-pair endpoint source inconsistencies; sandbox AC transition inference retracted; unrelated-family absolute FPS are not controlled power comparisons."
+  },
   "backup": "/Users/Honza/WebstormProjects/rust/output/next-render-cycle-9-power-backup",
   "publication": false,
   "physicalQuest": "unverified",
   "ci": "not run",
-  "verification": {
-    "status": "PASS stable code",
-    "details": "VERIFICATION.json",
-    "nativePassed": 428,
-    "browserPassed": 149,
-    "helperPassed": 49
-  },
+  "verification": "VERIFICATION.json",
   "postGateRuntimeAudit": {
     "runtimeFiles": 297,
     "additionalFixtures": 5,
     "mismatches": 0
   },
-  "checkpoint": "this local recovery commit; not B9 completion"
+  "checkpoint": "Final evidence is commit containing this manifest, parent0fcf7b1589bcf323a5cc65eb5c41289d9db03123; checkpoint hash reported separately to avoid self-reference.",
+  "freshAll": {
+    "cases": 33,
+    "runs": 134,
+    "frameRecords": 193076,
+    "cleanPrimaryAndThreeRuns": 106,
+    "instrumentedRuns": 28,
+    "rawRecomputeErrors": 0,
+    "nativePixelPairs": 40,
+    "nativeExactPairs": 39,
+    "crossRendererDiagnosticPairs": 11,
+    "gameplayPixelUnavailablePairs": 16
+  },
+  "inputAudit": "FINAL_INPUT_AUDIT.json",
+  "pixelAudit": "PIXEL_AUDIT.json",
+  "finalSourceAudit": "final-source-audit.json",
+  "worker": {
+    "replays": 12,
+    "passed": 12,
+    "stressModels": 64,
+    "simulatedHz": 72,
+    "eyeSize": [
+      320,
+      320
+    ],
+    "scope": "Worker/installation/publication wall time, no Quest or isolated worker compute timing"
+  },
+  "pool": {
+    "sampleMs": 120000,
+    "pairsPerBackend": 1,
+    "load": 256,
+    "finalBufferCapacityBytes": 622512,
+    "nativeCreatesAfterWarmup": 0,
+    "physicalMemory": "unavailable"
+  },
+  "actualBuilds": {
+    "baseline": {
+      "source": "845a83b79156a8b6d30151f17629b07cc966d0dc152de58b6fed36726d8a0963",
+      "wasm": "b5cc8eba529f7c3990b1a4eacbc16c13786ac774b8a366ad15eba6943340987a",
+      "bindings": "e248ba204254d2f9dcdaf67eb8dc4ec0438bb9f5ad34417caf2b0cdd421804e8",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "final": {
+      "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+      "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+      "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "current": {
+      "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+      "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+      "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    }
+  },
+  "completedAt": "2026-10-29T03:58:35.032410+00:00",
+  "archive": {
+    "archive": {
+      "archive": "docs/performance/next-render-cycle/batch-9/EVIDENCE.tar.gz",
+      "sha256": "9748a3d8962c01f8c32f532fe45916b6b381c8c1dee479fb74f20f15b4922aa9",
+      "bytes": 102651442,
+      "aliases": 2142,
+      "objects": 1285,
+      "logicalBytes": 467783719,
+      "uniqueBytes": 233249690,
+      "verifiedObjects": 1285,
+      "verifiedAliases": 2142
+    },
+    "restoration": {
+      "files": 2142,
+      "objects": 1285,
+      "independentFiles": true,
+      "restoredFilesRehashed": 2142,
+      "hashErrors": 0,
+      "sharedRuntimeFilesHaveIndependentInodes": true
+    },
+    "privateProcessInventories": "Full command lines omitted, role-only snapshots and original hashes included. Originals retained locally.",
+    "format": "objects/<sha256> + INDEX.json aliases + RESTORE.py; independent restored files; refuses existing destination"
+  }
 }

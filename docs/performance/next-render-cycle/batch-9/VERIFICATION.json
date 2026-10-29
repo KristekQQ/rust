@@ -1,5 +1,5 @@
 {
-  "status": "PASS for final stable code; performance batch still INCOMPLETE",
+  "status": "PASS stable-code gate; exact-image integration signoff BLOCKED by retained camera failure",
   "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
   "invocations": 1,
   "exitCode": 0,
@@ -62,13 +62,7 @@
   "physicalQuest": "not tested",
   "ci": "not run",
   "published": false,
-  "performanceMissing": [
-    "long dynamic64",
-    "pool256 plateau",
-    "fresh Three",
-    "worker latency replays",
-    "separate GPU/API diagnostics"
-  ],
+  "performanceMissing": [],
   "logs": "task-owned durable backup post-gate snapshots / isolated output/verification",
   "postGateRuntimeAudit": {
     "runtimeFiles": 297,
@@ -78,8 +72,63 @@
     "source": "post-gate-input-audit.json"
   },
   "localReferenceValidation": {
-    "targets": 43,
-    "missing": 0
+    "targets": 77,
+    "missing": 0,
+    "scope": "Final changed Markdown and all batch9 Markdown targets; all batch9 JSON parsed"
   },
-  "checkpointScope": "Local recovery checkpoint only; performance evidence INCOMPLETE"
+  "checkpointScope": "Code/test checkpoint0fcf7b1; final evidence is commit containing this manifest, parent0fcf7b1. No push/merge/deployment.",
+  "sourceIdentityRecheck": "All three original/final/current assertFreshBuild() PASS; final=current source/WASM/bindings/configuration",
+  "performanceAudit": {
+    "cases": 33,
+    "runs": 134,
+    "frameRecords": 193076,
+    "statisticOrCaptureHashErrors": 0,
+    "nativePixelPairs": 40,
+    "exact": 39,
+    "failed": 1,
+    "nativeGameplayUnreproduciblePairs": 16,
+    "crossRendererNonGatingPairs": 11
+  },
+  "inputAudit": {
+    "fileChecks": 2377,
+    "distinctFilesHashed": 142,
+    "errors": [],
+    "commandRecords": 54,
+    "scope": "Rehashed all accepted served runtime/harness files plus primary/Three/diagnostic/current cold driver and worker inputs. Earlier failed capture-tool hashes retained without original source bytes; early calibration orchestration differs by documented output refusal/power observers, workload bytes rechecked.",
+    "commands": {
+      "primary-": 16,
+      "three-": 3,
+      "diag-": 14,
+      "cal-": 17,
+      "worker-": 4,
+      "power-confirm-": 0
+    }
+  },
+  "frozenRuntimeAudit": {
+    "baseline": {
+      "files": 296,
+      "mismatches": [],
+      "manifestSha256": "455087bbf96443701aba9abaf6ddd4e15d2532b9a25dcc9bd693d1c785a88c5f"
+    },
+    "final": {
+      "files": 297,
+      "mismatches": [],
+      "manifestSha256": "1da2fafb6a0f3ab3c2814759bd86dc6ee2b74c608fdf4a0da99db296472705d2"
+    }
+  },
+  "archiveVerification": {
+    "archiveSha256": "9748a3d8962c01f8c32f532fe45916b6b381c8c1dee479fb74f20f15b4922aa9",
+    "objectsVerified": 1285,
+    "aliasesVerified": 2142,
+    "restoredFilesRehashed": 2142,
+    "hashErrors": 0,
+    "independentRestoredFiles": true
+  },
+  "finalSkillValidation": "quick_validate.py PASS with isolated PyYAML; final updated skill",
+  "finalEvidenceScriptSyntax": "All output/next-render-cycle-9 Python helpers py_compile PASS; audit-pixels/camera-oracle/camera-isolation node --check PASS",
+  "finalReceiptCheck": {
+    "command": "VERIFY_WASM_PROFILE=release npm exec --offline -- node scripts/verification-cache.mjs check all",
+    "result": "PASS reused: all (unchanged inputs)",
+    "note": "npm preserves the canonical checkout path for the CLI main-module guard; bare relative invocation from a symlink-spelled cwd may not execute the guard."
+  }
 }

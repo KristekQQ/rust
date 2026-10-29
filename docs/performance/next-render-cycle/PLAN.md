@@ -13,7 +13,7 @@ Base source is the live GitHub main observed at start, not the historical commit
 6. Lossless 16-bit indices where representable — complete locally; [report](batch-6/REPORT.md).
 7. Isolate GPU costs and deliver one demonstrated optimization stage — complete locally; [fixed protocol](batch-7/PROTOCOL.md).
 8. WebGL XR presentation between contexts — complete locally; [fixed protocol](batch-8/PROTOCOL.md).
-9. Integration, regressions, results and skill update — in progress; [fixed protocol](batch-9/PROTOCOL.md).
+9. Integration, regressions, results and skill update — evidence complete; unconditional exact-image signoff blocked; [fixed protocol](batch-9/PROTOCOL.md).
 
 ## Invariants and decisions
 

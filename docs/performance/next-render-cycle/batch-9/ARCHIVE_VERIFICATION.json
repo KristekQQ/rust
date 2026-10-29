@@ -1,0 +1,23 @@
+{
+  "archive": {
+    "archive": "docs/performance/next-render-cycle/batch-9/EVIDENCE.tar.gz",
+    "sha256": "9748a3d8962c01f8c32f532fe45916b6b381c8c1dee479fb74f20f15b4922aa9",
+    "bytes": 102651442,
+    "aliases": 2142,
+    "objects": 1285,
+    "logicalBytes": 467783719,
+    "uniqueBytes": 233249690,
+    "verifiedObjects": 1285,
+    "verifiedAliases": 2142
+  },
+  "restoration": {
+    "files": 2142,
+    "objects": 1285,
+    "independentFiles": true,
+    "restoredFilesRehashed": 2142,
+    "hashErrors": 0,
+    "sharedRuntimeFilesHaveIndependentInodes": true
+  },
+  "privateProcessInventories": "Full command lines omitted, role-only snapshots and original hashes included. Originals retained locally.",
+  "format": "objects/<sha256> + INDEX.json aliases + RESTORE.py; independent restored files; refuses existing destination"
+}
