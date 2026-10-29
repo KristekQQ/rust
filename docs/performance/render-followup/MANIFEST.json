@@ -1,0 +1,39 @@
+{
+  "baseCheckpoint": "9986cd4f9e37b1687af339eb741b22ec77f5c720",
+  "runtimeCheckpoint": "813a5abb266609cceea644e4b1086129a89ca535",
+  "sourceFingerprint": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+  "wasmSha256": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+  "environment": {
+    "platform": "macOS arm64 desktop",
+    "browser": "Chrome/156.0.8078.48",
+    "physicalQuest": false,
+    "isolatedGpu": false
+  },
+  "configuration": {
+    "backend": "webgpu",
+    "viewport": [
+      1280,
+      720
+    ],
+    "dpr": 1,
+    "load": 2048,
+    "seed": 1337,
+    "order": "spatial",
+    "profile": false,
+    "experiment": "production"
+  },
+  "runtimeAndHarnessDependency": "../next-render-cycle/batch-9/EVIDENCE.tar.gz sha2569748a3d8962c01f8c32f532fe45916b6b381c8c1dee479fb74f20f15b4922aa9",
+  "newEvidence": "EVIDENCE.tar.gz; INDEX.json aliases, RESTORE.py identical to verified B9 restorer",
+  "missing": [
+    "Original failing-session per-pose clocks and full native capture revisions",
+    "Per-capture descriptors for earlier culling-off pipelines",
+    "Independent GPU memory/completion proof",
+    "Physical Quest validation"
+  ],
+  "evidenceArchive": {
+    "sha256": "74e36da6048f6601c91aba6095227f48cc2d73a671b707bff258b54fd7c2b845",
+    "bytes": 18985703,
+    "verifiedObjects": 146,
+    "restoredFilesVerified": 217
+  }
+}

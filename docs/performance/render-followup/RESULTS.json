@@ -1,0 +1,1732 @@
+{
+  "status": "A_UNRESOLVED_NOT_REPRODUCED",
+  "totals": {
+    "diagnosticCaptures": 61,
+    "unchangedProtocolCaptures": 6,
+    "exactAgainstOriginal": 61,
+    "knownCullingDifference": 6,
+    "sixPixelReproductions": 0
+  },
+  "originalFailure": {
+    "changedPixels": 6,
+    "maxChannelDelta": 2,
+    "coordinates": [
+      [
+        382,
+        215,
+        1
+      ],
+      [
+        383,
+        216,
+        1
+      ],
+      [
+        394,
+        267,
+        1
+      ],
+      [
+        397,
+        267,
+        1
+      ],
+      [
+        45,
+        351,
+        1
+      ],
+      [
+        203,
+        456,
+        2
+      ]
+    ]
+  },
+  "errors": [],
+  "captureSummaries": [
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "fresh",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-fresh-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5248.700000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "fresh",
+      "method": "ack",
+      "file": "0-final-fresh-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5465.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "fresh-repeat",
+      "method": "ack",
+      "file": "0-final-fresh-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5696.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "elapsed33",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-elapsed33-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 39168.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "elapsed33",
+      "method": "ack",
+      "file": "0-final-elapsed33-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 39462.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "elapsed33-repeat",
+      "method": "ack",
+      "file": "0-final-elapsed33-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 39811.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-cache-off-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 40368.10000014305,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off",
+      "method": "ack",
+      "file": "0-final-cache-off-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 40730.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-pool-zero-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 41355.90000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero",
+      "method": "ack",
+      "file": "0-final-pool-zero-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 41775.90000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-cull-off-legacy.png",
+      "pixels": {
+        "changedPixels": 5014,
+        "maxChannelDelta": 79,
+        "coordinates": [
+          [
+            9,
+            0,
+            5
+          ],
+          [
+            10,
+            0,
+            1
+          ],
+          [
+            108,
+            0,
+            1
+          ],
+          [
+            996,
+            0,
+            1
+          ],
+          [
+            997,
+            0,
+            1
+          ],
+          [
+            1073,
+            0,
+            3
+          ],
+          [
+            1074,
+            0,
+            18
+          ],
+          [
+            1075,
+            0,
+            23
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            1
+          ],
+          [
+            287,
+            1,
+            1
+          ]
+        ]
+      },
+      "captureAtMs": 42485.90000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 803
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off",
+      "method": "ack",
+      "file": "0-final-cull-off-ack.png",
+      "pixels": {
+        "changedPixels": 5014,
+        "maxChannelDelta": 79,
+        "coordinates": [
+          [
+            9,
+            0,
+            5
+          ],
+          [
+            10,
+            0,
+            1
+          ],
+          [
+            108,
+            0,
+            1
+          ],
+          [
+            996,
+            0,
+            1
+          ],
+          [
+            997,
+            0,
+            1
+          ],
+          [
+            1073,
+            0,
+            3
+          ],
+          [
+            1074,
+            0,
+            18
+          ],
+          [
+            1075,
+            0,
+            23
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            1
+          ],
+          [
+            287,
+            1,
+            1
+          ]
+        ]
+      },
+      "captureAtMs": 43011.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 803
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "restored",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-restored-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 43866.90000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 0,
+      "runtime": "final",
+      "stage": "restored",
+      "method": "ack",
+      "file": "0-final-restored-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 44378.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 1,
+      "runtime": "original",
+      "stage": "fresh",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "1-original-fresh-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5059.600000143051,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 1,
+      "runtime": "original",
+      "stage": "fresh",
+      "method": "ack",
+      "file": "1-original-fresh-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5664,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 1,
+      "runtime": "original",
+      "stage": "fresh-repeat",
+      "method": "ack",
+      "file": "1-original-fresh-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 6252.100000143051,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 1,
+      "runtime": "original",
+      "stage": "elapsed33",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "1-original-elapsed33-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 40039.800000190735,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 1,
+      "runtime": "original",
+      "stage": "elapsed33",
+      "method": "ack",
+      "file": "1-original-elapsed33-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 40914.200000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 1,
+      "runtime": "original",
+      "stage": "elapsed33-repeat",
+      "method": "ack",
+      "file": "1-original-elapsed33-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 41666,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "fresh",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "2-final-fresh-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5316.900000095367,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "fresh",
+      "method": "ack",
+      "file": "2-final-fresh-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 6096.300000190735,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "fresh-repeat",
+      "method": "ack",
+      "file": "2-final-fresh-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 6999.300000190735,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "elapsed33",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "2-final-elapsed33-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 41180.10000014305,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "elapsed33",
+      "method": "ack",
+      "file": "2-final-elapsed33-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 42165.60000014305,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "elapsed33-repeat",
+      "method": "ack",
+      "file": "2-final-elapsed33-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 43096.60000014305,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "cache-off",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "2-final-cache-off-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 44339.40000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "cache-off",
+      "method": "ack",
+      "file": "2-final-cache-off-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 45375.90000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "pool-zero",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "2-final-pool-zero-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 46521.40000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "pool-zero",
+      "method": "ack",
+      "file": "2-final-pool-zero-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 48580.60000014305,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "cull-off",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "2-final-cull-off-legacy.png",
+      "pixels": {
+        "changedPixels": 5014,
+        "maxChannelDelta": 79,
+        "coordinates": [
+          [
+            9,
+            0,
+            5
+          ],
+          [
+            10,
+            0,
+            1
+          ],
+          [
+            108,
+            0,
+            1
+          ],
+          [
+            996,
+            0,
+            1
+          ],
+          [
+            997,
+            0,
+            1
+          ],
+          [
+            1073,
+            0,
+            3
+          ],
+          [
+            1074,
+            0,
+            18
+          ],
+          [
+            1075,
+            0,
+            23
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            1
+          ],
+          [
+            287,
+            1,
+            1
+          ]
+        ]
+      },
+      "captureAtMs": 49961.90000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 803
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "cull-off",
+      "method": "ack",
+      "file": "2-final-cull-off-ack.png",
+      "pixels": {
+        "changedPixels": 5014,
+        "maxChannelDelta": 79,
+        "coordinates": [
+          [
+            9,
+            0,
+            5
+          ],
+          [
+            10,
+            0,
+            1
+          ],
+          [
+            108,
+            0,
+            1
+          ],
+          [
+            996,
+            0,
+            1
+          ],
+          [
+            997,
+            0,
+            1
+          ],
+          [
+            1073,
+            0,
+            3
+          ],
+          [
+            1074,
+            0,
+            18
+          ],
+          [
+            1075,
+            0,
+            23
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            1
+          ],
+          [
+            287,
+            1,
+            1
+          ]
+        ]
+      },
+      "captureAtMs": 51115.40000009537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 803
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "restored",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "2-final-restored-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 52537,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 2,
+      "runtime": "final",
+      "stage": "restored",
+      "method": "ack",
+      "file": "2-final-restored-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 53768.300000190735,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 3,
+      "runtime": "original",
+      "stage": "fresh",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "3-original-fresh-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 5340.899999856949,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 3,
+      "runtime": "original",
+      "stage": "fresh",
+      "method": "ack",
+      "file": "3-original-fresh-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 6659.699999809265,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 3,
+      "runtime": "original",
+      "stage": "fresh-repeat",
+      "method": "ack",
+      "file": "3-original-fresh-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 8080.899999856949,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 3,
+      "runtime": "original",
+      "stage": "elapsed33",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "3-original-elapsed33-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 42605.89999985695,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 3,
+      "runtime": "original",
+      "stage": "elapsed33",
+      "method": "ack",
+      "file": "3-original-elapsed33-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 44146.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "host-reproduction-3",
+      "run": 3,
+      "runtime": "original",
+      "stage": "elapsed33-repeat",
+      "method": "ack",
+      "file": "3-original-elapsed33-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 45356.39999985695,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "replayed",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-replayed-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 30152.400000095367,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "replayed",
+      "method": "ack",
+      "file": "0-final-replayed-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 30389.200000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "replayed-repeat",
+      "method": "ack",
+      "file": "0-final-replayed-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 30638.299999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off-before",
+      "method": "ack",
+      "file": "0-final-cache-off-before-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 30905.700000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-cache-off-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 31403.700000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off",
+      "method": "ack",
+      "file": "0-final-cache-off-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 31773.400000095367,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off-restored",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-cache-off-restored-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 32322.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cache-off-restored",
+      "method": "ack",
+      "file": "0-final-cache-off-restored-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 32654.400000095367,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero-before",
+      "method": "ack",
+      "file": "0-final-pool-zero-before-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 33054.700000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-pool-zero-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 33765.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero",
+      "method": "ack",
+      "file": "0-final-pool-zero-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 34217.799999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero-restored",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-pool-zero-restored-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 34826.200000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "pool-zero-restored",
+      "method": "ack",
+      "file": "0-final-pool-zero-restored-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 35260.700000047684,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off-before",
+      "method": "ack",
+      "file": "0-final-cull-off-before-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 35769.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-cull-off-legacy.png",
+      "pixels": {
+        "changedPixels": 5014,
+        "maxChannelDelta": 79,
+        "coordinates": [
+          [
+            9,
+            0,
+            5
+          ],
+          [
+            10,
+            0,
+            1
+          ],
+          [
+            108,
+            0,
+            1
+          ],
+          [
+            996,
+            0,
+            1
+          ],
+          [
+            997,
+            0,
+            1
+          ],
+          [
+            1073,
+            0,
+            3
+          ],
+          [
+            1074,
+            0,
+            18
+          ],
+          [
+            1075,
+            0,
+            23
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            1
+          ],
+          [
+            287,
+            1,
+            1
+          ]
+        ]
+      },
+      "captureAtMs": 36602.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 803
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off",
+      "method": "ack",
+      "file": "0-final-cull-off-ack.png",
+      "pixels": {
+        "changedPixels": 5014,
+        "maxChannelDelta": 79,
+        "coordinates": [
+          [
+            9,
+            0,
+            5
+          ],
+          [
+            10,
+            0,
+            1
+          ],
+          [
+            108,
+            0,
+            1
+          ],
+          [
+            996,
+            0,
+            1
+          ],
+          [
+            997,
+            0,
+            1
+          ],
+          [
+            1073,
+            0,
+            3
+          ],
+          [
+            1074,
+            0,
+            18
+          ],
+          [
+            1075,
+            0,
+            23
+          ],
+          [
+            7,
+            1,
+            1
+          ],
+          [
+            8,
+            1,
+            6
+          ],
+          [
+            9,
+            1,
+            1
+          ],
+          [
+            287,
+            1,
+            1
+          ]
+        ]
+      },
+      "captureAtMs": 37144.299999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 803
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off-restored",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "0-final-cull-off-restored-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 38664.299999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 0,
+      "runtime": "final",
+      "stage": "cull-off-restored",
+      "method": "ack",
+      "file": "0-final-cull-off-restored-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 39267.5,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 1,
+      "runtime": "original",
+      "stage": "replayed",
+      "method": "legacy fifth RAF; frame state copied immediately afterward",
+      "file": "1-original-replayed-legacy.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 33085.299999952316,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 1,
+      "runtime": "original",
+      "stage": "replayed",
+      "method": "ack",
+      "file": "1-original-replayed-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 33897.59999990463,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    },
+    {
+      "dataset": "history-isolation",
+      "run": 1,
+      "runtime": "original",
+      "stage": "replayed-repeat",
+      "method": "ack",
+      "file": "1-original-replayed-repeat-ack.png",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "captureAtMs": 34572.39999985695,
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "globalUniformSha256": "f20fd17702f17877e93e284cf3e402fb8a10efb027c49b83e32d0211c839ad1f",
+      "commands": 307
+    }
+  ],
+  "unchangedProtocol": [
+    {
+      "id": "baseline-rim-camera-stress-2048-pair0",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "profiling": false,
+      "backend": "BrowserWebGpu",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979"
+    },
+    {
+      "id": "candidate-rim-camera-stress-2048-pair0",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "profiling": false,
+      "backend": "BrowserWebGpu",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979"
+    },
+    {
+      "id": "candidate-rim-camera-stress-2048-pair1",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "profiling": false,
+      "backend": "BrowserWebGpu",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979"
+    },
+    {
+      "id": "baseline-rim-camera-stress-2048-pair1",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "profiling": false,
+      "backend": "BrowserWebGpu",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979"
+    },
+    {
+      "id": "baseline-rim-camera-stress-2048-pair2",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "profiling": false,
+      "backend": "BrowserWebGpu",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979"
+    },
+    {
+      "id": "candidate-rim-camera-stress-2048-pair2",
+      "pixels": {
+        "changedPixels": 0,
+        "maxChannelDelta": 0,
+        "coordinates": []
+      },
+      "profiling": false,
+      "backend": "BrowserWebGpu",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979"
+    }
+  ],
+  "viewProjectionBits": [
+    3215839891,
+    3061133084,
+    3142095884,
+    3142082739,
+    0,
+    1075479160,
+    3120685368,
+    3120676856,
+    998772310,
+    3130826504,
+    3212845221,
+    3212836784,
+    1041545986,
+    3229882637,
+    1109920008,
+    1109935210
+  ],
+  "distinctViewProjectionBitPatterns": 1,
+  "limits": [
+    "Post-render acknowledgement identifies CPU submission callback, not compositor/device presentation. Canvas copy/readback is outside timing.",
+    "Buffer hashes shadow observed API writes/maps/copies, not independent GPU-buffer readback.",
+    "Internal per-object/material/pose revisions and native resource-generation IDs are not exposed by unchanged frozen runtime; actual submitted buffers/commands plus available cache epochs retained.",
+    "Recorded-interval replay does not reconstruct unlogged original per-pose clock values/engine RAF ordering.",
+    "First sequential-control pilot is separate from restore-before-each-axis history isolation.",
+    "Command-order digest excludes bindings/offsets; IDs session-local.",
+    "Final-session shader definition export omits earlier culling-off variants in six captures.",
+    "Zero pool budget evicts inactive retention, not active/pinned resources."
+  ]
+}

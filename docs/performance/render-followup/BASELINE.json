@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-29T09:47:46.136243+00:00",
+  "checkpoint": "9986cd4f9e37b1687af339eb741b22ec77f5c720",
+  "runtimeCommit": "813a5abb266609cceea644e4b1086129a89ca535",
+  "archiveSha256": "9748a3d8962c01f8c32f532fe45916b6b381c8c1dee479fb74f20f15b4922aa9",
+  "objectsVerified": 1285,
+  "caseFiles": [
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/raw.json.gz",
+      "sha256": "6906e07903834d773de3cc89d064ec473ed01a38d17764b5157490e8f81484d3",
+      "bytes": 316431
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/report.json",
+      "sha256": "1c038a945a0f7c11f76c5c877c44653f7a7720a8c7ddc1b8370bed36a34bc1e2",
+      "bytes": 308951
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/manifest-baseline.json",
+      "sha256": "68f0987b9a0574bf93f4bbe860781fb902457a511f40953be93e7f6665fdae52",
+      "bytes": 3539
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/manifest-candidate.json",
+      "sha256": "1559c642264b086a811d1b4e745c34d40abd1a30fb111652e929f3e00b06eebd",
+      "bytes": 3717
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/candidate-rim-camera-stress-2048-pair2.png",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+      "bytes": 1523328
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/candidate-rim-camera-stress-2048-pair1.png",
+      "sha256": "dd7eb52d975d3e55c8ac468098817beac469d964c1bfcd73731c19de59a51f5c",
+      "bytes": 1523295
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/candidate-rim-camera-stress-2048-pair0.png",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+      "bytes": 1523328
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/baseline-rim-camera-stress-2048-pair2.png",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+      "bytes": 1523328
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/baseline-rim-camera-stress-2048-pair0.png",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+      "bytes": 1523328
+    },
+    {
+      "path": "/private/tmp/rust-next-render-cycle-9/output/next-render-cycle-9/primary-rim-camera-stress-webgpu/baseline-rim-camera-stress-2048-pair1.png",
+      "sha256": "a5d531295d3ef42f6de3c4383cfd102f165c8b40c12926242f2d5789599b5979",
+      "bytes": 1523328
+    }
+  ],
+  "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+  "production": "not inferred from local build; shared services unchanged"
+}

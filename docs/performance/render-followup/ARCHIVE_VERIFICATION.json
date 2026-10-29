@@ -1,0 +1,14 @@
+{
+  "archive": "docs/performance/render-followup/EVIDENCE.tar.gz",
+  "sha256": "74e36da6048f6601c91aba6095227f48cc2d73a671b707bff258b54fd7c2b845",
+  "bytes": 18985703,
+  "aliases": 217,
+  "objects": 146,
+  "logicalBytes": 152894942,
+  "uniqueBytes": 48510086,
+  "verifiedObjects": 146,
+  "verifiedAliases": 217,
+  "restoredFilesVerified": 217,
+  "restoredRoot": "/private/tmp/rust-followup1-evidence-restore",
+  "restorerUnchangedFromB9": true
+}

@@ -1,0 +1,41 @@
+{
+  "commands": [
+    {
+      "command": "VERIFY_WASM_PROFILE=release npm run verify:push",
+      "exit": 101,
+      "result": "Disk full at wasm-check after completed native checks; full all-mode receipt NOT issued."
+    },
+    {
+      "command": "VERIFY_WASM_PROFILE=release npm run verify:browser",
+      "exit": 0,
+      "result": "Only missing WASM/browser/types remainder resumed; matching release WASM reused."
+    },
+    {
+      "command": "scripts/dump_sources.sh",
+      "exit": 0,
+      "result": "all_sources.txt byte-identical to base; not changed/committed."
+    }
+  ],
+  "native": {
+    "passed": 428,
+    "ignored": 2,
+    "failed": 0
+  },
+  "sdk": 32,
+  "xrPlatform": 71,
+  "harness": {
+    "node": 14,
+    "python": 13
+  },
+  "browser": {
+    "webgpu": 55,
+    "webgl": 94
+  },
+  "browserStatuses": {
+    "PASS": 149
+  },
+  "browserVersion": "Chrome/156.0.8078.48",
+  "sandboxDisabled": false,
+  "freshCombinedChecks": "All required stages completed across interrupted gate and resumed browser mode. Not a single successful verify:push invocation; no synthetic all-mode receipt.",
+  "scope": "Local desktop and maintained simulated XR; no physical headset/push/CI/deployment."
+}
