@@ -1,0 +1,59 @@
+{
+  "initial": {
+    "root": "/private/tmp/rust-render-followup-2/output/followup-2/original",
+    "build": {
+      "source": "54c6cde834bd3ad2e5363aabece753cd77cf4aa4537d378147405f6a814797f1",
+      "wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+      "bindings": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "head": "0b7af5b75082a2508d6fb19d05e7fef4e51c5c77",
+    "pkg/webgpu_wasm_bg.wasm": "f14c4beb5f3e5b59f16cae9ae90ddccba88b152ed10f07f3ce999d5a765a12de",
+    "pkg/webgpu_wasm.js": "d359800638f899ae7df46d50ab453a75b477044dec2d538d8ed39d91d24d44ba",
+    "js/engine.js": "b241f136503ff95a34b7fb700efa5b0681d4d645e1a7ab75bd8846b7e119b748",
+    "js/webxr.js": "05ecdf720089d64e13cb1a27f605a62c3f4c10282b78c282583045d1b7d4b02d"
+  },
+  "final": {
+    "root": "/private/tmp/rust-render-followup-2/output/followup-5/probe2",
+    "build": {
+      "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+      "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+      "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "head": "503502250de09250db3c2a8710c8bc51b25b091d",
+    "pkg/webgpu_wasm_bg.wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+    "pkg/webgpu_wasm.js": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "js/engine.js": "ea9b80dc1fa218cf2ff55735e79f53a54fb9e67c00f46ef1665c0eff9eefdbf6",
+    "js/webxr.js": "05ecdf720089d64e13cb1a27f605a62c3f4c10282b78c282583045d1b7d4b02d"
+  },
+  "integrationBase": "08c2d212a12228874e2f998e8f96c9b840facc68",
+  "branch": "codex/render-followup-6",
+  "runtimeChangedInBatch6": false,
+  "defaultSwitches": {
+    "overlaySelectionReference": true,
+    "instanceUploadPolicy": 0,
+    "rendererExperiment": 0,
+    "panelReuse": "WebGL2 only",
+    "sharedGlXr": "explicit opt-in"
+  },
+  "environment": {
+    "physicalQuest": false,
+    "headless": true,
+    "gpuIsolated": false,
+    "node": "v24.19.0",
+    "browser": "Per-campaign Chrome156.0.8078.48 or156.0.8078.74; see ENVIRONMENT.json",
+    "platform": "macOS26.6.1 Apple M1 16GiB"
+  },
+  "created": "2026-10-29T21:33:39.870926+00:00"
+}

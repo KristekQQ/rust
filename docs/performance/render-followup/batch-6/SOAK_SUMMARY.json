@@ -1,0 +1,1274 @@
+{
+  "limits": [
+    "One 120s cycle per runtime/backend; main default comparisons have three60s runs per runtime/API.",
+    "Gauge windows describe accounted engine-owned GPU resource capacities, not driver physical residency.",
+    "No monotonic-growth inference from one arbitrarily sampled active/retained phase.",
+    "Clear/reload is independently covered by the final maintained fixtures; new-range scratch is unavailable in the initial runtime."
+  ],
+  "runs": [
+    {
+      "experiment": "soak-final-webgl",
+      "backend": "Gl",
+      "frames": 6357,
+      "windows": [
+        {
+          "fromMs": 0,
+          "toMs": 30000,
+          "samples": 272,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 272,
+              "min": 0,
+              "max": 0
+            }
+          }
+        },
+        {
+          "fromMs": 30000,
+          "toMs": 60000,
+          "samples": 274,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 274,
+              "min": 0,
+              "max": 0
+            }
+          }
+        },
+        {
+          "fromMs": 60000,
+          "toMs": 90000,
+          "samples": 274,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 274,
+              "min": 0,
+              "max": 0
+            }
+          }
+        },
+        {
+          "fromMs": 90000,
+          "toMs": 120000,
+          "samples": 272,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 272,
+              "min": 0,
+              "max": 0
+            }
+          }
+        }
+      ],
+      "frameMs": {
+        "count": 6356,
+        "median": 16.69999999999709,
+        "mean": 18.88426683448707,
+        "p95": 33.30000000000291,
+        "p99": 33.40000000000873,
+        "max": 116.69999999999709,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 4219,
+        "rawExactOverrunDurationMs": 14240.933333333145,
+        "overruns": 733,
+        "overrunDurationMs": 14099.033333333315
+      },
+      "callbackMs": {
+        "count": 6357,
+        "median": 4.099999904632568,
+        "mean": 5.796098788016732,
+        "p95": 15.5,
+        "p99": 29.699999809265137,
+        "max": 122.40000009536743,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 223,
+        "rawExactOverrunDurationMs": 3690.0333352883677,
+        "overruns": 198,
+        "overrunDurationMs": 3684.000000953676
+      },
+      "poolWork": {
+        "instancePool.buffersCreated": {
+          "start": 410,
+          "end": 410,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.buffersReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsCreated": {
+          "start": 408,
+          "end": 408,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.createdBytes": {
+          "start": 2211456,
+          "end": 2211456,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.releasedBytes": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.reuses": {
+          "start": 1288,
+          "end": 17488,
+          "delta": 16200,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 2.5483718735252476,
+          "perSecond": 134.99268789607228
+        },
+        "instancePool.evictions": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.overBudgetEvents": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        }
+      },
+      "commands": {
+        "transforms": 245760,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0,
+        "poolTransitions": 240
+      }
+    },
+    {
+      "experiment": "soak-final-webgpu",
+      "backend": "BrowserWebGpu",
+      "frames": 7030,
+      "windows": [
+        {
+          "fromMs": 0,
+          "toMs": 30000,
+          "samples": 275,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 275,
+              "min": 0,
+              "max": 0
+            }
+          }
+        },
+        {
+          "fromMs": 30000,
+          "toMs": 60000,
+          "samples": 273,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 273,
+              "min": 0,
+              "max": 0
+            }
+          }
+        },
+        {
+          "fromMs": 60000,
+          "toMs": 90000,
+          "samples": 275,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 275,
+              "min": 0,
+              "max": 0
+            }
+          }
+        },
+        {
+          "fromMs": 90000,
+          "toMs": 120000,
+          "samples": 273,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 273,
+              "min": 0,
+              "max": 0
+            }
+          }
+        }
+      ],
+      "frameMs": {
+        "count": 7029,
+        "median": 16.69999999999709,
+        "mean": 17.076198605776188,
+        "p95": 16.79999999998836,
+        "p99": 16.80000000000291,
+        "max": 116.60000000000582,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 4373,
+        "rawExactOverrunDurationMs": 3058.9666666668368,
+        "overruns": 66,
+        "overrunDurationMs": 2883.100000000021
+      },
+      "callbackMs": {
+        "count": 7030,
+        "median": 4.400000095367432,
+        "mean": 4.96017069745369,
+        "p95": 15.299999952316284,
+        "p99": 21.299999952316284,
+        "max": 115.99999976158142,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 214,
+        "rawExactOverrunDurationMs": 3305.03333147367,
+        "overruns": 175,
+        "overrunDurationMs": 3295.7333315213536
+      },
+      "poolWork": {
+        "instancePool.buffersCreated": {
+          "start": 410,
+          "end": 410,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.buffersReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsCreated": {
+          "start": 408,
+          "end": 408,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.createdBytes": {
+          "start": 2211456,
+          "end": 2211456,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.releasedBytes": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.reuses": {
+          "start": 1080,
+          "end": 17280,
+          "delta": 16200,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 2.3044096728307255,
+          "perSecond": 134.99066314585272
+        },
+        "instancePool.evictions": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.overBudgetEvents": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        }
+      },
+      "commands": {
+        "transforms": 245760,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0,
+        "poolTransitions": 240
+      }
+    },
+    {
+      "experiment": "soak-initial-webgl",
+      "backend": "Gl",
+      "frames": 6330,
+      "windows": [
+        {
+          "fromMs": 0,
+          "toMs": 30000,
+          "samples": 273,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "fromMs": 30000,
+          "toMs": 60000,
+          "samples": 276,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "fromMs": 60000,
+          "toMs": 90000,
+          "samples": 274,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "fromMs": 90000,
+          "toMs": 120000,
+          "samples": 274,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        }
+      ],
+      "frameMs": {
+        "count": 6329,
+        "median": 16.69999999999709,
+        "mean": 18.96484436719857,
+        "p95": 33.30000000000291,
+        "p99": 33.40000000000873,
+        "max": 116.70000000000073,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 4201,
+        "rawExactOverrunDurationMs": 14689.933333333245,
+        "overruns": 727,
+        "overrunDurationMs": 14548.433333333238
+      },
+      "callbackMs": {
+        "count": 6330,
+        "median": 3.9000000953674316,
+        "mean": 5.859020537900698,
+        "p95": 15.200000047683716,
+        "p99": 34,
+        "max": 120.30000019073486,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 210,
+        "rawExactOverrunDurationMs": 4374.600002050402,
+        "overruns": 192,
+        "overrunDurationMs": 4370.600001573564
+      },
+      "poolWork": {
+        "instancePool.buffersCreated": {
+          "start": 410,
+          "end": 410,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.buffersReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsCreated": {
+          "start": 408,
+          "end": 408,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.createdBytes": {
+          "start": 2211456,
+          "end": 2211456,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.releasedBytes": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.reuses": {
+          "start": 1080,
+          "end": 17280,
+          "delta": 16200,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 2.559241706161137,
+          "perSecond": 134.97536699568417
+        },
+        "instancePool.evictions": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.overBudgetEvents": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        }
+      },
+      "commands": {
+        "transforms": 245760,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0,
+        "poolTransitions": 240
+      }
+    },
+    {
+      "experiment": "soak-initial-webgpu",
+      "backend": "BrowserWebGpu",
+      "frames": 7023,
+      "windows": [
+        {
+          "fromMs": 0,
+          "toMs": 30000,
+          "samples": 273,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "fromMs": 30000,
+          "toMs": 60000,
+          "samples": 271,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "fromMs": 60000,
+          "toMs": 90000,
+          "samples": 274,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        },
+        {
+          "fromMs": 90000,
+          "toMs": 120000,
+          "samples": 275,
+          "metrics": {
+            "activeBytes": {
+              "min": 0,
+              "max": 2145392
+            },
+            "inactiveBytes": {
+              "min": 66064,
+              "max": 2211456
+            },
+            "liveBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "ownedBytes": {
+              "min": 2211456,
+              "max": 2211456
+            },
+            "retiredBytes": {
+              "min": 0,
+              "max": 0
+            },
+            "buffersCreated": {
+              "min": 410,
+              "max": 410
+            },
+            "bindGroupsCreated": {
+              "min": 408,
+              "max": 408
+            },
+            "evictions": {
+              "min": 0,
+              "max": 0
+            },
+            "overBudgetEvents": {
+              "min": 0,
+              "max": 0
+            },
+            "range.scratchBytes": {
+              "availableSamples": 0,
+              "min": null,
+              "max": null
+            }
+          }
+        }
+      ],
+      "frameMs": {
+        "count": 7022,
+        "median": 16.69999999999709,
+        "mean": 17.095599544289453,
+        "p95": 16.799999999995634,
+        "p99": 16.80000000000291,
+        "max": 133.20000000000437,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 4375,
+        "rawExactOverrunDurationMs": 3192.233333333475,
+        "overruns": 66,
+        "overrunDurationMs": 3016.80000000004
+      },
+      "callbackMs": {
+        "count": 7023,
+        "median": 4.200000047683716,
+        "mean": 5.011433861524855,
+        "p95": 15.900000095367432,
+        "p99": 25.700000047683716,
+        "max": 132.20000004768372,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 245,
+        "rawExactOverrunDurationMs": 3653.6666661898316,
+        "overruns": 198,
+        "overrunDurationMs": 3645.399999618532
+      },
+      "poolWork": {
+        "instancePool.buffersCreated": {
+          "start": 410,
+          "end": 410,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.buffersReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsCreated": {
+          "start": 408,
+          "end": 408,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.bindGroupsReleased": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.createdBytes": {
+          "start": 2211456,
+          "end": 2211456,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.releasedBytes": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.reuses": {
+          "start": 1080,
+          "end": 17280,
+          "delta": 16200,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 2.3067065356685177,
+          "perSecond": 134.98740117583662
+        },
+        "instancePool.evictions": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        },
+        "instancePool.overBudgetEvents": {
+          "start": 0,
+          "end": 0,
+          "delta": 0,
+          "perProfilerFrame": null,
+          "perApplicationRaf": 0,
+          "perSecond": 0
+        }
+      },
+      "commands": {
+        "transforms": 245760,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0,
+        "poolTransitions": 240
+      }
+    }
+  ]
+}

@@ -1,0 +1,4901 @@
+{
+  "pixels": [
+    {
+      "campaign": "diagnostic-arena-active-webgl",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 27907,
+      "maxChannelDelta": 196,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "diagnostic-arena-active-webgpu",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 20215,
+      "maxChannelDelta": 195,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "diagnostic-rim-camera-stress-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "diagnostic-rim-camera-stress-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "historical-pool-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "historical-pool-webgl",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "historical-pool-webgl",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "historical-pool-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "historical-pool-webgpu",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "historical-pool-webgpu",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "pilot-rim-camera-stress-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "pilot-rim-camera-stress-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-arena-active-webgl",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 21413,
+      "maxChannelDelta": 163,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-arena-active-webgl",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 15690,
+      "maxChannelDelta": 170,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-arena-active-webgl",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 21065,
+      "maxChannelDelta": 179,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-arena-active-webgpu",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 30039,
+      "maxChannelDelta": 219,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-arena-active-webgpu",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 1093,
+      "maxChannelDelta": 138,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-arena-active-webgpu",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 18303,
+      "maxChannelDelta": 158,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-active-webgl",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 67105,
+      "maxChannelDelta": 248,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-rim-active-webgl",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 34380,
+      "maxChannelDelta": 252,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-rim-active-webgl",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 108807,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-rim-active-webgpu",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 235097,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-rim-active-webgpu",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 53481,
+      "maxChannelDelta": 250,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-rim-active-webgpu",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 64082,
+      "maxChannelDelta": 253,
+      "stored": {
+        "pass": null,
+        "reason": "native gameplay is not reset to a deterministic capture state; functional acceptance required"
+      }
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgl",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgl",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgpu",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgpu",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-clustered-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-clustered-webgl",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-clustered-webgl",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-clustered-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-clustered-webgpu",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-clustered-webgpu",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgl",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgl",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgpu",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgpu",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-stress-webgl",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-stress-webgl",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-stress-webgl",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-stress-webgpu",
+      "pair": 0,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-stress-webgpu",
+      "pair": 1,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "primary-rim-stress-webgpu",
+      "pair": 2,
+      "exactRequired": true,
+      "exact": true,
+      "changedPixels": 0,
+      "maxChannelDelta": 0,
+      "stored": {
+        "pass": true,
+        "exact": true,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 0,
+        "meanAbsoluteChannelDelta": 0,
+        "changedPixels": 0,
+        "changedFraction": 0,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0
+      }
+    },
+    {
+      "campaign": "three-common-webgl",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 5.425347222222222e-05,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "limited shared-GLB base-color profile; exact cross-renderer pixels not asserted; precision/visibility policies remain"
+      }
+    },
+    {
+      "campaign": "three-common-webgl",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 5.425347222222222e-05,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "limited shared-GLB base-color profile; exact cross-renderer pixels not asserted; precision/visibility policies remain"
+      }
+    },
+    {
+      "campaign": "three-common-webgl",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 5.425347222222222e-05,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "limited shared-GLB base-color profile; exact cross-renderer pixels not asserted; precision/visibility policies remain"
+      }
+    },
+    {
+      "campaign": "three-common-webgpu",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 5.425347222222222e-05,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "limited shared-GLB base-color profile; exact cross-renderer pixels not asserted; precision/visibility policies remain"
+      }
+    },
+    {
+      "campaign": "three-common-webgpu",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 5.425347222222222e-05,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "limited shared-GLB base-color profile; exact cross-renderer pixels not asserted; precision/visibility policies remain"
+      }
+    },
+    {
+      "campaign": "three-common-webgpu",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 255,
+        "meanAbsoluteChannelDelta": 0.003459201388888889,
+        "changedPixels": 50,
+        "changedFraction": 5.425347222222222e-05,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "limited shared-GLB base-color profile; exact cross-renderer pixels not asserted; precision/visibility policies remain"
+      }
+    },
+    {
+      "campaign": "three-production-webgl",
+      "pair": 0,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 705262,
+      "maxChannelDelta": 219,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 705262,
+        "changedFraction": 0.7652582465277777,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+      }
+    },
+    {
+      "campaign": "three-production-webgl",
+      "pair": 1,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 705262,
+      "maxChannelDelta": 219,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 705262,
+        "changedFraction": 0.7652582465277777,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+      }
+    },
+    {
+      "campaign": "three-production-webgl",
+      "pair": 2,
+      "exactRequired": false,
+      "exact": false,
+      "changedPixels": 705262,
+      "maxChannelDelta": 219,
+      "stored": {
+        "pass": null,
+        "exact": false,
+        "width": 1280,
+        "height": 720,
+        "maxChannelDelta": 219,
+        "meanAbsoluteChannelDelta": 5.6812741427951385,
+        "changedPixels": 705262,
+        "changedFraction": 0.7652582465277777,
+        "channelTolerance": 0,
+        "pixelFractionTolerance": 0,
+        "withinDiagnosticTolerance": false,
+        "gateDisabled": true,
+        "reason": "original Rome diagnostic; MSAA/FXAA, shader, shadow and scene-state equivalence not established"
+      }
+    }
+  ],
+  "strictPairs": 40,
+  "strictExact": 40,
+  "nonStrictPairs": 23,
+  "failures": [],
+  "rawFiles": [
+    {
+      "campaign": "cal-arena-active-webgl",
+      "bytes": 6722,
+      "verifiedRuns": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 2322.9,
+              "cpuMs": 4.3999998569488525
+            },
+            {
+              "index": 122,
+              "stamp": 4356.2,
+              "cpuMs": 4
+            },
+            {
+              "index": 41,
+              "stamp": 3006.2,
+              "cpuMs": 3.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-arena-active-webgpu",
+      "bytes": 6753,
+      "verifiedRuns": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 1622.2,
+              "cpuMs": 29
+            },
+            {
+              "index": 8,
+              "stamp": 1772.2,
+              "cpuMs": 4.900000095367432
+            },
+            {
+              "index": 24,
+              "stamp": 2038.8,
+              "cpuMs": 3.3999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-dynamic-webgl",
+      "bytes": 11195,
+      "verifiedRuns": [
+        {
+          "id": "baseline-dynamic-64-pair0",
+          "frames": 180,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 24,
+              "stamp": 1844.6,
+              "cpuMs": 39.00000023841858
+            },
+            {
+              "index": 44,
+              "stamp": 2194.6,
+              "cpuMs": 4.299999952316284
+            },
+            {
+              "index": 0,
+              "stamp": 1444.6,
+              "cpuMs": 4
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-dynamic-webgpu",
+      "bytes": 11137,
+      "verifiedRuns": [
+        {
+          "id": "baseline-dynamic-64-pair0",
+          "frames": 181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 1159,
+              "cpuMs": 4.200000047683716
+            },
+            {
+              "index": 180,
+              "stamp": 4159,
+              "cpuMs": 2.9000000953674316
+            },
+            {
+              "index": 71,
+              "stamp": 2342.3,
+              "cpuMs": 2.8000001907348633
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-final-production-webgl",
+      "bytes": 7625,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 94,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 44,
+              "stamp": 5655.2,
+              "cpuMs": 32.90000009536743
+            },
+            {
+              "index": 40,
+              "stamp": 5521.9,
+              "cpuMs": 32.5
+            },
+            {
+              "index": 36,
+              "stamp": 5405.3,
+              "cpuMs": 32.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-historical-pool-webgl",
+      "bytes": 8437,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-256-pair0",
+          "frames": 182,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 31,
+              "stamp": 2451.6,
+              "cpuMs": 9.700000047683716
+            },
+            {
+              "index": 91,
+              "stamp": 3451.5,
+              "cpuMs": 8.700000047683716
+            },
+            {
+              "index": 151,
+              "stamp": 4451.5,
+              "cpuMs": 7.900000095367432
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-historical-pool-webgpu",
+      "bytes": 8501,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-256-pair0",
+          "frames": 181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 31,
+              "stamp": 2390.3,
+              "cpuMs": 23.200000047683716
+            },
+            {
+              "index": 91,
+              "stamp": 3390.2,
+              "cpuMs": 8.700000047683716
+            },
+            {
+              "index": 151,
+              "stamp": 4390.2,
+              "cpuMs": 8.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-active-webgl",
+      "bytes": 12486,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-active-1-pair0",
+          "frames": 181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 1846.6,
+              "cpuMs": 4.599999904632568
+            },
+            {
+              "index": 167,
+              "stamp": 4629.8,
+              "cpuMs": 4.400000095367432
+            },
+            {
+              "index": 142,
+              "stamp": 4213.2,
+              "cpuMs": 4.299999713897705
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-active-webgpu",
+      "bytes": 12432,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-active-1-pair0",
+          "frames": 181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 79,
+              "stamp": 2707.7,
+              "cpuMs": 3.499999761581421
+            },
+            {
+              "index": 13,
+              "stamp": 1607.8,
+              "cpuMs": 3.3000001907348633
+            },
+            {
+              "index": 124,
+              "stamp": 3457.7,
+              "cpuMs": 3.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-camera-stress-webgl",
+      "bytes": 12428,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 106,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 9,
+              "stamp": 3966,
+              "cpuMs": 41.799999952316284
+            },
+            {
+              "index": 29,
+              "stamp": 4549.3,
+              "cpuMs": 40.799999952316284
+            },
+            {
+              "index": 0,
+              "stamp": 3699.3,
+              "cpuMs": 37.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-camera-stress-webgpu",
+      "bytes": 12878,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 146,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 118,
+              "stamp": 8623.5,
+              "cpuMs": 40.799999952316284
+            },
+            {
+              "index": 50,
+              "stamp": 7206.9,
+              "cpuMs": 37.19999980926514
+            },
+            {
+              "index": 0,
+              "stamp": 6140.2,
+              "cpuMs": 35
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-clustered-webgl",
+      "bytes": 10304,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-clustered-1024-pair0",
+          "frames": 78,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 12,
+              "stamp": 3191.5,
+              "cpuMs": 51.700000047683716
+            },
+            {
+              "index": 0,
+              "stamp": 2674.9,
+              "cpuMs": 48.200000047683716
+            },
+            {
+              "index": 3,
+              "stamp": 2808.3,
+              "cpuMs": 48
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-clustered-webgpu",
+      "bytes": 10610,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-clustered-1024-pair0",
+          "frames": 79,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 15,
+              "stamp": 4027.8,
+              "cpuMs": 48.89999985694885
+            },
+            {
+              "index": 0,
+              "stamp": 3394.5,
+              "cpuMs": 48.40000009536743
+            },
+            {
+              "index": 14,
+              "stamp": 3977.8,
+              "cpuMs": 46.60000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-common-webgl",
+      "bytes": 8070,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-common-2048-pair0",
+          "frames": 125,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 123,
+              "stamp": 6655.5,
+              "cpuMs": 29.899999856948853
+            },
+            {
+              "index": 35,
+              "stamp": 4455.5,
+              "cpuMs": 28.200000047683716
+            },
+            {
+              "index": 57,
+              "stamp": 5005.5,
+              "cpuMs": 28.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-common-webgpu",
+      "bytes": 8189,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-common-2048-pair0",
+          "frames": 140,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 128,
+              "stamp": 8537.1,
+              "cpuMs": 28.700000047683716
+            },
+            {
+              "index": 43,
+              "stamp": 6637.2,
+              "cpuMs": 26.799999952316284
+            },
+            {
+              "index": 38,
+              "stamp": 6537.2,
+              "cpuMs": 25.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-pool-cycle-webgl",
+      "bytes": 8550,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 160,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 30,
+              "stamp": 3262.5,
+              "cpuMs": 109.69999980926514
+            },
+            {
+              "index": 134,
+              "stamp": 5262.4,
+              "cpuMs": 62.90000009536743
+            },
+            {
+              "index": 75,
+              "stamp": 4262.5,
+              "cpuMs": 20.100000143051147
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-pool-cycle-webgpu",
+      "bytes": 8691,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 175,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 30,
+              "stamp": 4160.1,
+              "cpuMs": 74.59999990463257
+            },
+            {
+              "index": 147,
+              "stamp": 6160.1,
+              "cpuMs": 66.10000014305115
+            },
+            {
+              "index": 87,
+              "stamp": 5160.1,
+              "cpuMs": 17.899999856948853
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-stress-webgl",
+      "bytes": 6961,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 94,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 71,
+              "stamp": 6058.4,
+              "cpuMs": 42.60000014305115
+            },
+            {
+              "index": 51,
+              "stamp": 5408.5,
+              "cpuMs": 42.59999990463257
+            },
+            {
+              "index": 86,
+              "stamp": 6541.8,
+              "cpuMs": 41.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "cal-rim-stress-webgpu",
+      "bytes": 7707,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 120,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 53,
+              "stamp": 6967.8,
+              "cpuMs": 41.299999713897705
+            },
+            {
+              "index": 9,
+              "stamp": 5851.2,
+              "cpuMs": 39.5
+            },
+            {
+              "index": 13,
+              "stamp": 5951.1,
+              "cpuMs": 36.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "diagnostic-arena-active-webgl",
+      "bytes": 225586,
+      "verifiedRuns": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 481,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 369,
+              "stamp": 8915.4,
+              "cpuMs": 4
+            },
+            {
+              "index": 61,
+              "stamp": 3782.3,
+              "cpuMs": 3.8000001907348633
+            },
+            {
+              "index": 383,
+              "stamp": 9148.7,
+              "cpuMs": 3.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair0",
+          "frames": 482,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 68,
+              "stamp": 3830.8,
+              "cpuMs": 3.799999952316284
+            },
+            {
+              "index": 381,
+              "stamp": 9047.3,
+              "cpuMs": 3.799999952316284
+            },
+            {
+              "index": 382,
+              "stamp": 9063.9,
+              "cpuMs": 3.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "diagnostic-arena-active-webgpu",
+      "bytes": 228508,
+      "verifiedRuns": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 482,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 124,
+              "stamp": 4487.3,
+              "cpuMs": 3.4000000953674316
+            },
+            {
+              "index": 208,
+              "stamp": 5887.2,
+              "cpuMs": 3.299999952316284
+            },
+            {
+              "index": 324,
+              "stamp": 7820.5,
+              "cpuMs": 3.200000286102295
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair0",
+          "frames": 481,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 208,
+              "stamp": 5845.5,
+              "cpuMs": 3.8000001907348633
+            },
+            {
+              "index": 204,
+              "stamp": 5778.8,
+              "cpuMs": 3.799999952316284
+            },
+            {
+              "index": 128,
+              "stamp": 4512.1,
+              "cpuMs": 3.3999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "diagnostic-rim-camera-stress-webgl",
+      "bytes": 309335,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 243,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 33,
+              "stamp": 5989.8,
+              "cpuMs": 45.80000019073486
+            },
+            {
+              "index": 183,
+              "stamp": 10922.9,
+              "cpuMs": 45.39999985694885
+            },
+            {
+              "index": 184,
+              "stamp": 10989.5,
+              "cpuMs": 45.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair0",
+          "frames": 244,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 65,
+              "stamp": 7088,
+              "cpuMs": 47.5
+            },
+            {
+              "index": 37,
+              "stamp": 6154.7,
+              "cpuMs": 45.09999990463257
+            },
+            {
+              "index": 66,
+              "stamp": 7138,
+              "cpuMs": 44.59999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "diagnostic-rim-camera-stress-webgpu",
+      "bytes": 320494,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 253,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 53,
+              "stamp": 8696.3,
+              "cpuMs": 51.60000014305115
+            },
+            {
+              "index": 54,
+              "stamp": 8746.3,
+              "cpuMs": 45.89999985694885
+            },
+            {
+              "index": 14,
+              "stamp": 7463,
+              "cpuMs": 44.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair0",
+          "frames": 260,
+          "profiling": true,
+          "topCallbacks": [
+            {
+              "index": 16,
+              "stamp": 7120.5,
+              "cpuMs": 48.700000047683716
+            },
+            {
+              "index": 154,
+              "stamp": 11287,
+              "cpuMs": 39.60000014305115
+            },
+            {
+              "index": 14,
+              "stamp": 7053.8,
+              "cpuMs": 39.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "historical-pool-webgl",
+      "bytes": 583467,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-256-pair0",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1649,
+              "stamp": 36464.5,
+              "cpuMs": 40.200000047683716
+            },
+            {
+              "index": 930,
+              "stamp": 24465,
+              "cpuMs": 31.200000047683716
+            },
+            {
+              "index": 330,
+              "stamp": 14465.3,
+              "cpuMs": 25.399999856948853
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-256-pair0",
+          "frames": 3597,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1049,
+              "stamp": 26407.1,
+              "cpuMs": 50.89999985694885
+            },
+            {
+              "index": 2247,
+              "stamp": 46406.4,
+              "cpuMs": 41.39999985694885
+            },
+            {
+              "index": 331,
+              "stamp": 14407.7,
+              "cpuMs": 39.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-256-pair1",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2007,
+              "stamp": 42468.1,
+              "cpuMs": 31.90000009536743
+            },
+            {
+              "index": 2966,
+              "stamp": 58467.4,
+              "cpuMs": 24.799999952316284
+            },
+            {
+              "index": 567,
+              "stamp": 18469,
+              "cpuMs": 23.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-256-pair1",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 331,
+              "stamp": 14616.9,
+              "cpuMs": 29
+            },
+            {
+              "index": 691,
+              "stamp": 20616.7,
+              "cpuMs": 26.799999952316284
+            },
+            {
+              "index": 3331,
+              "stamp": 64615,
+              "cpuMs": 26.59999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-256-pair2",
+          "frames": 3596,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2726,
+              "stamp": 54595.4,
+              "cpuMs": 44.799999952316284
+            },
+            {
+              "index": 809,
+              "stamp": 22596.6,
+              "cpuMs": 41.19999980926514
+            },
+            {
+              "index": 2607,
+              "stamp": 52595.5,
+              "cpuMs": 35.39999985694885
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-256-pair2",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1650,
+              "stamp": 36498.6,
+              "cpuMs": 28.200000047683716
+            },
+            {
+              "index": 2370,
+              "stamp": 48498.1,
+              "cpuMs": 24.300000190734863
+            },
+            {
+              "index": 3570,
+              "stamp": 68497.2,
+              "cpuMs": 23.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "historical-pool-webgpu",
+      "bytes": 584178,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-256-pair0",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 691,
+              "stamp": 20341.9,
+              "cpuMs": 24.90000009536743
+            },
+            {
+              "index": 331,
+              "stamp": 14342.1,
+              "cpuMs": 23.799999952316284
+            },
+            {
+              "index": 1891,
+              "stamp": 40341,
+              "cpuMs": 21.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-256-pair0",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1409,
+              "stamp": 32413.6,
+              "cpuMs": 46
+            },
+            {
+              "index": 1528,
+              "stamp": 34413.5,
+              "cpuMs": 22.899999856948853
+            },
+            {
+              "index": 2848,
+              "stamp": 56412.7,
+              "cpuMs": 22.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-256-pair1",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3448,
+              "stamp": 66412.8,
+              "cpuMs": 23
+            },
+            {
+              "index": 1288,
+              "stamp": 30414.3,
+              "cpuMs": 22.90000009536743
+            },
+            {
+              "index": 328,
+              "stamp": 14414.9,
+              "cpuMs": 22.59999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-256-pair1",
+          "frames": 3600,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3329,
+              "stamp": 64395,
+              "cpuMs": 44.89999985694885
+            },
+            {
+              "index": 2130,
+              "stamp": 44395.8,
+              "cpuMs": 37.39999985694885
+            },
+            {
+              "index": 1650,
+              "stamp": 36396.1,
+              "cpuMs": 30.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-256-pair2",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1770,
+              "stamp": 38353.9,
+              "cpuMs": 28.899999856948853
+            },
+            {
+              "index": 3450,
+              "stamp": 66352.8,
+              "cpuMs": 23.59999990463257
+            },
+            {
+              "index": 2730,
+              "stamp": 54353.2,
+              "cpuMs": 23.399999856948853
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-256-pair2",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3451,
+              "stamp": 66423.8,
+              "cpuMs": 30
+            },
+            {
+              "index": 811,
+              "stamp": 22425.6,
+              "cpuMs": 24.100000143051147
+            },
+            {
+              "index": 91,
+              "stamp": 10426.1,
+              "cpuMs": 23.799999713897705
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "pilot-rim-camera-stress-webgl",
+      "bytes": 35244,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 177,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 8,
+              "stamp": 3857,
+              "cpuMs": 38.39999985694885
+            },
+            {
+              "index": 12,
+              "stamp": 3973.6,
+              "cpuMs": 35.799999952316284
+            },
+            {
+              "index": 24,
+              "stamp": 4323.6,
+              "cpuMs": 35.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair0",
+          "frames": 176,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 48,
+              "stamp": 5182.6,
+              "cpuMs": 51.80000019073486
+            },
+            {
+              "index": 56,
+              "stamp": 5415.9,
+              "cpuMs": 45.60000014305115
+            },
+            {
+              "index": 36,
+              "stamp": 4849.2,
+              "cpuMs": 43.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "pilot-rim-camera-stress-webgpu",
+      "bytes": 36603,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 236,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 14,
+              "stamp": 6297.3,
+              "cpuMs": 45
+            },
+            {
+              "index": 116,
+              "stamp": 8480.4,
+              "cpuMs": 43
+            },
+            {
+              "index": 135,
+              "stamp": 8897.2,
+              "cpuMs": 41.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair0",
+          "frames": 228,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 208,
+              "stamp": 10156,
+              "cpuMs": 106.39999985694885
+            },
+            {
+              "index": 209,
+              "stamp": 10306,
+              "cpuMs": 55.10000014305115
+            },
+            {
+              "index": 57,
+              "stamp": 7006.1,
+              "cpuMs": 43.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-arena-active-webgl",
+      "bytes": 194174,
+      "verifiedRuns": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 510,
+              "stamp": 17143.5,
+              "cpuMs": 4.8999998569488525
+            },
+            {
+              "index": 0,
+              "stamp": 8643.8,
+              "cpuMs": 4.1000001430511475
+            },
+            {
+              "index": 1233,
+              "stamp": 29193,
+              "cpuMs": 3.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair0",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 500,
+              "stamp": 17029.9,
+              "cpuMs": 3.5999999046325684
+            },
+            {
+              "index": 1104,
+              "stamp": 27096.1,
+              "cpuMs": 3.5999999046325684
+            },
+            {
+              "index": 19,
+              "stamp": 9013.4,
+              "cpuMs": 3.4000000953674316
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair1",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1363,
+              "stamp": 31391.7,
+              "cpuMs": 5
+            },
+            {
+              "index": 0,
+              "stamp": 8676,
+              "cpuMs": 4.799999952316284
+            },
+            {
+              "index": 736,
+              "stamp": 20942.1,
+              "cpuMs": 4.400000095367432
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-arena-active-1-pair1",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1286,
+              "stamp": 30126,
+              "cpuMs": 6.900000095367432
+            },
+            {
+              "index": 921,
+              "stamp": 24042.9,
+              "cpuMs": 5.199999809265137
+            },
+            {
+              "index": 952,
+              "stamp": 24559.6,
+              "cpuMs": 3.4000000953674316
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-arena-active-1-pair2",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1285,
+              "stamp": 30127.1,
+              "cpuMs": 10.299999952316284
+            },
+            {
+              "index": 510,
+              "stamp": 17210.9,
+              "cpuMs": 3.8999998569488525
+            },
+            {
+              "index": 0,
+              "stamp": 8711.2,
+              "cpuMs": 3.8000001907348633
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair2",
+          "frames": 1503,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1284,
+              "stamp": 30118.4,
+              "cpuMs": 5.300000190734863
+            },
+            {
+              "index": 511,
+              "stamp": 17235.5,
+              "cpuMs": 4.6000001430511475
+            },
+            {
+              "index": 0,
+              "stamp": 8719.3,
+              "cpuMs": 4.500000238418579
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-arena-active-webgpu",
+      "bytes": 196544,
+      "verifiedRuns": [
+        {
+          "id": "baseline-arena-active-1-pair0",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1289,
+              "stamp": 30163.1,
+              "cpuMs": 3.9000000953674316
+            },
+            {
+              "index": 1429,
+              "stamp": 32496.3,
+              "cpuMs": 3.1000001430511475
+            },
+            {
+              "index": 0,
+              "stamp": 8680.6,
+              "cpuMs": 3.0999999046325684
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair0",
+          "frames": 1503,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1502,
+              "stamp": 33512.4,
+              "cpuMs": 7.400000095367432
+            },
+            {
+              "index": 0,
+              "stamp": 8480.1,
+              "cpuMs": 4.900000095367432
+            },
+            {
+              "index": 1456,
+              "stamp": 32745.8,
+              "cpuMs": 4.800000190734863
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair1",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1302,
+              "stamp": 30116.3,
+              "cpuMs": 6.500000238418579
+            },
+            {
+              "index": 506,
+              "stamp": 16850.1,
+              "cpuMs": 5.099999904632568
+            },
+            {
+              "index": 1239,
+              "stamp": 29066.3,
+              "cpuMs": 4.900000095367432
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-arena-active-1-pair1",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 290,
+              "stamp": 13292.3,
+              "cpuMs": 2.799999952316284
+            },
+            {
+              "index": 509,
+              "stamp": 16942.2,
+              "cpuMs": 2.700000047683716
+            },
+            {
+              "index": 646,
+              "stamp": 19225.4,
+              "cpuMs": 2.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-arena-active-1-pair2",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 8420.6,
+              "cpuMs": 3.1999998092651367
+            },
+            {
+              "index": 525,
+              "stamp": 17170.3,
+              "cpuMs": 3.0999999046325684
+            },
+            {
+              "index": 1460,
+              "stamp": 32753,
+              "cpuMs": 3
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-arena-active-1-pair2",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1299,
+              "stamp": 30113.5,
+              "cpuMs": 7.200000047683716
+            },
+            {
+              "index": 0,
+              "stamp": 8464.3,
+              "cpuMs": 6.200000047683716
+            },
+            {
+              "index": 507,
+              "stamp": 16914,
+              "cpuMs": 5.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "bytes": 829416,
+      "verifiedRuns": [
+        {
+          "id": "baseline-dynamic-64-pair0",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3557,
+              "stamp": 67595.1,
+              "cpuMs": 6.299999952316284
+            },
+            {
+              "index": 2520,
+              "stamp": 50312.6,
+              "cpuMs": 6
+            },
+            {
+              "index": 3600,
+              "stamp": 68311.8,
+              "cpuMs": 4.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-dynamic-64-pair0",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3119,
+              "stamp": 60315.6,
+              "cpuMs": 5.799999952316284
+            },
+            {
+              "index": 2047,
+              "stamp": 42449.7,
+              "cpuMs": 5.3999998569488525
+            },
+            {
+              "index": 3023,
+              "stamp": 58715.6,
+              "cpuMs": 5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-dynamic-64-pair1",
+          "frames": 3585,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3116,
+              "stamp": 60586,
+              "cpuMs": 9.700000047683716
+            },
+            {
+              "index": 1165,
+              "stamp": 27787.2,
+              "cpuMs": 5.900000095367432
+            },
+            {
+              "index": 2698,
+              "stamp": 53619.6,
+              "cpuMs": 5.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-dynamic-64-pair1",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2142,
+              "stamp": 44032,
+              "cpuMs": 4.900000095367432
+            },
+            {
+              "index": 1394,
+              "stamp": 31565.9,
+              "cpuMs": 4.800000190734863
+            },
+            {
+              "index": 240,
+              "stamp": 12333.3,
+              "cpuMs": 4.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-dynamic-64-pair2",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2212,
+              "stamp": 45258,
+              "cpuMs": 6.799999952316284
+            },
+            {
+              "index": 1835,
+              "stamp": 38974.9,
+              "cpuMs": 4.700000047683716
+            },
+            {
+              "index": 239,
+              "stamp": 12376,
+              "cpuMs": 4.3999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-dynamic-64-pair2",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3052,
+              "stamp": 59232.4,
+              "cpuMs": 4.799999952316284
+            },
+            {
+              "index": 239,
+              "stamp": 12350.9,
+              "cpuMs": 4
+            },
+            {
+              "index": 43,
+              "stamp": 9084.3,
+              "cpuMs": 3.8999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "bytes": 828410,
+      "verifiedRuns": [
+        {
+          "id": "baseline-dynamic-64-pair0",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2014,
+              "stamp": 41672.8,
+              "cpuMs": 7.6000001430511475
+            },
+            {
+              "index": 3120,
+              "stamp": 60105.3,
+              "cpuMs": 7
+            },
+            {
+              "index": 2655,
+              "stamp": 52355.6,
+              "cpuMs": 5.199999809265137
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-dynamic-64-pair0",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2113,
+              "stamp": 43358.1,
+              "cpuMs": 7.999999761581421
+            },
+            {
+              "index": 3101,
+              "stamp": 59824.1,
+              "cpuMs": 6.200000047683716
+            },
+            {
+              "index": 1988,
+              "stamp": 41274.9,
+              "cpuMs": 5.900000333786011
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-dynamic-64-pair1",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2400,
+              "stamp": 48169.6,
+              "cpuMs": 8.5
+            },
+            {
+              "index": 3120,
+              "stamp": 60169.1,
+              "cpuMs": 8.300000190734863
+            },
+            {
+              "index": 515,
+              "stamp": 16754.2,
+              "cpuMs": 5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-dynamic-64-pair1",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3115,
+              "stamp": 60090.8,
+              "cpuMs": 7.5
+            },
+            {
+              "index": 2400,
+              "stamp": 48174.6,
+              "cpuMs": 6.999999761581421
+            },
+            {
+              "index": 515,
+              "stamp": 16759.2,
+              "cpuMs": 5.8999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-dynamic-64-pair2",
+          "frames": 3601,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2399,
+              "stamp": 48144.9,
+              "cpuMs": 6.3999998569488525
+            },
+            {
+              "index": 3103,
+              "stamp": 59877.7,
+              "cpuMs": 5.299999952316284
+            },
+            {
+              "index": 239,
+              "stamp": 12146.4,
+              "cpuMs": 4.099999904632568
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-dynamic-64-pair2",
+          "frames": 3602,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 3134,
+              "stamp": 60396.4,
+              "cpuMs": 6.700000047683716
+            },
+            {
+              "index": 764,
+              "stamp": 20898,
+              "cpuMs": 6.5
+            },
+            {
+              "index": 480,
+              "stamp": 16164.9,
+              "cpuMs": 5.599999904632568
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-active-webgl",
+      "bytes": 421012,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-active-1-pair0",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 694,
+              "stamp": 20294.7,
+              "cpuMs": 5.3999998569488525
+            },
+            {
+              "index": 158,
+              "stamp": 11361.7,
+              "cpuMs": 5.200000047683716
+            },
+            {
+              "index": 90,
+              "stamp": 10228.4,
+              "cpuMs": 5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-active-1-pair0",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1085,
+              "stamp": 26792,
+              "cpuMs": 7.900000095367432
+            },
+            {
+              "index": 604,
+              "stamp": 18775.6,
+              "cpuMs": 5.400000095367432
+            },
+            {
+              "index": 694,
+              "stamp": 20275.6,
+              "cpuMs": 5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-active-1-pair1",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 518,
+              "stamp": 17367.2,
+              "cpuMs": 7.299999952316284
+            },
+            {
+              "index": 1281,
+              "stamp": 30083.4,
+              "cpuMs": 5.1000001430511475
+            },
+            {
+              "index": 773,
+              "stamp": 21617.1,
+              "cpuMs": 5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-active-1-pair1",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1106,
+              "stamp": 27237.5,
+              "cpuMs": 9.299999952316284
+            },
+            {
+              "index": 691,
+              "stamp": 20321.1,
+              "cpuMs": 8.799999952316284
+            },
+            {
+              "index": 518,
+              "stamp": 17437.9,
+              "cpuMs": 5.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-active-1-pair2",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 518,
+              "stamp": 17443.8,
+              "cpuMs": 5.400000095367432
+            },
+            {
+              "index": 729,
+              "stamp": 20960.4,
+              "cpuMs": 4.800000190734863
+            },
+            {
+              "index": 77,
+              "stamp": 10094.1,
+              "cpuMs": 4.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-active-1-pair2",
+          "frames": 1503,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1280,
+              "stamp": 30122.2,
+              "cpuMs": 8.5
+            },
+            {
+              "index": 692,
+              "stamp": 20322.6,
+              "cpuMs": 8.400000095367432
+            },
+            {
+              "index": 0,
+              "stamp": 8773.1,
+              "cpuMs": 6.599999904632568
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-active-webgpu",
+      "bytes": 424505,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-active-1-pair0",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 8367.4,
+              "cpuMs": 28.90000009536743
+            },
+            {
+              "index": 1470,
+              "stamp": 33016.4,
+              "cpuMs": 21.5
+            },
+            {
+              "index": 1500,
+              "stamp": 33516.4,
+              "cpuMs": 19.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-active-1-pair0",
+          "frames": 1501,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 502,
+              "stamp": 16832.6,
+              "cpuMs": 38.90000009536743
+            },
+            {
+              "index": 506,
+              "stamp": 16915.8,
+              "cpuMs": 17.5
+            },
+            {
+              "index": 504,
+              "stamp": 16882.6,
+              "cpuMs": 13.100000143051147
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-active-1-pair1",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 985,
+              "stamp": 24807.5,
+              "cpuMs": 6.5
+            },
+            {
+              "index": 1304,
+              "stamp": 30124,
+              "cpuMs": 5.1000001430511475
+            },
+            {
+              "index": 0,
+              "stamp": 8391.5,
+              "cpuMs": 4.3999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-active-1-pair1",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 695,
+              "stamp": 19996.7,
+              "cpuMs": 8
+            },
+            {
+              "index": 1501,
+              "stamp": 33429.5,
+              "cpuMs": 5.299999952316284
+            },
+            {
+              "index": 0,
+              "stamp": 8413.8,
+              "cpuMs": 5.1000001430511475
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-active-1-pair2",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 575,
+              "stamp": 18006.6,
+              "cpuMs": 12.800000190734863
+            },
+            {
+              "index": 696,
+              "stamp": 20023.2,
+              "cpuMs": 7.099999904632568
+            },
+            {
+              "index": 0,
+              "stamp": 8423.6,
+              "cpuMs": 6.599999904632568
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-active-1-pair2",
+          "frames": 1502,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 8432.3,
+              "cpuMs": 4.5
+            },
+            {
+              "index": 503,
+              "stamp": 16815.3,
+              "cpuMs": 4.5
+            },
+            {
+              "index": 505,
+              "stamp": 16848.6,
+              "cpuMs": 4.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgl",
+      "bytes": 468315,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 930,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 701,
+              "stamp": 30118.3,
+              "cpuMs": 53.299999952316284
+            },
+            {
+              "index": 353,
+              "stamp": 20468.7,
+              "cpuMs": 45.799999952316284
+            },
+            {
+              "index": 501,
+              "stamp": 24485.3,
+              "cpuMs": 43.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair0",
+          "frames": 930,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 392,
+              "stamp": 21538.1,
+              "cpuMs": 44.50000023841858
+            },
+            {
+              "index": 693,
+              "stamp": 29937.7,
+              "cpuMs": 41.80000019073486
+            },
+            {
+              "index": 641,
+              "stamp": 28454.5,
+              "cpuMs": 39.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair1",
+          "frames": 928,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 17,
+              "stamp": 11417.6,
+              "cpuMs": 49.299999952316284
+            },
+            {
+              "index": 471,
+              "stamp": 23617.1,
+              "cpuMs": 43.89999985694885
+            },
+            {
+              "index": 751,
+              "stamp": 31466.8,
+              "cpuMs": 40.10000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-camera-stress-2048-pair1",
+          "frames": 930,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 53,
+              "stamp": 12486.8,
+              "cpuMs": 43.40000009536743
+            },
+            {
+              "index": 498,
+              "stamp": 24469.8,
+              "cpuMs": 39
+            },
+            {
+              "index": 314,
+              "stamp": 19453.2,
+              "cpuMs": 38.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-camera-stress-2048-pair2",
+          "frames": 927,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 238,
+              "stamp": 17340.7,
+              "cpuMs": 42.39999985694885
+            },
+            {
+              "index": 241,
+              "stamp": 17440.7,
+              "cpuMs": 42.10000014305115
+            },
+            {
+              "index": 4,
+              "stamp": 11124.4,
+              "cpuMs": 41.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair2",
+          "frames": 929,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 345,
+              "stamp": 20286.7,
+              "cpuMs": 40.09999990463257
+            },
+            {
+              "index": 617,
+              "stamp": 27769.6,
+              "cpuMs": 39.799999952316284
+            },
+            {
+              "index": 601,
+              "stamp": 27319.6,
+              "cpuMs": 39.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgpu",
+      "bytes": 481412,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-camera-stress-2048-pair0",
+          "frames": 1138,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 937,
+              "stamp": 33966.8,
+              "cpuMs": 136.10000014305115
+            },
+            {
+              "index": 829,
+              "stamp": 31316.8,
+              "cpuMs": 53.59999990463257
+            },
+            {
+              "index": 935,
+              "stamp": 33900,
+              "cpuMs": 51
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair0",
+          "frames": 1229,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 504,
+              "stamp": 23972.3,
+              "cpuMs": 55.299999952316284
+            },
+            {
+              "index": 17,
+              "stamp": 13856,
+              "cpuMs": 52.39999985694885
+            },
+            {
+              "index": 0,
+              "stamp": 13322.7,
+              "cpuMs": 49.39999985694885
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair1",
+          "frames": 1244,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 976,
+              "stamp": 32527.7,
+              "cpuMs": 42.89999985694885
+            },
+            {
+              "index": 903,
+              "stamp": 30911.1,
+              "cpuMs": 39
+            },
+            {
+              "index": 241,
+              "stamp": 17645,
+              "cpuMs": 38.60000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-camera-stress-2048-pair1",
+          "frames": 1300,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 803,
+              "stamp": 27948.6,
+              "cpuMs": 51.40000009536743
+            },
+            {
+              "index": 760,
+              "stamp": 27065.2,
+              "cpuMs": 41.700000047683716
+            },
+            {
+              "index": 764,
+              "stamp": 27181.9,
+              "cpuMs": 39.59999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-camera-stress-2048-pair2",
+          "frames": 1244,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 148,
+              "stamp": 15750.1,
+              "cpuMs": 54.5
+            },
+            {
+              "index": 379,
+              "stamp": 20149.9,
+              "cpuMs": 53.200000047683716
+            },
+            {
+              "index": 1095,
+              "stamp": 35015.9,
+              "cpuMs": 49.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-camera-stress-2048-pair2",
+          "frames": 1243,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 735,
+              "stamp": 27590.3,
+              "cpuMs": 49.700000047683716
+            },
+            {
+              "index": 586,
+              "stamp": 24357.1,
+              "cpuMs": 46.39999985694885
+            },
+            {
+              "index": 731,
+              "stamp": 27473.7,
+              "cpuMs": 43.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-clustered-webgl",
+      "bytes": 335961,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-clustered-1024-pair0",
+          "frames": 641,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 522,
+              "stamp": 30067,
+              "cpuMs": 52.50000023841858
+            },
+            {
+              "index": 486,
+              "stamp": 28533.7,
+              "cpuMs": 51.5
+            },
+            {
+              "index": 135,
+              "stamp": 14884.3,
+              "cpuMs": 50.19999980926514
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair0",
+          "frames": 634,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 458,
+              "stamp": 27759.3,
+              "cpuMs": 61.700000047683716
+            },
+            {
+              "index": 0,
+              "stamp": 9726.7,
+              "cpuMs": 57.5
+            },
+            {
+              "index": 491,
+              "stamp": 29142.6,
+              "cpuMs": 53.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair1",
+          "frames": 616,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 6,
+              "stamp": 10201.3,
+              "cpuMs": 62.799999952316284
+            },
+            {
+              "index": 306,
+              "stamp": 22234.2,
+              "cpuMs": 57.50000023841858
+            },
+            {
+              "index": 610,
+              "stamp": 34683.7,
+              "cpuMs": 56.59999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair1",
+          "frames": 624,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 159,
+              "stamp": 16087.9,
+              "cpuMs": 63.5
+            },
+            {
+              "index": 147,
+              "stamp": 15554.7,
+              "cpuMs": 58.5
+            },
+            {
+              "index": 564,
+              "stamp": 32504,
+              "cpuMs": 54.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair2",
+          "frames": 590,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 304,
+              "stamp": 22937,
+              "cpuMs": 76.89999985694885
+            },
+            {
+              "index": 130,
+              "stamp": 15387.2,
+              "cpuMs": 65.59999990463257
+            },
+            {
+              "index": 128,
+              "stamp": 15270.6,
+              "cpuMs": 64.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair2",
+          "frames": 573,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 321,
+              "stamp": 24466.9,
+              "cpuMs": 67.5
+            },
+            {
+              "index": 104,
+              "stamp": 14917.2,
+              "cpuMs": 61.59999990463257
+            },
+            {
+              "index": 459,
+              "stamp": 30450,
+              "cpuMs": 59.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-clustered-webgpu",
+      "bytes": 344425,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-clustered-1024-pair0",
+          "frames": 629,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 130,
+              "stamp": 15647.1,
+              "cpuMs": 69.09999990463257
+            },
+            {
+              "index": 281,
+              "stamp": 21696.8,
+              "cpuMs": 68.40000009536743
+            },
+            {
+              "index": 367,
+              "stamp": 25446.7,
+              "cpuMs": 67.29999995231628
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair0",
+          "frames": 644,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 537,
+              "stamp": 31515,
+              "cpuMs": 56.09999990463257
+            },
+            {
+              "index": 627,
+              "stamp": 34998.1,
+              "cpuMs": 55.89999985694885
+            },
+            {
+              "index": 159,
+              "stamp": 16915.6,
+              "cpuMs": 52.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair1",
+          "frames": 631,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 8,
+              "stamp": 11164.4,
+              "cpuMs": 57.299999952316284
+            },
+            {
+              "index": 16,
+              "stamp": 11531.1,
+              "cpuMs": 54.90000009536743
+            },
+            {
+              "index": 7,
+              "stamp": 11114.4,
+              "cpuMs": 53.10000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair1",
+          "frames": 624,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 434,
+              "stamp": 27428.6,
+              "cpuMs": 98.79999995231628
+            },
+            {
+              "index": 606,
+              "stamp": 34728.4,
+              "cpuMs": 69.59999990463257
+            },
+            {
+              "index": 528,
+              "stamp": 31528.5,
+              "cpuMs": 69.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-clustered-1024-pair2",
+          "frames": 643,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 137,
+              "stamp": 16014.1,
+              "cpuMs": 60.89999985694885
+            },
+            {
+              "index": 446,
+              "stamp": 27947,
+              "cpuMs": 56.10000014305115
+            },
+            {
+              "index": 135,
+              "stamp": 15914.1,
+              "cpuMs": 53.299999713897705
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-clustered-1024-pair2",
+          "frames": 631,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 74,
+              "stamp": 13456.1,
+              "cpuMs": 60.700000047683716
+            },
+            {
+              "index": 166,
+              "stamp": 17255.9,
+              "cpuMs": 56.700000047683716
+            },
+            {
+              "index": 0,
+              "stamp": 10522.8,
+              "cpuMs": 53.89999985694885
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgl",
+      "bytes": 580422,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 3181,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2310,
+              "stamp": 53115.4,
+              "cpuMs": 123
+            },
+            {
+              "index": 2517,
+              "stamp": 57115.2,
+              "cpuMs": 110.99999976158142
+            },
+            {
+              "index": 2413,
+              "stamp": 55115.3,
+              "cpuMs": 107.39999985694885
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair0",
+          "frames": 3183,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 932,
+              "stamp": 27160.8,
+              "cpuMs": 105.70000004768372
+            },
+            {
+              "index": 507,
+              "stamp": 19161.1,
+              "cpuMs": 97
+            },
+            {
+              "index": 1886,
+              "stamp": 45160,
+              "cpuMs": 93
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair1",
+          "frames": 3189,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 828,
+              "stamp": 25165.4,
+              "cpuMs": 75.60000014305115
+            },
+            {
+              "index": 3058,
+              "stamp": 67163.8,
+              "cpuMs": 70.20000004768372
+            },
+            {
+              "index": 2100,
+              "stamp": 49164.5,
+              "cpuMs": 69.7999997138977
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair1",
+          "frames": 3151,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2303,
+              "stamp": 53161.3,
+              "cpuMs": 425.7999999523163
+            },
+            {
+              "index": 509,
+              "stamp": 19162.6,
+              "cpuMs": 120.5
+            },
+            {
+              "index": 2202,
+              "stamp": 51161.3,
+              "cpuMs": 117.10000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair2",
+          "frames": 3168,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1771,
+              "stamp": 43267.7,
+              "cpuMs": 127
+            },
+            {
+              "index": 3038,
+              "stamp": 67266.7,
+              "cpuMs": 118.19999980926514
+            },
+            {
+              "index": 506,
+              "stamp": 19268.6,
+              "cpuMs": 112.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair2",
+          "frames": 3176,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1564,
+              "stamp": 39281.8,
+              "cpuMs": 110.70000004768372
+            },
+            {
+              "index": 720,
+              "stamp": 23282.4,
+              "cpuMs": 104.79999995231628
+            },
+            {
+              "index": 3152,
+              "stamp": 69280.6,
+              "cpuMs": 100.49999976158142
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgpu",
+      "bytes": 588196,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 3525,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 911,
+              "stamp": 26187.3,
+              "cpuMs": 90.79999995231628
+            },
+            {
+              "index": 1735,
+              "stamp": 40186.8,
+              "cpuMs": 89.09999990463257
+            },
+            {
+              "index": 3378,
+              "stamp": 68185.7,
+              "cpuMs": 74.29999995231628
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair0",
+          "frames": 3511,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2422,
+              "stamp": 51906.4,
+              "cpuMs": 98.89999985694885
+            },
+            {
+              "index": 1841,
+              "stamp": 41906.8,
+              "cpuMs": 91.79999995231628
+            },
+            {
+              "index": 432,
+              "stamp": 17907.8,
+              "cpuMs": 82
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair1",
+          "frames": 3504,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 2432,
+              "stamp": 51995.2,
+              "cpuMs": 108.69999980926514
+            },
+            {
+              "index": 2317,
+              "stamp": 49995.3,
+              "cpuMs": 107.89999985694885
+            },
+            {
+              "index": 1268,
+              "stamp": 31996,
+              "cpuMs": 105.20000004768372
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair1",
+          "frames": 3523,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 441,
+              "stamp": 18180.8,
+              "cpuMs": 90.69999980926514
+            },
+            {
+              "index": 675,
+              "stamp": 22180.6,
+              "cpuMs": 71.29999995231628
+            },
+            {
+              "index": 2905,
+              "stamp": 60179.1,
+              "cpuMs": 70.20000004768372
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair2",
+          "frames": 3518,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 209,
+              "stamp": 13980.1,
+              "cpuMs": 94.5
+            },
+            {
+              "index": 3258,
+              "stamp": 65978,
+              "cpuMs": 88.90000009536743
+            },
+            {
+              "index": 3374,
+              "stamp": 67977.9,
+              "cpuMs": 80.69999980926514
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-pool-cycle-1024-pair2",
+          "frames": 3515,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 676,
+              "stamp": 22067.1,
+              "cpuMs": 86.29999995231628
+            },
+            {
+              "index": 792,
+              "stamp": 24067,
+              "cpuMs": 73.10000014305115
+            },
+            {
+              "index": 2197,
+              "stamp": 48066.1,
+              "cpuMs": 72.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-stress-webgl",
+      "bytes": 187954,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 778,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 8,
+              "stamp": 11015.2,
+              "cpuMs": 41.09999990463257
+            },
+            {
+              "index": 209,
+              "stamp": 17498.3,
+              "cpuMs": 39.700000047683716
+            },
+            {
+              "index": 186,
+              "stamp": 16748.3,
+              "cpuMs": 38.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair0",
+          "frames": 779,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 132,
+              "stamp": 15239.8,
+              "cpuMs": 37.700000047683716
+            },
+            {
+              "index": 255,
+              "stamp": 19206.4,
+              "cpuMs": 37
+            },
+            {
+              "index": 0,
+              "stamp": 10990,
+              "cpuMs": 35.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair1",
+          "frames": 779,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 551,
+              "stamp": 28587.5,
+              "cpuMs": 43.09999990463257
+            },
+            {
+              "index": 706,
+              "stamp": 33570.7,
+              "cpuMs": 40.50000023841858
+            },
+            {
+              "index": 426,
+              "stamp": 24571,
+              "cpuMs": 39.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair1",
+          "frames": 778,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 621,
+              "stamp": 30798.1,
+              "cpuMs": 40.30000019073486
+            },
+            {
+              "index": 671,
+              "stamp": 32414.8,
+              "cpuMs": 39.69999980926514
+            },
+            {
+              "index": 584,
+              "stamp": 29598.2,
+              "cpuMs": 33.60000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair2",
+          "frames": 776,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 103,
+              "stamp": 14195.9,
+              "cpuMs": 50.19999980926514
+            },
+            {
+              "index": 775,
+              "stamp": 35928.3,
+              "cpuMs": 44.10000014305115
+            },
+            {
+              "index": 186,
+              "stamp": 16879,
+              "cpuMs": 43.30000019073486
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair2",
+          "frames": 773,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 11179.6,
+              "cpuMs": 45.59999990463257
+            },
+            {
+              "index": 660,
+              "stamp": 32595.4,
+              "cpuMs": 44.19999980926514
+            },
+            {
+              "index": 148,
+              "stamp": 15979.4,
+              "cpuMs": 42.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "primary-rim-stress-webgpu",
+      "bytes": 225087,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 987,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 487,
+              "stamp": 25093.8,
+              "cpuMs": 43.89999985694885
+            },
+            {
+              "index": 313,
+              "stamp": 20694,
+              "cpuMs": 39.90000009536743
+            },
+            {
+              "index": 30,
+              "stamp": 13510.8,
+              "cpuMs": 38.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair0",
+          "frames": 989,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 790,
+              "stamp": 32844.3,
+              "cpuMs": 42
+            },
+            {
+              "index": 360,
+              "stamp": 21894.7,
+              "cpuMs": 38.80000019073486
+            },
+            {
+              "index": 160,
+              "stamp": 16844.9,
+              "cpuMs": 38.59999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair1",
+          "frames": 992,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 563,
+              "stamp": 26996.6,
+              "cpuMs": 41.50000023841858
+            },
+            {
+              "index": 682,
+              "stamp": 30013.2,
+              "cpuMs": 36.59999990463257
+            },
+            {
+              "index": 665,
+              "stamp": 29579.8,
+              "cpuMs": 36.299999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair1",
+          "frames": 990,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 12466.6,
+              "cpuMs": 42.60000014305115
+            },
+            {
+              "index": 832,
+              "stamp": 33482.4,
+              "cpuMs": 40.40000009536743
+            },
+            {
+              "index": 613,
+              "stamp": 27932.6,
+              "cpuMs": 40.09999990463257
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair2",
+          "frames": 980,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 595,
+              "stamp": 27741.2,
+              "cpuMs": 55
+            },
+            {
+              "index": 591,
+              "stamp": 27624.6,
+              "cpuMs": 47.40000009536743
+            },
+            {
+              "index": 615,
+              "stamp": 28291.3,
+              "cpuMs": 46.39999985694885
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair2",
+          "frames": 988,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 259,
+              "stamp": 19290.8,
+              "cpuMs": 71.09999990463257
+            },
+            {
+              "index": 234,
+              "stamp": 18657.5,
+              "cpuMs": 60.5
+            },
+            {
+              "index": 883,
+              "stamp": 35156.9,
+              "cpuMs": 56
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "soak-final-webgl",
+      "bytes": 198810,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 6357,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 188,
+              "stamp": 13137.6,
+              "cpuMs": 122.40000009536743
+            },
+            {
+              "index": 1568,
+              "stamp": 39136.5,
+              "cpuMs": 119.40000009536743
+            },
+            {
+              "index": 5481,
+              "stamp": 113133.6,
+              "cpuMs": 112.20000004768372
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "soak-final-webgpu",
+      "bytes": 201966,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 7030,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1724,
+              "stamp": 40280.2,
+              "cpuMs": 115.99999976158142
+            },
+            {
+              "index": 904,
+              "stamp": 26280.7,
+              "cpuMs": 109.40000009536743
+            },
+            {
+              "index": 1957,
+              "stamp": 44280,
+              "cpuMs": 109.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "soak-initial-webgl",
+      "bytes": 181928,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 6330,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 4410,
+              "stamp": 93260.1,
+              "cpuMs": 120.30000019073486
+            },
+            {
+              "index": 819,
+              "stamp": 25246.1,
+              "cpuMs": 115.5
+            },
+            {
+              "index": 3676,
+              "stamp": 79244,
+              "cpuMs": 115.29999995231628
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "soak-initial-webgpu",
+      "bytes": 184446,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-pool-cycle-1024-pair0",
+          "frames": 7023,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 1843,
+              "stamp": 41948.2,
+              "cpuMs": 132.20000004768372
+            },
+            {
+              "index": 4180,
+              "stamp": 81946.5,
+              "cpuMs": 109.5
+            },
+            {
+              "index": 3250,
+              "stamp": 65947.1,
+              "cpuMs": 108.79999995231628
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "three-common-webgl",
+      "bytes": 144042,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-common-2048-pair0",
+          "frames": 1008,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 496,
+              "stamp": 22845.1,
+              "cpuMs": 131.79999995231628
+            },
+            {
+              "index": 755,
+              "stamp": 29361.5,
+              "cpuMs": 68
+            },
+            {
+              "index": 521,
+              "stamp": 23511.7,
+              "cpuMs": 42.10000014305115
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-common-2048-pair0",
+          "frames": 963,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 8250.3,
+              "cpuMs": 5.5
+            },
+            {
+              "index": 722,
+              "stamp": 27016.1,
+              "cpuMs": 2.5
+            },
+            {
+              "index": 253,
+              "stamp": 14833.3,
+              "cpuMs": 2
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-common-2048-pair1",
+          "frames": 963,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 962,
+              "stamp": 33242.9,
+              "cpuMs": 3.3999998569488525
+            },
+            {
+              "index": 357,
+              "stamp": 17510.2,
+              "cpuMs": 2.799999952316284
+            },
+            {
+              "index": 801,
+              "stamp": 29026.5,
+              "cpuMs": 2.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-common-2048-pair1",
+          "frames": 1010,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 484,
+              "stamp": 22715.6,
+              "cpuMs": 101.20000004768372
+            },
+            {
+              "index": 62,
+              "stamp": 12232.7,
+              "cpuMs": 83.39999985694885
+            },
+            {
+              "index": 467,
+              "stamp": 22282.3,
+              "cpuMs": 83.20000004768372
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-common-2048-pair2",
+          "frames": 1011,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 232,
+              "stamp": 16237.1,
+              "cpuMs": 152.20000004768372
+            },
+            {
+              "index": 239,
+              "stamp": 16520.4,
+              "cpuMs": 58.5
+            },
+            {
+              "index": 214,
+              "stamp": 15787.1,
+              "cpuMs": 41.40000009536743
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-common-2048-pair2",
+          "frames": 965,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 843,
+              "stamp": 30114.5,
+              "cpuMs": 7.200000047683716
+            },
+            {
+              "index": 0,
+              "stamp": 8265.4,
+              "cpuMs": 5.700000047683716
+            },
+            {
+              "index": 279,
+              "stamp": 15498.4,
+              "cpuMs": 2.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "three-common-webgpu",
+      "bytes": 148550,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-common-2048-pair0",
+          "frames": 1123,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 98,
+              "stamp": 14586.3,
+              "cpuMs": 41.09999990463257
+            },
+            {
+              "index": 608,
+              "stamp": 25985.8,
+              "cpuMs": 36.09999990463257
+            },
+            {
+              "index": 723,
+              "stamp": 28552.4,
+              "cpuMs": 29.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-common-2048-pair0",
+          "frames": 964,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 824,
+              "stamp": 30119.2,
+              "cpuMs": 3.299999952316284
+            },
+            {
+              "index": 963,
+              "stamp": 33735.8,
+              "cpuMs": 2.5
+            },
+            {
+              "index": 0,
+              "stamp": 8720.1,
+              "cpuMs": 2.3999998569488525
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-common-2048-pair1",
+          "frames": 964,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 8239.6,
+              "cpuMs": 5.499999761581421
+            },
+            {
+              "index": 91,
+              "stamp": 10639.4,
+              "cpuMs": 5.200000047683716
+            },
+            {
+              "index": 963,
+              "stamp": 33255.2,
+              "cpuMs": 2.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-common-2048-pair1",
+          "frames": 1123,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 28,
+              "stamp": 13292.5,
+              "cpuMs": 126
+            },
+            {
+              "index": 127,
+              "stamp": 15525.8,
+              "cpuMs": 45.200000047683716
+            },
+            {
+              "index": 477,
+              "stamp": 23342.2,
+              "cpuMs": 44.700000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-common-2048-pair2",
+          "frames": 1123,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 898,
+              "stamp": 32547.4,
+              "cpuMs": 37.89999985694885
+            },
+            {
+              "index": 598,
+              "stamp": 25831.1,
+              "cpuMs": 32.10000014305115
+            },
+            {
+              "index": 1098,
+              "stamp": 36997.3,
+              "cpuMs": 31.800000190734863
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-common-2048-pair2",
+          "frames": 966,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 842,
+              "stamp": 30111.7,
+              "cpuMs": 8.200000047683716
+            },
+            {
+              "index": 0,
+              "stamp": 8279.3,
+              "cpuMs": 3.4000000953674316
+            },
+            {
+              "index": 55,
+              "stamp": 9712.6,
+              "cpuMs": 2.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    },
+    {
+      "campaign": "three-production-webgl",
+      "bytes": 126845,
+      "verifiedRuns": [
+        {
+          "id": "baseline-rim-stress-2048-pair0",
+          "frames": 759,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 279,
+              "stamp": 20150,
+              "cpuMs": 276.60000014305115
+            },
+            {
+              "index": 239,
+              "stamp": 18666.7,
+              "cpuMs": 114.70000004768372
+            },
+            {
+              "index": 277,
+              "stamp": 20016.7,
+              "cpuMs": 98.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair0",
+          "frames": 772,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 439,
+              "stamp": 23804.8,
+              "cpuMs": 7.200000047683716
+            },
+            {
+              "index": 311,
+              "stamp": 19638.4,
+              "cpuMs": 7
+            },
+            {
+              "index": 460,
+              "stamp": 24488.2,
+              "cpuMs": 6.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair1",
+          "frames": 774,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 0,
+              "stamp": 8653.3,
+              "cpuMs": 8.200000047683716
+            },
+            {
+              "index": 773,
+              "stamp": 33685.6,
+              "cpuMs": 6.099999904632568
+            },
+            {
+              "index": 354,
+              "stamp": 20136.1,
+              "cpuMs": 5.799999952316284
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair1",
+          "frames": 778,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 541,
+              "stamp": 28470,
+              "cpuMs": 152.5
+            },
+            {
+              "index": 479,
+              "stamp": 26470.1,
+              "cpuMs": 45.69999980926514
+            },
+            {
+              "index": 308,
+              "stamp": 20987,
+              "cpuMs": 44.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "baseline-rim-stress-2048-pair2",
+          "frames": 780,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 17,
+              "stamp": 11515.7,
+              "cpuMs": 38.40000009536743
+            },
+            {
+              "index": 596,
+              "stamp": 30115,
+              "cpuMs": 36.799999952316284
+            },
+            {
+              "index": 0,
+              "stamp": 10965.8,
+              "cpuMs": 36.5
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        },
+        {
+          "id": "candidate-rim-stress-2048-pair2",
+          "frames": 773,
+          "profiling": false,
+          "topCallbacks": [
+            {
+              "index": 412,
+              "stamp": 22033.1,
+              "cpuMs": 5.599999904632568
+            },
+            {
+              "index": 0,
+              "stamp": 8717,
+              "cpuMs": 5.299999713897705
+            },
+            {
+              "index": 301,
+              "stamp": 18449.9,
+              "cpuMs": 5.200000047683716
+            }
+          ],
+          "contextLimit": "Clean sparse stats are not exact per-callback context; maxima are not causal attribution."
+        }
+      ]
+    }
+  ],
+  "limits": "Authored gameplay and cross-engine images have no strict equivalence claim; observed differences are retained, not normalized. Physical Quest not tested."
+}

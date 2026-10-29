@@ -1,0 +1,15 @@
+{
+  "archive": "docs/performance/render-followup/batch-6/EVIDENCE.tar.gz",
+  "sha256": "ecf033652c14d71e59ba8b419ca5437479a5014de6db83cb52fbb7c0d070c510",
+  "bytes": 97249059,
+  "aliases": 2168,
+  "objects": 1215,
+  "logicalBytes": 408435285,
+  "uniqueBytes": 208031164,
+  "verifiedObjects": 1215,
+  "verifiedAliases": 2168,
+  "restoredDirectory": "/private/tmp/rust-followup6-evidence-restore-final",
+  "restoredFilesVerified": 2168,
+  "nestedArchives": [],
+  "temporaryRestoreRemovedAfterVerification": true
+}

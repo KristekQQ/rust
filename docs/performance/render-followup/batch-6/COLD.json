@@ -1,0 +1,1426 @@
+{
+  "sessions": 12,
+  "rows": [
+    {
+      "id": "webgpu-1-baseline",
+      "backend": "webgpu",
+      "runtime": "baseline",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1647.0999999046326,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.09999990463256836,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.2975000003973643,
+        "p95": 0.7000000476837158,
+        "p99": 1.7999999523162842,
+        "max": 2,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 27.636666666666667,
+        "p95": 16.700000000000273,
+        "p99": 750,
+        "max": 1599.8999999999999,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 2317.933333333333,
+        "overruns": 2,
+        "overrunDurationMs": 2316.5666666666666
+      },
+      "foregroundPixels": 27107,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgpu-1-baseline",
+      "backend": "webgpu",
+      "runtime": "baseline",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 3.4000000953674316,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 10.900000095367432,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.2274999996026357,
+        "p95": 0.7000000476837158,
+        "p99": 0.8000001907348633,
+        "max": 0.8000001907348633,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.334166666666663,
+        "p95": 16.699999999999818,
+        "p99": 16.799999999999272,
+        "max": 16.799999999999272,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 39,
+        "rawExactOverrunDurationMs": 1.4999999999935874,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgpu-1-candidate",
+      "backend": "webgpu",
+      "runtime": "candidate",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1630.2000000476837,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.23166666229565938,
+        "p95": 0.6000001430511475,
+        "p99": 1.0999999046325684,
+        "max": 1.2999999523162842,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 21.3875,
+        "p95": 16.700000000000045,
+        "p99": 16.700000000000273,
+        "max": 1583.3000000000002,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 39,
+        "rawExactOverrunDurationMs": 1567.8999999999985,
+        "overruns": 1,
+        "overrunDurationMs": 1566.6333333333334
+      },
+      "foregroundPixels": 27107,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgpu-1-candidate",
+      "backend": "webgpu",
+      "runtime": "candidate",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 2.799999952316284,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 1.4000000953674316,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.24166667461395264,
+        "p95": 0.7000000476837158,
+        "p99": 0.8000001907348633,
+        "max": 0.9000000953674316,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.333333333333334,
+        "p95": 16.700000000000273,
+        "p99": 16.799999999999727,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 1.4666666666668036,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgpu-2-candidate",
+      "backend": "webgpu",
+      "runtime": "candidate",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1626.7000000476837,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.10000014305114746,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.2783333281675974,
+        "p95": 0.7999999523162842,
+        "p99": 1.6999998092651367,
+        "max": 1.7000000476837158,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 21.52833333333333,
+        "p95": 16.700000000000273,
+        "p99": 33.299999999999955,
+        "max": 1583.3999999999999,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 1584.9333333333325,
+        "overruns": 2,
+        "overrunDurationMs": 1583.3666666666663
+      },
+      "foregroundPixels": 27107,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgpu-2-candidate",
+      "backend": "webgpu",
+      "runtime": "candidate",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 3.299999952316284,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 9.5,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.2191666821638743,
+        "p95": 0.7000000476837158,
+        "p99": 0.7000000476837158,
+        "max": 0.8000001907348633,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.332500000000001,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 36,
+        "rawExactOverrunDurationMs": 1.4999999999967741,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgpu-2-baseline",
+      "backend": "webgpu",
+      "runtime": "baseline",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1633.5,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.19999980926513672,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.2833333412806193,
+        "p95": 0.7000000476837158,
+        "p99": 1.7999999523162842,
+        "max": 1.7999999523162842,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 21.526666666666664,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1599.8999999999999,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 39,
+        "rawExactOverrunDurationMs": 1584.5999999999988,
+        "overruns": 1,
+        "overrunDurationMs": 1583.2333333333331
+      },
+      "foregroundPixels": 27107,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgpu-2-baseline",
+      "backend": "webgpu",
+      "runtime": "baseline",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 2.9000000953674316,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 12.100000143051147,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.2316666543483734,
+        "p95": 0.7000000476837158,
+        "p99": 0.7999999523162842,
+        "max": 0.7999999523162842,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.332500000000001,
+        "p95": 16.700000000000273,
+        "p99": 16.799999999999727,
+        "max": 16.799999999999727,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 1.4333333333313796,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgpu-3-baseline",
+      "backend": "webgpu",
+      "runtime": "baseline",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1633.7999999523163,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.10000014305114746,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.2708333452542623,
+        "p95": 0.7999999523162842,
+        "p99": 1.6000001430511475,
+        "max": 1.7999999523162842,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 21.527499999999996,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1599.8999999999999,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 40,
+        "rawExactOverrunDurationMs": 1584.7333333333347,
+        "overruns": 1,
+        "overrunDurationMs": 1583.2333333333331
+      },
+      "foregroundPixels": 27107,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgpu-3-baseline",
+      "backend": "webgpu",
+      "runtime": "baseline",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 2.799999952316284,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 6.5,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.21250000596046448,
+        "p95": 0.6000001430511475,
+        "p99": 0.7000000476837158,
+        "max": 0.9000000953674316,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.333333333333334,
+        "p95": 16.700000000000273,
+        "p99": 16.799999999999727,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 1.4666666666681678,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgpu-3-candidate",
+      "backend": "webgpu",
+      "runtime": "candidate",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1660.7999999523163,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.20000004768371582,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.31083332896232607,
+        "p95": 0.7000000476837158,
+        "p99": 1.8999998569488525,
+        "max": 7.3999998569488525,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 22.082499999999996,
+        "p95": 16.700000000000273,
+        "p99": 66.70000000000005,
+        "max": 1616.6000000000001,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 39,
+        "rawExactOverrunDurationMs": 1651.4000000000008,
+        "overruns": 2,
+        "overrunDurationMs": 1649.9666666666667
+      },
+      "foregroundPixels": 27107,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgpu-3-candidate",
+      "backend": "webgpu",
+      "runtime": "candidate",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 4,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 14.800000190734863,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.2675000071525574,
+        "p95": 0.7000000476837158,
+        "p99": 0.7999999523162842,
+        "max": 0.9000000953674316,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.333333333333334,
+        "p95": 16.700000000000273,
+        "p99": 16.700000000000273,
+        "max": 16.799999999999727,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 39,
+        "rawExactOverrunDurationMs": 1.4000000000000448,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgl-1-baseline",
+      "backend": "webgl",
+      "runtime": "baseline",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1690.5,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0.10000014305114746,
+      "activationToCallbackEndMs": 0.10000014305114746,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 3.9208333353201548,
+        "p95": 1.5999999046325684,
+        "p99": 3.0999999046325684,
+        "max": 419.7999999523163,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 1,
+        "rawExactOverrunDurationMs": 403.1333332856496,
+        "overruns": 1,
+        "overrunDurationMs": 403.1333332856496
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 25.692500000000003,
+        "p95": 16.700000000000273,
+        "p99": 100,
+        "max": 2016.4999999999998,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 2084.633333333332,
+        "overruns": 2,
+        "overrunDurationMs": 2083.1666666666665
+      },
+      "foregroundPixels": 27112,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgl-1-baseline",
+      "backend": "webgl",
+      "runtime": "baseline",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 3.700000047683716,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 7.299999952316284,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.9899999896685282,
+        "p95": 1.2999999523162842,
+        "p99": 2.299999952316284,
+        "max": 63.19999980926514,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 1,
+        "rawExactOverrunDurationMs": 46.533333142598465,
+        "overruns": 1,
+        "overrunDurationMs": 46.533333142598465
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.609999999999998,
+        "p95": 16.700000000000273,
+        "p99": 16.799999999999727,
+        "max": 50,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 34.66666666666616,
+        "overruns": 1,
+        "overrunDurationMs": 33.33333333333333
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgl-1-candidate",
+      "backend": "webgl",
+      "runtime": "candidate",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1685,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.20000004768371582,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 1.5166666666666666,
+        "p95": 1.2999999523162842,
+        "p99": 2,
+        "max": 138.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 1,
+        "rawExactOverrunDurationMs": 121.83333333333333,
+        "overruns": 1,
+        "overrunDurationMs": 121.83333333333333
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 22.6375,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1733.3000000000002,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 35,
+        "rawExactOverrunDurationMs": 1718.166666666665,
+        "overruns": 1,
+        "overrunDurationMs": 1716.6333333333334
+      },
+      "foregroundPixels": 27112,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgl-1-candidate",
+      "backend": "webgl",
+      "runtime": "candidate",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 4,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0.09999990463256836,
+      "activationToCallbackEndMs": 6.699999809265137,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.6041666706403096,
+        "p95": 1.2999999523162842,
+        "p99": 2.299999952316284,
+        "max": 14.300000190734863,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.333333333333334,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 1.5333333333344719,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgl-2-candidate",
+      "backend": "webgl",
+      "runtime": "candidate",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1753.2000000476837,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 149.39999985694885,
+      "activationToCallbackEndMs": 149.79999995231628,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.3466666618982951,
+        "p95": 1.0999999046325684,
+        "p99": 1.7000000476837158,
+        "max": 1.9000000953674316,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 16.59999999999991,
+        "mean": 23.470833333333335,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1816.6,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 1801.4333333333348,
+        "overruns": 1,
+        "overrunDurationMs": 1799.9333333333332
+      },
+      "foregroundPixels": 27112,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgl-2-candidate",
+      "backend": "webgl",
+      "runtime": "candidate",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 11.099999904632568,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 18,
+      "activationToCallbackEndMs": 31.299999952316284,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 0.35916667580604555,
+        "p95": 1.2999999523162842,
+        "p99": 1.8000001907348633,
+        "max": 1.8999998569488525,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.332500000000001,
+        "p95": 16.700000000000273,
+        "p99": 16.700000000000273,
+        "max": 16.799999999999727,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 1.3666666666673493,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgl-2-baseline",
+      "backend": "webgl",
+      "runtime": "baseline",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1724.0999999046326,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.20000004768371582,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 1.4208333373069764,
+        "p95": 1.3999998569488525,
+        "p99": 2.1000001430511475,
+        "max": 131.40000009536743,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 1,
+        "rawExactOverrunDurationMs": 114.73333342870076,
+        "overruns": 1,
+        "overrunDurationMs": 114.73333342870076
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 22.776666666666664,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1749.9,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 1734.6666666666658,
+        "overruns": 1,
+        "overrunDurationMs": 1733.2333333333333
+      },
+      "foregroundPixels": 27112,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgl-2-baseline",
+      "backend": "webgl",
+      "runtime": "baseline",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 3,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 6.599999904632568,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.5733333190282186,
+        "p95": 1.2999999523162842,
+        "p99": 2,
+        "max": 15.200000047683716,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.333333333333334,
+        "p95": 16.700000000000273,
+        "p99": 16.799999999999727,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 1.5666666666662579,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgl-3-baseline",
+      "backend": "webgl",
+      "runtime": "baseline",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1734.6999998092651,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.20000004768371582,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.09999990463256836,
+        "mean": 1.4566666543483735,
+        "p95": 1.0999999046325684,
+        "p99": 2.1999998092651367,
+        "max": 138.09999990463257,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 1,
+        "rawExactOverrunDurationMs": 121.4333332379659,
+        "overruns": 1,
+        "overrunDurationMs": 121.4333332379659
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 23.054166666666667,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1783.1999999999998,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 39,
+        "rawExactOverrunDurationMs": 1767.9000000000015,
+        "overruns": 1,
+        "overrunDurationMs": 1766.533333333333
+      },
+      "foregroundPixels": 27112,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgl-3-baseline",
+      "backend": "webgl",
+      "runtime": "baseline",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 3.799999952316284,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 9.599999904632568,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.5399999956289927,
+        "p95": 1.2000000476837158,
+        "p99": 1.9000000953674316,
+        "max": 15.300000190734863,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.333333333333334,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 37,
+        "rawExactOverrunDurationMs": 1.5333333333340171,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    },
+    {
+      "id": "webgl-3-candidate",
+      "backend": "webgl",
+      "runtime": "candidate",
+      "variant": "white-helmet",
+      "status": "PASS",
+      "loadWallMs": 1756.5,
+      "loadCallbacks": 4,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.20000004768371582,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 1.4583333412806192,
+        "p95": 0.7000000476837158,
+        "p99": 1.2999999523162842,
+        "max": 146.59999990463257,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 1,
+        "rawExactOverrunDurationMs": 129.9333332379659,
+        "overruns": 1,
+        "overrunDurationMs": 129.9333332379659
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 23.332499999999996,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182,
+        "max": 1816.6000000000001,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 36,
+        "rawExactOverrunDurationMs": 1801.4999999999986,
+        "overruns": 1,
+        "overrunDurationMs": 1799.9333333333334
+      },
+      "foregroundPixels": 27112,
+      "indexLayouts": [
+        {
+          "bufferBytes": 92712,
+          "count": 46356,
+          "format": "Uint16",
+          "max": 14555,
+          "payloadBytes": 92712,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 1164480,
+          "omitColor": true,
+          "primitive": 0,
+          "stride": 80
+        }
+      ]
+    },
+    {
+      "id": "webgl-3-candidate",
+      "backend": "webgl",
+      "runtime": "candidate",
+      "variant": "colored-rgba",
+      "status": "PASS",
+      "loadWallMs": 4.8999998569488525,
+      "loadCallbacks": 2,
+      "firstPostLoadCallbackMs": 0,
+      "activationToCallbackEndMs": 0.2999999523162842,
+      "warmCallbackMs": {
+        "count": 120,
+        "median": 0.10000014305114746,
+        "mean": 0.5066666682561238,
+        "p95": 1.2999999523162842,
+        "p99": 1.9000000953674316,
+        "max": 13.299999952316284,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "warmFrameMs": {
+        "count": 120,
+        "median": 0,
+        "mean": 8.332500000000001,
+        "p95": 16.700000000000273,
+        "p99": 16.799999999999727,
+        "max": 16.800000000000182,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 38,
+        "rawExactOverrunDurationMs": 1.4666666666663488,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "foregroundPixels": 25609,
+      "indexLayouts": [
+        {
+          "bufferBytes": 8,
+          "count": 3,
+          "format": "Uint16",
+          "max": 2,
+          "payloadBytes": 6,
+          "primitive": 0,
+          "topology": "TriangleList"
+        }
+      ],
+      "vertexLayouts": [
+        {
+          "bufferBytes": 120,
+          "omitColor": false,
+          "primitive": 0,
+          "stride": 40
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Instrumented fresh browser sessions; driver/OS caches not cleared.",
+    "Loading includes rendering callbacks; first after load is not first-ever use. Zero wall time can be timer quantization.",
+    "Warm small fixtures are separate from game throughput."
+  ]
+}

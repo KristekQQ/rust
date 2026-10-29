@@ -1,4 +1,8 @@
-# Current renderer cycle — 2026-10-29
+# Current render followup — 2026-10-30
+
+Six-batch series complete locally; [final report](docs/performance/render-followup/FINAL_REPORT.md), [current state](docs/performance/render-followup/STATE.md). No broad default FPS gain proved; GL Neon allocation benefit confirmed. Fresh functional gate passes; old independent image blockers remain, Quest unverified. No push/merge/deploy; production differs from local final. Stop series and read current state before further work.
+
+# Historical nine-batch renderer cycle — 2026-10-29
 
 Nine-batch evidence complete; **exact-image signoff blocked**, no publication. [Final report](docs/performance/next-render-cycle/FINAL_REPORT.md), [current state](docs/performance/next-render-cycle/STATE.md), [verification](docs/performance/next-render-cycle/batch-9/VERIFICATION.json). B8 release reused after identity checks;134 runs/193076 RAF rows,428 native/149 browser PASS. Static2048 stress improves, active/tail results mixed;39/40 native image pairs exact, candidate camera6pixels/max2 and historical B4 concern unresolved. Larger culling-off difference occurs identically in original/final; root cause unproven. Shared-GL XR remains opt-in. No physical Quest/CI/push/merge/deployment. Stop series; prioritize image correctness before unconditional release.
 

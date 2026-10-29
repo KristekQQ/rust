@@ -1,0 +1,74 @@
+{
+  "command": "VERIFY_FORCE=1 VERIFY_WASM_PROFILE=release npm run verify:push",
+  "exit": 0,
+  "attempts": 1,
+  "freshTests": true,
+  "wasmBuild": "reused exact matching release source/binary configuration; no stale output accepted",
+  "native": {
+    "passed": 433,
+    "failed": 0,
+    "ignored": 2
+  },
+  "sdk": 32,
+  "xrPlatform": 71,
+  "harness": {
+    "node": 14,
+    "python": 13
+  },
+  "browser": {
+    "total": 169,
+    "WebGPU": 65,
+    "WebGL2": 104,
+    "failed": 0,
+    "version": "Chrome/156.0.8078.74",
+    "started": "2026-10-29T23:23:31.525Z",
+    "finished": "2026-10-29T23:34:35.380Z",
+    "sandboxDisabled": false
+  },
+  "otherChecks": [
+    "rust-format",
+    "native Clippy",
+    "wasm32 check/Clippy",
+    "SDK typecheck",
+    "source dump regenerated"
+  ],
+  "build": {
+    "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+    "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+    "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "receipt": {
+    "passed": true,
+    "key": "40e598a5ab90ba794464dbabf085a5a923d2738cb2d650128cc7875100370880",
+    "mode": "all",
+    "args": [],
+    "build": {
+      "source": "79b7fcd9f8a4bd6742effc40aaf8741ba652c19fdf0f88b21b697c77b3470f20",
+      "wasm": "34acb880ddcf429a1cd1b62fe43ab07d2a69e3ab4827958d98cb7d02154e3a5d",
+      "bindings": "62a99f26d857b4330be39924125fc98ea2ab016481d8c8a71c2b532d97eb00ea",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "types": "e97ec62a5542c28a9f1bbcdf322cc2a8152928a62aa0891e60f5f848f518f261",
+    "finished": "2026-10-29T23:34:36.101Z"
+  },
+  "receiptOnlyCommand": "VERIFY_WASM_PROFILE=release npm exec -- node scripts/verification-cache.mjs check all",
+  "receiptInvocationLimit": "Direct node produced a false cache miss because filtered environment key order differs from npm. Same npm launch checks PASS. No receipt overwritten or tests skipped in forced gate.",
+  "additionalEvidence": {
+    "strictNativePairs": 40,
+    "workerReplays": 12,
+    "coldSessions": 12,
+    "physicalQuest": false
+  },
+  "sourceDumpSha256": "fa4462ce416e4b43bec6af7540c71a584d0901b4d17787c71da437b599ebfdc6"
+}

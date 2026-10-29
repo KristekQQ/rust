@@ -5,9 +5,9 @@
 3. Non-glTF allocations in Neon (completed2026-10-29: GL panel reuse accepted; WG automatic reuse rejected).
 4. Camera motion, uploads and worst frames (completed; union defaults retained).
 5. Independent remaining-bottleneck audit and Three comparison (completed; bounded mode3 opt-in retained, default unchanged).
-6. Final verification and memory/skill update.
+6. Final verification and memory/skill update (completed2026-10-30; bounded verdict, image release blockers retained).
 
-Batches1–5 are recorded; batch5 is complete. Batch6 is not authorized. Start from verified9986cd4f9/B8 runtime, preserve prior proven improvements. Investigate A (candidate-only six-pixel camera2048 WG), B (historical B4 eight-pixel moving1024 WG), C (5014-pixel culling/shadow control in original and final) separately. Do not assume one cause.
+Batches1–6 are recorded and this series is complete. See FINAL_REPORT.md; completion is not unconditional image/performance/release acceptance. No additional optimization cycle is authorized. Start from verified9986cd4f9/B8 runtime, preserve prior proven improvements. Investigate A (candidate-only six-pixel camera2048 WG), B (historical B4 eight-pixel moving1024 WG), C (5014-pixel culling/shadow control in original and final) separately. Do not assume one cause.
 
 Historical batch3 reused isolated `/private/tmp/rust-render-followup-2` on `codex/render-followup-3` from `bcd774eb5761c201777c9b8892017e1be494b9af`; preserve prior checkpoints. preserve other worktrees, dirty/staged files, servers and processes. No push/main merge/production deployment/shared-service restart. One owner per file; read-only helper for capture review, serial owned GPU/build work.
 

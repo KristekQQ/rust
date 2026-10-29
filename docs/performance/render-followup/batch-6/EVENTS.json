@@ -1,0 +1,409 @@
+{
+  "pairs": [
+    {
+      "campaign": "primary-dynamic-webgl",
+      "pair": 0,
+      "sameEventCounts": false,
+      "runs": [
+        {
+          "label": "baseline",
+          "elapsedMs": 60003.90000009537,
+          "commands": {
+            "transforms": 460928,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72704,
+            "frustumDriftUpdates": 230464,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.994299999952316,
+            "cluster": 0.5560095427708981,
+            "centerX": 1.5159024713878666,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.00859999995232,
+            "cluster": 0.07931722508312444,
+            "centerX": -4.369879113004647,
+            "cutEventIndex": 34
+          }
+        },
+        {
+          "label": "candidate",
+          "elapsedMs": 60013.59999990463,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 30,
+            "removes": 90,
+            "cuts": 30,
+            "cutAttempts": 30,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72832,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 8.006800000047685,
+            "cluster": 0.5609751898233737,
+            "centerX": 1.4973512145004915,
+            "cutEventIndex": 4
+          },
+          "end": {
+            "elapsedSeconds": 68.0378000000477,
+            "cluster": 0.07311992662183009,
+            "centerX": -4.3586715751813125,
+            "cutEventIndex": 34
+          }
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "pair": 1,
+      "sameEventCounts": false,
+      "runs": [
+        {
+          "label": "baseline",
+          "elapsedMs": 60012.700000047684,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80448,
+            "separatedRootUpdates": 72704,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.989700000095366,
+            "cluster": 0.5541807485613777,
+            "centerX": 1.5227220489772055,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.02060000009537,
+            "cluster": 0.07674241072914645,
+            "centerX": -4.365328453474327,
+            "cutEventIndex": 34
+          }
+        },
+        {
+          "label": "candidate",
+          "elapsedMs": 60013.40000009537,
+          "commands": {
+            "transforms": 458880,
+            "spawns": 30,
+            "removes": 90,
+            "cuts": 30,
+            "cutAttempts": 30,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72832,
+            "frustumDriftUpdates": 229440,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 8.0112,
+            "cluster": 0.5627216721529368,
+            "centerX": 1.490814334179658,
+            "cutEventIndex": 4
+          },
+          "end": {
+            "elapsedSeconds": 68.0422,
+            "cluster": 0.07220620007595224,
+            "centerX": -4.3569432704777356,
+            "cutEventIndex": 34
+          }
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "pair": 2,
+      "sameEventCounts": true,
+      "runs": [
+        {
+          "label": "baseline",
+          "elapsedMs": 60009.89999985695,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 30,
+            "removes": 90,
+            "cuts": 30,
+            "cutAttempts": 30,
+            "clusteredRootUpdates": 80512,
+            "separatedRootUpdates": 72768,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 8.009300000047684,
+            "cluster": 0.5619676034096279,
+            "centerX": 1.4936375125558934,
+            "cutEventIndex": 4
+          },
+          "end": {
+            "elapsedSeconds": 68.0403000000477,
+            "cluster": 0.07260011422151724,
+            "centerX": -4.357690851700264,
+            "cutEventIndex": 34
+          }
+        },
+        {
+          "label": "candidate",
+          "elapsedMs": 60007.59999990463,
+          "commands": {
+            "transforms": 460928,
+            "spawns": 30,
+            "removes": 90,
+            "cuts": 30,
+            "cutAttempts": 30,
+            "clusteredRootUpdates": 80448,
+            "separatedRootUpdates": 72704,
+            "frustumDriftUpdates": 230464,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 8.006299999809265,
+            "cluster": 0.5607766776163348,
+            "centerX": 1.4980938177653398,
+            "cutEventIndex": 4
+          },
+          "end": {
+            "elapsedSeconds": 68.02049999980927,
+            "cluster": 0.07676370672792149,
+            "centerX": -4.3653666940358615,
+            "cutEventIndex": 34
+          }
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "pair": 0,
+      "sameEventCounts": true,
+      "runs": [
+        {
+          "label": "baseline",
+          "elapsedMs": 60015.39999985695,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72832,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.9949999999523165,
+            "cluster": 0.5562877716695624,
+            "centerX": 1.5148643646406323,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.02599999995232,
+            "cluster": 0.07559645632523743,
+            "centerX": -4.363255529267283,
+            "cutEventIndex": 34
+          }
+        },
+        {
+          "label": "candidate",
+          "elapsedMs": 60016.200000047684,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72832,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.9947,
+            "cluster": 0.5561685328883075,
+            "centerX": 1.5153092785994744,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.0257,
+            "cluster": 0.07565991285948803,
+            "centerX": -4.363371100667966,
+            "cutEventIndex": 34
+          }
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "pair": 1,
+      "sameEventCounts": true,
+      "runs": [
+        {
+          "label": "baseline",
+          "elapsedMs": 60012.39999985695,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72768,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.991700000047683,
+            "cluster": 0.5549759680966211,
+            "centerX": 1.5197574991694693,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.02270000004768,
+            "cluster": 0.07629582199830515,
+            "centerX": -4.364524168791115,
+            "cutEventIndex": 34
+          }
+        },
+        {
+          "label": "candidate",
+          "elapsedMs": 60005.799999952316,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72832,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.990700000047684,
+            "cluster": 0.5545783757845987,
+            "centerX": 1.5212398672846121,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.02170000004769,
+            "cluster": 0.07650833423697728,
+            "centerX": -4.364907455592585,
+            "cutEventIndex": 34
+          }
+        }
+      ]
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "pair": 2,
+      "sameEventCounts": false,
+      "runs": [
+        {
+          "label": "baseline",
+          "elapsedMs": 60003.5,
+          "commands": {
+            "transforms": 460928,
+            "spawns": 30,
+            "removes": 90,
+            "cuts": 30,
+            "cutAttempts": 30,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72832,
+            "frustumDriftUpdates": 230464,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 8.002899999856949,
+            "cluster": 0.5594265390121465,
+            "centerX": 1.5031422996073216,
+            "cutEventIndex": 4
+          },
+          "end": {
+            "elapsedSeconds": 68.01719999985696,
+            "cluster": 0.07746799143793498,
+            "centerX": -4.366625628668642,
+            "cutEventIndex": 34
+          }
+        },
+        {
+          "label": "candidate",
+          "elapsedMs": 60012.5,
+          "commands": {
+            "transforms": 461056,
+            "spawns": 31,
+            "removes": 93,
+            "cuts": 31,
+            "cutAttempts": 31,
+            "clusteredRootUpdates": 80384,
+            "separatedRootUpdates": 72704,
+            "frustumDriftUpdates": 230528,
+            "cameraUpdates": 0,
+            "clusteredModelUpdates": 0,
+            "animationSeeks": 0,
+            "mixedModelUpdates": 0
+          },
+          "start": {
+            "elapsedSeconds": 7.994200000047684,
+            "cluster": 0.5559697943874025,
+            "centerX": 1.516050764783865,
+            "cutEventIndex": 3
+          },
+          "end": {
+            "elapsedSeconds": 68.02520000004769,
+            "cluster": 0.07576572807034138,
+            "centerX": -4.363563612778149,
+            "cutEventIndex": 34
+          }
+        }
+      ]
+    }
+  ],
+  "equalEventPairs": 3,
+  "unequalEventPairs": 3,
+  "limits": "Fixed elapsed-time schedule; measurement can begin either side of the2s event boundary. Event-index deltas verify the counts. Keep unequal-event pairs, but do not call them identical-event work or infer a speedup from them."
+}

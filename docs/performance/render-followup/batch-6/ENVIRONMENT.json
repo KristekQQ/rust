@@ -1,0 +1,252 @@
+{
+  "campaigns": [
+    {
+      "campaign": "cal-arena-active-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-arena-active-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-dynamic-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-dynamic-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-final-production-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-historical-pool-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-historical-pool-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-active-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-active-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-camera-stress-webgl",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-camera-stress-webgpu",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-clustered-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-clustered-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-common-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-common-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-pool-cycle-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-pool-cycle-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-stress-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "cal-rim-stress-webgpu",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 1
+    },
+    {
+      "campaign": "cold",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 12
+    },
+    {
+      "campaign": "diagnostic-arena-active-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 2
+    },
+    {
+      "campaign": "diagnostic-arena-active-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 2
+    },
+    {
+      "campaign": "diagnostic-rim-camera-stress-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 2
+    },
+    {
+      "campaign": "diagnostic-rim-camera-stress-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 2
+    },
+    {
+      "campaign": "historical-pool-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "historical-pool-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "pilot-rim-camera-stress-webgl",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 2
+    },
+    {
+      "campaign": "pilot-rim-camera-stress-webgpu",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 2
+    },
+    {
+      "campaign": "primary-arena-active-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-arena-active-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-dynamic-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-dynamic-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-active-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-active-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-camera-stress-webgpu",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-clustered-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-clustered-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-pool-cycle-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-stress-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "primary-rim-stress-webgpu",
+      "browser": "Chrome/156.0.8078.48",
+      "runSides": 6
+    },
+    {
+      "campaign": "soak-final-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "soak-final-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "soak-initial-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "soak-initial-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 1
+    },
+    {
+      "campaign": "three-common-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "three-common-webgpu",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    },
+    {
+      "campaign": "three-production-webgl",
+      "browser": "Chrome/156.0.8078.74",
+      "runSides": 6
+    }
+  ],
+  "finalGateBrowser": "Chrome/156.0.8078.74",
+  "pairBoundary": "One browser launch per maintained comparison campaign; both paired sides share it.",
+  "limit": "Chrome updated between campaigns from156.0.8078.48 to156.0.8078.74. Do not treat cross-workload/diagnostic differences as an isolated same-browser aggregate."
+}

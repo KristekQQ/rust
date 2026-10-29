@@ -1,0 +1,17 @@
+# Followup6 predeclared final integration protocol
+
+Initial frozen runtime: output/followup-2/original, B8 WASM f14c4beb (carried by B9/F1). Final: output/followup-5/probe2, F5 WASM34acb880. Existing immutable roots are reused, not rebuilt or deployed. Current maintained harness is served identically to both; frozen SDK/assets remain version-specific and are hash recorded. Default production switches on both sides; mode3 is NOT silently enabled.
+
+1280x720 DPR1, seed1337, spatial, full graphics. Baseline-only fixed-load confirmation: static/camera2048, cluster1024, authored Rim/Neon1, pool1024. Three alternating pairs AB/BA/AB,8s warmup25s sample; pool60s. Raw full-frame series retained. Exact pixels remain zero tolerance; failed image gates are retained and block image acceptance independently of process exit. Authored active-game images remain non-deterministic and cannot prove exactness.
+
+Separate120s pool soaks per runtime/backend; real-worker simulated-XR replay three alternating pairs per API with one actual cut event per run (three events per runtime/API cell; staging steps are not separate cuts); cold variant harness separately. Detailed2s/8s scope/allocation diagnostics are not clean performance. All clean runs assert profiling disabled. Three final common2048 both native APIs and productionGL2048 only, existing pinned instancing and graphically limited contracts; no nativeWG production comparison through an unsupported path.
+
+Initial pilots1s/5s; no conclusions from pilots. AC/thermal observations every10s in runner host context. Shared GPU environment remains nonisolated. No foreign processes terminated. Browser is headless; no physical Quest. One serial GPU/build owner. Final maintained release gate once; source identity checked before/after. Archive excludes older archives and validates every object and restored alias.
+
+Acceptance A/B/C remain independently unresolved unless new causal evidence closes them. D includes old F2 cluster issue and all new exact comparisons. E is deterministic dynamic fixtures (panel, cache/pool/motion, asymmetric eyes, actual worker publication); authored whole-game temporal parity remains a separate limitation. A PASS gate never erases a pixel blocker. No new runtime optimization, push, merge or production server change.
+
+Protocol clarification before additional runs: F6 declared1024 pool stress is larger than historical F4 frozen256. Keep the1024 results unchanged and run the256 workload separately (3pairs,8s/60s,bothAPIs). Do not interpret their different retained capacities as memory growth. This addition restores the direct historical-load control; it does not replace unfavorable1024 observations.
+
+Coverage correction before additional runs: actual pool commands report0spawns/0removes, so pool cycles are not a spawn/despawn surrogate. Add maintained `dynamic64`, with the original B9 settings8s/60s/3pairs/API, unchanged native closed-mesh cutting and actual spawn/remove commands. This is a synthetic native event workload, separately from actual asynchronous worker replays and authored gameplay. No existing run is replaced.
+
+Existing common-profile contract: native `createNativeCommon` explicitly selects mode1 base-color shading, with no AA/lights/shadows/postprocessing, while production comparisons remain mode0. Do not apply the production-default mode assertion to this declared diagnostic profile. Mode3 is never selected in F6.

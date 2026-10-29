@@ -1,4 +1,8 @@
-# Latest — render followup5, local checkpoint
+# Latest — followup series complete, 2026-10-30
+
+[Final report](render-followup/FINAL_REPORT.md), [state](render-followup/STATE.md), [fresh verification](render-followup/batch-6/VERIFICATION.json). Default broad FPS gain not proved; GL Neon buffer churn38→0/5s. ClusteredGL/poolWG adverse observations retained.149runs/243705RAF;40/40new strict native pairs exact; old A/B/C/F2cluster image issues unresolved. Fresh433native/169browser plus SDK/XR/harness PASS,763files match measured final. Local evidence only, finalWASM34acb880; production remainsc7091506. No Quest/CI/push/merge/deployment. Unconditional release blocked; no next batch authorized.
+
+# Historical — render followup5, local checkpoint
 
 [State](render-followup/STATE.md), [audit/report](render-followup/batch-5/REPORT.md), [pairs](render-followup/batch-5/RESULTS.md). Bounded stable ordinal transpose retained as explicit mode3; default0 unchanged. Camera2048WG three pairs+3.08/+3.69/+6.65%FPS; other workloads smaller/mixed, no global or Quest claim.134runs/102380RAF,34strict native image pairs exact; Three has explicit culling/triangle/quality/sampler differences.433native/169browser plus SDK/XR/harness fresh gate PASS, source/pkg/receipt match WASM34acb880. Prior A/B/C/D remain open. No push/merge/deploy/shared service change/CI/headset; stop before batch6.
 
