@@ -29511,7 +29511,7 @@ struct PassCache {
     camera_position: Vec3,
     light_class: crate::render_lights::LightClass,
     queue: RenderQueue,
-    key: Option<(Mat4, u64, bool)>,
+    key: Option<(Mat4, u64, bool, bool)>,
     batches: [InstanceBatch; 3],
     mirrored_batches: [InstanceBatch; 3],
     imported: ImportedInstances,
@@ -29620,6 +29620,8 @@ pub struct SceneRenderer {
     shadow_pipelines: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
     effects: Option<Effects>,
     pub frustum_culling: bool,
+    main_root_culling: bool,
+    main_primitive_culling: bool,
     pub upload_bytes: usize,
     pub prepare_ms: f64,
     /// Actual draw/draw_indexed commands in the current/last submitted frame.
@@ -29768,6 +29770,8 @@ impl SceneRenderer {
             helper_pipelines: HashMap::new(),
             effects,
             frustum_culling: true,
+            main_root_culling: true,
+            main_primitive_culling: true,
             upload_bytes: 0,
             prepare_ms: 0.0,
             draw_calls: 0,
@@ -30158,6 +30162,10 @@ impl SceneRenderer {
         let _cpu_scope = super::profiler::cpu_scope("scene.prepare");
         self.active_cache = index;
         let is_main = pass == RenderPassKind::Main;
+        // Auxiliary passes retain the global switch. Both decisions belong to
+        // this pass/view cache, including independently prepared XR eyes.
+        let root_culling = self.frustum_culling && (!is_main || self.main_root_culling);
+        let primitive_culling = self.frustum_culling && (!is_main || self.main_primitive_culling);
         let instance_upload_start = self.upload_bytes;
         let (cache, left) = if is_main && index == BASE_PASS_CACHE_COUNT + 1 {
             let (earlier, right) = self.passes.split_at_mut(index);
@@ -30187,7 +30195,8 @@ impl SceneRenderer {
             } else {
                 self.scene.render_revision()
             },
-            self.frustum_culling,
+            root_culling,
+            primitive_culling,
         );
 
         // No additional clock reads or BVH counters when diagnostics are off.
@@ -30209,7 +30218,7 @@ impl SceneRenderer {
             let start = clock.as_ref().map(|p| p.now());
             cache
                 .queue
-                .extract_pass(&self.scene, camera_matrix, self.frustum_culling, pass);
+                .extract_pass(&self.scene, camera_matrix, root_culling, pass);
             if let (Some(clock), Some(start)) = (clock, start) {
                 self.cull_ms = clock.now() - start;
             }
@@ -30497,6 +30506,11 @@ impl SceneRenderer {
             }
         }
         stats
+    }
+    /// Independent diagnostic controls; never invalidate world shadow maps.
+    pub fn set_main_view_culling(&mut self, roots: bool, primitives: bool) {
+        self.main_root_culling = roots;
+        self.main_primitive_culling = primitives;
     }
     pub fn set_instance_upload_policy(&mut self, mode: u32, gap: u32, diagnostic: bool) -> bool {
         self.gltf_gpu
@@ -30901,7 +30915,7 @@ impl SceneRenderer {
             cache.camera_position,
             self.active_cache,
             cache.key.expect("prepared view").0,
-            self.frustum_culling,
+            cache.key.expect("prepared view").3,
             self.scene.render_revision(),
         );
         self.upload_bytes += gltf_opaque.upload_bytes;
@@ -31092,7 +31106,7 @@ impl SceneRenderer {
             cache.camera_position,
             self.active_cache,
             cache.key.expect("prepared view").0,
-            self.frustum_culling,
+            cache.key.expect("prepared view").3,
             self.scene.render_revision(),
         );
         self.upload_bytes += gltf_opaque.upload_bytes;
@@ -31110,7 +31124,7 @@ impl SceneRenderer {
                 cache.camera_position,
                 self.active_cache,
                 cache.key.expect("prepared view").0,
-                self.frustum_culling,
+                cache.key.expect("prepared view").3,
                 self.scene.render_revision(),
             );
             self.upload_bytes += p.upload_bytes;
@@ -31782,7 +31796,7 @@ impl SceneRenderer {
                 cache.camera_position,
                 self.last_main_cache,
                 cache.key.expect("prepared view").0,
-                self.frustum_culling,
+                cache.key.expect("prepared view").3,
                 self.scene.render_revision(),
             );
             self.upload_bytes += p.upload_bytes;
@@ -47405,6 +47419,16 @@ pub fn set_frustum_culling(enabled: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {
             state.borrow_mut().frustum_culling = enabled;
+        }
+    });
+}
+
+/// Diagnostic main-view controls. Global culling still gates every pass.
+#[wasm_bindgen]
+pub fn set_main_view_culling(roots: bool, primitives: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_main_view_culling(roots, primitives);
         }
     });
 }

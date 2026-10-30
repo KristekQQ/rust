@@ -1,3 +1,9 @@
+# Renderer closeout — local review candidate, 2026-10-30
+
+Selected K production mode0, WASM887e7de9; [decision/evidence](docs/performance/render-followup/CLOSEOUT.md), [current state](docs/performance/render-followup/STATE.md).433native/171browser+11packaged PASS; exact-image signoff remains BLOCKED by separate historical and culling/derivative cases. GL panel allocations removed in observed warm window; no broad FPS gain. Durable isolated checkout, local checkpoint only; own preview8899, shared production unchanged. Physical Quest unverified. Do not restart optimization automatically.
+
+# Historical followup series
+
 # Current render followup — 2026-10-30
 
 Six-batch series complete locally; [final report](docs/performance/render-followup/FINAL_REPORT.md), [current state](docs/performance/render-followup/STATE.md). No broad default FPS gain proved; GL Neon allocation benefit confirmed. Fresh functional gate passes; old independent image blockers remain, Quest unverified. No push/merge/deploy; production differs from local final. Stop series and read current state before further work.

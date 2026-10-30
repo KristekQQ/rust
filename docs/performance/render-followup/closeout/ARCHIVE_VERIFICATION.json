@@ -1,0 +1,29 @@
+[
+  {
+    "archive": "docs/performance/render-followup/closeout/EVIDENCE_RUNTIME.tar.gz",
+    "sha256": "3d0011f131fce2c5e1956cd38c2f0e5a9976744ac832453c2f4d6dbd8e3be39a",
+    "bytes": 69807247,
+    "objects": 870,
+    "aliases": 5513,
+    "verifiedObjects": 870,
+    "verifiedAliases": 5513
+  },
+  {
+    "archive": "docs/performance/render-followup/closeout/EVIDENCE_RUNS.tar.gz",
+    "sha256": "bddab77e5dcd6bb6e05b413df4d64809872ac9c772234a87af520f897f4b857b",
+    "bytes": 55870675,
+    "objects": 537,
+    "aliases": 1054,
+    "verifiedObjects": 537,
+    "verifiedAliases": 1054
+  },
+  {
+    "archive": "docs/performance/render-followup/closeout/EVIDENCE_PRODUCTION.tar.gz",
+    "sha256": "e132d6e0452087fd7f409e8e9a5363683e3e0c2f9303e31d64eec3d3e53bcabd",
+    "bytes": 46186049,
+    "objects": 565,
+    "aliases": 578,
+    "verifiedObjects": 565,
+    "verifiedAliases": 578
+  }
+]

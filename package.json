@@ -10,7 +10,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test:sdk": "node --test tests/sdk-unit.test.mjs",
-    "test:harness": "node --test tests/harness-unit.test.mjs tests/production-bundle-unit.test.mjs tests/render-performance-output.test.mjs && python3 tests/production-server-unit.py && python3 tests/arena-tools-unit.py",
+    "test:harness": "node --test tests/render-capture-probe.test.mjs tests/render-performance-recorder.test.mjs tests/harness-unit.test.mjs tests/production-bundle-unit.test.mjs tests/render-performance-output.test.mjs && python3 tests/production-server-unit.py && python3 tests/arena-tools-unit.py",
     "verify:fast": "npm run typecheck && npm run test:sdk && npm run test:harness",
     "test:browser": "node scripts/test-browser.mjs",
     "verify": "bash scripts/verify.sh all",

@@ -642,6 +642,16 @@ pub fn set_frustum_culling(enabled: bool) {
     });
 }
 
+/// Diagnostic main-view controls. Global culling still gates every pass.
+#[wasm_bindgen]
+pub fn set_main_view_culling(roots: bool, primitives: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state.borrow_mut().set_main_view_culling(roots, primitives);
+        }
+    });
+}
+
 /// Independent uncached preparation path for correctness/performance controls.
 #[wasm_bindgen]
 pub fn configure_gltf_instance_pool(

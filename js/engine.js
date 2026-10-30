@@ -710,6 +710,8 @@ async function initializeEngine(canvas, backend, initialization) {
         },
         renderer_backend: wasm.renderer_backend,
         set_frustum_culling: wasm.set_frustum_culling,
+        /** Diagnostic main-view controls; shadows/reflections stay global. @param {boolean} roots @param {boolean} primitives */
+        setMainViewCulling(roots, primitives) { wasm.set_main_view_culling(roots, primitives); },
         /** Optional Rust-rendered HUD; disabled by default. */
         /** @param {boolean} enabled */
         setDebugOverlay(enabled) { wasm.set_debug_overlay(enabled); },

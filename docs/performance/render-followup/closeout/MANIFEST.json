@@ -1,0 +1,20 @@
+{
+  "selected": "K",
+  "base": "185c5f71ad778d6d3f89394885ee54fb087d9e9b",
+  "wasm": "887e7de920fb8d4488855dea8689459381f48fe06bcdbc6931e55899e860d81c",
+  "source": "132546d049a1d310e0b9ed41a8315f59aa2e345e38f61d6e42a4e7171bda49db",
+  "authoredSdkSha256": "6be022ffbd37f01e1fe9935dc65b176a645f241e469c651783968f5d1c27e007",
+  "productionSdkSha256": "dae92ceb4d3969112f5c5aacd7824501d1eb5f72356bd64a577b81bf0027ad07",
+  "productionReleaseId": "bc3daa46a7",
+  "productionManifestSha256": "17b33d8e0f4b6eadfe8f39b8e4ca7162096d8c9af5469f9b6119b83e1b6596c8",
+  "nativePass": 433,
+  "nativeIgnored": 2,
+  "browserPass": 171,
+  "packagedBrowserPass": 11,
+  "imageAcceptance": "BLOCKED independent A/B/C/D",
+  "physicalQuest": "NOT TESTED",
+  "deployedSharedServer": false,
+  "gateReceiptAfterDocumentation": "PASS reused: all (unchanged inputs)",
+  "preview": "http://127.0.0.1:8899",
+  "archiveRestoreVerified": true
+}

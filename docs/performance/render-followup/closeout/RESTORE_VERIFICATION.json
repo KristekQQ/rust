@@ -1,0 +1,26 @@
+[
+  {
+    "files": 5513,
+    "objects": 870,
+    "independentFiles": true,
+    "archive": "docs/performance/render-followup/closeout/EVIDENCE_RUNTIME.tar.gz",
+    "destination": "output/recovery/closeout-restore-runtime",
+    "elapsedSeconds": 1.45011305809021
+  },
+  {
+    "files": 1054,
+    "objects": 537,
+    "independentFiles": true,
+    "archive": "docs/performance/render-followup/closeout/EVIDENCE_RUNS.tar.gz",
+    "destination": "output/recovery/closeout-restore-runs",
+    "elapsedSeconds": 0.5764069557189941
+  },
+  {
+    "files": 578,
+    "objects": 565,
+    "independentFiles": true,
+    "archive": "docs/performance/render-followup/closeout/EVIDENCE_PRODUCTION.tar.gz",
+    "destination": "output/recovery/closeout-restore-production",
+    "elapsedSeconds": 0.32590794563293457
+  }
+]

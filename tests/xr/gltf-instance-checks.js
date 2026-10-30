@@ -95,6 +95,16 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
         const shifted = await readEyes();
         test.assert(pixelDifference(restored[0], shifted[0])>0, 'left projection shift changes glTF pixels in the left eye');
         test.assert(pixelDifference(rightBefore, shifted[1], 0)===0, 'left projection shift preserves exact glTF pixels in the right eye');
+        // Keep the right eye fixed while independently disabling main root or
+        // primitive selection. The oracle reads both real eye attachments.
+        try {
+            for (const [roots, primitives] of [[false,true],[true,false],[false,false],[true,true]]) {
+                engine.setMainViewCulling(roots,primitives);frame();
+                const uncullEyes=await readEyes();
+                test.assert(uncullEyes.every((image,eye)=>pixelDifference(shifted[eye],image,0)===0),
+                    'main-only culling controls preserve asymmetric XR eye pixels '+[roots,primitives]);
+            }
+        } finally { engine.setMainViewCulling(true,true); }
         shiftLeft(0);
         frame();
     }
