@@ -23,6 +23,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:"gltf-publication",path:"tests/gltf-publication.html",status:"#result"},
     {name:"main-view-culling",path:"tests/main-view-culling.html",status:"#result"},
     {name:"gltf-indices",path:"tests/gltf-indices.html",status:"#result"},
     {name:"gltf-white-colors",path:"tests/gltf-white-colors.html",status:"#result"},

@@ -70,3 +70,9 @@ See [closeout evidence and current limits](../../../docs/performance/render-foll
 - Capture CPU write shadows are not GPU readback. Unknown copy sources/missing resources must mark traces incomplete. `node --test tests/render-capture-probe.test.mjs tests/render-performance-recorder.test.mjs` checks these tool contracts. `scripts/render-image-replay.mjs --config REPLAY.json --out NEW_DIR` is bounded diagnostic replay, not performance evidence; retain errors and incomplete original history.
 - Preserve unresolved image cases independently. Exact quantized normals with differing derivative visualization narrow the C diagnosis but do not prove bitwise float equality or a driver defect. No AA disabling, numeric rounding, reference replacement or tolerance increase was accepted.
 - Keep recovery checkpoints and evidence outside `/tmp` across reboots. Freeze runtime-only roots with `--runtime-only` to omit historical documentation archives, not runtime inputs. Reuse the existing content-addressed archive/restorer, verify aliases and exclude nested historical archives.
+
+## Model-publication trap
+
+[Measured change-driven publication](../../../docs/performance/model-publication/REPORT.md): a per-model unchanged stamp can still require scanning every model. Track relevant pose/root/options mutations and removals upstream; deduplicate IDs, preserve clone/commit queue membership and retry work, and publish before either eye. Test direct physics/spin paths and clear→reload, not only SDK setters. CPU-only native scenes have no GPU consumer: do not accumulate publication queues there.
+
+Keep the full-scan reference for exact pixels. Stable CPU queue capacity is not GPU allocation or physical memory evidence. A~one-third static callback reduction did not yield a generalFPS gain; retain adverse per-run frame/p99 results and compare active motion separately.

@@ -1,0 +1,19 @@
+{
+  "files": 2086,
+  "objects": 1042,
+  "independentFiles": true,
+  "archive": "docs/performance/model-publication/EVIDENCE.tar.gz",
+  "verifiedReconstructedOverlays": [
+    {
+      "variant": "candidate",
+      "verifiedFiles": 794,
+      "wasm": "4145329481875b260fc74b1c69e9a4fa8782ef4934f37644f9b85fd6ed17645a"
+    },
+    {
+      "variant": "candidate-final",
+      "verifiedFiles": 794,
+      "wasm": "a81d6ee104b30e8fe09a3915f8659d16c48c999f0197b68b66e8f63e00e8fcc0"
+    }
+  ],
+  "baseRuntime": "K from fcc9dda3b closeout archive; unchanged assets reused"
+}

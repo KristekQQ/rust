@@ -302,6 +302,13 @@ struct BoxCollider {
     offset: Vec3,
 }
 
+/// View-independent model changes awaiting publication before either XR eye.
+#[derive(Default)]
+pub(crate) struct ModelGpuChanges {
+    pub updated: Vec<u32>,
+    pub removed: Vec<u32>,
+}
+
 #[derive(Default)]
 pub struct SceneManager {
     pub table_tennis: Option<crate::table_tennis::Game>,
@@ -323,6 +330,7 @@ pub struct SceneManager {
     // Current preview: cutter, first dashed-line handle, plane/origin/finite axis.
     cutting_guide: Option<(u32, u32, [[f32; 4]; 3])>,
     models: BTreeMap<u32, crate::gltf_model::ModelInstance>,
+    model_gpu_changes: ModelGpuChanges,
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
     next_id: u32,
@@ -397,7 +405,54 @@ impl SceneManager {
             self.shadow_revisions.dynamic_casters
         }
     }
+    fn queue_model_gpu_update(
+        models: &mut BTreeMap<u32, crate::gltf_model::ModelInstance>,
+        changes: &mut ModelGpuChanges,
+        id: u32,
+    ) {
+        if !cfg!(any(target_arch = "wasm32", test)) {
+            return;
+        }
+        if let Some(model) = models.get_mut(&id) {
+            if !model.gpu_publication_queued {
+                model.gpu_publication_queued = true;
+                changes.updated.push(id);
+            }
+        }
+    }
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn take_model_gpu_changes(&mut self) -> ModelGpuChanges {
+        let changes = std::mem::take(&mut self.model_gpu_changes);
+        for id in &changes.updated {
+            if let Some(model) = self.models.get_mut(id) {
+                model.gpu_publication_queued = false;
+            }
+        }
+        changes
+    }
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn recycle_model_gpu_changes(&mut self, mut changes: ModelGpuChanges) {
+        changes.updated.clear();
+        changes.removed.clear();
+        // Publication errors may have requeued work. Preserve it for a retry.
+        changes.updated.append(&mut self.model_gpu_changes.updated);
+        changes.removed.append(&mut self.model_gpu_changes.removed);
+        self.model_gpu_changes = changes;
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn model_gpu_queue_stats(&self) -> (usize, usize) {
+        let changes = &self.model_gpu_changes;
+        (
+            changes.updated.len() + changes.removed.len(),
+            (changes.updated.capacity() + changes.removed.capacity()) * std::mem::size_of::<u32>(),
+        )
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn retry_model_gpu_update(&mut self, id: u32) {
+        Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, id);
+    }
     fn changed(&mut self, id: u32) {
+        Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, id);
         if let Some(object) = self.objects.get(&id) {
             self.shadow_revisions.changed(object.render_options);
         }
@@ -633,6 +688,7 @@ impl SceneManager {
             object.refresh_render_data();
             self.collision_dirty |= self.colliders.contains_key(&body.id);
             self.shadow_revisions.changed(object.render_options);
+            Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, body.id);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -652,6 +708,7 @@ impl SceneManager {
             velocity.y -= *gravity * duration;
             object.refresh_render_data();
             self.shadow_revisions.changed(object.render_options);
+            Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, id);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -730,6 +787,7 @@ impl SceneManager {
                 if value != object.visual_fade {
                     object.visual_fade = value;
                     self.shadow_revisions.changed(object.render_options);
+                    Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, id);
                     self.render_revision = self.render_revision.wrapping_add(1);
                     if object.render_options.is_static {
                         self.static_revision = self.static_revision.wrapping_add(1);
@@ -778,6 +836,7 @@ impl SceneManager {
             return Err("Cannot allocate model root".into());
         }
         self.models.insert(id, model);
+        Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, id);
         Ok(id)
     }
     fn commit_model(
@@ -2507,6 +2566,12 @@ impl SceneManager {
         self.collision_dirty = true;
         self.shadow_revisions.clear();
         self.objects.clear();
+        self.model_gpu_changes.updated.clear();
+        if cfg!(any(target_arch = "wasm32", test)) {
+            self.model_gpu_changes
+                .removed
+                .extend(self.models.keys().copied());
+        }
         self.models.clear();
         self.mirror_object = None;
         self.spins.clear();
@@ -2547,7 +2612,9 @@ impl SceneManager {
         };
         self.shadow_revisions.changed(removed.render_options);
         self.collision_dirty |= self.colliders.remove(&id).is_some();
-        self.models.remove(&id);
+        if self.models.remove(&id).is_some() && cfg!(any(target_arch = "wasm32", test)) {
+            self.model_gpu_changes.removed.push(id);
+        }
         self.triangle_meshes.remove(&id);
         self.variant_instances.remove(&id);
         self.collect_mesh_variants();
@@ -2861,6 +2928,7 @@ impl SceneManager {
             object.refresh_render_data();
             self.collision_dirty |= self.colliders.contains_key(id);
             self.shadow_revisions.changed(object.render_options);
+            Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, *id);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -2897,6 +2965,7 @@ impl SceneManager {
             object.transform = transform;
             object.refresh_render_data();
             self.shadow_revisions.changed(object.render_options);
+            Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, *id);
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -2917,6 +2986,11 @@ impl SceneManager {
             rotation.elapsed = elapsed;
             object.refresh_render_data();
             self.shadow_revisions.changed(object.render_options);
+            Self::queue_model_gpu_update(
+                &mut self.models,
+                &mut self.model_gpu_changes,
+                rotation.id,
+            );
             self.render_revision = self.render_revision.wrapping_add(1);
             if object.render_options.is_static {
                 self.static_revision = self.static_revision.wrapping_add(1);
@@ -2952,6 +3026,7 @@ impl SceneManager {
                 }
                 object.refresh_render_data();
                 self.shadow_revisions.changed(object.render_options);
+                Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, *id);
                 self.render_revision = self.render_revision.wrapping_add(1);
                 if object.render_options.is_static {
                     self.static_revision = self.static_revision.wrapping_add(1);
@@ -2982,6 +3057,102 @@ impl SceneManager {
 
 #[cfg(test)]
 mod tests {
+
+    fn publication_asset() -> std::sync::Arc<crate::gltf_model::ModelAsset> {
+        std::sync::Arc::new(
+            crate::gltf_loader::parse_model(
+                include_bytes!("../assets/models/rim/drone-orbiter.glb"),
+                &[],
+                &[],
+            )
+            .unwrap(),
+        )
+    }
+    fn publication_changes(scene: &mut SceneManager) -> (Vec<u32>, Vec<u32>) {
+        let changes = scene.take_model_gpu_changes();
+        let result = (changes.updated.clone(), changes.removed.clone());
+        scene.recycle_model_gpu_changes(changes);
+        result
+    }
+    #[test]
+    fn model_publication_deduplicates_and_ignores_unchanged_or_unrelated_objects() {
+        let mut scene = SceneManager::default();
+        let asset = publication_asset();
+        let a = scene.add_model(asset.clone()).unwrap();
+        let b = scene.add_model(asset).unwrap();
+        assert_eq!(publication_changes(&mut scene), (vec![a, b], vec![]));
+        assert_eq!(publication_changes(&mut scene), (vec![], vec![]));
+        assert!(scene.set_object_position(a, Vec3::ZERO));
+        assert!(publication_changes(&mut scene).0.is_empty());
+        scene.set_object_position(a, Vec3::X);
+        scene.set_object_rotation(a, Vec3::Y);
+        scene.set_object_scale(a, Vec3::new(-2., 1., 0.5));
+        scene.set_render_options(
+            a,
+            RenderOptions {
+                reflectivity: 0.4,
+                receives_shadow: false,
+                opaque_reorderable: true,
+                ..Default::default()
+            },
+        );
+        let cube = scene.add_cube(Vec3::ZERO);
+        scene.set_object_position(cube, Vec3::Y);
+        assert_eq!(publication_changes(&mut scene), (vec![a], vec![]));
+        scene.set_object_position(b, Vec3::Z);
+        assert_eq!(publication_changes(&mut scene).0, vec![b]);
+        assert!(scene.play_model_animation(a, usize::MAX, true, 1.).is_err());
+        assert!(publication_changes(&mut scene).0.is_empty());
+    }
+    #[test]
+    fn model_publication_tracks_animation_spin_and_projectile_mutations() {
+        let mut scene = SceneManager::default();
+        let asset = publication_asset();
+        let animated = scene.add_model(asset.clone()).unwrap();
+        let spinning = scene.add_model(asset.clone()).unwrap();
+        let moving = scene.add_model(asset).unwrap();
+        publication_changes(&mut scene);
+        scene.play_model_animation(animated, 0, true, 1.).unwrap();
+        publication_changes(&mut scene);
+        scene.set_object_spin(spinning, Vec3::Y);
+        scene.set_projectile(moving, Vec3::X, 0., 0.);
+        scene.update(0.1);
+        let (mut changed, removed) = publication_changes(&mut scene);
+        changed.sort_unstable();
+        let mut expected = vec![animated, spinning, moving];
+        expected.sort_unstable();
+        assert_eq!(changed, expected);
+        assert!(removed.is_empty());
+        scene.pause_model_animation(animated, true).unwrap();
+        scene.set_object_spin(spinning, Vec3::ZERO);
+        scene.set_projectile(moving, Vec3::ZERO, 0., 0.);
+        scene.update(0.1);
+        assert!(publication_changes(&mut scene).0.is_empty());
+    }
+    #[test]
+    fn model_publication_preserves_removals_clear_reload_and_inflight_requeue() {
+        let mut scene = SceneManager::default();
+        let asset = publication_asset();
+        let a = scene.add_model(asset.clone()).unwrap();
+        let b = scene.add_model(asset.clone()).unwrap();
+        publication_changes(&mut scene);
+        scene.set_object_position(a, Vec3::X);
+        let changes = scene.take_model_gpu_changes();
+        // A later mutation/error retry during publication must survive recycling.
+        scene.set_object_position(a, Vec3::Y);
+        scene.recycle_model_gpu_changes(changes);
+        assert_eq!(publication_changes(&mut scene).0, vec![a]);
+        assert!(scene.remove_object(a));
+        assert!(!scene.remove_object(a));
+        scene.clear_scene();
+        let c = scene.add_model(asset).unwrap();
+        assert_ne!(b, c);
+        let (changed, mut removed) = publication_changes(&mut scene);
+        removed.sort_unstable();
+        assert_eq!(changed, vec![c]);
+        assert_eq!(removed, vec![a, b]);
+        assert_eq!(publication_changes(&mut scene), (vec![], vec![]));
+    }
     #[test]
     fn compound_colliders_follow_owner_without_extra_render_nodes() {
         let mut scene = SceneManager::default();

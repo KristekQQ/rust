@@ -54,11 +54,20 @@ export async function verifyGltfInstanceViews(engine, sim, test, {pixels, shiftL
     test.assert(uncached.every((image,eye)=>pixelDifference(warm[eye],image,0)===0),'cache-off culling-off independent oracle preserves exact stereo pixels');
     engine.set_frustum_culling(true);engine.setPreparedPlanCacheEnabled(true);frame();frame();
 
+    const publicationBefore=engine.debugStats().gltf.publication;
+    frame();frame();
+    test.assert(engine.debugStats().gltf.publication.modelVisits===publicationBefore.modelVisits,
+        'unchanged stereo models skip publication visits for both eyes');
     instances[2].setPosition([.9,1.6,-2]);
     frame();
     const moved = await readEyes();
     test.assert(moved.every((image, eye) => pixelDifference(warm[eye], image)>0),
         'moving one glTF instance updates both XR eye projections', moved.map((image, eye) => pixelDifference(warm[eye], image)));
+    engine.setModelPublicationReuseEnabled(false);frame();
+    const publishedReference=await readEyes();
+    test.assert(publishedReference.every((image,eye)=>pixelDifference(moved[eye],image,0)===0),
+        'changed model publication matches full-scan reference in both eyes');
+    engine.setModelPublicationReuseEnabled(true);
     instances[2].setPosition([baseline[2],1.6,-2]);
     frame();
     const restored = await readEyes();

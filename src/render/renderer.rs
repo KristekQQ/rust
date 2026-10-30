@@ -590,6 +590,11 @@ pub struct SceneRenderer {
     gltf_gpu: super::gltf_gpu::GltfGpu,
     cut_feedback_gpu: Option<super::cut_feedback_gpu::CutFeedbackGpu>,
     gltf_models: HashMap<u32, super::gltf_gpu::GpuModel>,
+    model_publication_reuse: bool,
+    model_publication_frames: u64,
+    model_publication_visits: u64,
+    model_publication_full_scans: u64,
+    model_publication_idle_frames: u64,
     grid_uniform_buffer: wgpu::Buffer,
     grid_bind_group: wgpu::BindGroup,
     _default_colors: VariantColors,
@@ -741,6 +746,11 @@ impl SceneRenderer {
             gltf_gpu,
             cut_feedback_gpu: None,
             gltf_models: HashMap::new(),
+            model_publication_reuse: true,
+            model_publication_frames: 0,
+            model_publication_visits: 0,
+            model_publication_full_scans: 0,
+            model_publication_idle_frames: 0,
             grid_uniform_buffer,
             grid_bind_group,
             _default_colors: default_colors,
@@ -954,13 +964,23 @@ impl SceneRenderer {
     pub fn finish_scene_updates(&mut self) {
         let _cpu_scope = super::profiler::cpu_scope("scene.gpuUpdates");
         self.sync_triangle_meshes();
-        let removed: std::collections::HashSet<_> = self
-            .gltf_models
-            .iter()
-            .filter(|(id, _)| !self.scene.mesh_exists(**id))
-            .map(|(_, m)| super::gltf_gpu::GltfGpu::model_generation(m))
-            .collect();
-        self.gltf_models.retain(|id, _| self.scene.mesh_exists(*id));
+        let changes = self.scene.take_model_gpu_changes();
+        let mut removed = std::collections::HashSet::new();
+        for id in &changes.removed {
+            if let Some(model) = self.gltf_models.remove(id) {
+                removed.insert(super::gltf_gpu::GltfGpu::model_generation(&model));
+            }
+        }
+        if !self.model_publication_reuse {
+            self.model_publication_full_scans += 1;
+            self.gltf_models.retain(|id, model| {
+                let exists = self.scene.mesh_exists(*id);
+                if !exists {
+                    removed.insert(super::gltf_gpu::GltfGpu::model_generation(model));
+                }
+                exists
+            });
+        }
         if !removed.is_empty() {
             if self.gltf_models.is_empty() {
                 self.gltf_gpu.clear_instance_pages();
@@ -968,13 +988,23 @@ impl SceneRenderer {
                 self.gltf_gpu.models_removed(&removed);
             }
         }
-        for (id, gpu) in &mut self.gltf_models {
-            if let (Some(model), Some(object)) =
-                (self.scene.model(*id), self.scene.objects().get(id))
-            {
+        let reference_ids;
+        let updated = if self.model_publication_reuse {
+            &changes.updated
+        } else {
+            reference_ids = self.gltf_models.keys().copied().collect::<Vec<_>>();
+            &reference_ids
+        };
+        self.model_publication_frames += 1;
+        self.model_publication_visits += updated.len() as u64;
+        self.model_publication_idle_frames += u64::from(updated.is_empty());
+        for id in updated {
+            if let (Some(model), Some(object), Some(gpu)) = (
+                self.scene.model(*id),
+                self.scene.objects().get(id),
+                self.gltf_models.get_mut(id),
+            ) {
                 let options = object.render_options;
-                // Semantic queue policy is not shader data and must update even
-                // when pose/root uniforms remain unchanged.
                 gpu.opaque_reorderable = options.opaque_reorderable;
                 match self.gltf_gpu.update(
                     &self.queue,
@@ -993,11 +1023,13 @@ impl SceneRenderer {
                 ) {
                     Ok(bytes) => self.upload_bytes += bytes,
                     Err(error) => {
-                        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&error))
+                        self.scene.retry_model_gpu_update(*id);
+                        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&error));
                     }
                 }
             }
         }
+        self.scene.recycle_model_gpu_changes(changes);
         self.imported_meshes
             .retain(|id, _| self.scene.mesh_exists(*id));
         self.cpu_mesh_sources.retain(|id, _| {
@@ -1530,6 +1562,9 @@ impl SceneRenderer {
     pub fn set_overlay_selection_reference(&mut self, enabled: bool) {
         self.overlay_selection_reference = enabled;
     }
+    pub fn set_model_publication_reuse_enabled(&mut self, enabled: bool) {
+        self.model_publication_reuse = enabled;
+    }
     pub fn set_prepared_plan_cache_enabled(&self, enabled: bool) {
         self.gltf_gpu.set_plan_cache_enabled(enabled);
     }
@@ -1573,6 +1608,10 @@ impl SceneRenderer {
                 "primitiveCulled": gltf.primitive_culled,
                 "rootBoundsTests": gltf.root_bounds_tests,
                 "rootFullyInside": gltf.root_fully_inside,
+                "publication": {"enabled": self.model_publication_reuse,
+                    "frames": self.model_publication_frames, "modelVisits": self.model_publication_visits,
+                    "fullScans": self.model_publication_full_scans, "idleFrames": self.model_publication_idle_frames,
+                    "pendingIds": self.scene.model_gpu_queue_stats().0, "queueCapacityBytes": self.scene.model_gpu_queue_stats().1},
                 "activeDrawIndexBytes": self.gltf_models.values().map(|m| m.active_draw_index_bytes()).sum::<usize>(),
                 "instancedDrawCalls": gltf.instanced_draw_calls,
                 "translatedDrawCalls": gltf.translated_draw_calls,

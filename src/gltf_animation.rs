@@ -292,6 +292,7 @@ impl ModelInstance {
             playback_revision: 0,
             scene,
             revision: 1,
+            gpu_publication_queued: false,
             last_error: None,
             morph_overrides: Default::default(),
         })

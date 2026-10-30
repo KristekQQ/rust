@@ -1,3 +1,7 @@
+# Model publication — local CPU optimization, 2026-10-30
+
+[Report](docs/performance/model-publication/REPORT.md), [state](docs/performance/STATE.md). Branchcodex/model-gpu-publication, releaseWASMa81d6ee1. Upstream unchanged-model scans removed: static2048GL CPU callback~5→3.2–3.4ms; no generalFPS gain, production/dynamic results mixed.436native/173browserPASS,31strictnativepairs exact. Old image blockers and physicalQuest remain unverified; no shared deployment. Own preview8899 stillK. No automatic next optimization.
+
 # Renderer closeout — local review candidate, 2026-10-30
 
 Selected K production mode0, WASM887e7de9; [decision/evidence](docs/performance/render-followup/CLOSEOUT.md), [current state](docs/performance/render-followup/STATE.md).433native/171browser+11packaged PASS; exact-image signoff remains BLOCKED by separate historical and culling/derivative cases. GL panel allocations removed in observed warm window; no broad FPS gain. Durable isolated checkout, local checkpoint only; own preview8899, shared production unchanged. Physical Quest unverified. Do not restart optimization automatically.

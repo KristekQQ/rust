@@ -1,0 +1,45 @@
+{
+  "source": "91c9d9bf877092e07e4ef6e57e543fb53e117f01014474f81df6dabf3b93b90f",
+  "wasm": "a81d6ee104b30e8fe09a3915f8659d16c48c999f0197b68b66e8f63e00e8fcc0",
+  "bindings": "1687686b0f20cf7492eb15d73a42c7b23ad6b157f30701a7f5cf69cc437e88d9",
+  "configuration": {
+    "rustflags": "--cfg=web_sys_unstable_apis",
+    "cargo": {},
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+    "profile": "release"
+  },
+  "base": "fcc9dda3bf3d4fce46949149d83626b3e18f3cd4",
+  "branch": "codex/model-gpu-publication",
+  "decision": "accept CPU-headroom improvement; no generalFPS claim; inherited image integration blockers remain",
+  "deployed": false,
+  "physicalQuest": "not tested",
+  "verification": {
+    "nativePass": 436,
+    "nativeIgnored": 2,
+    "browserPass": 173,
+    "webgpu": 67,
+    "webgl": 106,
+    "sdkPass": 32,
+    "xrPlatformPass": 71,
+    "nodeHarnessPass": 18,
+    "pythonHarnessPass": 13,
+    "workerReplays": 6,
+    "rawRunSides": 70,
+    "rawRafRows": 55082,
+    "strictNativePairsExact": 31,
+    "nongatingPairs": 4,
+    "independentIntegrityErrors": 0
+  },
+  "archive": {
+    "archive": "docs/performance/model-publication/EVIDENCE.tar.gz",
+    "sha256": "e82a8df6fded9077120539f2d759d9492e83374ed1df2bcc5fcd7e703c114f9f",
+    "bytes": 47659227,
+    "objects": 1042,
+    "aliases": 2086,
+    "verifiedObjects": 1042,
+    "verifiedAliases": 2086
+  },
+  "sourceDumpSha256": "c5121dedcfe57d8ce5fd0242f60678a88ed88156548f20e5a2e42fd98cdf4eb5",
+  "sharedProductionChanged": false,
+  "inheritedImageAcceptance": "Unresolved A/B/C/D from closeout; no new strict native difference"
+}

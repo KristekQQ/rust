@@ -249,6 +249,8 @@ pub struct ModelInstance {
     pub playback_revision: u64,
     pub scene: usize,
     pub revision: u64,
+    /// Scene publication queue membership; independent of pose/render revisions.
+    pub(crate) gpu_publication_queued: bool,
     pub last_error: Option<String>,
     /// Manual weights persist for properties not targeted by the active animation.
     pub morph_overrides: std::collections::BTreeMap<usize, Vec<f32>>,

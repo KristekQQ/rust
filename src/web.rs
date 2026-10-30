@@ -770,6 +770,17 @@ pub fn set_overlay_selection_reference(enabled: bool) {
 }
 
 #[wasm_bindgen]
+pub fn set_model_publication_reuse_enabled(enabled: bool) {
+    STATE.with(|state| {
+        if let Some(state) = state.borrow().as_ref() {
+            state
+                .borrow_mut()
+                .set_model_publication_reuse_enabled(enabled);
+        }
+    });
+}
+
+#[wasm_bindgen]
 pub fn set_prepared_plan_cache_enabled(enabled: bool) {
     STATE.with(|state| {
         if let Some(state) = state.borrow().as_ref() {

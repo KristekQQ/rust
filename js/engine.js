@@ -732,6 +732,8 @@ async function initializeEngine(canvas, backend, initialization) {
         diagnosticPanelText(id,value) { wasm.diagnostic_panel_text(id,value); },
         /** Diagnostic only: true preserves the default original scan; false opts into the experimental immutable guard. @param {boolean} enabled */
         setOverlaySelectionReference(enabled) { wasm.set_overlay_selection_reference(enabled); },
+        /** Reference control for model GPU publication; false scans every model. @param {boolean} enabled */
+        setModelPublicationReuseEnabled(enabled) { wasm.set_model_publication_reuse_enabled(enabled); },
         /** Exact opaque prepared-plan reuse; disable for independent comparison. @param {boolean} enabled */
         setPreparedPlanCacheEnabled(enabled) { wasm.set_prepared_plan_cache_enabled(enabled); },
         debugStats() { return JSON.parse(wasm.debug_stats()); },
