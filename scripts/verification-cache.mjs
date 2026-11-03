@@ -9,6 +9,14 @@ import { root, assertFreshBuild } from './build-fingerprint.mjs';
 const inputs = ['src', 'third_party', 'js', 'examples', 'tests', 'scripts', 'assets', '.github',
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml',
     'package.json', 'package-lock.json', 'tsconfig.json'];
+// Execution-broker transport identity is not consumed by the browser runner.
+// These can change between Codex calls despite identical verification inputs.
+// Keep every other BROWSER_* key (including future flags) in the fingerprint.
+const browserTransportKeys = new Set([
+    'BROWSER_USE_ACCESS_EXECUTOR_ID',
+    'BROWSER_USE_ACCESS_PIPE_PATH',
+    'BROWSER_USE_ACCESS_VERIFYING_IDENTITY',
+]);
 const localOption = key => {
     try { return execFileSync('git', ['config', '--local', '--get', key], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
     catch { return ''; }
@@ -27,7 +35,8 @@ export async function verificationKey(mode, args, directory = root) {
         hash.update('\0');
     }
     hash.update(JSON.stringify({ mode, args, platform: process.platform, arch: process.arch, node: process.version,
-        env: Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(BROWSER_|PUPPETEER_|CARGO_|RUST|GITHUB_ACTIONS$)/.test(key))),
+        env: Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+            /^(BROWSER_|PUPPETEER_|CARGO_|RUST|GITHUB_ACTIONS$)/.test(key) && !browserTransportKeys.has(key))),
         browser: localOption('verification.browser'), browserNode: localOption('verification.node'),
     }));
     hash.update(execFileSync('rustc', ['-Vv'], { encoding: 'utf8' }));

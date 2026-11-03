@@ -926,6 +926,7 @@ dependencies = [
  "bytemuck",
  "console_error_panic_hook",
  "glam",
+ "glow",
  "gltf",
  "image",
  "js-sys",

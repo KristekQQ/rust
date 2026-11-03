@@ -17,6 +17,10 @@ strip = "debuginfo"
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O3"]
 
+[features]
+# Native diagnostic allocator; excluded from normal and WASM builds.
+animation-allocation-probe = []
+
 [dependencies]
 bytemuck = { version = "1.25", features = ["derive"] }
 wasm-bindgen = "0.2"
@@ -42,6 +46,10 @@ gltf = { version = "1.4", default-features = false, features = ["utils", "names"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Same version already used by the pinned wgpu-hal GLES backend.
+glow = "=0.17.0"
 
 [patch.crates-io]
 wgpu = { path = "third_party/wgpu" }

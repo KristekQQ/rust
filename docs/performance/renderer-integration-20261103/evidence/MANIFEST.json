@@ -1,0 +1,22 @@
+{
+  "animation-workspace.tar.gz": {
+    "sha256": "3c9671fd83961922ee74e589bd669bd43d353f4a6f37e7a5a02cfbeacea8c112",
+    "bytes": 3993942
+  },
+  "benchmark-repeatability.tar.gz": {
+    "sha256": "1f15b5099a319604cd16486f5b7fa5bb3a23648069bef44bff6d31b33006fda7",
+    "bytes": 21764328
+  },
+  "three-comparison.tar.gz": {
+    "sha256": "8ff4e5c7087515b47806cfaf26895472307dc39e5e92c69b4012801c2052b1aa",
+    "bytes": 3153784
+  },
+  "xr-first-bind.tar.gz": {
+    "sha256": "71460a753404c39f7990aff43cce194477340cd702b3e77c85018c59483fa5e5",
+    "bytes": 475430
+  },
+  "xr-safe-default.tar.gz": {
+    "sha256": "894634dccc79b29fe1bcee7607bef56d80bbcf0ca646176d4920b81e105f5d21",
+    "bytes": 149375
+  }
+}

@@ -1188,6 +1188,20 @@ impl PostProcessor {
         })
     }
     /// Call ensure_size before requesting the scene render attachments.
+    pub fn foveate_scene(
+        &self,
+        foveation: &mut super::xr_foveation::GlFoveation,
+        device: &wgpu::Device,
+    ) -> Result<(), wasm_bindgen::JsValue> {
+        if let Some(targets) = &self.targets {
+            if let Some(depth) = &targets.depth_color {
+                foveation.apply(device, &[&targets.scene.texture, &depth._texture])?;
+            } else {
+                foveation.apply(device, &[&targets.scene.texture])?;
+            }
+        }
+        Ok(())
+    }
     pub fn target(&self) -> RenderTarget<'_> {
         let targets = self
             .targets

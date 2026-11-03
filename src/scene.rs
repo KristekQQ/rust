@@ -2878,17 +2878,36 @@ impl SceneManager {
             .map(|(&id, _)| id)
             .collect();
         for id in active {
-            let mut candidate = self.models[&id].clone();
-            let result = match candidate.update(dt) {
-                Ok(true) => self.commit_model(id, candidate),
-                Ok(false) => Ok(()),
-                Err(error) => Err(error),
-            };
-            if let Err(error) = result {
-                if let Some(model) = self.models.get_mut(&id) {
-                    model.last_error = Some(error);
-                    if let Some(playback) = &mut model.playback {
-                        playback.playing = false;
+            let result = (|| {
+                let model = self
+                    .models
+                    .get_mut(&id)
+                    .ok_or("Model root does not exist")?;
+                if !model.prepare_animation(dt)? {
+                    return Ok(false);
+                }
+                // Bounds/root validation can still fail after interpolation. Do
+                // not publish pose, clock, revision or object data before both.
+                let (min, max) = model.prepared_render_bounds()?;
+                let object = self
+                    .objects
+                    .get_mut(&id)
+                    .ok_or("Model root does not exist")?;
+                model.publish_animation();
+                object.local_bounds = Some((min, max));
+                object.refresh_render_data();
+                Ok::<_, String>(true)
+            })();
+            match result {
+                Ok(true) => self.changed(id),
+                Ok(false) => {}
+                Err(error) => {
+                    if let Some(model) = self.models.get_mut(&id) {
+                        model.discard_animation();
+                        model.last_error = Some(error);
+                        if let Some(playback) = &mut model.playback {
+                            playback.playing = false;
+                        }
                     }
                 }
             }

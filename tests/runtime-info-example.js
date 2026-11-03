@@ -9,6 +9,7 @@ const name=new URLSearchParams(location.search).get('scene')??'basic';
 if(!scenes.includes(name))throw Error('Unknown example '+name);
 const sim=installXRSimulator({profile:{id:'example-info-'+name,hz:72,eyeWidth:320,eyeHeight:320},clockTimers:false});
 const run=new XRTestRun('example-info-'+name,sim,publishXRReport);
+const originalBinding=globalThis.XRWebGLBinding;
 let engine;
 await run.execute(async test=>{
     const response=await fetch('../examples/'+name+'/');if(!response.ok)throw Error('Example HTML unavailable');
@@ -32,7 +33,24 @@ await run.execute(async test=>{
     test.assert(!engine.frameProfile().enabled,'actual example defaults to profiling off');
     test.assert(!document.querySelector('[data-runtime-info]'),'no desktop info panel covers entry UI');
     const ui=installRuntimeInfo(engine);
-    await engine.xr.enter();
+    if(name==='rim'||name==='neon-arena'){
+        // Exercise the actual example button/options, not just generic SDK entry.
+        // Advertise the experimental capability so fallback-on-missing-API
+        // cannot accidentally make the old unsafe default pass this test.
+        globalThis.XRWebGLBinding=class {
+            constructor(){throw Error('Ordinary example entry must not construct experimental scene binding');}
+            foveateBoundTexture(){}
+        };
+        const enter=document.getElementById('enter');
+        test.assert(enter instanceof HTMLButtonElement&&!enter.disabled,'actual example VR entry is available');
+        let timeout;
+        const started=new Promise((resolve,reject)=>{
+            engine.xr.addEventListener('start',resolve,{once:true});
+            timeout=setTimeout(()=>reject(Error('Example VR button did not start XR')),10000);
+        });
+        try{enter.click();await started;}finally{clearTimeout(timeout);globalThis.XRWebGLBinding=originalBinding;}
+        test.assert(engine.xr.presentationMode==='canvas-transfer','ordinary example button selects safe WebGL presentation');
+    }else await engine.xr.enter();
     const yaw=-Math.atan2(.9,1),pitch=-Math.atan2(1.25,Math.hypot(.9,1));
     const sp=Math.sin(pitch/2),cp=Math.cos(pitch/2),sy=Math.sin(yaw/2),cy=Math.cos(yaw/2);
     // Studio characters occupy the authoring origin: stand in front of the model,

@@ -1,0 +1,43 @@
+{
+  "status": "PASS",
+  "command": "VERIFY_WASM_PROFILE=release BROWSER_EXECUTABLE=<owned Chrome .80> npm run verify:push",
+  "rustTests": {
+    "passed": 441,
+    "ignored": 3
+  },
+  "sdkTests": 32,
+  "xrPlatformTests": 72,
+  "harness": {
+    "nodeTests": 19,
+    "pythonTests": 13
+  },
+  "browser": {
+    "passed": 177,
+    "backends": {
+      "webgpu": 68,
+      "webgl": 109
+    },
+    "version": "Chrome/156.0.8078.80",
+    "started": "2026-11-03T12:00:47.259Z",
+    "finished": "2026-11-03T12:10:45.158Z"
+  },
+  "build": {
+    "source": "9b7880363ae64d704f911dae694eb234854efa57622bd67ba04d42aeb90e7f53",
+    "wasm": "e13acace5f4b9fe0cc5b8673fb2b30ef6008fee151fdf293448c3d01235b89eb",
+    "bindings": "3f2c346579a37e32f855902a4d1ec4648c01bc97987f480264c413edb6813516",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "receiptKey": "28cdee3c4bfbc67cb46edcc9aa15a01a5c4e4c9e22e96719ba11ad208dcec5b0",
+  "receiptFinished": "2026-11-03T12:10:45.618Z",
+  "browserReportSha256": "5dcc0fbab0df03914be12a61208454cf9ac12c1d789ecd2e48b995bbc6ea74b2",
+  "allSourcesSha256": "0b4b7ec6ba5bbb4b40185485250464a9a682aaaa2d5a85b42f49fce061b70e26",
+  "priorAttempts": "attempt1 browser update invalidation; attempt2 nonportable transport key corrected then entire gate repeated; receipts not rewritten",
+  "nativeTarget": "Quest APK/OpenXR confirmed; new thread read-only audit complete",
+  "physicalQuest": "no new acceptance; scene FFR prototype completeness unresolved",
+  "deployment": "existing preview unchanged"
+}

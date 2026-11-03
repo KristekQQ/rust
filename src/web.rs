@@ -2682,6 +2682,28 @@ pub fn xr_round_state() -> String {
 
 /// WebXR host owns session scheduling; Rust retains scene and view calculations.
 #[wasm_bindgen]
+pub fn xr_set_scene_foveation(binding: JsValue, level: f32) -> Result<(), JsValue> {
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let state = slot
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?;
+        let result = state.borrow_mut().set_xr_scene_foveation(binding, level);
+        result
+    })
+}
+#[wasm_bindgen]
+pub fn xr_scene_foveation_stats() -> Result<JsValue, JsValue> {
+    STATE.with(|slot| {
+        let slot = slot.borrow();
+        let state = slot
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine unavailable"))?
+            .borrow();
+        js_sys::JSON::parse(&state.xr_scene_foveation_stats().to_string())
+    })
+}
+#[wasm_bindgen]
 pub fn xr_set_presenting(active: bool) -> Result<(), JsValue> {
     MELEE.with(|slot| {
         if let Some(encounter) = slot.borrow_mut().as_mut() {

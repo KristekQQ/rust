@@ -1,0 +1,143 @@
+{
+  "status": "accepted local CPU/allocation candidate; capped FPS; no deployment",
+  "date": "2026-10-31",
+  "checkout": "/Users/Honza/WebstormProjects/rust/output/worktrees/animation-workspace",
+  "branch": "codex/animation-workspace",
+  "baseCommit": "c20f03fed6737e87654067b279ebc60aad21a30a",
+  "baseline": {
+    "root": "/Users/Honza/WebstormProjects/rust/output/worktrees/render-closeout/output/model-publication/animation-baseline-runtime",
+    "build": {
+      "source": "9c9735606e3509141cc5e81260172c8c40bc14a7056d6ead2353110a58ac015b",
+      "wasm": "cb3106b675c738b7e05c8481548d9df543d55eb85e91d16c4f189b8a116afc42",
+      "bindings": "141ad06fdff5afe66b89a9984349a12dc8e29a4155f0d176330636a0a2e76f58",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "manifestSha256": "0a6312693c5b7d9f068a4dd41faa0e7a21cb89d6f4a455385b655c8f0cb2d748",
+    "inheritedOverlay": "own prior uncommitted FFR prototype"
+  },
+  "candidate": {
+    "root": "/Users/Honza/WebstormProjects/rust/output/worktrees/animation-workspace/output/animation-workspace/candidate-runtime",
+    "build": {
+      "source": "c8b6ee4490c8cc9fee089ec125f6ff94e2a3874aae3f13bd4e4ba214d7850ec8",
+      "wasm": "59615b78ac729b361a611047ecc5bf6d56ef1e99571a0ddc14b3d35f296fc6eb",
+      "bindings": "141ad06fdff5afe66b89a9984349a12dc8e29a4155f0d176330636a0a2e76f58",
+      "configuration": {
+        "rustflags": "--cfg=web_sys_unstable_apis",
+        "cargo": {},
+        "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "profile": "release"
+      }
+    },
+    "manifestSha256": "f9b708dadf68271be636c3a8df9ff4c084edf987c358b70f624c50c7921afeab"
+  },
+  "ownedChangesVsBaseline": {
+    "Cargo.toml": {
+      "beforeSha256": "efbc4abe1e77373c64754f9eca04975e4b5531d3f385c627d202d9bc28a84f35",
+      "afterSha256": "d00de80b5d8e336c0d2bdbccd405acd27e08cf53349f9896dd93a514313b1518"
+    },
+    "src/lib.rs": {
+      "beforeSha256": "5901081dd4e88c39a809cac43e1e3b37d8f1133a6df373c47a843aeef2fc2f6a",
+      "afterSha256": "57f72bdf990ea70fd482f19e8e5bed6be1867538437deecb51904c6987fb38ea"
+    },
+    "src/gltf_animation.rs": {
+      "beforeSha256": "911cd20f3048bba97a0e4768c2e812fb3ca211f3055cc14f5eba91126290fe88",
+      "afterSha256": "40ab2187b9bc7b7cf1730920ec5f77fda91d730dfebdb386da98fe61d59a4961"
+    },
+    "src/gltf_model.rs": {
+      "beforeSha256": "fdd3e102b3d74861bbd24baaa0a059b18f556847a7c1361418a238fa7446ab8d",
+      "afterSha256": "79cf43fe72cc3f369c457ec57fffda3ecd1442a809d02139625f484b8718c296"
+    },
+    "src/scene.rs": {
+      "beforeSha256": "30432fcafdd69990ee4fb405f8f044ff6379e6bfdd9cbedc81036e3476455281",
+      "afterSha256": "f3fd5a6fc4928ce24c0d4d3e59f44f7bd4e4b42f8283d0c725d8865aaaf87825"
+    },
+    "src/animation_reference.rs": {
+      "beforeSha256": null,
+      "afterSha256": "33aefba6e5c393e07cc0e84116083b174b64c1fe1340de7651d3974f596778a4"
+    },
+    "src/animation_workspace_probe.rs": {
+      "beforeSha256": null,
+      "afterSha256": "1b9dffe48e148d4940012bf56929e38f5539914b1572af4badb7b72c711ac928"
+    },
+    "scripts/test-browser.mjs": {
+      "beforeSha256": "0bd97eeb5236fd3cb1c30d381cd121bc709583abbd240dff7090577271a3e433",
+      "afterSha256": "3e7d6415d5d69f808ea088a93aa6e0ec27a177aed4a947bc05c7a4be1e29a93d"
+    },
+    "scripts/render-performance-lib.mjs": {
+      "beforeSha256": "2dce1ac523a85f1096a0badd7640e619e557f491e43069320771eeb891731e3b",
+      "afterSha256": "09380e5cf7609de5cd11a3ff3430cbf43eb59ce34e19922bd53d19f55b43c759"
+    },
+    "scripts/compare-animation-workspace.mjs": {
+      "beforeSha256": null,
+      "afterSha256": "b4dc352203bada5dcf7b55cd79956e5ec743b94b4ac3538c78feaf99e526bd61"
+    },
+    "tests/animation-workspace.html": {
+      "beforeSha256": null,
+      "afterSha256": "4cea589d330c68b0589ad3b56126cc0a6720f4a82fbe1575a1968c6d549714b1"
+    },
+    "tests/animation-workspace.js": {
+      "beforeSha256": null,
+      "afterSha256": "8f9d65bea316d9c489d4105047d62ac4e4e71756ee5223e87b8cad2f1c626a4f"
+    },
+    "docs/performance/STATE.md": {
+      "beforeSha256": "3d8ea08795d93eadc610f8974b78694dcaac3d73a6cf35cc817301d9b24fd189",
+      "afterSha256": "fecc67f0d3c1f7538f42d1fdc47c65684b44163a9f51d46adcce33c545525cb2"
+    },
+    "docs/performance/animation-workspace/REPORT.md": {
+      "beforeSha256": null,
+      "afterSha256": "1498b1337acffd3bc037f71b471849416bc13a6b6aaec83d0b6ed69c269f76b7"
+    },
+    "docs/performance/animation-workspace/RESULTS.json": {
+      "beforeSha256": null,
+      "afterSha256": "e953c847a37aedc56eac0dd97c1af056c5730e264c7b237683192152debd173c"
+    }
+  },
+  "animationOnlyPatchSha256": "0b2f1c63acfcaae4f5f4b34cdee6ea6b9143dc7bda0303c403ae005101259fb9",
+  "nativeBinaries": {
+    "baseline-clean-bin": "3243e5a4f105a46c89697102fbdfb347e4dcd2c2081e2b3df223505bd87543fc",
+    "candidate-allocation-bin": "c958da4aaecd26a2c6cc2f23196cd7420f670839825dc59a73557514d63aa77f",
+    "candidate-clean-bin": "3cf742bd022972e3d0fbae3e4fe783c6205e846ae9e588e43814f53c274f073f",
+    "baseline-allocation-bin": "601c4362dac8ee320248dd600c52f791f11f8a6d8fea4985eedcbd7eb7d9b144"
+  },
+  "cleanNativeBinaryLimit": "candidate clean binary precedes final additional test-only morph test; runtime core unchanged",
+  "reports": {
+    "output/animation-workspace/native-pairs.json": "95b740747e5934123076c71fffafeab86e9888f425bb0087da3fd3110406eed8",
+    "output/animation-workspace/baseline-allocations.json": "5ca26be74055e898dd1a49662520c3bc2a90bc987e63935477158876ec16d4a3",
+    "output/animation-workspace/candidate-allocations.json": "f0f6557df848a1f29fde4849209000db522b9fbbd6cce4bf3afd0ce48a352168",
+    "output/animation-workspace/pixels/report.json": "a8691978fa291a048a444f19c4fbf584814e3f40cba8ecb3f77637c6ddcb1da7",
+    "output/animation-workspace/rome-wg-pairs/report.json": "08ba63e4112f38cc8ca2de3961762257785e5bfa561f8f4522442fe5a2a48e9f",
+    "output/animation-workspace/rome-gl-pairs/report.json": "fe2c779cc4f449e197429177797a2da3aa86e42d3b091536d237b8a4eb66b3ce",
+    "output/animation-workspace/native-final.log": "97562f61d07d97b93ff32727e3a73bd934df1f51b18c809097241c42965a9048",
+    "output/animation-workspace/browser-regression.log": "346791d81c21a6c036c0ba82537b5707e28b4f20e4384a21d2cc66e325faa25a",
+    "docs/performance/animation-workspace/RESULTS.json": "e953c847a37aedc56eac0dd97c1af056c5730e264c7b237683192152debd173c",
+    "docs/performance/animation-workspace/REPORT.md": "1498b1337acffd3bc037f71b471849416bc13a6b6aaec83d0b6ed69c269f76b7"
+  },
+  "nativeTests": {
+    "passed": 441,
+    "ignored": 3
+  },
+  "browserScenariosPassed": 10,
+  "strictExactPixels": 24,
+  "gpuTiming": null,
+  "physicalQuest": "unverified",
+  "live8443": "prior cb3106b675c738b7e05c8481548d9df543d55eb85e91d16c4f189b8a116afc42; untouched",
+  "publication": {
+    "commit": false,
+    "push": false,
+    "merge": false,
+    "deploy": false
+  },
+  "limits": [
+    "60Hz capped desktop game",
+    "nonisolated normal desktop load",
+    "short native component windows",
+    "timed gameplay pixels unavailable",
+    "no fresh Three campaign",
+    "historical image blockers remain open"
+  ]
+}

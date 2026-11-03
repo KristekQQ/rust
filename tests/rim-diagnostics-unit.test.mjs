@@ -84,3 +84,16 @@ test('default sender posts same-origin JSON bytes with build IDs and safe fetch 
   assert.equal(JSON.parse(request.body).wasmBuild,'wasm-456');assert.ok(Buffer.byteLength(request.body)<32768);f.dispose();
  }finally {saved?Object.defineProperty(globalThis,'fetch',saved):delete globalThis.fetch;}
 });
+
+test('scene FFR evidence preserves unavailability, invocation and rollback without GPU handles',()=>{
+ const f=fixture();
+ for(const status of ['unavailable','configured','failed','rollback-failed']){
+  f.event('performance',{fixedFoveation:1,sceneFoveation:{status,level:1,calls:2,failures:status==='configured'?0:1,trackedTextures:2,hardwareEffect:'unverified',rollbackError:status==='rollback-failed'?'reset rejected':null,textures:[{privateHandle:123}]}});
+  const detail=f.records.at(-1).details;
+  assert.equal(detail.fixedFoveation,1);assert.equal(detail.sceneFoveation.status,status);
+  assert.equal(detail.sceneFoveation.hardwareEffect,'unverified');assert.equal(detail.sceneFoveation.calls,2);
+  assert.equal(detail.sceneFoveation.rollbackError,status==='rollback-failed'?'reset rejected':null);
+  assert.equal(JSON.stringify(detail).includes('privateHandle'),false);
+ }
+ f.dispose();
+});

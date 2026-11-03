@@ -26,7 +26,15 @@ const report=await run.execute(async test=>{
         test.assert(rejected&&!engine.xr.isPresenting,'WebGPU never masquerades as supported XR backend');
         return;
     }
-    await engine.xr.enter();sim.frame({head:{position:[0,1.6,0]}});
+    for(const fixedFoveation of [-.1,1.1,NaN,Infinity]) {
+        let rejected=false;try{await engine.xr.enter({fixedFoveation});}catch(error){rejected=error instanceof RangeError;}
+        test.assert(rejected&&!engine.xr.isPresenting,'invalid foveation rejected before entering XR');
+    }
+    await engine.xr.enter();
+    test.assert(sim.session.renderState.baseLayer.fixedFoveation===0,'omitted foveation preserves browser default');
+    await engine.xr.exit();
+    await engine.xr.enter({fixedFoveation:1});sim.frame({head:{position:[0,1.6,0]}});
+    test.assert(sim.session.renderState.baseLayer.fixedFoveation===1,'WebGL layer applies maximum requested foveation on reentry');
     test.assert(!engine.xr.lastError,'actual XR rendering');assertForeground(sim.pixels(),'actual stereo framebuffer');
     test.assert(true,'actual stereo geometry');
     verifyMainViewCaches(engine,sim,test,{singleImported:true});

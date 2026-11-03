@@ -53,6 +53,14 @@ export class WebXRHost extends EventTarget {
     #engine; #canvas; #session = null; #pending = false; #disposed = false;
     #gpuBinding = null; #gpuLayer = null; #gpuSessionUnavailable = false;
     #sharedGl = false;
+    #sceneFoveationBinding = null;
+    #sceneFoveationState = {status:'disabled'};
+    get sceneFoveation(){return this.#sceneFoveationBinding?this.#engine.xr_scene_foveation_stats():{...this.#sceneFoveationState};}
+    setSceneFoveation(level){
+        if(!Number.isFinite(level)||level<0||level>1)throw new RangeError('Scene foveation must be between 0 and 1.');
+        if(!this.#session||!this.#sceneFoveationBinding)throw new Error('Scene texture foveation is not available in this session.');
+        this.#engine.xr_set_scene_foveation(this.#sceneFoveationBinding,level);
+    }
     #profile = null; #lastProfile = null; #presentation = 'canvas-transfer';
     get presentationProfile(){return this.#profile?.snapshot()??this.#lastProfile;}
     /** @returns {'canvas-transfer'|'shared-framebuffer'|'webgpu'} */
@@ -227,15 +235,18 @@ export class WebXRHost extends EventTarget {
     async isSupported() {
         return !!globalThis.isSecureContext && !!navigator.xr && (this.#engine.renderer_backend() === 'Gl' || (!this.#gpuSessionUnavailable && typeof globalThis.XRGPUBinding === 'function' && this.#engine.xr_gpu_supported())) && await navigator.xr.isSessionSupported('immersive-vr');
     }
-    async enter({resolutionScale=.75,webglPresentation='canvas-transfer',presentationDiagnostics=false}={}) {
+    async enter({resolutionScale=.75,fixedFoveation,sceneFoveation=false,webglPresentation='canvas-transfer',presentationDiagnostics=false}={}) {
         if(!['canvas-transfer','shared-framebuffer'].includes(webglPresentation))throw new RangeError('Unknown WebGL XR presentation path.');
         if(typeof presentationDiagnostics!=='boolean')throw new TypeError('presentationDiagnostics must be boolean.');
+        if(typeof sceneFoveation!=='boolean')throw new TypeError('sceneFoveation must be boolean.');
         if(!Number.isFinite(resolutionScale)||resolutionScale<.5||resolutionScale>1.5)throw new RangeError('XR resolutionScale must be between 0.5 and 1.5.');
+        if(fixedFoveation!==undefined&&(!Number.isFinite(fixedFoveation)||fixedFoveation<0||fixedFoveation>1))throw new RangeError('XR fixedFoveation must be between 0 and 1.');
         if (this.#disposed) throw new Error('WebXR byl ukončen.');
         if (this.#pending || this.#session) throw new Error('WebXR již běží nebo se spouští.');
         if (!globalThis.isSecureContext) throw new Error('WebXR potřebuje důvěryhodné HTTPS nebo localhost přes ADB.');
         if (!navigator.xr) throw new Error('Tento prohlížeč nemá WebXR. Otevřete stránku v Meta Quest Browser.');
         const gpu = this.#engine.renderer_backend() === 'BrowserWebGpu';
+        if(sceneFoveation&&(gpu||webglPresentation!=='shared-framebuffer'))throw new Error('Scene texture foveation requires opt-in shared WebGL presentation.');
         if(gpu&&(webglPresentation!=='canvas-transfer'||presentationDiagnostics))throw new Error('WebGL presentation controls require the WebGL backend.');
         this.#lastProfile=null;this.#sharedGl=false;this.#presentation='canvas-transfer';
         if (gpu && typeof globalThis.XRGPUBinding !== 'function') throw new Error('Prohlížeč nemá WebGPU pro WebXR (XRGPUBinding). Použijte odkaz WebGL.');
@@ -260,6 +271,7 @@ export class WebXRHost extends EventTarget {
             session.addEventListener('end', this.#onEnd);
             this.#size = [this.#canvas.width, this.#canvas.height];
             let gl = null, layer = null;
+            let sceneFoveationState=/** @type {{status:string,error?:string}} */({status:sceneFoveation?'unavailable':'disabled'});
             if (gpu) {
                 const device=this.#engine.xr_gpu_device();
                 if(this.#gpuErrorDevice!==device){
@@ -276,9 +288,14 @@ export class WebXRHost extends EventTarget {
                 this.#gpuLayer = this.#gpuBinding.createProjectionLayer({
                     colorFormat:this.#engine.xr_gpu_color_format(), depthStencilFormat:'depth32float', textureUsage:GPUTextureUsage.RENDER_ATTACHMENT, scaleFactor:resolutionScale,
                 });
+                if(fixedFoveation!==undefined&&typeof this.#gpuLayer.fixedFoveation==='number')this.#gpuLayer.fixedFoveation=fixedFoveation;
                 session.updateRenderState({layers:[this.#gpuLayer],depthNear:0.05,depthFar:100});
             } else {
-                if(webglPresentation==='shared-framebuffer') {
+                const sceneFoveationAvailable=typeof globalThis.XRWebGLBinding==='function'&&typeof globalThis.XRWebGLBinding.prototype.foveateBoundTexture==='function';
+                if(webglPresentation==='shared-framebuffer'&&sceneFoveation&&!sceneFoveationAvailable) {
+                    this.dispatchEvent(new CustomEvent('presentationfallback',{detail:{requested:webglPresentation,selected:'canvas-transfer',reason:'Scene texture foveation API unavailable'}}));
+                }
+                if(webglPresentation==='shared-framebuffer'&&(!sceneFoveation||sceneFoveationAvailable)) {
                     try {
                         if(!this.#engine.xr_gl_context||!this.#engine.xr_render_gl_eye||!this.#engine.xr_present_gl_frame)throw new Error('Pinned renderer does not expose WebGL XR framebuffer interop.');
                         gl=this.#engine.xr_gl_context();this.#sharedGl=true;this.#presentation='shared-framebuffer';
@@ -293,9 +310,24 @@ export class WebXRHost extends EventTarget {
                 await gl.makeXRCompatible();
                 if (this.#disposed || this.#session !== session) throw new Error('Spuštění WebXR bylo zrušeno.');
                 layer = new XRWebGLLayer(session, gl, { alpha: false, depth: false, antialias: false, framebufferScaleFactor: resolutionScale });
+                if(fixedFoveation!==undefined&&typeof layer.fixedFoveation==='number')layer.fixedFoveation=fixedFoveation;
                 if(this.#sharedGl&&(layer.antialias!==false||gl.getContextAttributes?.()?.antialias!==false||gl.isContextLost()))throw new Error('Shared WebGL XR requires a live single-sampled context and layer.');
                 session.updateRenderState({ baseLayer: layer, depthNear: 0.05, depthFar: 100 });
+                if(sceneFoveation&&this.#sharedGl) {
+                    try {
+                        const Binding=globalThis.XRWebGLBinding;
+                        if(typeof Binding==='function'&&typeof Binding.prototype.foveateBoundTexture==='function') {
+                            const binding=new Binding(session,gl);
+                            this.#engine.xr_set_scene_foveation(binding,fixedFoveation??1);
+                            this.#sceneFoveationBinding=binding;
+                            sceneFoveationState={status:'configured'};
+                        }
+                    } catch(error) {
+                        sceneFoveationState={status:'setup-failed',error:String(error)};
+                    }
+                }
             }
+            this.#sceneFoveationState=sceneFoveationState;
             let space;
             try { space = await session.requestReferenceSpace('local-floor'); }
             catch {
@@ -321,6 +353,7 @@ export class WebXRHost extends EventTarget {
                 frameRate:Number.isFinite(session.frameRate)?session.frameRate:null,
                 supportedFrameRates:session.supportedFrameRates?Array.from(session.supportedFrameRates):null,
                 fixedFoveation:(gpu?this.#gpuLayer:layer)?.fixedFoveation??null,
+                sceneFoveation:this.sceneFoveation,
                 antialias:gpu?false:layer?.antialias??null,
                 layerKind:gpu?'XRProjectionLayer':'XRWebGLLayer',
                 ...(!gpu?{presentation:this.#presentation,framebuffer:{width:layer.framebufferWidth,height:layer.framebufferHeight},rendererContextAttributes:this.#canvas.getContext?.('webgl2')?.getContextAttributes?.(),xrContextAttributes:gl.getContextAttributes?.(),sharedContext:gl===this.#canvas.getContext?.('webgl2'),depth:false,eyeTargets:eyeViewports.map(v=>({eye:v.eye,width:v.width,height:v.height,colorFormat:'rgba8unorm-srgb',depthFormat:'depth32float',sampleCount:1,ownership:this.#sharedGl?'renderer-owned per-eye stage':'renderer canvas output'})),drawingBufferColorSpace:gl.drawingBufferColorSpace??null}:{}),
@@ -473,6 +506,8 @@ export class WebXRHost extends EventTarget {
             this.#engine.xr_set_presenting(false);
             if (this.#size && !this.#gpuBinding) this.#engine.resize(...this.#size);
         } catch { /* Engine disposal can precede an asynchronous session end. */ }
+        this.#sceneFoveationBinding=null;
+        this.#sceneFoveationState={status:'disabled'};
         if (this.#gl) {
             for (const image of this.#textures) if (image) this.#gl.deleteTexture(image.texture);
             this.#gl.deleteProgram(this.#program);

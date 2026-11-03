@@ -4,6 +4,15 @@ use glam::{Mat3, Mat4, Quat, Vec3};
 use std::sync::Arc;
 
 pub fn sample_channel(channel: &AnimationChannel, time: f32) -> Result<Vec<f32>, String> {
+    let mut sampled = Vec::new();
+    sample_channel_into(channel, time, &mut sampled)?;
+    Ok(sampled)
+}
+fn sample_channel_into(
+    channel: &AnimationChannel,
+    time: f32,
+    sampled: &mut Vec<f32>,
+) -> Result<(), String> {
     if !time.is_finite() || channel.times.is_empty() || channel.components == 0 {
         return Err("Invalid animation sample".into());
     }
@@ -21,6 +30,7 @@ pub fn sample_channel(channel: &AnimationChannel, time: f32) -> Result<Vec<f32>,
     {
         return Err("Invalid animation values length".into());
     }
+    sampled.resize(n, 0.);
     let value = |key: usize| {
         &channel.values
             [key * width + if cubic { n } else { 0 }..key * width + if cubic { 2 * n } else { n }]
@@ -28,10 +38,12 @@ pub fn sample_channel(channel: &AnimationChannel, time: f32) -> Result<Vec<f32>,
     let upper = channel.times.partition_point(|&t| t <= time);
     let lower = upper.saturating_sub(1);
     if upper == 0 {
-        return Ok(value(0).to_vec());
+        sampled.copy_from_slice(value(0));
+        return Ok(());
     }
     if upper >= channel.times.len() || channel.interpolation == Interpolation::Step {
-        return Ok(value(lower).to_vec());
+        sampled.copy_from_slice(value(lower));
+        return Ok(());
     }
     let dt = channel.times[upper] - channel.times[lower];
     if !dt.is_finite() || dt <= 0.0 {
@@ -46,9 +58,9 @@ pub fn sample_channel(channel: &AnimationChannel, time: f32) -> Result<Vec<f32>,
         }
         let qa = Quat::from_array([a[0], a[1], a[2], a[3]]).normalize();
         let qb = Quat::from_array([b[0], b[1], b[2], b[3]]).normalize();
-        return Ok(qa.slerp(qb, t).normalize().to_array().to_vec());
+        sampled.copy_from_slice(&qa.slerp(qb, t).normalize().to_array());
+        return Ok(());
     }
-    let mut sampled = vec![0.; n];
     for i in 0..n {
         sampled[i] = if cubic {
             let out = channel.values[lower * width + 2 * n + i];
@@ -74,9 +86,9 @@ pub fn sample_channel(channel: &AnimationChannel, time: f32) -> Result<Vec<f32>,
         if q.length_squared() <= 0.0 {
             return Err("Animation produced a zero quaternion".into());
         }
-        sampled = q.normalize().to_array().to_vec();
+        sampled.copy_from_slice(&q.normalize().to_array());
     }
-    Ok(sampled)
+    Ok(())
 }
 
 pub fn default_pose(asset: &ModelAsset, scene: usize) -> Result<ModelPose, String> {
@@ -101,7 +113,7 @@ pub fn default_pose(asset: &ModelAsset, scene: usize) -> Result<ModelPose, Strin
 const MAX_POSE_BYTES: usize = 64 * 1024 * 1024;
 
 // Count expanded per-node data, not just the shared mesh/skin source arrays.
-fn validate_pose_budget(asset: &ModelAsset) -> Result<(), String> {
+pub(crate) fn validate_pose_budget(asset: &ModelAsset) -> Result<(), String> {
     let base = std::mem::size_of::<NodeTrs>()
         + std::mem::size_of::<Mat4>()
         + 2 * std::mem::size_of::<Vec<f32>>()
@@ -173,6 +185,14 @@ pub fn rest_pose(asset: &ModelAsset) -> Result<ModelPose, String> {
 }
 
 pub fn recompute_world(asset: &ModelAsset, pose: &mut ModelPose) -> Result<(), String> {
+    recompute_world_reuse(asset, pose, &mut Vec::new(), &mut Vec::new())
+}
+fn recompute_world_reuse(
+    asset: &ModelAsset,
+    pose: &mut ModelPose,
+    parents: &mut Vec<Option<usize>>,
+    stack: &mut Vec<(usize, Mat4)>,
+) -> Result<(), String> {
     validate_pose_budget(asset)?;
     let n = asset.nodes.len();
     if pose.local_trs.len() != n
@@ -183,7 +203,8 @@ pub fn recompute_world(asset: &ModelAsset, pose: &mut ModelPose) -> Result<(), S
     {
         return Err("Model pose node count mismatch".into());
     }
-    let mut parents = vec![None; asset.nodes.len()];
+    parents.resize(asset.nodes.len(), None);
+    parents.fill(None);
     for (i, node) in asset.nodes.iter().enumerate() {
         for &child in &node.children {
             if child >= parents.len() || parents[child].replace(i).is_some() {
@@ -191,12 +212,14 @@ pub fn recompute_world(asset: &ModelAsset, pose: &mut ModelPose) -> Result<(), S
             }
         }
     }
-    let mut stack: Vec<_> = parents
-        .iter()
-        .enumerate()
-        .filter(|(_, p)| p.is_none())
-        .map(|(i, _)| (i, Mat4::IDENTITY))
-        .collect();
+    stack.clear();
+    stack.extend(
+        parents
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.is_none())
+            .map(|(i, _)| (i, Mat4::IDENTITY)),
+    );
     let mut visited = 0;
     while let Some((i, parent)) = stack.pop() {
         let node = &asset.nodes[i];
@@ -242,41 +265,153 @@ pub fn apply_clip(
     clip: usize,
     time: f32,
 ) -> Result<(), String> {
+    let mut candidate = pose.clone();
+    apply_clip_reuse(
+        asset,
+        &mut candidate,
+        clip,
+        time,
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+    )?;
+    *pose = candidate;
+    Ok(())
+}
+fn apply_clip_reuse(
+    asset: &ModelAsset,
+    pose: &mut ModelPose,
+    clip: usize,
+    time: f32,
+    sampled: &mut Vec<f32>,
+    parents: &mut Vec<Option<usize>>,
+    stack: &mut Vec<(usize, Mat4)>,
+) -> Result<(), String> {
     let clip = asset
         .animations
         .get(clip)
         .ok_or("Animation clip index out of range")?;
-    let original = pose;
-    let mut candidate = original.clone();
-    let pose = &mut candidate;
-    // Unanimated properties preserve the asset's default pose.
+    if pose.local_trs.len() != asset.nodes.len() || pose.node_weights.len() != asset.nodes.len() {
+        return Err("Model pose node count mismatch".into());
+    }
     for (i, node) in asset.nodes.iter().enumerate() {
         pose.local_trs[i] = node.trs;
-        pose.node_weights[i] = node.weights.clone().unwrap_or_else(|| {
-            node.mesh
-                .map(|m| asset.meshes[m].weights.clone())
-                .unwrap_or_default()
-        });
+        if let Some(weights) = node
+            .weights
+            .as_ref()
+            .or_else(|| node.mesh.map(|m| &asset.meshes[m].weights))
+        {
+            pose.node_weights[i].clone_from(weights);
+        } else {
+            pose.node_weights[i].clear();
+        }
     }
     for channel in &clip.channels {
-        let sampled = sample_channel(channel, time)?;
+        sample_channel_into(channel, time, sampled)?;
         let trs = pose
             .local_trs
             .get_mut(channel.node)
             .ok_or("Animation node index out of range")?;
         match channel.property {
-            AnimationProperty::Translation => trs.translation = Vec3::from_slice(&sampled),
-            AnimationProperty::Scale => trs.scale = Vec3::from_slice(&sampled),
+            AnimationProperty::Translation => trs.translation = Vec3::from_slice(sampled),
+            AnimationProperty::Scale => trs.scale = Vec3::from_slice(sampled),
             AnimationProperty::Rotation => {
                 trs.rotation =
                     Quat::from_array([sampled[0], sampled[1], sampled[2], sampled[3]]).normalize()
             }
-            AnimationProperty::Weights => pose.node_weights[channel.node] = sampled,
+            AnimationProperty::Weights => pose.node_weights[channel.node].clone_from(sampled),
         }
     }
-    recompute_world(asset, pose)?;
-    *original = candidate;
-    Ok(())
+    recompute_world_reuse(asset, pose, parents, stack)
+}
+
+/// Never-animated instances pay only one pointer. Paused/stopped hot instances
+/// retain bounded scratch for resume. Clones start empty so cold command
+/// transactions never duplicate retained buffers.
+#[derive(Debug, Default)]
+pub(crate) struct AnimationWorkspace {
+    scratch: Option<Box<AnimationScratch>>,
+}
+impl Clone for AnimationWorkspace {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+#[derive(Debug)]
+struct AnimationScratch {
+    pose: ModelPose,
+    sampled: Vec<f32>,
+    parents: Vec<Option<usize>>,
+    stack: Vec<(usize, Mat4)>,
+    next_playback: Option<AnimationPlayback>,
+    animated_weights: Vec<bool>,
+}
+impl AnimationWorkspace {
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let Some(s) = &self.scratch else {
+            return 0;
+        };
+        let p = &s.pose;
+        std::mem::size_of::<AnimationScratch>()
+            + p.local_trs.capacity() * std::mem::size_of::<NodeTrs>()
+            + p.world_matrices.capacity() * std::mem::size_of::<Mat4>()
+            + p.node_weights.capacity() * std::mem::size_of::<Vec<f32>>()
+            + p.node_weights
+                .iter()
+                .map(|v| v.capacity() * 4)
+                .sum::<usize>()
+            + p.skin_matrices.capacity() * std::mem::size_of::<Vec<Mat4>>()
+            + p.skin_matrices
+                .iter()
+                .map(|v| v.capacity() * std::mem::size_of::<Mat4>())
+                .sum::<usize>()
+            + p.skin_world_space.capacity()
+            + p.active_nodes.capacity() * std::mem::size_of::<usize>()
+            + s.animated_weights.capacity()
+            + s.sampled.capacity() * 4
+            + s.parents.capacity() * std::mem::size_of::<Option<usize>>()
+            + s.stack.capacity() * std::mem::size_of::<(usize, Mat4)>()
+    }
+    fn limit(&mut self) {
+        // Large valid assets keep transient evaluation, never unbounded retained
+        // scratch. This excludes shared assets and the already-published pose.
+        if self.retained_bytes() > 2 * 1024 * 1024 {
+            self.scratch = None;
+        }
+    }
+}
+fn copy_pose_into(source: &ModelPose, target: &mut ModelPose) {
+    target.local_trs.clone_from(&source.local_trs);
+    target.world_matrices.clone_from(&source.world_matrices);
+    target.node_weights.clone_from(&source.node_weights);
+    target.skin_matrices.clone_from(&source.skin_matrices);
+    target.skin_world_space.clone_from(&source.skin_world_space);
+    target.active_nodes.clone_from(&source.active_nodes);
+}
+fn apply_morph_overrides_into(
+    asset: &ModelAsset,
+    overrides: &std::collections::BTreeMap<usize, Vec<f32>>,
+    clip: usize,
+    pose: &mut ModelPose,
+    animated: &mut Vec<bool>,
+) {
+    if overrides.is_empty() {
+        return;
+    }
+    animated.resize(asset.nodes.len(), false);
+    animated.fill(false);
+    for channel in &asset.animations[clip].channels {
+        if channel.property == AnimationProperty::Weights {
+            if let Some(flag) = animated.get_mut(channel.node) {
+                *flag = true;
+            }
+        }
+    }
+    for (&node, weights) in overrides {
+        if !animated[node] {
+            pose.node_weights[node].clone_from(weights);
+        }
+    }
 }
 
 impl ModelInstance {
@@ -295,6 +430,7 @@ impl ModelInstance {
             gpu_publication_queued: false,
             last_error: None,
             morph_overrides: Default::default(),
+            animation_workspace: AnimationWorkspace::default(),
         })
     }
     pub(crate) fn render_bounds(&self) -> Result<(Vec3, Vec3), String> {
@@ -345,6 +481,53 @@ impl ModelInstance {
         Ok(())
     }
     pub fn update(&mut self, delta: f32) -> Result<bool, String> {
+        if !self.prepare_animation(delta)? {
+            return Ok(false);
+        }
+        self.publish_animation();
+        Ok(true)
+    }
+    pub(crate) fn prepare_animation(&mut self, delta: f32) -> Result<bool, String> {
+        if let Some(scratch) = &mut self.animation_workspace.scratch {
+            scratch.next_playback = None;
+        }
+        let result = self.prepare_animation_inner(delta);
+        if result.is_err() {
+            self.discard_animation();
+        }
+        result
+    }
+    pub(crate) fn prepared_render_bounds(&self) -> Result<(Vec3, Vec3), String> {
+        let pose = &self
+            .animation_workspace
+            .scratch
+            .as_ref()
+            .ok_or("Animation not prepared")?
+            .pose;
+        self.render_bounds_cache.bounds(&self.asset, pose)
+    }
+    pub(crate) fn publish_animation(&mut self) {
+        let scratch = self
+            .animation_workspace
+            .scratch
+            .as_mut()
+            .expect("animation prepared before publication");
+        let playback = scratch
+            .next_playback
+            .take()
+            .expect("animation prepared before publication");
+        std::mem::swap(&mut self.pose, &mut scratch.pose);
+        self.playback = Some(playback);
+        self.revision = self.revision.wrapping_add(1);
+        self.animation_workspace.limit();
+    }
+    pub(crate) fn discard_animation(&mut self) {
+        if let Some(scratch) = &mut self.animation_workspace.scratch {
+            scratch.next_playback = None;
+        }
+        self.animation_workspace.limit();
+    }
+    fn prepare_animation_inner(&mut self, delta: f32) -> Result<bool, String> {
         #[cfg(target_arch = "wasm32")]
         let _scope = crate::render::profiler::cpu_scope("gltf.animation");
         if !delta.is_finite() || delta < 0. {
@@ -371,10 +554,34 @@ impl ModelInstance {
         if !playback.looping && (advanced >= duration || advanced < 0.) {
             playback.playing = false;
         }
-        apply_clip(&self.asset, &mut self.pose, playback.clip, playback.time)?;
-        self.apply_morph_overrides(playback.clip);
-        self.playback = Some(playback);
-        self.revision = self.revision.wrapping_add(1);
+        let scratch = self.animation_workspace.scratch.get_or_insert_with(|| {
+            Box::new(AnimationScratch {
+                pose: self.pose.clone(),
+                sampled: Vec::new(),
+                parents: Vec::new(),
+                stack: Vec::new(),
+                next_playback: None,
+                animated_weights: Vec::new(),
+            })
+        });
+        copy_pose_into(&self.pose, &mut scratch.pose);
+        apply_clip_reuse(
+            &self.asset,
+            &mut scratch.pose,
+            playback.clip,
+            playback.time,
+            &mut scratch.sampled,
+            &mut scratch.parents,
+            &mut scratch.stack,
+        )?;
+        apply_morph_overrides_into(
+            &self.asset,
+            &self.morph_overrides,
+            playback.clip,
+            &mut scratch.pose,
+            &mut scratch.animated_weights,
+        );
+        scratch.next_playback = Some(playback);
         Ok(true)
     }
     pub fn select_scene(&mut self, scene: usize) -> Result<(), String> {
@@ -404,17 +611,13 @@ impl ModelInstance {
         Ok(())
     }
     fn apply_morph_overrides(&mut self, clip: usize) {
-        let animated: std::collections::HashSet<_> = self.asset.animations[clip]
-            .channels
-            .iter()
-            .filter(|channel| channel.property == AnimationProperty::Weights)
-            .map(|channel| channel.node)
-            .collect();
-        for (&node, weights) in &self.morph_overrides {
-            if !animated.contains(&node) {
-                self.pose.node_weights[node] = weights.clone();
-            }
-        }
+        apply_morph_overrides_into(
+            &self.asset,
+            &self.morph_overrides,
+            clip,
+            &mut self.pose,
+            &mut Vec::new(),
+        );
     }
 }
 
@@ -744,5 +947,197 @@ mod tests {
         );
         let q = sample_channel(&cubic, 1.).unwrap();
         assert!((q.iter().map(|v| v * v).sum::<f32>() - 1.).abs() < 1e-6);
+    }
+}
+
+#[cfg(test)]
+mod workspace_tests {
+    use super::*;
+    fn assets() -> Vec<Arc<ModelAsset>> {
+        [
+            include_bytes!("../assets/models/rim/core-tank.glb").as_slice(),
+            include_bytes!("../assets/models/rim/drone-orbiter.glb").as_slice(),
+            include_bytes!("../assets/models/fox/Fox.glb").as_slice(),
+        ]
+        .into_iter()
+        .map(|b| Arc::new(crate::gltf_loader::parse_model(b, &[], &[]).unwrap()))
+        .collect()
+    }
+    fn bits(p: &ModelPose) -> Vec<u32> {
+        let mut out = Vec::new();
+        for trs in &p.local_trs {
+            out.extend(
+                trs.translation
+                    .to_array()
+                    .into_iter()
+                    .chain(trs.rotation.to_array())
+                    .chain(trs.scale.to_array())
+                    .map(f32::to_bits),
+            );
+        }
+        out.extend(
+            p.world_matrices
+                .iter()
+                .flat_map(|m| m.to_cols_array())
+                .map(f32::to_bits),
+        );
+        out.extend(p.node_weights.iter().flatten().copied().map(f32::to_bits));
+        out.extend(
+            p.skin_matrices
+                .iter()
+                .flatten()
+                .flat_map(|m| m.to_cols_array())
+                .map(f32::to_bits),
+        );
+        out.extend(p.skin_world_space.iter().map(|b| *b as u32));
+        out.extend(p.active_nodes.iter().map(|n| *n as u32));
+        out
+    }
+    #[test]
+    fn animation_workspace_matches_frozen_reference_for_all_authored_and_skin_clips() {
+        for asset in assets() {
+            for clip in 0..asset.animations.len() {
+                let mut hot = ModelInstance::new(asset.clone(), None).unwrap();
+                hot.play(clip, true).unwrap();
+                let mut reference = hot.clone();
+                for dt in [0., 1. / 90., 1. / 120., 0.1, 0.37, 2.33, 0.001, 1. / 60.] {
+                    assert_eq!(
+                        hot.update(dt).unwrap(),
+                        crate::animation_reference::update(&mut reference, dt).unwrap()
+                    );
+                    assert_eq!(bits(&hot.pose), bits(&reference.pose));
+                    assert_eq!(hot.revision, reference.revision);
+                    assert_eq!(
+                        hot.playback.as_ref().unwrap().time.to_bits(),
+                        reference.playback.as_ref().unwrap().time.to_bits()
+                    );
+                }
+                assert!(hot.animation_workspace.retained_bytes() > 0);
+                let mut clone = hot.clone();
+                assert_eq!(clone.animation_workspace.retained_bytes(), 0);
+                let before = bits(&hot.pose);
+                clone.update(0.13).unwrap();
+                assert_eq!(before, bits(&hot.pose));
+            }
+        }
+    }
+    #[test]
+    fn animation_workspace_preserves_pose_and_recovers_after_mutated_invalid_graph() {
+        let asset = assets().remove(0);
+        let mut hot = ModelInstance::new(asset.clone(), None).unwrap();
+        hot.play(0, true).unwrap();
+        hot.update(0.1).unwrap();
+        let before = bits(&hot.pose);
+        let revision = hot.revision;
+        let time = hot.playback.as_ref().unwrap().time;
+        Arc::make_mut(&mut hot.asset).nodes[0].children.push(0);
+        assert!(hot.update(0.1).is_err());
+        assert_eq!(bits(&hot.pose), before);
+        assert_eq!(hot.revision, revision);
+        assert_eq!(hot.playback.as_ref().unwrap().time, time);
+        hot.asset = asset;
+        assert!(hot.update(0.1).unwrap());
+        assert_ne!(hot.revision, revision);
+    }
+    #[test]
+    fn animation_workspace_retention_is_bounded_and_discard_keeps_published_pose() {
+        let asset = assets().remove(0);
+        let mut hot = ModelInstance::new(asset, None).unwrap();
+        hot.play(0, true).unwrap();
+        hot.update(0.1).unwrap();
+        let before = bits(&hot.pose);
+        hot.animation_workspace
+            .scratch
+            .as_mut()
+            .unwrap()
+            .parents
+            .reserve(200_000);
+        assert!(hot.animation_workspace.retained_bytes() > 2 * 1024 * 1024);
+        hot.discard_animation();
+        assert_eq!(hot.animation_workspace.retained_bytes(), 0);
+        assert_eq!(bits(&hot.pose), before);
+        assert!(hot.update(0.1).unwrap());
+    }
+    #[test]
+    fn animation_workspace_sampler_matches_frozen_reference_endpoints_and_morph_cubic() {
+        let mut output = Vec::new();
+        for asset in assets() {
+            for clip in &asset.animations {
+                for channel in &clip.channels {
+                    for time in [-0.1, 0., 0.001, 0.37, clip.duration, clip.duration + 0.1] {
+                        sample_channel_into(channel, time, &mut output).unwrap();
+                        assert_eq!(
+                            output.iter().copied().map(f32::to_bits).collect::<Vec<_>>(),
+                            crate::animation_reference::sample_channel(channel, time)
+                                .unwrap()
+                                .into_iter()
+                                .map(f32::to_bits)
+                                .collect::<Vec<_>>()
+                        );
+                    }
+                }
+            }
+        }
+        for interpolation in [
+            Interpolation::Step,
+            Interpolation::Linear,
+            Interpolation::CubicSpline,
+        ] {
+            let width = if interpolation == Interpolation::CubicSpline {
+                30
+            } else {
+                10
+            };
+            let channel = AnimationChannel {
+                node: 0,
+                property: AnimationProperty::Weights,
+                interpolation,
+                times: vec![0., 2.],
+                values: (0..width).map(|i| i as f32 * 0.01).collect(),
+                components: 5,
+            };
+            for time in [0., 0.2, 1., 2., 3.] {
+                sample_channel_into(&channel, time, &mut output).unwrap();
+                assert_eq!(
+                    output,
+                    crate::animation_reference::sample_channel(&channel, time).unwrap()
+                );
+            }
+        }
+    }
+    #[test]
+    fn animation_workspace_morph_flags_reset_after_clip_seek_and_preserve_untargeted_overrides() {
+        let base =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gltf/full");
+        let mut asset = crate::gltf_loader::parse_model(
+            &std::fs::read(base.join("full.gltf")).unwrap(),
+            &[std::fs::read(base.join("full.bin")).unwrap()],
+            &[std::fs::read(base.join("checker.png")).unwrap()],
+        )
+        .unwrap();
+        let mut second = asset.animations[0].clone();
+        second.channels.retain(|c| c.node == 1);
+        asset.animations[0].channels.retain(|c| c.node == 0);
+        asset.animations.push(second);
+        let mut hot = ModelInstance::new(Arc::new(asset), None).unwrap();
+        hot.set_morph_weights(0, &[0.7]).unwrap();
+        hot.set_morph_weights(1, &[0.4]).unwrap();
+        hot.play(0, true).unwrap();
+        let mut reference = hot.clone();
+        for clip in [0, 1, 0] {
+            hot.play(clip, true).unwrap();
+            reference.play(clip, true).unwrap();
+            hot.seek(0.2).unwrap();
+            reference.seek(0.2).unwrap();
+            for dt in [0.01, 0.1, 0.3] {
+                hot.update(dt).unwrap();
+                crate::animation_reference::update(&mut reference, dt).unwrap();
+                assert_eq!(bits(&hot.pose), bits(&reference.pose));
+                assert_eq!(
+                    hot.pose.node_weights[if clip == 0 { 1 } else { 0 }],
+                    if clip == 0 { vec![0.4] } else { vec![0.7] }
+                );
+            }
+        }
     }
 }

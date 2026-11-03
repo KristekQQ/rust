@@ -1,5 +1,6 @@
 //! Opt-in WebGL XR: owned sRGB eye targets and a borrowed, render-only XR FBO.
-//! No raw GL binds; the pinned GLES backend owns state transitions and submission.
+//! A cold ownership probe restores the exact DRAW binding before backend work;
+//! the pinned GLES backend owns rendering state transitions and submission.
 use super::{
     target::{RenderTarget, Viewport},
     textures::ColorTarget,
@@ -11,6 +12,44 @@ pub fn context(device: &wgpu::Device) -> Result<web_sys::WebGl2RenderingContext,
     unsafe { device.as_hal::<wgpu::hal::api::Gles>() }
         .map(|hal| hal.context().webgl2_context.clone())
         .ok_or_else(|| JsValue::from_str("WebGL device unavailable"))
+}
+fn validate_framebuffer(
+    gl: &web_sys::WebGl2RenderingContext,
+    framebuffer: &web_sys::WebGlFramebuffer,
+) -> Result<(), JsValue> {
+    use web_sys::WebGl2RenderingContext as Gl;
+    if gl.is_context_lost() {
+        return Err(JsValue::from_str("WebGL XR context is lost"));
+    }
+    if gl.is_framebuffer(Some(framebuffer)) {
+        return Ok(());
+    }
+    // Chromium creates opaque XR FBOs without setting HasEverBeenBound. Thus
+    // isFramebuffer(false) alone does not establish foreign ownership. Probe
+    // only this cold case inside the XR callback, without touching attachments.
+    // Restore DRAW exactly on every result; READ and the HAL state cache remain
+    // unchanged when normal backend command encoding/submission resumes.
+    let previous = gl.get_parameter(Gl::DRAW_FRAMEBUFFER_BINDING)?;
+    gl.bind_framebuffer(Gl::DRAW_FRAMEBUFFER, Some(framebuffer));
+    let result = (|| {
+        let bound = gl.get_parameter(Gl::DRAW_FRAMEBUFFER_BINDING)?;
+        if !js_sys::Object::is(&bound, framebuffer.as_ref())
+            || !gl.is_framebuffer(Some(framebuffer))
+        {
+            return Err(JsValue::from_str(
+                "WebGL XR framebuffer must belong to the renderer context",
+            ));
+        }
+        let status = gl.check_framebuffer_status(Gl::DRAW_FRAMEBUFFER);
+        if status != Gl::FRAMEBUFFER_COMPLETE {
+            return Err(JsValue::from_str(&format!(
+                "WebGL XR framebuffer is not active or complete (status=0x{status:04x})"
+            )));
+        }
+        Ok(())
+    })();
+    gl.bind_framebuffer(Gl::DRAW_FRAMEBUFFER, previous.dyn_ref());
+    result
 }
 struct Eye {
     target: ColorTarget,
@@ -152,6 +191,13 @@ impl GlXrOutput {
             .target
             .target()
     }
+    pub fn color_texture(&self, index: usize) -> &wgpu::Texture {
+        &self.eyes[index]
+            .as_ref()
+            .expect("validated eye")
+            .target
+            .texture
+    }
     pub fn mark_ready(&mut self, index: usize) {
         self.eyes[index].as_mut().expect("validated eye").ready = true;
     }
@@ -199,11 +245,7 @@ impl GlXrOutput {
             .dyn_into::<web_sys::WebGlFramebuffer>()
             .map_err(|_| JsValue::from_str("Invalid WebGL XR framebuffer"))?;
         let gl = context(device)?;
-        if gl.is_context_lost() || !gl.is_framebuffer(Some(&framebuffer)) {
-            return Err(JsValue::from_str(
-                "WebGL XR framebuffer must belong to the renderer context",
-            ));
-        }
+        validate_framebuffer(&gl, &framebuffer)?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let desc = wgpu::TextureDescriptor {
             label: Some("borrowed WebGL XR framebuffer"),

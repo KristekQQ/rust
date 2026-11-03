@@ -377,6 +377,54 @@ s odděleným limitem 80 záznamů na načtení stránky; běžné chyby dál de
 Po přepnutí SSR vyhodnocuj až následující celé měřicí okno, první může obsahovat
 oba režimy. Nejde o GPU timestamp ani čas kompozitoru.
 
+`engine.xr.enter({fixedFoveation:1})` požádá o maximální pevnou foveaci vrstvy
+na WebGL i WebGPU, stejně jako připnutá Three.js r170. `0` ji vypíná; vynechání
+volby zachová výchozí hodnotu prohlížeče. Nepodporované vrstvy (`null` nebo
+chybějící vlastnost) ji přeskočí. Řím a Neon ji explicitně zapínají; nastavení
+rozlišení, AA a efektů zůstává nezměněné. Skutečnou hodnotu uvádí XR diagnostika.
+Nejde o důkaz úspory GPU: scéna přes mezicíle může většinu práce provést před
+foveovaným finálním předáním. Přínos a periferní kvalitu ověřuj na headsetu.
+
+Experiment `engine.xr.enter({webglPresentation:'shared-framebuffer',sceneFoveation:true,fixedFoveation:1})`
+
+First-bind correction (2026-10-31): Chromium can return `false` from
+`isFramebuffer()` for a valid opaque XR framebuffer until its first public bind.
+The adapter probes only this cold case: bind DRAW, validate actual binding
+identity/ownership and completeness, then restore the exact previous DRAW binding
+before backend work. READ is untouched; no attachments are inspected or changed.
+The `xr-gl-presentation` regression injects this initially-unrecognized state and
+also checks foreign/deleted/incomplete objects and distinct READ/DRAW restoration.
+This simulator coverage does not establish real-headset foveation quality or speed.
+používá stejný GL kontext a při dostupném veřejném
+`XRWebGLBinding.foveateBoundTexture` nastaví vlastní textury scény před kreslením.
+Zahrnuje barevný i packed-depth MRT cíl; bez efektů nastaví vlastní cíle očí.
+Efekty, sRGB staging, rozlišení a finální stereo předání zůstávají zachované.
+Generické API zůstává opt-in. Po neúspěšném testu na Questu je i v Římě a Neonu
+výchozí WebGL VR cesta `canvas-transfer`; experiment se aktivuje pouze přes
+`?backend=webgl&xrPresentation=shared-framebuffer`. První oprava odstranila
+odmítnutí dosud nepřipojeného framebufferu, ale Quest dále hlásí nekompletní XR
+framebuffer. Stav obsahuje hexadecimální kód; příčina této druhé chyby je otevřená.
+Původní cestu lze také výslovně vybrat přes `xrPresentation=canvas-transfer`.
+Pokud metoda chybí, tato kombinace se vrací na původní `canvas-transfer`, nikoli
+na samostatný shared-GL experiment bez doloženého přínosu. Výslovný shared-GL bez
+`sceneFoveation` zůstává dostupný pro oddělené testování prezentační ceny.
+WebGPU zatím používá původní owned-eye cestu bez foveace vlastních textur.
+
+`engine.xr.sceneFoveation` a XR diagnostika rozlišují `unavailable`, `configured`,
+`failed` a `rollback-failed`. Počítají skutečná volání a nejvýše osm sledovaných
+textur; JS wrappery nebrání jejich explicitnímu GPU smazání. `configured` není
+důkaz hardwarové úspory: API smí na nepodporovaném zařízení provést no-op.
+`engine.xr.setSceneFoveation(0|1)` dovoluje porovnání v aktivní podporované relaci;
+před změnou resetuje i neaktivní dříve použité cíle. Chyba nastavení vrací všechny
+sledované živé textury na nulu. Selhání tohoto rollbacku ukončí XR místo pokračování
+s rozdílnými preferencemi. Cache, evikce a cleanup drží omezený stav.
+
+`xr-scene-foveation` a `xr-scene-foveation-asymmetric` používají pozorovací shim
+veřejného API nad skutečným GL renderingem. Ověřují přesné stereo pixely, obnovení
+GL stavu, efekty/MRT, druhé oko/attachment při chybě, rollback, změnu 1→0,
+clear/reload a reentry. Shim nesimuluje hardwarovou foveaci; periferní kvalitu,
+kompatibilitu MRT a skutečnou cenu GPU musí potvrdit fyzický Quest.
+
 ### Quest Browser 152.1: dokončené stereo před kompozitorem
 
 Uživatel po aktualizaci hlásí artefakty pouze se SSR; nativní depth a odstranění

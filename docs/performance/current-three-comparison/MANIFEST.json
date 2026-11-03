@@ -1,0 +1,91 @@
+{
+  "nativeBuild": {
+    "source": "c8b6ee4490c8cc9fee089ec125f6ff94e2a3874aae3f13bd4e4ba214d7850ec8",
+    "wasm": "59615b78ac729b361a611047ecc5bf6d56ef1e99571a0ddc14b3d35f296fc6eb",
+    "bindings": "141ad06fdff5afe66b89a9984349a12dc8e29a4155f0d176330636a0a2e76f58",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "three": {
+    "version": "r170",
+    "moduleSha256": "ce1fa418de16a19495a9f72495580e3015d7745c296d3ce0485897f902ddedfb",
+    "representation": "existing per-part InstancedMesh",
+    "usesNativeWasm": false
+  },
+  "browser": {
+    "wg": "Chrome/156.0.8078.74",
+    "gl": "Chrome/156.0.8078.74"
+  },
+  "driverIdentity": {
+    "wg": {
+      "capturedAt": "2026-10-31T16:31:44.762Z",
+      "nodeVersion": "v24.22.1",
+      "v8Version": "13.6.233.17-node.58",
+      "files": {
+        "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+        "scripts/render-performance.mjs": "73f3e4f7d79a52773bb28536e20c8f35a5d8c04f586ee7e13b6fc9200d8c96a8",
+        "scripts/render-performance-lib.mjs": "09380e5cf7609de5cd11a3ff3430cbf43eb59ce34e19922bd53d19f55b43c759",
+        "scripts/render-performance-api.mjs": "ee0ef0c497fea6cad6750a0a6f5432c3af5f070d23f2f1153e92bf176b927a6f",
+        "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+        "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+        "scripts/render-performance-recorder.mjs": "ecab427c135504c9ef73408a9beb11997dfece4e8555f56f229e197a01743e0c",
+        "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+        "tests/render-performance.js": "49f19a67168ec5101964d58ec03a8f7f1c61a5f19954dbd56d100deb5a2be0d1",
+        "tests/render-performance-common.js": "3da445fee3c6c6689476de023e508a171bcbef4b30bfcd2b210bdb5e173114ae",
+        "tests/render-performance-panels.js": "8a09367d6e0fff4d261233bcb5e4a98735125b749c154b7265350d487f2f5909",
+        "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+        "tests/render-performance-three-common.js": "1dec7c74fda0793d9417b794af1646a860eb15b7a85c0d2dc82ec0a79b587bde",
+        "tests/render-performance-three.html": "cb35b6c7cce32d957b01f2e6cbfcbcda1a84b71655106a6c978b84d903830bbf",
+        "tests/render-performance-three.js": "73432000070a87f1820fd470796fe1784aa0d29e57aa2948ccd3741e0ae1f478",
+        "tests/render-performance-three-rim.html": "aa948ebfaf9777a3c93a21080aa671ff5a7ba684fce9531763c9009de0fd5867",
+        "tests/render-performance-three-rim.js": "447f40ce4acdb8895eb801a82cf6b3d6c7d098dd64be527d1e3c1eff42f440a4",
+        "examples/rim-three/stress.js": "374a88c334418295aecb19c9135e9a97cc7d43a8672f1b61cfdc9baecc63254e"
+      },
+      "sha256": "1fc3ead47097903f0375534c35eb16a450d822d1c5cccb24e7129dd8a3d8b891"
+    },
+    "gl": {
+      "capturedAt": "2026-10-31T16:36:10.069Z",
+      "nodeVersion": "v24.22.1",
+      "v8Version": "13.6.233.17-node.58",
+      "files": {
+        "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+        "scripts/render-performance.mjs": "73f3e4f7d79a52773bb28536e20c8f35a5d8c04f586ee7e13b6fc9200d8c96a8",
+        "scripts/render-performance-lib.mjs": "09380e5cf7609de5cd11a3ff3430cbf43eb59ce34e19922bd53d19f55b43c759",
+        "scripts/render-performance-api.mjs": "ee0ef0c497fea6cad6750a0a6f5432c3af5f070d23f2f1153e92bf176b927a6f",
+        "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+        "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+        "scripts/render-performance-recorder.mjs": "ecab427c135504c9ef73408a9beb11997dfece4e8555f56f229e197a01743e0c",
+        "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+        "tests/render-performance.js": "49f19a67168ec5101964d58ec03a8f7f1c61a5f19954dbd56d100deb5a2be0d1",
+        "tests/render-performance-common.js": "3da445fee3c6c6689476de023e508a171bcbef4b30bfcd2b210bdb5e173114ae",
+        "tests/render-performance-panels.js": "8a09367d6e0fff4d261233bcb5e4a98735125b749c154b7265350d487f2f5909",
+        "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece",
+        "tests/render-performance-three-common.js": "1dec7c74fda0793d9417b794af1646a860eb15b7a85c0d2dc82ec0a79b587bde",
+        "tests/render-performance-three.html": "cb35b6c7cce32d957b01f2e6cbfcbcda1a84b71655106a6c978b84d903830bbf",
+        "tests/render-performance-three.js": "73432000070a87f1820fd470796fe1784aa0d29e57aa2948ccd3741e0ae1f478",
+        "tests/render-performance-three-rim.html": "aa948ebfaf9777a3c93a21080aa671ff5a7ba684fce9531763c9009de0fd5867",
+        "tests/render-performance-three-rim.js": "447f40ce4acdb8895eb801a82cf6b3d6c7d098dd64be527d1e3c1eff42f440a4",
+        "examples/rim-three/stress.js": "374a88c334418295aecb19c9135e9a97cc7d43a8672f1b61cfdc9baecc63254e"
+      },
+      "sha256": "1fc3ead47097903f0375534c35eb16a450d822d1c5cccb24e7129dd8a3d8b891"
+    }
+  },
+  "reportHashes": {
+    "wg": "29578ad3fd6a84f3eec953f3a8817aae1221f73f1e2542e23158ed07d0b624b5",
+    "gl": "20352ac6a8ab4e0e9b69a9f3c77ef54d23a3f4d8025935ddd2d4c4b00e859b4b"
+  },
+  "analysisSha256": "fee7faf18b8dc51fbe97b2d82a0953cc36a6eaa65283f227d588e5621c027660",
+  "pixelAuditSha256": "5a07fe186d307e74c2763051324e20164d47f40a47f55d8b5608c729d79d263a",
+  "docs": {
+    "REPORT.md": "8bfdcf3634b841f2d9b7f8c3d2f19dccc1d0a2053a5f3a47fa32e2bad247f5fa",
+    "RESULTS.json": "f5e637309e3958cbbe28afefb4cacf61160a5c1b686dd3e27469315c9e34cb3f",
+    "PROTOCOL.md": "8f48ac78beabd84a445b23cecf6d5d46d2070309c4f1e3522989d2173a3dbe15"
+  },
+  "runtimeChanged": false,
+  "deployed": false,
+  "scope": "limited base-color shared city/drone static profile; not exact equal GPU work, full gameplay, production quality or Quest"
+}

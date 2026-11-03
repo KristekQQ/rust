@@ -28,6 +28,7 @@ pub struct State {
     xr_depth_resolve: Option<super::depth_resolve::DepthResolve>,
     xr_present: Option<super::xr_present::XrPresent>,
     xr_gl_present: Option<super::xr_gl_output::GlXrOutput>,
+    xr_foveation: Option<super::xr_foveation::GlFoveation>,
     environment: Option<super::environment::EnvironmentProbe>,
     background: wgpu::Color,
     pub backend: String,
@@ -94,6 +95,7 @@ impl State {
             xr_depth_resolve: None,
             xr_present: None,
             xr_gl_present: None,
+            xr_foveation: None,
             environment: None,
             background: wgpu::Color {
                 r: 0.1,
@@ -795,6 +797,21 @@ impl State {
     }
     pub fn release_xr_gl(&mut self) {
         self.xr_gl_present = None;
+        self.xr_foveation = None;
+    }
+    pub fn set_xr_scene_foveation(&mut self, binding: JsValue, level: f32) -> Result<(), JsValue> {
+        self.xr_gl_context()?;
+        let next = super::xr_foveation::GlFoveation::new(binding, level)?;
+        if let Some(previous) = &mut self.xr_foveation {
+            previous.reset(&self.renderer.device)?;
+        }
+        self.xr_foveation = Some(next);
+        Ok(())
+    }
+    pub fn xr_scene_foveation_stats(&self) -> serde_json::Value {
+        self.xr_foveation
+            .as_ref()
+            .map_or_else(|| serde_json::json!({"status":"disabled"}), |f| f.stats())
     }
     pub fn render_xr_gl_eye(
         &mut self,
@@ -816,6 +833,18 @@ impl State {
             .unwrap_or_else(|| super::xr_gl_output::GlXrOutput::new(&self.renderer.device));
         let result = (|| {
             present.ensure_eye(&self.renderer.device, index, width, height)?;
+            if !self.postprocess.needs_render(
+                RenderView {
+                    view_projection: matrix,
+                    camera_position: position,
+                },
+                width,
+                height,
+            ) {
+                if let Some(foveation) = &mut self.xr_foveation {
+                    foveation.apply(&self.renderer.device, &[present.color_texture(index)])?;
+                }
+            }
             self.render_xr_gpu_eye(matrix, position, &present.target(index), false)?;
             present.mark_ready(index);
             Ok(())
@@ -1023,6 +1052,12 @@ impl State {
             self.postprocess
                 .ensure_size(&self.renderer.device, target.width, target.height)
                 .map_err(|e| JsValue::from_str(&e))?;
+            if self.xr_rendering {
+                if let Some(foveation) = &mut self.xr_foveation {
+                    self.postprocess
+                        .foveate_scene(foveation, &self.renderer.device)?;
+                }
+            }
             let mut scene_target = self.postprocess.target();
             scene_target.color_load = wgpu::LoadOp::Clear(self.background);
             commands.push(

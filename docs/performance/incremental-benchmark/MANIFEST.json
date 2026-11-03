@@ -1,0 +1,76 @@
+{
+  "baselineAndCandidateBuild": {
+    "source": "c8b6ee4490c8cc9fee089ec125f6ff94e2a3874aae3f13bd4e4ba214d7850ec8",
+    "wasm": "59615b78ac729b361a611047ecc5bf6d56ef1e99571a0ddc14b3d35f296fc6eb",
+    "bindings": "141ad06fdff5afe66b89a9984349a12dc8e29a4155f0d176330636a0a2e76f58",
+    "configuration": {
+      "rustflags": "--cfg=web_sys_unstable_apis",
+      "cargo": {},
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+      "profile": "release"
+    }
+  },
+  "browser": {
+    "wg": "Chrome/156.0.8078.74",
+    "gl": "Chrome/156.0.8078.74"
+  },
+  "driverIdentity": {
+    "wg": {
+      "capturedAt": "2026-10-31T15:35:21.278Z",
+      "nodeVersion": "v24.22.1",
+      "v8Version": "13.6.233.17-node.58",
+      "files": {
+        "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+        "scripts/render-performance.mjs": "73f3e4f7d79a52773bb28536e20c8f35a5d8c04f586ee7e13b6fc9200d8c96a8",
+        "scripts/render-performance-lib.mjs": "09380e5cf7609de5cd11a3ff3430cbf43eb59ce34e19922bd53d19f55b43c759",
+        "scripts/render-performance-api.mjs": "ee0ef0c497fea6cad6750a0a6f5432c3af5f070d23f2f1153e92bf176b927a6f",
+        "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+        "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+        "scripts/render-performance-recorder.mjs": "ecab427c135504c9ef73408a9beb11997dfece4e8555f56f229e197a01743e0c",
+        "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+        "tests/render-performance.js": "49f19a67168ec5101964d58ec03a8f7f1c61a5f19954dbd56d100deb5a2be0d1",
+        "tests/render-performance-common.js": "3da445fee3c6c6689476de023e508a171bcbef4b30bfcd2b210bdb5e173114ae",
+        "tests/render-performance-panels.js": "8a09367d6e0fff4d261233bcb5e4a98735125b749c154b7265350d487f2f5909",
+        "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+      },
+      "sha256": "29f4e146740b34d8e67e4960c3c675ec749f811e93b73ecfbec9dcb84d24692c"
+    },
+    "gl": {
+      "capturedAt": "2026-10-31T15:40:18.455Z",
+      "nodeVersion": "v24.22.1",
+      "v8Version": "13.6.233.17-node.58",
+      "files": {
+        "scripts/benchmark-core.mjs": "d8e51c81a180ba1434486404ec545e1a317a86799585d607582494690e476de1",
+        "scripts/render-performance.mjs": "73f3e4f7d79a52773bb28536e20c8f35a5d8c04f586ee7e13b6fc9200d8c96a8",
+        "scripts/render-performance-lib.mjs": "09380e5cf7609de5cd11a3ff3430cbf43eb59ce34e19922bd53d19f55b43c759",
+        "scripts/render-performance-api.mjs": "ee0ef0c497fea6cad6750a0a6f5432c3af5f070d23f2f1153e92bf176b927a6f",
+        "scripts/render-performance-gl-timer.mjs": "28abe2986dab1bdb4e0daeb3e0177dd038e88aa5f0c1e1fbceeb80ba9943b9d3",
+        "scripts/render-performance-order.mjs": "db6045f5b6a7dae2217b66c05f72a6908290136bba0b6737a3d58e73c266246a",
+        "scripts/render-performance-recorder.mjs": "ecab427c135504c9ef73408a9beb11997dfece4e8555f56f229e197a01743e0c",
+        "tests/render-performance.html": "21f80c67a1555347dfefdf25ca300ae8c09a6d0f158a54e246a6ee61096c81fe",
+        "tests/render-performance.js": "49f19a67168ec5101964d58ec03a8f7f1c61a5f19954dbd56d100deb5a2be0d1",
+        "tests/render-performance-common.js": "3da445fee3c6c6689476de023e508a171bcbef4b30bfcd2b210bdb5e173114ae",
+        "tests/render-performance-panels.js": "8a09367d6e0fff4d261233bcb5e4a98735125b749c154b7265350d487f2f5909",
+        "tests/pixels.js": "f82000ca00994b67ff9683afe58206deabfa0d05c13a231addc80dc720221ece"
+      },
+      "sha256": "29f4e146740b34d8e67e4960c3c675ec749f811e93b73ecfbec9dcb84d24692c"
+    }
+  },
+  "reports": {
+    "/Users/Honza/WebstormProjects/rust/output/worktrees/animation-workspace/output/incremental-benchmark/wg-aa/report.json": "13f3617be2570f7a43608d1a71a7a5f3ffd69b64d3b1553a7bc47c98935856c6",
+    "/Users/Honza/WebstormProjects/rust/output/worktrees/animation-workspace/output/incremental-benchmark/gl-aa/report.json": "bb9a10a8b491fbc037fbdd81e154e507f29d506deddcd33f5348c5fa28a8437d"
+  },
+  "analysisScriptSha256": "43b6973b2f52ad7038cc862ea4bf845ec122a5f187bca49ab9c2638d3c49b23c",
+  "pixelAuditSha256": "dab15d00feeeb5ad64d6b268ebae3184ac96a53b08300b35260ad4400e6da0aa",
+  "docs": {
+    "REPORT.md": "804b8e9cafc1b2374bb3cf1213d0072a5a952493613ef9f1e2bc6bccb7212a88",
+    "RESULTS.json": "f7e15666603e7d7d8a6c1e8eb6a3bc80ec612b6ca42d8c5b68333bbb407b3a3d",
+    "PROTOCOL.md": "0baddbc3facab6006e61b4ceb5350fa160cb2c3a0b9be3d5a3b489fe63cc1efc"
+  },
+  "newRuntimeChange": false,
+  "newThreeMeasurement": false,
+  "physicalQuest": "unverified",
+  "deployment": "unchanged",
+  "controlPairsPerBackend": 3,
+  "strictExactPairs": 6
+}

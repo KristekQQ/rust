@@ -241,6 +241,7 @@ pub struct AnimationPlayback {
 }
 #[derive(Clone, Debug)]
 pub struct ModelInstance {
+    pub(crate) animation_workspace: crate::gltf_animation::AnimationWorkspace,
     pub(crate) render_bounds_cache: std::sync::Arc<crate::gltf_bounds::RenderBoundsCache>,
     pub asset: std::sync::Arc<ModelAsset>,
     pub pose: ModelPose,

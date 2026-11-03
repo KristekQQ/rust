@@ -76,6 +76,7 @@ export function installRimDiagnostics(engine,options){
   const detail=/** @type {CustomEvent<unknown>} */(event).detail;
   const source=detail&&typeof detail==='object'?/** @type {Data} */(detail):{};
   const summary=pick(detail,['sessionId','sample','frames','fps','frameMs','cpuSubmitMs','resolutionScale','frameRate','framebufferScaleFactor','fixedFoveation','antialias','layerKind','presentation','usesDepthValues','ignoreDepthValues']);
+  if(source.sceneFoveation&&typeof source.sceneFoveation==='object')summary.sceneFoveation=pick(source.sceneFoveation,['status','level','calls','failures','trackedTextures','error','rollbackError','hardwareEffect']);
   if(Array.isArray(source.supportedFrameRates))summary.supportedFrameRates=source.supportedFrameRates.filter(rate=>typeof rate==='number'&&Number.isFinite(rate)&&rate>0).slice(0,8);
   // First WebGPU frames expose viewport under eyes; performance has flat eyeViewports.
   const eyes=Array.isArray(source.eyeViewports)?source.eyeViewports:Array.isArray(source.eyes)?source.eyes:null;

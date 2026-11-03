@@ -66,3 +66,9 @@ mod render_target_tests;
 
 #[cfg(test)]
 mod test_scenes;
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod animation_workspace_probe;
+
+#[cfg(test)]
+mod animation_reference;

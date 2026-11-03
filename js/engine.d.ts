@@ -412,10 +412,13 @@ export interface WebXRHost extends EventTarget {
     readonly lastError?: unknown;
     isSupported(): Promise<boolean>;
     /** Call directly from a click. Requires WebGL backend and secure context. */
-    enter(options?: {resolutionScale?:number;webglPresentation?:'canvas-transfer'|'shared-framebuffer';presentationDiagnostics?:boolean}): Promise<void>;
+    enter(options?: {resolutionScale?:number;fixedFoveation?:number;sceneFoveation?:boolean;webglPresentation?:'canvas-transfer'|'shared-framebuffer';presentationDiagnostics?:boolean}): Promise<void>;
     /** Opt-in bounded WebGL-only CPU/query diagnostics; application intervals, not GPU busy/compositor time. */
     readonly presentationProfile: unknown|null;
     readonly presentationMode: 'canvas-transfer'|'shared-framebuffer'|'webgpu';
+    /** Experimental owned-texture FFR. Configured/calls do not prove hardware shading reduction. */
+    readonly sceneFoveation: {status:string;level?:number;calls?:number;failures?:number;trackedTextures?:number;error?:string|null;rollbackError?:string|null;hardwareEffect?:string};
+    setSceneFoveation(level:number):void;
     exit(): Promise<void>;
     dispose(): void;
 }

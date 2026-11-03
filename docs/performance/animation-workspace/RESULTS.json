@@ -1,0 +1,5318 @@
+{
+  "nativeAllocations": {
+    "baseline": {
+      "rows": [
+        {
+          "allocatedBytes": 10303200,
+          "allocationObservation": true,
+          "allocations": 52200,
+          "elapsedMs": 9.185666,
+          "frames": 900,
+          "models": 1,
+          "msPerUpdate": 0.010206295555555555,
+          "retainedWorkspaceBytes": 0,
+          "trace": [
+            "f59079689b4450b7",
+            "f9c17360e81c66a2",
+            "0b1f5b40dd544607",
+            "d0cfc50ea1b59752",
+            "e7b32842f7a3e047",
+            "11841a05a088e38e",
+            "2cd0248f0b6e9fcd",
+            "82db3fcee3f75dbe",
+            "318326290786141a",
+            "c646b9c2b868d0e9",
+            "7afce0425e7fd269",
+            "740cb748f6e709f3",
+            "ee1eb1cfd010422e",
+            "8bcc4bef97b0166b",
+            "d7eb4adf79509c79",
+            "bca1c5a611c30510",
+            "371c52426b584a9e",
+            "01b62c1889a5b795",
+            "197984ee793aae1c",
+            "61809f3bd068c447",
+            "63370a0f4fda0e10",
+            "e7b91857a95cadd7",
+            "48674a52d875beba",
+            "827cd6481df62ee4",
+            "84f5cd31a70749d6",
+            "9dbe6413e291c602",
+            "dfed17d8e42ddc24",
+            "55ab4b1bccfea39d",
+            "ec1fcdea372c90b4",
+            "25f514ff9aac92e3",
+            "7ffcfb869022742e",
+            "f056f4d7b9a68348",
+            "76453375afdb3251",
+            "93e203fd4e674d84",
+            "cd8e8df49c66f081",
+            "1cdde2c3d5bf107e",
+            "b7c579a08edc6f5f",
+            "4351af7e0c7f61fb",
+            "6473e03a62843d8b",
+            "adbfaebebf73ef1e",
+            "7f6713dfce8149b8",
+            "540719ea02c453db",
+            "52f0a94f84d44d82",
+            "53b3cc3e8613a7f7",
+            "236a68e79564a113",
+            "d2ad906f700678ea",
+            "277bb35c713720ec",
+            "778167efaa0902c1",
+            "47d1343178d69444",
+            "69dc1e7abe2b40f3",
+            "1ed4f5bd9d8593c0",
+            "7807a5b793c31eb1",
+            "23bf982d64241cb8",
+            "c987232efb20743f",
+            "55a99fcd61e76296",
+            "f8d5ee5bac31b748",
+            "b70035ea20ed0cda",
+            "d6d2c7fef5d81a5c",
+            "f3d70489938b8968",
+            "5287b6fc8174d34a",
+            "2133f0475e742369",
+            "be8930267753f58e",
+            "257688008354599c",
+            "9e80cffa5dde9493"
+          ]
+        },
+        {
+          "allocatedBytes": 228740400,
+          "allocationObservation": true,
+          "allocations": 988200,
+          "elapsedMs": 83.67962499999999,
+          "frames": 900,
+          "models": 15,
+          "msPerUpdate": 0.0929773611111111,
+          "retainedWorkspaceBytes": 0,
+          "trace": [
+            "cba03d3790d94405",
+            "deae45cb51ecf9b1",
+            "2ca27a9f6e1706dc",
+            "8333740b5fe61cf4",
+            "1660779cfd277c35",
+            "3f73b7bfaaa53e39",
+            "d90ce63068847806",
+            "d830bc6c91948e79",
+            "ad3948d838e26c8f",
+            "2ce74ed08dbfa574",
+            "0198dba5d438c7f9",
+            "5cebc38bbd248c20",
+            "120acd0b71e17d86",
+            "b26197864c0566a1",
+            "53d68c30da85a2b4",
+            "acf493cc935b3ff1",
+            "dfba82312c15c37c",
+            "10e1407f728fdb29",
+            "1c1078984791bcf0",
+            "525ff78578606435",
+            "f7695e20742e90ee",
+            "ae1d70d9135ff159",
+            "bcf602d94d0ce95f",
+            "138d125088b89fa0",
+            "7d03dc874b92a3f3",
+            "3a1ff2612438beed",
+            "312428ca3d99c3a4",
+            "e98a7bfa282ead3a",
+            "0c15cab5deeddc3e",
+            "a2574a0029ebba98",
+            "a13351dd5e42280d",
+            "8172bf0a1ee3ed02",
+            "607311b12168fae5",
+            "e5f02576587f5110",
+            "ed4f9af34b841962",
+            "ddff48740cf86233",
+            "c92bd5138359539e",
+            "6b52817665c0da5d",
+            "e71cb42718d81ee8",
+            "3b639f10bb1fdb46",
+            "d788182a44f53721",
+            "d5fdf8a24f915593",
+            "ad98deb70e47dff2",
+            "8f15f8fc85e5114f",
+            "ad82e6291c6d54f0",
+            "5cbd91ffde89f913",
+            "320f28292d2b6428",
+            "a8418dcfd8c1262d",
+            "8e71335034d70bca",
+            "7da6f11c222b6c5d",
+            "d6368559ab110179",
+            "cc20e3ebeeeb3ec5",
+            "5f92a842bbdbf72e",
+            "645a6965c415a0aa",
+            "4fe556d2305147fd",
+            "e47125b7f32f3df5",
+            "d8c08cc3dd197b33",
+            "ef8d3bea1844e197",
+            "605d6260bd36a73e",
+            "d45c94815a9920da",
+            "a2fa1a535f0fccca",
+            "cdad7669285e77d3",
+            "7427b68816c01ddf",
+            "74dc43ec13b78e1a"
+          ]
+        },
+        {
+          "allocatedBytes": 884952000,
+          "allocationObservation": true,
+          "allocations": 3546900,
+          "elapsedMs": 286.627083,
+          "frames": 900,
+          "models": 64,
+          "msPerUpdate": 0.3184745366666667,
+          "retainedWorkspaceBytes": 0,
+          "trace": [
+            "524af79ab1f19625",
+            "7f1db8779178fbc5",
+            "d83e8b27d1dfdcc5",
+            "fec4af38c5b60605",
+            "fbfa22799a2576a5",
+            "bfa3eb264501cba5",
+            "b1f4a71d63119c25",
+            "d69dc60d92bf5725",
+            "249332079a183985",
+            "aab32ecfaf38ba85",
+            "a253a3fb4abc5625",
+            "b479f33f1dd008a5",
+            "0a05674af300efa5",
+            "4182a562c6d59505",
+            "9e270bdbc7bf5da5",
+            "2c8ef8501c4f2b25",
+            "764ca6f30280d8a5",
+            "6fd07f5c5eeea565",
+            "5a6539cb9babb645",
+            "2d4598758432aea5",
+            "6f637a93a7481a05",
+            "ff7f4924b0f103a5",
+            "d67fa5d0033398a5",
+            "0e48bdbe043b2d25",
+            "084ab83b48140865",
+            "60f3989a2667dec5",
+            "7cf34fe0a9006ac5",
+            "b1a721cc726dec45",
+            "50590d907d0a5945",
+            "529506a26e745445",
+            "82f942326c3d6c25",
+            "cfa5340161c884a5",
+            "a84c2dc0535346a5",
+            "a5dfa2de7ee44145",
+            "dd4ba098681b5425",
+            "27cf666eb24e8865",
+            "40db738a15f4bfa5",
+            "375318f034b24b25",
+            "6ff81d0c5252d0a5",
+            "0f290d0e30c2c9a5",
+            "a8b596468b5f4d25",
+            "d6922afb4d49d085",
+            "1733137e7ba88945",
+            "d6b29e6e3d97d465",
+            "87f57aad560f6625",
+            "043580220c003fa5",
+            "88ce9a0505b4ac45",
+            "bf1b3fd916ba44e5",
+            "4b9bad6baa265da5",
+            "808af3ea7476c305",
+            "09f190e9a6c2af25",
+            "f4cae33c2be0f1a5",
+            "42cbffc755c3b665",
+            "69bd9fe5b67b9c05",
+            "df254158e5bb4b25",
+            "a3a70c4bc37746a5",
+            "aa49f91e68f85b25",
+            "e93cac12cf1a7ca5",
+            "9b263c2e34a26f85",
+            "503788f2ed209c45",
+            "92e61bd1a130a125",
+            "14380443f3d71145",
+            "bdb21427f38b20c5",
+            "71b3f63b889c75a5"
+          ]
+        }
+      ],
+      "scope": "native whole Scene::update; actual Rome rigid assets, Idle; no rendering/FPS/GPU inference",
+      "warmupUpdates": 120
+    },
+    "candidate": {
+      "rows": [
+        {
+          "allocatedBytes": 14400,
+          "allocationObservation": true,
+          "allocations": 900,
+          "elapsedMs": 6.264208,
+          "frames": 900,
+          "models": 1,
+          "msPerUpdate": 0.0069602311111111115,
+          "retainedWorkspaceBytes": 6100,
+          "trace": [
+            "f59079689b4450b7",
+            "f9c17360e81c66a2",
+            "0b1f5b40dd544607",
+            "d0cfc50ea1b59752",
+            "e7b32842f7a3e047",
+            "11841a05a088e38e",
+            "2cd0248f0b6e9fcd",
+            "82db3fcee3f75dbe",
+            "318326290786141a",
+            "c646b9c2b868d0e9",
+            "7afce0425e7fd269",
+            "740cb748f6e709f3",
+            "ee1eb1cfd010422e",
+            "8bcc4bef97b0166b",
+            "d7eb4adf79509c79",
+            "bca1c5a611c30510",
+            "371c52426b584a9e",
+            "01b62c1889a5b795",
+            "197984ee793aae1c",
+            "61809f3bd068c447",
+            "63370a0f4fda0e10",
+            "e7b91857a95cadd7",
+            "48674a52d875beba",
+            "827cd6481df62ee4",
+            "84f5cd31a70749d6",
+            "9dbe6413e291c602",
+            "dfed17d8e42ddc24",
+            "55ab4b1bccfea39d",
+            "ec1fcdea372c90b4",
+            "25f514ff9aac92e3",
+            "7ffcfb869022742e",
+            "f056f4d7b9a68348",
+            "76453375afdb3251",
+            "93e203fd4e674d84",
+            "cd8e8df49c66f081",
+            "1cdde2c3d5bf107e",
+            "b7c579a08edc6f5f",
+            "4351af7e0c7f61fb",
+            "6473e03a62843d8b",
+            "adbfaebebf73ef1e",
+            "7f6713dfce8149b8",
+            "540719ea02c453db",
+            "52f0a94f84d44d82",
+            "53b3cc3e8613a7f7",
+            "236a68e79564a113",
+            "d2ad906f700678ea",
+            "277bb35c713720ec",
+            "778167efaa0902c1",
+            "47d1343178d69444",
+            "69dc1e7abe2b40f3",
+            "1ed4f5bd9d8593c0",
+            "7807a5b793c31eb1",
+            "23bf982d64241cb8",
+            "c987232efb20743f",
+            "55a99fcd61e76296",
+            "f8d5ee5bac31b748",
+            "b70035ea20ed0cda",
+            "d6d2c7fef5d81a5c",
+            "f3d70489938b8968",
+            "5287b6fc8174d34a",
+            "2133f0475e742369",
+            "be8930267753f58e",
+            "257688008354599c",
+            "9e80cffa5dde9493"
+          ]
+        },
+        {
+          "allocatedBytes": 100800,
+          "allocationObservation": true,
+          "allocations": 2700,
+          "elapsedMs": 63.282458999999996,
+          "frames": 900,
+          "models": 15,
+          "msPerUpdate": 0.07031384333333333,
+          "retainedWorkspaceBytes": 133930,
+          "trace": [
+            "cba03d3790d94405",
+            "deae45cb51ecf9b1",
+            "2ca27a9f6e1706dc",
+            "8333740b5fe61cf4",
+            "1660779cfd277c35",
+            "3f73b7bfaaa53e39",
+            "d90ce63068847806",
+            "d830bc6c91948e79",
+            "ad3948d838e26c8f",
+            "2ce74ed08dbfa574",
+            "0198dba5d438c7f9",
+            "5cebc38bbd248c20",
+            "120acd0b71e17d86",
+            "b26197864c0566a1",
+            "53d68c30da85a2b4",
+            "acf493cc935b3ff1",
+            "dfba82312c15c37c",
+            "10e1407f728fdb29",
+            "1c1078984791bcf0",
+            "525ff78578606435",
+            "f7695e20742e90ee",
+            "ae1d70d9135ff159",
+            "bcf602d94d0ce95f",
+            "138d125088b89fa0",
+            "7d03dc874b92a3f3",
+            "3a1ff2612438beed",
+            "312428ca3d99c3a4",
+            "e98a7bfa282ead3a",
+            "0c15cab5deeddc3e",
+            "a2574a0029ebba98",
+            "a13351dd5e42280d",
+            "8172bf0a1ee3ed02",
+            "607311b12168fae5",
+            "e5f02576587f5110",
+            "ed4f9af34b841962",
+            "ddff48740cf86233",
+            "c92bd5138359539e",
+            "6b52817665c0da5d",
+            "e71cb42718d81ee8",
+            "3b639f10bb1fdb46",
+            "d788182a44f53721",
+            "d5fdf8a24f915593",
+            "ad98deb70e47dff2",
+            "8f15f8fc85e5114f",
+            "ad82e6291c6d54f0",
+            "5cbd91ffde89f913",
+            "320f28292d2b6428",
+            "a8418dcfd8c1262d",
+            "8e71335034d70bca",
+            "7da6f11c222b6c5d",
+            "d6368559ab110179",
+            "cc20e3ebeeeb3ec5",
+            "5f92a842bbdbf72e",
+            "645a6965c415a0aa",
+            "4fe556d2305147fd",
+            "e47125b7f32f3df5",
+            "d8c08cc3dd197b33",
+            "ef8d3bea1844e197",
+            "605d6260bd36a73e",
+            "d45c94815a9920da",
+            "a2fa1a535f0fccca",
+            "cdad7669285e77d3",
+            "7427b68816c01ddf",
+            "74dc43ec13b78e1a"
+          ]
+        },
+        {
+          "allocatedBytes": 446400,
+          "allocationObservation": true,
+          "allocations": 4500,
+          "elapsedMs": 183.972792,
+          "frames": 900,
+          "models": 64,
+          "msPerUpdate": 0.20441421333333334,
+          "retainedWorkspaceBytes": 520960,
+          "trace": [
+            "524af79ab1f19625",
+            "7f1db8779178fbc5",
+            "d83e8b27d1dfdcc5",
+            "fec4af38c5b60605",
+            "fbfa22799a2576a5",
+            "bfa3eb264501cba5",
+            "b1f4a71d63119c25",
+            "d69dc60d92bf5725",
+            "249332079a183985",
+            "aab32ecfaf38ba85",
+            "a253a3fb4abc5625",
+            "b479f33f1dd008a5",
+            "0a05674af300efa5",
+            "4182a562c6d59505",
+            "9e270bdbc7bf5da5",
+            "2c8ef8501c4f2b25",
+            "764ca6f30280d8a5",
+            "6fd07f5c5eeea565",
+            "5a6539cb9babb645",
+            "2d4598758432aea5",
+            "6f637a93a7481a05",
+            "ff7f4924b0f103a5",
+            "d67fa5d0033398a5",
+            "0e48bdbe043b2d25",
+            "084ab83b48140865",
+            "60f3989a2667dec5",
+            "7cf34fe0a9006ac5",
+            "b1a721cc726dec45",
+            "50590d907d0a5945",
+            "529506a26e745445",
+            "82f942326c3d6c25",
+            "cfa5340161c884a5",
+            "a84c2dc0535346a5",
+            "a5dfa2de7ee44145",
+            "dd4ba098681b5425",
+            "27cf666eb24e8865",
+            "40db738a15f4bfa5",
+            "375318f034b24b25",
+            "6ff81d0c5252d0a5",
+            "0f290d0e30c2c9a5",
+            "a8b596468b5f4d25",
+            "d6922afb4d49d085",
+            "1733137e7ba88945",
+            "d6b29e6e3d97d465",
+            "87f57aad560f6625",
+            "043580220c003fa5",
+            "88ce9a0505b4ac45",
+            "bf1b3fd916ba44e5",
+            "4b9bad6baa265da5",
+            "808af3ea7476c305",
+            "09f190e9a6c2af25",
+            "f4cae33c2be0f1a5",
+            "42cbffc755c3b665",
+            "69bd9fe5b67b9c05",
+            "df254158e5bb4b25",
+            "a3a70c4bc37746a5",
+            "aa49f91e68f85b25",
+            "e93cac12cf1a7ca5",
+            "9b263c2e34a26f85",
+            "503788f2ed209c45",
+            "92e61bd1a130a125",
+            "14380443f3d71145",
+            "bdb21427f38b20c5",
+            "71b3f63b889c75a5"
+          ]
+        }
+      ],
+      "scope": "native whole Scene::update; actual Rome rigid assets, Idle; no rendering/FPS/GPU inference",
+      "warmupUpdates": 120
+    }
+  },
+  "nativeClean": {
+    "scope": "native whole Scene::update release; custom allocator compiled OUT;120warmup/900sample updates;3alternating pairs; no FPS/GPU/Quest inference",
+    "binaries": {
+      "baseline": "3243e5a4f105a46c89697102fbdfb347e4dcd2c2081e2b3df223505bd87543fc",
+      "candidate": "3cf742bd022972e3d0fbae3e4fe783c6205e846ae9e588e43814f53c274f073f"
+    },
+    "powerBefore": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+    "runs": [
+      {
+        "pair": 1,
+        "label": "baseline",
+        "file": "output/animation-workspace/pair-1-baseline.json",
+        "rows": [
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 4.18025,
+            "frames": 900,
+            "models": 1,
+            "msPerUpdate": 0.004644722222222222,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "f59079689b4450b7",
+              "f9c17360e81c66a2",
+              "0b1f5b40dd544607",
+              "d0cfc50ea1b59752",
+              "e7b32842f7a3e047",
+              "11841a05a088e38e",
+              "2cd0248f0b6e9fcd",
+              "82db3fcee3f75dbe",
+              "318326290786141a",
+              "c646b9c2b868d0e9",
+              "7afce0425e7fd269",
+              "740cb748f6e709f3",
+              "ee1eb1cfd010422e",
+              "8bcc4bef97b0166b",
+              "d7eb4adf79509c79",
+              "bca1c5a611c30510",
+              "371c52426b584a9e",
+              "01b62c1889a5b795",
+              "197984ee793aae1c",
+              "61809f3bd068c447",
+              "63370a0f4fda0e10",
+              "e7b91857a95cadd7",
+              "48674a52d875beba",
+              "827cd6481df62ee4",
+              "84f5cd31a70749d6",
+              "9dbe6413e291c602",
+              "dfed17d8e42ddc24",
+              "55ab4b1bccfea39d",
+              "ec1fcdea372c90b4",
+              "25f514ff9aac92e3",
+              "7ffcfb869022742e",
+              "f056f4d7b9a68348",
+              "76453375afdb3251",
+              "93e203fd4e674d84",
+              "cd8e8df49c66f081",
+              "1cdde2c3d5bf107e",
+              "b7c579a08edc6f5f",
+              "4351af7e0c7f61fb",
+              "6473e03a62843d8b",
+              "adbfaebebf73ef1e",
+              "7f6713dfce8149b8",
+              "540719ea02c453db",
+              "52f0a94f84d44d82",
+              "53b3cc3e8613a7f7",
+              "236a68e79564a113",
+              "d2ad906f700678ea",
+              "277bb35c713720ec",
+              "778167efaa0902c1",
+              "47d1343178d69444",
+              "69dc1e7abe2b40f3",
+              "1ed4f5bd9d8593c0",
+              "7807a5b793c31eb1",
+              "23bf982d64241cb8",
+              "c987232efb20743f",
+              "55a99fcd61e76296",
+              "f8d5ee5bac31b748",
+              "b70035ea20ed0cda",
+              "d6d2c7fef5d81a5c",
+              "f3d70489938b8968",
+              "5287b6fc8174d34a",
+              "2133f0475e742369",
+              "be8930267753f58e",
+              "257688008354599c",
+              "9e80cffa5dde9493"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 75.127041,
+            "frames": 900,
+            "models": 15,
+            "msPerUpdate": 0.08347449000000001,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "cba03d3790d94405",
+              "deae45cb51ecf9b1",
+              "2ca27a9f6e1706dc",
+              "8333740b5fe61cf4",
+              "1660779cfd277c35",
+              "3f73b7bfaaa53e39",
+              "d90ce63068847806",
+              "d830bc6c91948e79",
+              "ad3948d838e26c8f",
+              "2ce74ed08dbfa574",
+              "0198dba5d438c7f9",
+              "5cebc38bbd248c20",
+              "120acd0b71e17d86",
+              "b26197864c0566a1",
+              "53d68c30da85a2b4",
+              "acf493cc935b3ff1",
+              "dfba82312c15c37c",
+              "10e1407f728fdb29",
+              "1c1078984791bcf0",
+              "525ff78578606435",
+              "f7695e20742e90ee",
+              "ae1d70d9135ff159",
+              "bcf602d94d0ce95f",
+              "138d125088b89fa0",
+              "7d03dc874b92a3f3",
+              "3a1ff2612438beed",
+              "312428ca3d99c3a4",
+              "e98a7bfa282ead3a",
+              "0c15cab5deeddc3e",
+              "a2574a0029ebba98",
+              "a13351dd5e42280d",
+              "8172bf0a1ee3ed02",
+              "607311b12168fae5",
+              "e5f02576587f5110",
+              "ed4f9af34b841962",
+              "ddff48740cf86233",
+              "c92bd5138359539e",
+              "6b52817665c0da5d",
+              "e71cb42718d81ee8",
+              "3b639f10bb1fdb46",
+              "d788182a44f53721",
+              "d5fdf8a24f915593",
+              "ad98deb70e47dff2",
+              "8f15f8fc85e5114f",
+              "ad82e6291c6d54f0",
+              "5cbd91ffde89f913",
+              "320f28292d2b6428",
+              "a8418dcfd8c1262d",
+              "8e71335034d70bca",
+              "7da6f11c222b6c5d",
+              "d6368559ab110179",
+              "cc20e3ebeeeb3ec5",
+              "5f92a842bbdbf72e",
+              "645a6965c415a0aa",
+              "4fe556d2305147fd",
+              "e47125b7f32f3df5",
+              "d8c08cc3dd197b33",
+              "ef8d3bea1844e197",
+              "605d6260bd36a73e",
+              "d45c94815a9920da",
+              "a2fa1a535f0fccca",
+              "cdad7669285e77d3",
+              "7427b68816c01ddf",
+              "74dc43ec13b78e1a"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 277.582,
+            "frames": 900,
+            "models": 64,
+            "msPerUpdate": 0.30842444444444445,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "524af79ab1f19625",
+              "7f1db8779178fbc5",
+              "d83e8b27d1dfdcc5",
+              "fec4af38c5b60605",
+              "fbfa22799a2576a5",
+              "bfa3eb264501cba5",
+              "b1f4a71d63119c25",
+              "d69dc60d92bf5725",
+              "249332079a183985",
+              "aab32ecfaf38ba85",
+              "a253a3fb4abc5625",
+              "b479f33f1dd008a5",
+              "0a05674af300efa5",
+              "4182a562c6d59505",
+              "9e270bdbc7bf5da5",
+              "2c8ef8501c4f2b25",
+              "764ca6f30280d8a5",
+              "6fd07f5c5eeea565",
+              "5a6539cb9babb645",
+              "2d4598758432aea5",
+              "6f637a93a7481a05",
+              "ff7f4924b0f103a5",
+              "d67fa5d0033398a5",
+              "0e48bdbe043b2d25",
+              "084ab83b48140865",
+              "60f3989a2667dec5",
+              "7cf34fe0a9006ac5",
+              "b1a721cc726dec45",
+              "50590d907d0a5945",
+              "529506a26e745445",
+              "82f942326c3d6c25",
+              "cfa5340161c884a5",
+              "a84c2dc0535346a5",
+              "a5dfa2de7ee44145",
+              "dd4ba098681b5425",
+              "27cf666eb24e8865",
+              "40db738a15f4bfa5",
+              "375318f034b24b25",
+              "6ff81d0c5252d0a5",
+              "0f290d0e30c2c9a5",
+              "a8b596468b5f4d25",
+              "d6922afb4d49d085",
+              "1733137e7ba88945",
+              "d6b29e6e3d97d465",
+              "87f57aad560f6625",
+              "043580220c003fa5",
+              "88ce9a0505b4ac45",
+              "bf1b3fd916ba44e5",
+              "4b9bad6baa265da5",
+              "808af3ea7476c305",
+              "09f190e9a6c2af25",
+              "f4cae33c2be0f1a5",
+              "42cbffc755c3b665",
+              "69bd9fe5b67b9c05",
+              "df254158e5bb4b25",
+              "a3a70c4bc37746a5",
+              "aa49f91e68f85b25",
+              "e93cac12cf1a7ca5",
+              "9b263c2e34a26f85",
+              "503788f2ed209c45",
+              "92e61bd1a130a125",
+              "14380443f3d71145",
+              "bdb21427f38b20c5",
+              "71b3f63b889c75a5"
+            ]
+          }
+        ]
+      },
+      {
+        "pair": 1,
+        "label": "candidate",
+        "file": "output/animation-workspace/pair-1-candidate.json",
+        "rows": [
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 6.475042,
+            "frames": 900,
+            "models": 1,
+            "msPerUpdate": 0.0071944911111111115,
+            "retainedWorkspaceBytes": 6100,
+            "trace": [
+              "f59079689b4450b7",
+              "f9c17360e81c66a2",
+              "0b1f5b40dd544607",
+              "d0cfc50ea1b59752",
+              "e7b32842f7a3e047",
+              "11841a05a088e38e",
+              "2cd0248f0b6e9fcd",
+              "82db3fcee3f75dbe",
+              "318326290786141a",
+              "c646b9c2b868d0e9",
+              "7afce0425e7fd269",
+              "740cb748f6e709f3",
+              "ee1eb1cfd010422e",
+              "8bcc4bef97b0166b",
+              "d7eb4adf79509c79",
+              "bca1c5a611c30510",
+              "371c52426b584a9e",
+              "01b62c1889a5b795",
+              "197984ee793aae1c",
+              "61809f3bd068c447",
+              "63370a0f4fda0e10",
+              "e7b91857a95cadd7",
+              "48674a52d875beba",
+              "827cd6481df62ee4",
+              "84f5cd31a70749d6",
+              "9dbe6413e291c602",
+              "dfed17d8e42ddc24",
+              "55ab4b1bccfea39d",
+              "ec1fcdea372c90b4",
+              "25f514ff9aac92e3",
+              "7ffcfb869022742e",
+              "f056f4d7b9a68348",
+              "76453375afdb3251",
+              "93e203fd4e674d84",
+              "cd8e8df49c66f081",
+              "1cdde2c3d5bf107e",
+              "b7c579a08edc6f5f",
+              "4351af7e0c7f61fb",
+              "6473e03a62843d8b",
+              "adbfaebebf73ef1e",
+              "7f6713dfce8149b8",
+              "540719ea02c453db",
+              "52f0a94f84d44d82",
+              "53b3cc3e8613a7f7",
+              "236a68e79564a113",
+              "d2ad906f700678ea",
+              "277bb35c713720ec",
+              "778167efaa0902c1",
+              "47d1343178d69444",
+              "69dc1e7abe2b40f3",
+              "1ed4f5bd9d8593c0",
+              "7807a5b793c31eb1",
+              "23bf982d64241cb8",
+              "c987232efb20743f",
+              "55a99fcd61e76296",
+              "f8d5ee5bac31b748",
+              "b70035ea20ed0cda",
+              "d6d2c7fef5d81a5c",
+              "f3d70489938b8968",
+              "5287b6fc8174d34a",
+              "2133f0475e742369",
+              "be8930267753f58e",
+              "257688008354599c",
+              "9e80cffa5dde9493"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 61.954083,
+            "frames": 900,
+            "models": 15,
+            "msPerUpdate": 0.06883787,
+            "retainedWorkspaceBytes": 133930,
+            "trace": [
+              "cba03d3790d94405",
+              "deae45cb51ecf9b1",
+              "2ca27a9f6e1706dc",
+              "8333740b5fe61cf4",
+              "1660779cfd277c35",
+              "3f73b7bfaaa53e39",
+              "d90ce63068847806",
+              "d830bc6c91948e79",
+              "ad3948d838e26c8f",
+              "2ce74ed08dbfa574",
+              "0198dba5d438c7f9",
+              "5cebc38bbd248c20",
+              "120acd0b71e17d86",
+              "b26197864c0566a1",
+              "53d68c30da85a2b4",
+              "acf493cc935b3ff1",
+              "dfba82312c15c37c",
+              "10e1407f728fdb29",
+              "1c1078984791bcf0",
+              "525ff78578606435",
+              "f7695e20742e90ee",
+              "ae1d70d9135ff159",
+              "bcf602d94d0ce95f",
+              "138d125088b89fa0",
+              "7d03dc874b92a3f3",
+              "3a1ff2612438beed",
+              "312428ca3d99c3a4",
+              "e98a7bfa282ead3a",
+              "0c15cab5deeddc3e",
+              "a2574a0029ebba98",
+              "a13351dd5e42280d",
+              "8172bf0a1ee3ed02",
+              "607311b12168fae5",
+              "e5f02576587f5110",
+              "ed4f9af34b841962",
+              "ddff48740cf86233",
+              "c92bd5138359539e",
+              "6b52817665c0da5d",
+              "e71cb42718d81ee8",
+              "3b639f10bb1fdb46",
+              "d788182a44f53721",
+              "d5fdf8a24f915593",
+              "ad98deb70e47dff2",
+              "8f15f8fc85e5114f",
+              "ad82e6291c6d54f0",
+              "5cbd91ffde89f913",
+              "320f28292d2b6428",
+              "a8418dcfd8c1262d",
+              "8e71335034d70bca",
+              "7da6f11c222b6c5d",
+              "d6368559ab110179",
+              "cc20e3ebeeeb3ec5",
+              "5f92a842bbdbf72e",
+              "645a6965c415a0aa",
+              "4fe556d2305147fd",
+              "e47125b7f32f3df5",
+              "d8c08cc3dd197b33",
+              "ef8d3bea1844e197",
+              "605d6260bd36a73e",
+              "d45c94815a9920da",
+              "a2fa1a535f0fccca",
+              "cdad7669285e77d3",
+              "7427b68816c01ddf",
+              "74dc43ec13b78e1a"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 184.73675,
+            "frames": 900,
+            "models": 64,
+            "msPerUpdate": 0.20526305555555555,
+            "retainedWorkspaceBytes": 520960,
+            "trace": [
+              "524af79ab1f19625",
+              "7f1db8779178fbc5",
+              "d83e8b27d1dfdcc5",
+              "fec4af38c5b60605",
+              "fbfa22799a2576a5",
+              "bfa3eb264501cba5",
+              "b1f4a71d63119c25",
+              "d69dc60d92bf5725",
+              "249332079a183985",
+              "aab32ecfaf38ba85",
+              "a253a3fb4abc5625",
+              "b479f33f1dd008a5",
+              "0a05674af300efa5",
+              "4182a562c6d59505",
+              "9e270bdbc7bf5da5",
+              "2c8ef8501c4f2b25",
+              "764ca6f30280d8a5",
+              "6fd07f5c5eeea565",
+              "5a6539cb9babb645",
+              "2d4598758432aea5",
+              "6f637a93a7481a05",
+              "ff7f4924b0f103a5",
+              "d67fa5d0033398a5",
+              "0e48bdbe043b2d25",
+              "084ab83b48140865",
+              "60f3989a2667dec5",
+              "7cf34fe0a9006ac5",
+              "b1a721cc726dec45",
+              "50590d907d0a5945",
+              "529506a26e745445",
+              "82f942326c3d6c25",
+              "cfa5340161c884a5",
+              "a84c2dc0535346a5",
+              "a5dfa2de7ee44145",
+              "dd4ba098681b5425",
+              "27cf666eb24e8865",
+              "40db738a15f4bfa5",
+              "375318f034b24b25",
+              "6ff81d0c5252d0a5",
+              "0f290d0e30c2c9a5",
+              "a8b596468b5f4d25",
+              "d6922afb4d49d085",
+              "1733137e7ba88945",
+              "d6b29e6e3d97d465",
+              "87f57aad560f6625",
+              "043580220c003fa5",
+              "88ce9a0505b4ac45",
+              "bf1b3fd916ba44e5",
+              "4b9bad6baa265da5",
+              "808af3ea7476c305",
+              "09f190e9a6c2af25",
+              "f4cae33c2be0f1a5",
+              "42cbffc755c3b665",
+              "69bd9fe5b67b9c05",
+              "df254158e5bb4b25",
+              "a3a70c4bc37746a5",
+              "aa49f91e68f85b25",
+              "e93cac12cf1a7ca5",
+              "9b263c2e34a26f85",
+              "503788f2ed209c45",
+              "92e61bd1a130a125",
+              "14380443f3d71145",
+              "bdb21427f38b20c5",
+              "71b3f63b889c75a5"
+            ]
+          }
+        ]
+      },
+      {
+        "pair": 2,
+        "label": "candidate",
+        "file": "output/animation-workspace/pair-2-candidate.json",
+        "rows": [
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 2.672916,
+            "frames": 900,
+            "models": 1,
+            "msPerUpdate": 0.0029699066666666663,
+            "retainedWorkspaceBytes": 6100,
+            "trace": [
+              "f59079689b4450b7",
+              "f9c17360e81c66a2",
+              "0b1f5b40dd544607",
+              "d0cfc50ea1b59752",
+              "e7b32842f7a3e047",
+              "11841a05a088e38e",
+              "2cd0248f0b6e9fcd",
+              "82db3fcee3f75dbe",
+              "318326290786141a",
+              "c646b9c2b868d0e9",
+              "7afce0425e7fd269",
+              "740cb748f6e709f3",
+              "ee1eb1cfd010422e",
+              "8bcc4bef97b0166b",
+              "d7eb4adf79509c79",
+              "bca1c5a611c30510",
+              "371c52426b584a9e",
+              "01b62c1889a5b795",
+              "197984ee793aae1c",
+              "61809f3bd068c447",
+              "63370a0f4fda0e10",
+              "e7b91857a95cadd7",
+              "48674a52d875beba",
+              "827cd6481df62ee4",
+              "84f5cd31a70749d6",
+              "9dbe6413e291c602",
+              "dfed17d8e42ddc24",
+              "55ab4b1bccfea39d",
+              "ec1fcdea372c90b4",
+              "25f514ff9aac92e3",
+              "7ffcfb869022742e",
+              "f056f4d7b9a68348",
+              "76453375afdb3251",
+              "93e203fd4e674d84",
+              "cd8e8df49c66f081",
+              "1cdde2c3d5bf107e",
+              "b7c579a08edc6f5f",
+              "4351af7e0c7f61fb",
+              "6473e03a62843d8b",
+              "adbfaebebf73ef1e",
+              "7f6713dfce8149b8",
+              "540719ea02c453db",
+              "52f0a94f84d44d82",
+              "53b3cc3e8613a7f7",
+              "236a68e79564a113",
+              "d2ad906f700678ea",
+              "277bb35c713720ec",
+              "778167efaa0902c1",
+              "47d1343178d69444",
+              "69dc1e7abe2b40f3",
+              "1ed4f5bd9d8593c0",
+              "7807a5b793c31eb1",
+              "23bf982d64241cb8",
+              "c987232efb20743f",
+              "55a99fcd61e76296",
+              "f8d5ee5bac31b748",
+              "b70035ea20ed0cda",
+              "d6d2c7fef5d81a5c",
+              "f3d70489938b8968",
+              "5287b6fc8174d34a",
+              "2133f0475e742369",
+              "be8930267753f58e",
+              "257688008354599c",
+              "9e80cffa5dde9493"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 48.935083999999996,
+            "frames": 900,
+            "models": 15,
+            "msPerUpdate": 0.05437231555555555,
+            "retainedWorkspaceBytes": 133930,
+            "trace": [
+              "cba03d3790d94405",
+              "deae45cb51ecf9b1",
+              "2ca27a9f6e1706dc",
+              "8333740b5fe61cf4",
+              "1660779cfd277c35",
+              "3f73b7bfaaa53e39",
+              "d90ce63068847806",
+              "d830bc6c91948e79",
+              "ad3948d838e26c8f",
+              "2ce74ed08dbfa574",
+              "0198dba5d438c7f9",
+              "5cebc38bbd248c20",
+              "120acd0b71e17d86",
+              "b26197864c0566a1",
+              "53d68c30da85a2b4",
+              "acf493cc935b3ff1",
+              "dfba82312c15c37c",
+              "10e1407f728fdb29",
+              "1c1078984791bcf0",
+              "525ff78578606435",
+              "f7695e20742e90ee",
+              "ae1d70d9135ff159",
+              "bcf602d94d0ce95f",
+              "138d125088b89fa0",
+              "7d03dc874b92a3f3",
+              "3a1ff2612438beed",
+              "312428ca3d99c3a4",
+              "e98a7bfa282ead3a",
+              "0c15cab5deeddc3e",
+              "a2574a0029ebba98",
+              "a13351dd5e42280d",
+              "8172bf0a1ee3ed02",
+              "607311b12168fae5",
+              "e5f02576587f5110",
+              "ed4f9af34b841962",
+              "ddff48740cf86233",
+              "c92bd5138359539e",
+              "6b52817665c0da5d",
+              "e71cb42718d81ee8",
+              "3b639f10bb1fdb46",
+              "d788182a44f53721",
+              "d5fdf8a24f915593",
+              "ad98deb70e47dff2",
+              "8f15f8fc85e5114f",
+              "ad82e6291c6d54f0",
+              "5cbd91ffde89f913",
+              "320f28292d2b6428",
+              "a8418dcfd8c1262d",
+              "8e71335034d70bca",
+              "7da6f11c222b6c5d",
+              "d6368559ab110179",
+              "cc20e3ebeeeb3ec5",
+              "5f92a842bbdbf72e",
+              "645a6965c415a0aa",
+              "4fe556d2305147fd",
+              "e47125b7f32f3df5",
+              "d8c08cc3dd197b33",
+              "ef8d3bea1844e197",
+              "605d6260bd36a73e",
+              "d45c94815a9920da",
+              "a2fa1a535f0fccca",
+              "cdad7669285e77d3",
+              "7427b68816c01ddf",
+              "74dc43ec13b78e1a"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 184.167667,
+            "frames": 900,
+            "models": 64,
+            "msPerUpdate": 0.2046307411111111,
+            "retainedWorkspaceBytes": 520960,
+            "trace": [
+              "524af79ab1f19625",
+              "7f1db8779178fbc5",
+              "d83e8b27d1dfdcc5",
+              "fec4af38c5b60605",
+              "fbfa22799a2576a5",
+              "bfa3eb264501cba5",
+              "b1f4a71d63119c25",
+              "d69dc60d92bf5725",
+              "249332079a183985",
+              "aab32ecfaf38ba85",
+              "a253a3fb4abc5625",
+              "b479f33f1dd008a5",
+              "0a05674af300efa5",
+              "4182a562c6d59505",
+              "9e270bdbc7bf5da5",
+              "2c8ef8501c4f2b25",
+              "764ca6f30280d8a5",
+              "6fd07f5c5eeea565",
+              "5a6539cb9babb645",
+              "2d4598758432aea5",
+              "6f637a93a7481a05",
+              "ff7f4924b0f103a5",
+              "d67fa5d0033398a5",
+              "0e48bdbe043b2d25",
+              "084ab83b48140865",
+              "60f3989a2667dec5",
+              "7cf34fe0a9006ac5",
+              "b1a721cc726dec45",
+              "50590d907d0a5945",
+              "529506a26e745445",
+              "82f942326c3d6c25",
+              "cfa5340161c884a5",
+              "a84c2dc0535346a5",
+              "a5dfa2de7ee44145",
+              "dd4ba098681b5425",
+              "27cf666eb24e8865",
+              "40db738a15f4bfa5",
+              "375318f034b24b25",
+              "6ff81d0c5252d0a5",
+              "0f290d0e30c2c9a5",
+              "a8b596468b5f4d25",
+              "d6922afb4d49d085",
+              "1733137e7ba88945",
+              "d6b29e6e3d97d465",
+              "87f57aad560f6625",
+              "043580220c003fa5",
+              "88ce9a0505b4ac45",
+              "bf1b3fd916ba44e5",
+              "4b9bad6baa265da5",
+              "808af3ea7476c305",
+              "09f190e9a6c2af25",
+              "f4cae33c2be0f1a5",
+              "42cbffc755c3b665",
+              "69bd9fe5b67b9c05",
+              "df254158e5bb4b25",
+              "a3a70c4bc37746a5",
+              "aa49f91e68f85b25",
+              "e93cac12cf1a7ca5",
+              "9b263c2e34a26f85",
+              "503788f2ed209c45",
+              "92e61bd1a130a125",
+              "14380443f3d71145",
+              "bdb21427f38b20c5",
+              "71b3f63b889c75a5"
+            ]
+          }
+        ]
+      },
+      {
+        "pair": 2,
+        "label": "baseline",
+        "file": "output/animation-workspace/pair-2-baseline.json",
+        "rows": [
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 3.9588330000000003,
+            "frames": 900,
+            "models": 1,
+            "msPerUpdate": 0.0043987033333333335,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "f59079689b4450b7",
+              "f9c17360e81c66a2",
+              "0b1f5b40dd544607",
+              "d0cfc50ea1b59752",
+              "e7b32842f7a3e047",
+              "11841a05a088e38e",
+              "2cd0248f0b6e9fcd",
+              "82db3fcee3f75dbe",
+              "318326290786141a",
+              "c646b9c2b868d0e9",
+              "7afce0425e7fd269",
+              "740cb748f6e709f3",
+              "ee1eb1cfd010422e",
+              "8bcc4bef97b0166b",
+              "d7eb4adf79509c79",
+              "bca1c5a611c30510",
+              "371c52426b584a9e",
+              "01b62c1889a5b795",
+              "197984ee793aae1c",
+              "61809f3bd068c447",
+              "63370a0f4fda0e10",
+              "e7b91857a95cadd7",
+              "48674a52d875beba",
+              "827cd6481df62ee4",
+              "84f5cd31a70749d6",
+              "9dbe6413e291c602",
+              "dfed17d8e42ddc24",
+              "55ab4b1bccfea39d",
+              "ec1fcdea372c90b4",
+              "25f514ff9aac92e3",
+              "7ffcfb869022742e",
+              "f056f4d7b9a68348",
+              "76453375afdb3251",
+              "93e203fd4e674d84",
+              "cd8e8df49c66f081",
+              "1cdde2c3d5bf107e",
+              "b7c579a08edc6f5f",
+              "4351af7e0c7f61fb",
+              "6473e03a62843d8b",
+              "adbfaebebf73ef1e",
+              "7f6713dfce8149b8",
+              "540719ea02c453db",
+              "52f0a94f84d44d82",
+              "53b3cc3e8613a7f7",
+              "236a68e79564a113",
+              "d2ad906f700678ea",
+              "277bb35c713720ec",
+              "778167efaa0902c1",
+              "47d1343178d69444",
+              "69dc1e7abe2b40f3",
+              "1ed4f5bd9d8593c0",
+              "7807a5b793c31eb1",
+              "23bf982d64241cb8",
+              "c987232efb20743f",
+              "55a99fcd61e76296",
+              "f8d5ee5bac31b748",
+              "b70035ea20ed0cda",
+              "d6d2c7fef5d81a5c",
+              "f3d70489938b8968",
+              "5287b6fc8174d34a",
+              "2133f0475e742369",
+              "be8930267753f58e",
+              "257688008354599c",
+              "9e80cffa5dde9493"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 72.41816700000001,
+            "frames": 900,
+            "models": 15,
+            "msPerUpdate": 0.08046463000000001,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "cba03d3790d94405",
+              "deae45cb51ecf9b1",
+              "2ca27a9f6e1706dc",
+              "8333740b5fe61cf4",
+              "1660779cfd277c35",
+              "3f73b7bfaaa53e39",
+              "d90ce63068847806",
+              "d830bc6c91948e79",
+              "ad3948d838e26c8f",
+              "2ce74ed08dbfa574",
+              "0198dba5d438c7f9",
+              "5cebc38bbd248c20",
+              "120acd0b71e17d86",
+              "b26197864c0566a1",
+              "53d68c30da85a2b4",
+              "acf493cc935b3ff1",
+              "dfba82312c15c37c",
+              "10e1407f728fdb29",
+              "1c1078984791bcf0",
+              "525ff78578606435",
+              "f7695e20742e90ee",
+              "ae1d70d9135ff159",
+              "bcf602d94d0ce95f",
+              "138d125088b89fa0",
+              "7d03dc874b92a3f3",
+              "3a1ff2612438beed",
+              "312428ca3d99c3a4",
+              "e98a7bfa282ead3a",
+              "0c15cab5deeddc3e",
+              "a2574a0029ebba98",
+              "a13351dd5e42280d",
+              "8172bf0a1ee3ed02",
+              "607311b12168fae5",
+              "e5f02576587f5110",
+              "ed4f9af34b841962",
+              "ddff48740cf86233",
+              "c92bd5138359539e",
+              "6b52817665c0da5d",
+              "e71cb42718d81ee8",
+              "3b639f10bb1fdb46",
+              "d788182a44f53721",
+              "d5fdf8a24f915593",
+              "ad98deb70e47dff2",
+              "8f15f8fc85e5114f",
+              "ad82e6291c6d54f0",
+              "5cbd91ffde89f913",
+              "320f28292d2b6428",
+              "a8418dcfd8c1262d",
+              "8e71335034d70bca",
+              "7da6f11c222b6c5d",
+              "d6368559ab110179",
+              "cc20e3ebeeeb3ec5",
+              "5f92a842bbdbf72e",
+              "645a6965c415a0aa",
+              "4fe556d2305147fd",
+              "e47125b7f32f3df5",
+              "d8c08cc3dd197b33",
+              "ef8d3bea1844e197",
+              "605d6260bd36a73e",
+              "d45c94815a9920da",
+              "a2fa1a535f0fccca",
+              "cdad7669285e77d3",
+              "7427b68816c01ddf",
+              "74dc43ec13b78e1a"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 277.08066599999995,
+            "frames": 900,
+            "models": 64,
+            "msPerUpdate": 0.3078674066666666,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "524af79ab1f19625",
+              "7f1db8779178fbc5",
+              "d83e8b27d1dfdcc5",
+              "fec4af38c5b60605",
+              "fbfa22799a2576a5",
+              "bfa3eb264501cba5",
+              "b1f4a71d63119c25",
+              "d69dc60d92bf5725",
+              "249332079a183985",
+              "aab32ecfaf38ba85",
+              "a253a3fb4abc5625",
+              "b479f33f1dd008a5",
+              "0a05674af300efa5",
+              "4182a562c6d59505",
+              "9e270bdbc7bf5da5",
+              "2c8ef8501c4f2b25",
+              "764ca6f30280d8a5",
+              "6fd07f5c5eeea565",
+              "5a6539cb9babb645",
+              "2d4598758432aea5",
+              "6f637a93a7481a05",
+              "ff7f4924b0f103a5",
+              "d67fa5d0033398a5",
+              "0e48bdbe043b2d25",
+              "084ab83b48140865",
+              "60f3989a2667dec5",
+              "7cf34fe0a9006ac5",
+              "b1a721cc726dec45",
+              "50590d907d0a5945",
+              "529506a26e745445",
+              "82f942326c3d6c25",
+              "cfa5340161c884a5",
+              "a84c2dc0535346a5",
+              "a5dfa2de7ee44145",
+              "dd4ba098681b5425",
+              "27cf666eb24e8865",
+              "40db738a15f4bfa5",
+              "375318f034b24b25",
+              "6ff81d0c5252d0a5",
+              "0f290d0e30c2c9a5",
+              "a8b596468b5f4d25",
+              "d6922afb4d49d085",
+              "1733137e7ba88945",
+              "d6b29e6e3d97d465",
+              "87f57aad560f6625",
+              "043580220c003fa5",
+              "88ce9a0505b4ac45",
+              "bf1b3fd916ba44e5",
+              "4b9bad6baa265da5",
+              "808af3ea7476c305",
+              "09f190e9a6c2af25",
+              "f4cae33c2be0f1a5",
+              "42cbffc755c3b665",
+              "69bd9fe5b67b9c05",
+              "df254158e5bb4b25",
+              "a3a70c4bc37746a5",
+              "aa49f91e68f85b25",
+              "e93cac12cf1a7ca5",
+              "9b263c2e34a26f85",
+              "503788f2ed209c45",
+              "92e61bd1a130a125",
+              "14380443f3d71145",
+              "bdb21427f38b20c5",
+              "71b3f63b889c75a5"
+            ]
+          }
+        ]
+      },
+      {
+        "pair": 3,
+        "label": "baseline",
+        "file": "output/animation-workspace/pair-3-baseline.json",
+        "rows": [
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 3.9378340000000005,
+            "frames": 900,
+            "models": 1,
+            "msPerUpdate": 0.004375371111111112,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "f59079689b4450b7",
+              "f9c17360e81c66a2",
+              "0b1f5b40dd544607",
+              "d0cfc50ea1b59752",
+              "e7b32842f7a3e047",
+              "11841a05a088e38e",
+              "2cd0248f0b6e9fcd",
+              "82db3fcee3f75dbe",
+              "318326290786141a",
+              "c646b9c2b868d0e9",
+              "7afce0425e7fd269",
+              "740cb748f6e709f3",
+              "ee1eb1cfd010422e",
+              "8bcc4bef97b0166b",
+              "d7eb4adf79509c79",
+              "bca1c5a611c30510",
+              "371c52426b584a9e",
+              "01b62c1889a5b795",
+              "197984ee793aae1c",
+              "61809f3bd068c447",
+              "63370a0f4fda0e10",
+              "e7b91857a95cadd7",
+              "48674a52d875beba",
+              "827cd6481df62ee4",
+              "84f5cd31a70749d6",
+              "9dbe6413e291c602",
+              "dfed17d8e42ddc24",
+              "55ab4b1bccfea39d",
+              "ec1fcdea372c90b4",
+              "25f514ff9aac92e3",
+              "7ffcfb869022742e",
+              "f056f4d7b9a68348",
+              "76453375afdb3251",
+              "93e203fd4e674d84",
+              "cd8e8df49c66f081",
+              "1cdde2c3d5bf107e",
+              "b7c579a08edc6f5f",
+              "4351af7e0c7f61fb",
+              "6473e03a62843d8b",
+              "adbfaebebf73ef1e",
+              "7f6713dfce8149b8",
+              "540719ea02c453db",
+              "52f0a94f84d44d82",
+              "53b3cc3e8613a7f7",
+              "236a68e79564a113",
+              "d2ad906f700678ea",
+              "277bb35c713720ec",
+              "778167efaa0902c1",
+              "47d1343178d69444",
+              "69dc1e7abe2b40f3",
+              "1ed4f5bd9d8593c0",
+              "7807a5b793c31eb1",
+              "23bf982d64241cb8",
+              "c987232efb20743f",
+              "55a99fcd61e76296",
+              "f8d5ee5bac31b748",
+              "b70035ea20ed0cda",
+              "d6d2c7fef5d81a5c",
+              "f3d70489938b8968",
+              "5287b6fc8174d34a",
+              "2133f0475e742369",
+              "be8930267753f58e",
+              "257688008354599c",
+              "9e80cffa5dde9493"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 72.53175,
+            "frames": 900,
+            "models": 15,
+            "msPerUpdate": 0.08059083333333333,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "cba03d3790d94405",
+              "deae45cb51ecf9b1",
+              "2ca27a9f6e1706dc",
+              "8333740b5fe61cf4",
+              "1660779cfd277c35",
+              "3f73b7bfaaa53e39",
+              "d90ce63068847806",
+              "d830bc6c91948e79",
+              "ad3948d838e26c8f",
+              "2ce74ed08dbfa574",
+              "0198dba5d438c7f9",
+              "5cebc38bbd248c20",
+              "120acd0b71e17d86",
+              "b26197864c0566a1",
+              "53d68c30da85a2b4",
+              "acf493cc935b3ff1",
+              "dfba82312c15c37c",
+              "10e1407f728fdb29",
+              "1c1078984791bcf0",
+              "525ff78578606435",
+              "f7695e20742e90ee",
+              "ae1d70d9135ff159",
+              "bcf602d94d0ce95f",
+              "138d125088b89fa0",
+              "7d03dc874b92a3f3",
+              "3a1ff2612438beed",
+              "312428ca3d99c3a4",
+              "e98a7bfa282ead3a",
+              "0c15cab5deeddc3e",
+              "a2574a0029ebba98",
+              "a13351dd5e42280d",
+              "8172bf0a1ee3ed02",
+              "607311b12168fae5",
+              "e5f02576587f5110",
+              "ed4f9af34b841962",
+              "ddff48740cf86233",
+              "c92bd5138359539e",
+              "6b52817665c0da5d",
+              "e71cb42718d81ee8",
+              "3b639f10bb1fdb46",
+              "d788182a44f53721",
+              "d5fdf8a24f915593",
+              "ad98deb70e47dff2",
+              "8f15f8fc85e5114f",
+              "ad82e6291c6d54f0",
+              "5cbd91ffde89f913",
+              "320f28292d2b6428",
+              "a8418dcfd8c1262d",
+              "8e71335034d70bca",
+              "7da6f11c222b6c5d",
+              "d6368559ab110179",
+              "cc20e3ebeeeb3ec5",
+              "5f92a842bbdbf72e",
+              "645a6965c415a0aa",
+              "4fe556d2305147fd",
+              "e47125b7f32f3df5",
+              "d8c08cc3dd197b33",
+              "ef8d3bea1844e197",
+              "605d6260bd36a73e",
+              "d45c94815a9920da",
+              "a2fa1a535f0fccca",
+              "cdad7669285e77d3",
+              "7427b68816c01ddf",
+              "74dc43ec13b78e1a"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 278.30262500000003,
+            "frames": 900,
+            "models": 64,
+            "msPerUpdate": 0.3092251388888889,
+            "retainedWorkspaceBytes": 0,
+            "trace": [
+              "524af79ab1f19625",
+              "7f1db8779178fbc5",
+              "d83e8b27d1dfdcc5",
+              "fec4af38c5b60605",
+              "fbfa22799a2576a5",
+              "bfa3eb264501cba5",
+              "b1f4a71d63119c25",
+              "d69dc60d92bf5725",
+              "249332079a183985",
+              "aab32ecfaf38ba85",
+              "a253a3fb4abc5625",
+              "b479f33f1dd008a5",
+              "0a05674af300efa5",
+              "4182a562c6d59505",
+              "9e270bdbc7bf5da5",
+              "2c8ef8501c4f2b25",
+              "764ca6f30280d8a5",
+              "6fd07f5c5eeea565",
+              "5a6539cb9babb645",
+              "2d4598758432aea5",
+              "6f637a93a7481a05",
+              "ff7f4924b0f103a5",
+              "d67fa5d0033398a5",
+              "0e48bdbe043b2d25",
+              "084ab83b48140865",
+              "60f3989a2667dec5",
+              "7cf34fe0a9006ac5",
+              "b1a721cc726dec45",
+              "50590d907d0a5945",
+              "529506a26e745445",
+              "82f942326c3d6c25",
+              "cfa5340161c884a5",
+              "a84c2dc0535346a5",
+              "a5dfa2de7ee44145",
+              "dd4ba098681b5425",
+              "27cf666eb24e8865",
+              "40db738a15f4bfa5",
+              "375318f034b24b25",
+              "6ff81d0c5252d0a5",
+              "0f290d0e30c2c9a5",
+              "a8b596468b5f4d25",
+              "d6922afb4d49d085",
+              "1733137e7ba88945",
+              "d6b29e6e3d97d465",
+              "87f57aad560f6625",
+              "043580220c003fa5",
+              "88ce9a0505b4ac45",
+              "bf1b3fd916ba44e5",
+              "4b9bad6baa265da5",
+              "808af3ea7476c305",
+              "09f190e9a6c2af25",
+              "f4cae33c2be0f1a5",
+              "42cbffc755c3b665",
+              "69bd9fe5b67b9c05",
+              "df254158e5bb4b25",
+              "a3a70c4bc37746a5",
+              "aa49f91e68f85b25",
+              "e93cac12cf1a7ca5",
+              "9b263c2e34a26f85",
+              "503788f2ed209c45",
+              "92e61bd1a130a125",
+              "14380443f3d71145",
+              "bdb21427f38b20c5",
+              "71b3f63b889c75a5"
+            ]
+          }
+        ]
+      },
+      {
+        "pair": 3,
+        "label": "candidate",
+        "file": "output/animation-workspace/pair-3-candidate.json",
+        "rows": [
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 2.7039590000000002,
+            "frames": 900,
+            "models": 1,
+            "msPerUpdate": 0.0030043988888888893,
+            "retainedWorkspaceBytes": 6100,
+            "trace": [
+              "f59079689b4450b7",
+              "f9c17360e81c66a2",
+              "0b1f5b40dd544607",
+              "d0cfc50ea1b59752",
+              "e7b32842f7a3e047",
+              "11841a05a088e38e",
+              "2cd0248f0b6e9fcd",
+              "82db3fcee3f75dbe",
+              "318326290786141a",
+              "c646b9c2b868d0e9",
+              "7afce0425e7fd269",
+              "740cb748f6e709f3",
+              "ee1eb1cfd010422e",
+              "8bcc4bef97b0166b",
+              "d7eb4adf79509c79",
+              "bca1c5a611c30510",
+              "371c52426b584a9e",
+              "01b62c1889a5b795",
+              "197984ee793aae1c",
+              "61809f3bd068c447",
+              "63370a0f4fda0e10",
+              "e7b91857a95cadd7",
+              "48674a52d875beba",
+              "827cd6481df62ee4",
+              "84f5cd31a70749d6",
+              "9dbe6413e291c602",
+              "dfed17d8e42ddc24",
+              "55ab4b1bccfea39d",
+              "ec1fcdea372c90b4",
+              "25f514ff9aac92e3",
+              "7ffcfb869022742e",
+              "f056f4d7b9a68348",
+              "76453375afdb3251",
+              "93e203fd4e674d84",
+              "cd8e8df49c66f081",
+              "1cdde2c3d5bf107e",
+              "b7c579a08edc6f5f",
+              "4351af7e0c7f61fb",
+              "6473e03a62843d8b",
+              "adbfaebebf73ef1e",
+              "7f6713dfce8149b8",
+              "540719ea02c453db",
+              "52f0a94f84d44d82",
+              "53b3cc3e8613a7f7",
+              "236a68e79564a113",
+              "d2ad906f700678ea",
+              "277bb35c713720ec",
+              "778167efaa0902c1",
+              "47d1343178d69444",
+              "69dc1e7abe2b40f3",
+              "1ed4f5bd9d8593c0",
+              "7807a5b793c31eb1",
+              "23bf982d64241cb8",
+              "c987232efb20743f",
+              "55a99fcd61e76296",
+              "f8d5ee5bac31b748",
+              "b70035ea20ed0cda",
+              "d6d2c7fef5d81a5c",
+              "f3d70489938b8968",
+              "5287b6fc8174d34a",
+              "2133f0475e742369",
+              "be8930267753f58e",
+              "257688008354599c",
+              "9e80cffa5dde9493"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 49.019542,
+            "frames": 900,
+            "models": 15,
+            "msPerUpdate": 0.05446615777777778,
+            "retainedWorkspaceBytes": 133930,
+            "trace": [
+              "cba03d3790d94405",
+              "deae45cb51ecf9b1",
+              "2ca27a9f6e1706dc",
+              "8333740b5fe61cf4",
+              "1660779cfd277c35",
+              "3f73b7bfaaa53e39",
+              "d90ce63068847806",
+              "d830bc6c91948e79",
+              "ad3948d838e26c8f",
+              "2ce74ed08dbfa574",
+              "0198dba5d438c7f9",
+              "5cebc38bbd248c20",
+              "120acd0b71e17d86",
+              "b26197864c0566a1",
+              "53d68c30da85a2b4",
+              "acf493cc935b3ff1",
+              "dfba82312c15c37c",
+              "10e1407f728fdb29",
+              "1c1078984791bcf0",
+              "525ff78578606435",
+              "f7695e20742e90ee",
+              "ae1d70d9135ff159",
+              "bcf602d94d0ce95f",
+              "138d125088b89fa0",
+              "7d03dc874b92a3f3",
+              "3a1ff2612438beed",
+              "312428ca3d99c3a4",
+              "e98a7bfa282ead3a",
+              "0c15cab5deeddc3e",
+              "a2574a0029ebba98",
+              "a13351dd5e42280d",
+              "8172bf0a1ee3ed02",
+              "607311b12168fae5",
+              "e5f02576587f5110",
+              "ed4f9af34b841962",
+              "ddff48740cf86233",
+              "c92bd5138359539e",
+              "6b52817665c0da5d",
+              "e71cb42718d81ee8",
+              "3b639f10bb1fdb46",
+              "d788182a44f53721",
+              "d5fdf8a24f915593",
+              "ad98deb70e47dff2",
+              "8f15f8fc85e5114f",
+              "ad82e6291c6d54f0",
+              "5cbd91ffde89f913",
+              "320f28292d2b6428",
+              "a8418dcfd8c1262d",
+              "8e71335034d70bca",
+              "7da6f11c222b6c5d",
+              "d6368559ab110179",
+              "cc20e3ebeeeb3ec5",
+              "5f92a842bbdbf72e",
+              "645a6965c415a0aa",
+              "4fe556d2305147fd",
+              "e47125b7f32f3df5",
+              "d8c08cc3dd197b33",
+              "ef8d3bea1844e197",
+              "605d6260bd36a73e",
+              "d45c94815a9920da",
+              "a2fa1a535f0fccca",
+              "cdad7669285e77d3",
+              "7427b68816c01ddf",
+              "74dc43ec13b78e1a"
+            ]
+          },
+          {
+            "allocatedBytes": null,
+            "allocationObservation": false,
+            "allocations": null,
+            "elapsedMs": 187.353084,
+            "frames": 900,
+            "models": 64,
+            "msPerUpdate": 0.20817009333333333,
+            "retainedWorkspaceBytes": 520960,
+            "trace": [
+              "524af79ab1f19625",
+              "7f1db8779178fbc5",
+              "d83e8b27d1dfdcc5",
+              "fec4af38c5b60605",
+              "fbfa22799a2576a5",
+              "bfa3eb264501cba5",
+              "b1f4a71d63119c25",
+              "d69dc60d92bf5725",
+              "249332079a183985",
+              "aab32ecfaf38ba85",
+              "a253a3fb4abc5625",
+              "b479f33f1dd008a5",
+              "0a05674af300efa5",
+              "4182a562c6d59505",
+              "9e270bdbc7bf5da5",
+              "2c8ef8501c4f2b25",
+              "764ca6f30280d8a5",
+              "6fd07f5c5eeea565",
+              "5a6539cb9babb645",
+              "2d4598758432aea5",
+              "6f637a93a7481a05",
+              "ff7f4924b0f103a5",
+              "d67fa5d0033398a5",
+              "0e48bdbe043b2d25",
+              "084ab83b48140865",
+              "60f3989a2667dec5",
+              "7cf34fe0a9006ac5",
+              "b1a721cc726dec45",
+              "50590d907d0a5945",
+              "529506a26e745445",
+              "82f942326c3d6c25",
+              "cfa5340161c884a5",
+              "a84c2dc0535346a5",
+              "a5dfa2de7ee44145",
+              "dd4ba098681b5425",
+              "27cf666eb24e8865",
+              "40db738a15f4bfa5",
+              "375318f034b24b25",
+              "6ff81d0c5252d0a5",
+              "0f290d0e30c2c9a5",
+              "a8b596468b5f4d25",
+              "d6922afb4d49d085",
+              "1733137e7ba88945",
+              "d6b29e6e3d97d465",
+              "87f57aad560f6625",
+              "043580220c003fa5",
+              "88ce9a0505b4ac45",
+              "bf1b3fd916ba44e5",
+              "4b9bad6baa265da5",
+              "808af3ea7476c305",
+              "09f190e9a6c2af25",
+              "f4cae33c2be0f1a5",
+              "42cbffc755c3b665",
+              "69bd9fe5b67b9c05",
+              "df254158e5bb4b25",
+              "a3a70c4bc37746a5",
+              "aa49f91e68f85b25",
+              "e93cac12cf1a7ca5",
+              "9b263c2e34a26f85",
+              "503788f2ed209c45",
+              "92e61bd1a130a125",
+              "14380443f3d71145",
+              "bdb21427f38b20c5",
+              "71b3f63b889c75a5"
+            ]
+          }
+        ]
+      }
+    ],
+    "powerAfter": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n"
+  },
+  "browserRows": [
+    {
+      "backend": "wg",
+      "pair": 1,
+      "label": "baseline",
+      "frames": 1501,
+      "fps": 60.00240009600379,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.2000000029802322,
+        "mean": 2.141772152005951,
+        "p95": 2.5999999940395355,
+        "p99": 2.7999999970197678,
+        "max": 4.200000002980232,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.666000000000015,
+        "p95": 16.799999999999272,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 907,
+        "rawExactOverrunDurationMs": 39.333333333312055,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:34:59.670Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:35:33.202Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 1,
+      "label": "candidate",
+      "frames": 1501,
+      "fps": 60.00264011616509,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.0999999940395355,
+        "mean": 2.021652231756089,
+        "p95": 2.5,
+        "p99": 2.6000000089406967,
+        "max": 4.299999997019768,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.66593333333334,
+        "p95": 16.700000000004366,
+        "p99": 16.799999999999272,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 929,
+        "rawExactOverrunDurationMs": 37.76666666667306,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:35:33.223Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:36:06.706Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 2,
+      "label": "candidate",
+      "frames": 1501,
+      "fps": 60.00240009600379,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.0999999940395355,
+        "mean": 1.9786142571162255,
+        "p95": 2.5,
+        "p99": 2.7000000029802322,
+        "max": 3.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.666000000000015,
+        "p95": 16.799999999999272,
+        "p99": 16.80000000000291,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 929,
+        "rawExactOverrunDurationMs": 38.66666666666903,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:36:06.725Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:36:40.207Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 2,
+      "label": "baseline",
+      "frames": 1501,
+      "fps": 60.002400096003804,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.2999999970197678,
+        "mean": 2.2439706860126294,
+        "p95": 2.7000000029802322,
+        "p99": 2.9000000059604645,
+        "max": 4.5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.66600000000001,
+        "p95": 16.799999999995634,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 927,
+        "rawExactOverrunDurationMs": 38.499999999962355,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:36:40.227Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:37:13.719Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 3,
+      "label": "baseline",
+      "frames": 1501,
+      "fps": 60.00264011616507,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.2000000029802322,
+        "mean": 2.1072618255787576,
+        "p95": 2.6000000089406967,
+        "p99": 2.7999999970197678,
+        "max": 3.2999999970197678,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.665933333333346,
+        "p95": 16.799999999999272,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 916,
+        "rawExactOverrunDurationMs": 39.03333333339282,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:37:13.739Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:37:47.235Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 3,
+      "label": "candidate",
+      "frames": 1501,
+      "fps": 60.00240009600379,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.2000000029802322,
+        "mean": 2.12191872095204,
+        "p95": 2.5,
+        "p99": 2.7000000029802322,
+        "max": 4.100000008940697,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.666000000000015,
+        "p95": 16.799999999995634,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 923,
+        "rawExactOverrunDurationMs": 38.366666666627935,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:37:47.256Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:38:20.752Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 1,
+      "label": "baseline",
+      "frames": 1502,
+      "fps": 60.002318543954345,
+      "cpuMs": {
+        "count": 1502,
+        "median": 2.800000011920929,
+        "mean": 2.7961384822104804,
+        "p95": 3.5,
+        "p99": 3.7999999970197678,
+        "max": 4.199999988079071,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1501,
+        "median": 16.69999999999891,
+        "mean": 16.666022651565637,
+        "p95": 16.700000000004366,
+        "p99": 16.80000000000291,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 927,
+        "rawExactOverrunDurationMs": 38.400000000062036,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:40:50.240Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:41:24.131Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 1,
+      "label": "candidate",
+      "frames": 1501,
+      "fps": 60.00264011616507,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.7000000029802322,
+        "mean": 2.6130579614007896,
+        "p95": 3.4000000059604645,
+        "p99": 3.7999999970197678,
+        "max": 4.4000000059604645,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.665933333333346,
+        "p95": 16.700000000004366,
+        "p99": 16.799999999999272,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 928,
+        "rawExactOverrunDurationMs": 37.73333333331536,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:41:24.151Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:41:57.994Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 2,
+      "label": "candidate",
+      "frames": 1501,
+      "fps": 60.002400096003804,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.7999999970197678,
+        "mean": 2.743304463603511,
+        "p95": 3.4000000059604645,
+        "p99": 3.7000000029802322,
+        "max": 4.4000000059604645,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.66600000000001,
+        "p95": 16.700000000004366,
+        "p99": 16.799999999999272,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 929,
+        "rawExactOverrunDurationMs": 37.966666666655584,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:41:58.014Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:42:31.858Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 2,
+      "label": "baseline",
+      "frames": 1502,
+      "fps": 60.002318543954374,
+      "cpuMs": {
+        "count": 1502,
+        "median": 2.8999999910593033,
+        "mean": 2.855659121024942,
+        "p95": 3.5999999940395355,
+        "p99": 4,
+        "max": 5,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1501,
+        "median": 16.69999999999891,
+        "mean": 16.66602265156563,
+        "p95": 16.700000000000728,
+        "p99": 16.799999999999272,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 949,
+        "rawExactOverrunDurationMs": 37.0333333333128,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:42:31.878Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:43:05.705Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 3,
+      "label": "baseline",
+      "frames": 1502,
+      "fps": 60.00207868627024,
+      "cpuMs": {
+        "count": 1502,
+        "median": 2.9000000059604645,
+        "mean": 2.918242343722504,
+        "p95": 3.5999999940395355,
+        "p99": 3.8999999910593033,
+        "max": 4.200000002980232,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1501,
+        "median": 16.69999999999891,
+        "mean": 16.666089273817466,
+        "p95": 16.799999999999272,
+        "p99": 16.80000000000291,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 929,
+        "rawExactOverrunDurationMs": 38.56666666673597,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:43:05.726Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:43:39.552Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 3,
+      "label": "candidate",
+      "frames": 1501,
+      "fps": 60.002400096003804,
+      "cpuMs": {
+        "count": 1501,
+        "median": 2.7000000029802322,
+        "mean": 2.6996668887924624,
+        "p95": 3.5,
+        "p99": 3.7999999970197678,
+        "max": 4.399999991059303,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 0,
+        "rawExactOverrunDurationMs": 0,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "frameIntervalMs": {
+        "count": 1500,
+        "median": 16.69999999999891,
+        "mean": 16.66600000000001,
+        "p95": 16.700000000004366,
+        "p99": 16.80000000000109,
+        "max": 16.80000000000291,
+        "budgetMs": 16.666666666666668,
+        "overrunToleranceMs": 0.5,
+        "rawExactOverruns": 934,
+        "rawExactOverrunDurationMs": 37.633333333355,
+        "overruns": 0,
+        "overrunDurationMs": 0
+      },
+      "gpuMs": null,
+      "profiling": false,
+      "samplerPolls": 0,
+      "powerBefore": {
+        "at": "2026-10-31T14:43:39.574Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T14:44:13.398Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t70%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      }
+    }
+  ],
+  "browserWork": [
+    {
+      "backend": "wg",
+      "pair": 1,
+      "label": "baseline",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.57228514323785,
+        "instancesDrawn": 365.1005996002665,
+        "trianglesDrawn": 169763.65356429046,
+        "instanceUploadBytes": 56740.423717521655,
+        "uniformUploadBytes": 66911.40306462359,
+        "bufferUploadCalls": 43.37908061292472,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 1,
+        "fps": 59.999998994171634,
+        "frameMs": 16.66666694606344
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.995899999994039,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4397906064987183,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.952057361602783,
+                  1.20485258102417,
+                  38.0308723449707
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.433670997619629,
+                  1.2033013105392456,
+                  37.08935546875
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7444900274276733,
+                  1.097581386566162,
+                  36.70876693725586
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.07690346240997314,
+                  0.9848911762237549,
+                  36.87822723388672
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4092179536819458,
+                  0.9688376188278198,
+                  37.53086853027344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6017966270446777,
+                  1.0641802549362183,
+                  38.57135772705078
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.011499999994044,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7564042806625366,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.849721908569336,
+                  1.043041467666626,
+                  37.1396369934082
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.066391468048096,
+                  1.1666334867477417,
+                  35.81285095214844
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.9564449787139893,
+                  1.21976900100708,
+                  35.11465835571289
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7342891097068787,
+                  1.1535955667495728,
+                  35.11565399169922
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.3744583129882812,
+                  1.028952717781067,
+                  35.81547164916992
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.1558709144592285,
+                  0.9604364633560181,
+                  37.142822265625
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62907,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 1,
+      "label": "candidate",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.53431045969353,
+        "instancesDrawn": 365.0946035976016,
+        "trianglesDrawn": 169768.20519653565,
+        "instanceUploadBytes": 56759.397734843435,
+        "uniformUploadBytes": 66917.26582278482,
+        "bufferUploadCalls": 43.32445036642238,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 0.7999999970197678,
+        "fps": 60.042610639416786,
+        "frameMs": 16.654838777838215
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.99489999998808,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4400849342346191,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.948088645935059,
+                  1.2046765089035034,
+                  38.027103424072266
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4274468421936035,
+                  1.2034845352172852,
+                  37.08671188354492
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7372539043426514,
+                  1.0979554653167725,
+                  36.708335876464844
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.0701749324798584,
+                  0.9851122498512268,
+                  36.880104064941406
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4146418571472168,
+                  0.9687022566795349,
+                  37.534515380859375
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6047868728637695,
+                  1.0638128519058228,
+                  38.575233459472656
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.01059999998808,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7492316961288452,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.868250370025635,
+                  1.0420410633087158,
+                  37.11187744140625
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.0747785568237305,
+                  1.1657627820968628,
+                  35.7774658203125
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.9527792930603027,
+                  1.2198286056518555,
+                  35.07518768310547
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.717867374420166,
+                  1.154530644416809,
+                  35.07607650756836
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4030473232269287,
+                  1.029903531074524,
+                  35.77982711791992
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.194783926010132,
+                  0.9605288505554199,
+                  37.11478042602539
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62908,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 2,
+      "label": "candidate",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.76815456362425,
+        "instancesDrawn": 365.1705529646902,
+        "trianglesDrawn": 169628.85676215857,
+        "instanceUploadBytes": 56690.85676215856,
+        "uniformUploadBytes": 66931.06995336442,
+        "bufferUploadCalls": 43.66755496335776,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 2.1000000089406967,
+        "fps": 60.04260988126597,
+        "frameMs": 16.65483898813686
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.999200000008941,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4413855075836182,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.949654579162598,
+                  1.204925537109375,
+                  38.02733612060547
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4291491508483887,
+                  1.203224778175354,
+                  37.086875915527344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7390140295028687,
+                  1.0974255800247192,
+                  36.7083625793457
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.07189333438873291,
+                  0.9847995042800903,
+                  36.87998962402344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4126172065734863,
+                  0.9688942432403564,
+                  37.534053802490234
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.603144884109497,
+                  1.0643330812454224,
+                  38.574832916259766
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.01490000000894,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7480491399765015,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.864726543426514,
+                  1.0428708791732788,
+                  37.114768981933594
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.0723066329956055,
+                  1.1664855480194092,
+                  35.781150817871094
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.951566457748413,
+                  1.2197797298431396,
+                  35.07929992675781
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.717985212802887,
+                  1.1537550687789917,
+                  35.08020782470703
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4016575813293457,
+                  1.0291143655776978,
+                  35.78355407714844
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.192312002182007,
+                  0.960451602935791,
+                  37.11771774291992
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62727,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 2,
+      "label": "baseline",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.54097268487675,
+        "instancesDrawn": 365.05929380413056,
+        "trianglesDrawn": 169760.13590939375,
+        "instanceUploadBytes": 56720.618254497,
+        "uniformUploadBytes": 66871.45103264491,
+        "bufferUploadCalls": 43.295136575616255,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 2.300000011920929,
+        "fps": 59.988000632472485,
+        "frameMs": 16.67000049104293
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.992299999999999,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4379820823669434,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.950230598449707,
+                  1.2040878534317017,
+                  38.030853271484375
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.431699275970459,
+                  1.2040836811065674,
+                  37.08928680419922
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.742365837097168,
+                  1.0991915464401245,
+                  36.70874786376953
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.07533061504364014,
+                  0.9858488440513611,
+                  36.87816619873047
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4109814167022705,
+                  0.9682621359825134,
+                  37.53083801269531
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6035051345825195,
+                  1.0626007318496704,
+                  38.57124328613281
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.0079,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7618390321731567,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.87822961807251,
+                  1.041541337966919,
+                  37.114620208740234
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.085760593414307,
+                  1.1653249263763428,
+                  35.78097152709961
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.9649548530578613,
+                  1.2198550701141357,
+                  35.079097747802734
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7313050031661987,
+                  1.1549972295761108,
+                  35.07999801635742
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.3884083032608032,
+                  1.030381202697754,
+                  35.78334426879883
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.1791231632232666,
+                  0.9605785012245178,
+                  37.1175537109375
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62902,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 3,
+      "label": "baseline",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.7728181212525,
+        "instancesDrawn": 365.145236508994,
+        "trianglesDrawn": 169355.06329113923,
+        "instanceUploadBytes": 56558.79546968688,
+        "uniformUploadBytes": 66789.41505662892,
+        "bufferUploadCalls": 43.627581612258496,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 1.7999999970197678,
+        "fps": 60.03098242500198,
+        "frameMs": 16.658064879236683
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.995099999988079,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4478107690811157,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.951333522796631,
+                  1.2045514583587646,
+                  38.02315139770508
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4284591674804688,
+                  1.2036136388778687,
+                  37.08400344848633
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7373597621917725,
+                  1.0982199907302856,
+                  36.707916259765625
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.07096338272094727,
+                  0.9852688908576965,
+                  36.88196563720703
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4125739336013794,
+                  0.9686072468757629,
+                  37.53813934326172
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6002936363220215,
+                  1.0635535717010498,
+                  38.57905578613281
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.01069999998808,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7550917863845825,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.895553112030029,
+                  1.0421037673950195,
+                  37.08907699584961
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.093761920928955,
+                  1.1658176183700562,
+                  35.74834442138672
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.961855173110962,
+                  1.2198251485824585,
+                  35.04266357421875
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7164278626441956,
+                  1.1544721126556396,
+                  35.04344177246094
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4145402908325195,
+                  1.0298436880111694,
+                  35.750396728515625
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.2148261070251465,
+                  0.9605228304862976,
+                  37.09160232543945
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62623,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "wg",
+      "pair": 3,
+      "label": "candidate",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.92205196535642,
+        "instancesDrawn": 365.16522318454366,
+        "trianglesDrawn": 169192.34377081945,
+        "instanceUploadBytes": 56520.442371752164,
+        "uniformUploadBytes": 66768.97001998668,
+        "bufferUploadCalls": 43.70219853431046,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 1.9000000059604645,
+        "fps": 59.99612889925401,
+        "frameMs": 16.667742041810865
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.998000000005961,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4399585723876953,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.952857971191406,
+                  1.2047500610351562,
+                  38.03143310546875
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.43466854095459,
+                  1.2034082412719727,
+                  37.089691162109375
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7454795837402344,
+                  1.09779953956604,
+                  36.70881271362305
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.07768452167510986,
+                  0.9850200414657593,
+                  36.87806701660156
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4085838794708252,
+                  0.9687585234642029,
+                  37.53057098388672
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6013617515563965,
+                  1.063965916633606,
+                  38.571044921875
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.01370000000596,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7636462450027466,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.926693439483643,
+                  1.0427452325820923,
+                  37.06475830078125
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.115987300872803,
+                  1.1663764715194702,
+                  35.71735763549805
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.973517894744873,
+                  1.21978759765625,
+                  35.00813674926758
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7169457674026489,
+                  1.1538726091384888,
+                  35.00889587402344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.424617886543274,
+                  1.029233455657959,
+                  35.71933364868164
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.2338716983795166,
+                  0.9604628682136536,
+                  37.06717300415039
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62660,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 1,
+      "label": "baseline",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.13981358189082,
+        "instancesDrawn": 364.79560585885486,
+        "trianglesDrawn": 169734.3395472703,
+        "instanceUploadBytes": 56587.23834886817,
+        "uniformUploadBytes": 66682.09853528629,
+        "bufferUploadCalls": 43.06191744340879,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 2.7000000029802322,
+        "fps": 59.99999977648258,
+        "frameMs": 16.666666728754837
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.9849,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4393647909164429,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.937640190124512,
+                  1.2077901363372803,
+                  38.01853561401367
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4119162559509277,
+                  1.1999269723892212,
+                  37.08074951171875
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7195117473602295,
+                  1.0909974575042725,
+                  36.7074089050293
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.053563833236694336,
+                  0.9811509251594543,
+                  36.88438034057617
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4273778200149536,
+                  0.9713797569274902,
+                  37.54222106933594
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6125240325927734,
+                  1.0706675052642822,
+                  38.58353805541992
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.017300000000006,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1984,
+              "visual": 1984
+            },
+            "playerPosition": {
+              "x": 1.7540714740753174,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.823601722717285,
+                  1.0523042678833008,
+                  37.165565490722656
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.049750804901123,
+                  1.1743242740631104,
+                  35.84591293334961
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.951068639755249,
+                  1.2188169956207275,
+                  35.15155029296875
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7408299446105957,
+                  1.1448760032653809,
+                  35.15262985229492
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.3565584421157837,
+                  1.0204823017120361,
+                  35.8487434387207
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.12833309173584,
+                  0.9600028395652771,
+                  37.16900634765625
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 63181,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1502,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 1,
+      "label": "candidate",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.44237175216523,
+        "instancesDrawn": 365.0572951365756,
+        "trianglesDrawn": 169762.87408394404,
+        "instanceUploadBytes": 56548.199866755494,
+        "uniformUploadBytes": 66654.9020652898,
+        "bufferUploadCalls": 43.11125916055963,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 2,
+        "fps": 60.124125759338106,
+        "frameMs": 16.632258471462034
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.99690000000894,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4424247741699219,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.937761306762695,
+                  1.2087258100509644,
+                  38.015953063964844
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4105119705200195,
+                  1.1987075805664062,
+                  37.07896041870117
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7173514366149902,
+                  1.088744044303894,
+                  36.70713424682617
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.05181443691253662,
+                  0.9799352884292603,
+                  36.88568878173828
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4275214672088623,
+                  0.9723195433616638,
+                  37.544281005859375
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6114296913146973,
+                  1.0728986263275146,
+                  38.585872650146484
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.01250000000894,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.760086178779602,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.898171424865723,
+                  1.0512945652008057,
+                  37.091583251953125
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.097282886505127,
+                  1.1735175848007202,
+                  35.7515869140625
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.9664716720581055,
+                  1.2189549207687378,
+                  35.04631423950195
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7222354412078857,
+                  1.1458317041397095,
+                  35.04714584350586
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4075665473937988,
+                  1.0213770866394043,
+                  35.753780364990234
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.206840753555298,
+                  0.9600141048431396,
+                  37.094295501708984
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62554,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 2,
+      "label": "candidate",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.35576282478348,
+        "instancesDrawn": 364.99467021985345,
+        "trianglesDrawn": 169754.32511658894,
+        "instanceUploadBytes": 56589.100599600264,
+        "uniformUploadBytes": 66713.71085942705,
+        "bufferUploadCalls": 43.18587608261159,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 3,
+        "fps": 60.01936087816336,
+        "frameMs": 16.661290379781878
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.996700000000001,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4431989192962646,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.938117027282715,
+                  1.2088066339492798,
+                  38.015586853027344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4106502532958984,
+                  1.1985985040664673,
+                  37.078704833984375
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7173818349838257,
+                  1.0885454416275024,
+                  36.707096099853516
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.05189049243927002,
+                  0.979829728603363,
+                  36.8858757019043
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4277000427246094,
+                  0.9724040627479553,
+                  37.544898986816406
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6111152172088623,
+                  1.0730955600738525,
+                  38.58641815185547
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.0123,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7507803440093994,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.844019889831543,
+                  1.0512566566467285,
+                  37.13978958129883
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.060744285583496,
+                  1.1734871864318848,
+                  35.813053131103516
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.9508683681488037,
+                  1.218959927558899,
+                  35.11488723754883
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7287834882736206,
+                  1.1458675861358643,
+                  35.11587905883789
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.3799002170562744,
+                  1.0214108228683472,
+                  35.815650939941406
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.1612579822540283,
+                  0.9600147008895874,
+                  37.142974853515625
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62723,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 2,
+      "label": "baseline",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.19041278295606,
+        "instancesDrawn": 364.8035952063915,
+        "trianglesDrawn": 169733.637816245,
+        "instanceUploadBytes": 56648.98002663116,
+        "uniformUploadBytes": 66738.5672436751,
+        "bufferUploadCalls": 43.03994673768309,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 3.2000000029802322,
+        "fps": 59.99999932944775,
+        "frameMs": 16.666666852931183
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.9865,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4382846355438232,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.9415788650512695,
+                  1.2080965042114258,
+                  38.02294921875
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4183597564697266,
+                  1.1995364427566528,
+                  37.083770751953125
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7269132137298584,
+                  1.0902690887451172,
+                  36.707862854003906
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.06027710437774658,
+                  0.9807543754577637,
+                  36.88227462768555
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4221405982971191,
+                  0.9716796875,
+                  37.53816604614258
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.609973669052124,
+                  1.0713882446289062,
+                  38.57923889160156
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.018800000000006,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1984,
+              "visual": 1984
+            },
+            "playerPosition": {
+              "x": 1.756264090538025,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.8259501457214355,
+                  1.0531038045883179,
+                  37.16558074951172
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.052126407623291,
+                  1.1749577522277832,
+                  35.845943450927734
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.9534595012664795,
+                  1.2187020778656006,
+                  35.15155792236328
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7432200312614441,
+                  1.144118309020996,
+                  35.152626037597656
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.3541852235794067,
+                  1.0197784900665283,
+                  35.84870910644531
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.1259868144989014,
+                  0.9600000381469727,
+                  37.168975830078125
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 63185,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1502,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 3,
+      "label": "baseline",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.21238348868175,
+        "instancesDrawn": 364.8681757656458,
+        "trianglesDrawn": 169745.7656458056,
+        "instanceUploadBytes": 56599.637816245006,
+        "uniformUploadBytes": 66710.63648468709,
+        "bufferUploadCalls": 43.129161118508655,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 2.5999999940395355,
+        "fps": 60.007742748326926,
+        "frameMs": 16.664516180753708
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.990399999999999,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4478706121444702,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.9423828125,
+                  1.208390235900879,
+                  38.01523208618164
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.414827585220337,
+                  1.199154019355774,
+                  37.07850646972656
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7216284275054932,
+                  1.089562177658081,
+                  36.70707321166992
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.05634164810180664,
+                  0.9803729057312012,
+                  36.88593673706055
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4236050844192505,
+                  0.9719741940498352,
+                  37.54526901245117
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.606717109680176,
+                  1.0720878839492798,
+                  38.58674240112305
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.022800000000004,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1984,
+              "visual": 1984
+            },
+            "playerPosition": {
+              "x": 1.7539576292037964,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.824130058288574,
+                  1.0537347793579102,
+                  37.165260314941406
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.050163745880127,
+                  1.1754543781280518,
+                  35.84553146362305
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.951347589492798,
+                  1.2186076641082764,
+                  35.15110397338867
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7409683465957642,
+                  1.143519639968872,
+                  35.15218734741211
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.356550693511963,
+                  1.0192259550094604,
+                  35.848350524902344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.1284353733062744,
+                  0.9600015878677368,
+                  37.1687126159668
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 63005,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1502,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    },
+    {
+      "backend": "gl",
+      "pair": 3,
+      "label": "candidate",
+      "gltfWorkPerRaf": {
+        "drawCalls": 142.60426382411725,
+        "instancesDrawn": 365.11592271818785,
+        "trianglesDrawn": 169766.75149900067,
+        "instanceUploadBytes": 56619.76815456362,
+        "uniformUploadBytes": 66793.30579613592,
+        "bufferUploadCalls": 43.38974017321785,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "legacyLastGauge": {
+        "total": 133,
+        "visible": 33,
+        "culled": 100,
+        "drawCalls": 463,
+        "uploadBytes": 79360,
+        "prepareMs": 2.9000000059604645,
+        "fps": 60.089163373722045,
+        "frameMs": 16.6419358142922
+      },
+      "phaseEvidence": {
+        "start": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 7.9922999999970195,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 482,
+              "visual": 482
+            },
+            "playerPosition": {
+              "x": 1.4393501281738281,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  4.943181037902832,
+                  1.2082536220550537,
+                  38.02342224121094
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  3.4203290939331055,
+                  1.1993328332901,
+                  37.084136962890625
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  1.7285470962524414,
+                  1.0898919105529785,
+                  36.7078971862793
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.06260788440704346,
+                  0.9805505275726318,
+                  36.881935119628906
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4201297760009766,
+                  0.9718363285064697,
+                  37.537559509277344
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -2.6083621978759766,
+                  1.0717612504959106,
+                  38.57859420776367
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "end": {
+          "kind": "rim-gameplay",
+          "elapsedSeconds": 33.00779999999702,
+          "native": {
+            "stressModels": 0,
+            "active": true,
+            "paused": false,
+            "dead": false,
+            "health": 100,
+            "wave": 1,
+            "kills": 0,
+            "frame": {
+              "simulation": 1983,
+              "visual": 1983
+            },
+            "playerPosition": {
+              "x": 1.7628551721572876,
+              "y": 0,
+              "z": 42
+            },
+            "enemies": [
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  6.9018025398254395,
+                  1.0501307249069214,
+                  37.09040069580078
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  5.100466251373291,
+                  1.1725783348083496,
+                  35.75004196166992
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  2.969128131866455,
+                  1.2191038131713867,
+                  35.04458236694336
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  0.7243320345878601,
+                  1.1469318866729736,
+                  35.04541015625
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -1.4060057401657104,
+                  1.0224170684814453,
+                  35.752227783203125
+                ]
+              },
+              {
+                "kind": "drone-orbiter",
+                "hp": 100,
+                "phase": 1,
+                "position": [
+                  -3.2057366371154785,
+                  0.9600377678871155,
+                  37.093048095703125
+                ]
+              }
+            ],
+            "projectiles": {
+              "active": 0,
+              "fired": 0,
+              "reflected": 0
+            },
+            "cuts": {
+              "queued": 0,
+              "pending": 0,
+              "pieces": 0,
+              "commits": 0,
+              "errors": 0
+            }
+          }
+        },
+        "commandScope": "requested workload commands and observed native state at measured boundaries; fields depend on workload family",
+        "nativeGltfPrimitiveCulledDelta": 62608,
+        "cullingObserved": true,
+        "cullingRequiredForShortSmoke": false
+      },
+      "commands": {
+        "transforms": 1501,
+        "spawns": 0,
+        "removes": 0,
+        "cuts": 0,
+        "cutAttempts": 0,
+        "clusteredRootUpdates": 0,
+        "separatedRootUpdates": 0,
+        "frustumDriftUpdates": 0,
+        "cameraUpdates": 0,
+        "clusteredModelUpdates": 0,
+        "animationSeeks": 0,
+        "mixedModelUpdates": 0
+      }
+    }
+  ],
+  "exactPixelPairs": 24
+}

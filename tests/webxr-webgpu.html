@@ -81,7 +81,7 @@ class SimulatedGPUBinding {
         // Shadow only JS metadata; createView/readback still use the real GPUTexture.
         this.opaqueMetadata=bindings.length===2;
         if(this.opaqueMetadata)for(const name of ['mipLevelCount','sampleCount','usage'])Object.defineProperty(this.color,name,{configurable:true,value:0});
-        return this.layer={textureWidth:width,textureHeight:height,textureArrayLength:2};
+        return this.layer={textureWidth:width,textureHeight:height,textureArrayLength:2,fixedFoveation:bindings.length===2?null:0};
     }
     getViewSubImage(layer,view) {
         if(layer!==this.layer)throw new Error('Unknown GPU projection layer');
@@ -163,7 +163,8 @@ const report=await run.execute(async test=>{
     let firstFrames=0;const performanceReports=[];engine.xr.addEventListener('performance',event=>performanceReports.push(event.detail));engine.xr.addEventListener('firstframe',()=>firstFrames++);
     test.assert(await engine.xr.isSupported(),'WebGPU XR support with native binding');
     const frame=()=>{sim.frame({head:{position:[0,1.6,0],orientation:[0,0,0,1]}});test.assert(!engine.xr.lastError,'XR frame completes',String(engine.xr.lastError));};
-    await engine.xr.enter();const binding=bindings.at(-1);
+    await engine.xr.enter({fixedFoveation:1});const binding=bindings.at(-1);
+    test.assert(binding.layer.fixedFoveation===1,'WebGPU projection applies maximum requested foveation');
     binding.instanceUploads=0;uploadTargets[0].setPosition([-.44,1.85,-1.6]);
     test.assert(requests.at(-1).options.requiredFeatures?.includes('webgpu'),'session requires webgpu feature');
     test.assert(binding.options.depthStencilFormat==='depth32float'&&binding.options.scaleFactor===.75,'projection layer depth and scale');
@@ -263,7 +264,8 @@ const report=await run.execute(async test=>{
     await binding.checkValidation(test);
     const first=sim.session;await engine.xr.exit();
     test.assert(first.ended&&first.pendingFrameCount===0&&!engine.xr.isPresenting,'exit ends session and cancels frames');
-    await engine.xr.enter();frame();const second=bindings.at(-1);
+    await engine.xr.enter({fixedFoveation:1});frame();const second=bindings.at(-1);
+    test.assert(second.layer.fixedFoveation===null,'unsupported foveation stays null and renders on reentry');
     assertForeground(await second.pixels(0),'GPU reentry left eye');assertForeground(await second.pixels(1),'GPU reentry right eye');
     test.assert(second!==binding&&sim.session!==first,'reentry creates fresh GPU binding and layer');
     test.assert(firstFrames===2,'first-frame diagnostic resets on reentry');

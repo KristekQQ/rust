@@ -1,0 +1,2202 @@
+{
+  "scope": "limited base-color shared city/drone static profile; not exact equal GPU work, full gameplay, production quality or Quest",
+  "runs": [
+    {
+      "campaign": "wg",
+      "pair": 1,
+      "renderer": "native-wg",
+      "fps": 44.872050780470275,
+      "frameIntervalMs": {
+        "count": 1124,
+        "mean": 22.2855871886121,
+        "median": 16.700000000000728,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 1125,
+        "mean": 2.348711110962762,
+        "median": 2.5999999940395355,
+        "p95": 2.9000000059604645,
+        "p99": 3,
+        "max": 4.600000008940697
+      },
+      "draws": 287,
+      "triangles": 39061900,
+      "workScope": "native glTF command/triangle counter",
+      "nativeWorkPerRaf": {
+        "pipelineChanges": 2,
+        "bindGroupChanges": 289,
+        "bufferUploadCalls": 0,
+        "instanceUploadBytes": 0,
+        "uniformUploadBytes": 0,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "common": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "quality": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": true,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "diagnostic workload",
+        "unmatchedThreeReference": false,
+        "loadUnit": "visible object count"
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 0,
+          "width": 0,
+          "height": 0,
+          "targets": 0,
+          "frames": 0,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": false,
+          "passes": [],
+          "transientBuffers": 0,
+          "transientTextures": 0
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:31:45.353Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:32:22.863Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "baseline-rim-common-2048-pair0.png",
+        "sha256": "f17aa4ba6f82ad5880906d7ad849006105994489dce2416ff860b9a529efbe17"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "wg",
+      "pair": 1,
+      "renderer": "Three-WebGL2",
+      "fps": 38.58731982243428,
+      "frameIntervalMs": {
+        "count": 964,
+        "mean": 25.915248962655603,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 965,
+        "mean": 0.7172020728569575,
+        "median": 0.7999999970197678,
+        "p95": 0.9000000059604645,
+        "p99": 1,
+        "max": 1.5999999940395355
+      },
+      "draws": 86,
+      "triangles": 42009212,
+      "workScope": "Three renderer.info.render",
+      "nativeWorkPerRaf": null,
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "assets": [
+          "/assets/models/rim/rim-city.glb",
+          "/assets/models/rim/drone-orbiter.glb"
+        ],
+        "stress": {
+          "count": 2048,
+          "representation": "instanced",
+          "partsPerModel": 67,
+          "staticPose": "Idle@0",
+          "castsShadow": false
+        },
+        "pose": "Idle@0",
+        "camera": {
+          "position": [
+            0,
+            1.7,
+            42
+          ],
+          "target": [
+            0,
+            1.7,
+            -20
+          ],
+          "fov": 65,
+          "near": 0.08,
+          "far": 350
+        },
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ],
+        "renderer": {
+          "version": "170",
+          "antialias": false,
+          "samples": 0,
+          "toneMapping": 0,
+          "toneMappingExposure": 1,
+          "outputColorSpace": "srgb",
+          "shadows": false,
+          "lights": 0,
+          "fog": false,
+          "postprocessing": false
+        },
+        "profile": "limited shared-GLB base-color; existing per-part InstancedMesh; not production PBR",
+        "gameplay": false
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "enabled": false,
+          "antialias": false,
+          "samples": 0
+        },
+        "graph": {
+          "passes": []
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:32:22.886Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:32:56.719Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "candidate-rim-common-2048-pair0.png",
+        "sha256": "74c1f29e2b8e89e36da01ef7e9314c48a33681e38f665c04a6e4d9157c9714dd"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "wg",
+      "pair": 2,
+      "renderer": "Three-WebGL2",
+      "fps": 38.6013896500274,
+      "frameIntervalMs": {
+        "count": 965,
+        "mean": 25.905803108808293,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 966,
+        "mean": 0.735921325227612,
+        "median": 0.7999999970197678,
+        "p95": 0.9000000059604645,
+        "p99": 1,
+        "max": 1.2000000029802322
+      },
+      "draws": 86,
+      "triangles": 42009212,
+      "workScope": "Three renderer.info.render",
+      "nativeWorkPerRaf": null,
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "assets": [
+          "/assets/models/rim/rim-city.glb",
+          "/assets/models/rim/drone-orbiter.glb"
+        ],
+        "stress": {
+          "count": 2048,
+          "representation": "instanced",
+          "partsPerModel": 67,
+          "staticPose": "Idle@0",
+          "castsShadow": false
+        },
+        "pose": "Idle@0",
+        "camera": {
+          "position": [
+            0,
+            1.7,
+            42
+          ],
+          "target": [
+            0,
+            1.7,
+            -20
+          ],
+          "fov": 65,
+          "near": 0.08,
+          "far": 350
+        },
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ],
+        "renderer": {
+          "version": "170",
+          "antialias": false,
+          "samples": 0,
+          "toneMapping": 0,
+          "toneMappingExposure": 1,
+          "outputColorSpace": "srgb",
+          "shadows": false,
+          "lights": 0,
+          "fog": false,
+          "postprocessing": false
+        },
+        "profile": "limited shared-GLB base-color; existing per-part InstancedMesh; not production PBR",
+        "gameplay": false
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "enabled": false,
+          "antialias": false,
+          "samples": 0
+        },
+        "graph": {
+          "passes": []
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:32:56.740Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:33:30.305Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "candidate-rim-common-2048-pair1.png",
+        "sha256": "74c1f29e2b8e89e36da01ef7e9314c48a33681e38f665c04a6e4d9157c9714dd"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "wg",
+      "pair": 2,
+      "renderer": "native-wg",
+      "fps": 44.98188340663863,
+      "frameIntervalMs": {
+        "count": 1126,
+        "mean": 22.231172291296623,
+        "median": 16.700000000000728,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 1127,
+        "mean": 2.389529724946674,
+        "median": 2.5999999940395355,
+        "p95": 2.9000000059604645,
+        "p99": 3,
+        "max": 4.600000008940697
+      },
+      "draws": 287,
+      "triangles": 39061900,
+      "workScope": "native glTF command/triangle counter",
+      "nativeWorkPerRaf": {
+        "pipelineChanges": 2,
+        "bindGroupChanges": 289,
+        "bufferUploadCalls": 0,
+        "instanceUploadBytes": 0,
+        "uniformUploadBytes": 0,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "common": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "quality": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": true,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "diagnostic workload",
+        "unmatchedThreeReference": false,
+        "loadUnit": "visible object count"
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 0,
+          "width": 0,
+          "height": 0,
+          "targets": 0,
+          "frames": 0,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": false,
+          "passes": [],
+          "transientBuffers": 0,
+          "transientTextures": 0
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:33:30.329Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:34:07.876Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "baseline-rim-common-2048-pair1.png",
+        "sha256": "f17aa4ba6f82ad5880906d7ad849006105994489dce2416ff860b9a529efbe17"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "wg",
+      "pair": 3,
+      "renderer": "native-wg",
+      "fps": 44.901986633269814,
+      "frameIntervalMs": {
+        "count": 1124,
+        "mean": 22.27072953736655,
+        "median": 16.700000000000728,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 1125,
+        "mean": 2.3404444444709354,
+        "median": 2.5999999940395355,
+        "p95": 2.9000000059604645,
+        "p99": 3,
+        "max": 3.7000000029802322
+      },
+      "draws": 287,
+      "triangles": 39061900,
+      "workScope": "native glTF command/triangle counter",
+      "nativeWorkPerRaf": {
+        "pipelineChanges": 2,
+        "bindGroupChanges": 289,
+        "bufferUploadCalls": 0,
+        "instanceUploadBytes": 0,
+        "uniformUploadBytes": 0,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "common": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "quality": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": true,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "diagnostic workload",
+        "unmatchedThreeReference": false,
+        "loadUnit": "visible object count"
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 0,
+          "width": 0,
+          "height": 0,
+          "targets": 0,
+          "frames": 0,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": false,
+          "passes": [],
+          "transientBuffers": 0,
+          "transientTextures": 0
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:34:07.898Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:34:45.606Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "baseline-rim-common-2048-pair2.png",
+        "sha256": "f17aa4ba6f82ad5880906d7ad849006105994489dce2416ff860b9a529efbe17"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "wg",
+      "pair": 3,
+      "renderer": "Three-WebGL2",
+      "fps": 38.601544061762475,
+      "frameIntervalMs": {
+        "count": 965,
+        "mean": 25.905699481865284,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 966,
+        "mean": 0.7376811594141196,
+        "median": 0.7999999970197678,
+        "p95": 0.9000000059604645,
+        "p99": 1,
+        "max": 1.2000000029802322
+      },
+      "draws": 86,
+      "triangles": 42009212,
+      "workScope": "Three renderer.info.render",
+      "nativeWorkPerRaf": null,
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "assets": [
+          "/assets/models/rim/rim-city.glb",
+          "/assets/models/rim/drone-orbiter.glb"
+        ],
+        "stress": {
+          "count": 2048,
+          "representation": "instanced",
+          "partsPerModel": 67,
+          "staticPose": "Idle@0",
+          "castsShadow": false
+        },
+        "pose": "Idle@0",
+        "camera": {
+          "position": [
+            0,
+            1.7,
+            42
+          ],
+          "target": [
+            0,
+            1.7,
+            -20
+          ],
+          "fov": 65,
+          "near": 0.08,
+          "far": 350
+        },
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ],
+        "renderer": {
+          "version": "170",
+          "antialias": false,
+          "samples": 0,
+          "toneMapping": 0,
+          "toneMappingExposure": 1,
+          "outputColorSpace": "srgb",
+          "shadows": false,
+          "lights": 0,
+          "fog": false,
+          "postprocessing": false
+        },
+        "profile": "limited shared-GLB base-color; existing per-part InstancedMesh; not production PBR",
+        "gameplay": false
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "enabled": false,
+          "antialias": false,
+          "samples": 0
+        },
+        "graph": {
+          "passes": []
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:34:45.628Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t67%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:35:19.457Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "candidate-rim-common-2048-pair2.png",
+        "sha256": "74c1f29e2b8e89e36da01ef7e9314c48a33681e38f665c04a6e4d9157c9714dd"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "gl",
+      "pair": 1,
+      "renderer": "native-gl",
+      "fps": 39.18936733740007,
+      "frameIntervalMs": {
+        "count": 981,
+        "mean": 25.517125382263,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 982,
+        "mean": 3.207942973860291,
+        "median": 3.5,
+        "p95": 3.9000000059604645,
+        "p99": 4,
+        "max": 4.5999999940395355
+      },
+      "draws": 287,
+      "triangles": 39061900,
+      "workScope": "native glTF command/triangle counter",
+      "nativeWorkPerRaf": {
+        "pipelineChanges": 2,
+        "bindGroupChanges": 289,
+        "bufferUploadCalls": 0,
+        "instanceUploadBytes": 0,
+        "uniformUploadBytes": 0,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "common": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "quality": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": true,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "diagnostic workload",
+        "unmatchedThreeReference": false,
+        "loadUnit": "visible object count"
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 0,
+          "width": 0,
+          "height": 0,
+          "targets": 0,
+          "frames": 0,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": false,
+          "passes": [],
+          "transientBuffers": 0,
+          "transientTextures": 0
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:36:10.672Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:36:46.267Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "baseline-rim-common-2048-pair0.png",
+        "sha256": "f17aa4ba6f82ad5880906d7ad849006105994489dce2416ff860b9a529efbe17"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "gl",
+      "pair": 1,
+      "renderer": "Three-WebGL2",
+      "fps": 38.601544061762475,
+      "frameIntervalMs": {
+        "count": 965,
+        "mean": 25.905699481865284,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 966,
+        "mean": 0.7574534161675791,
+        "median": 0.7999999970197678,
+        "p95": 0.9000000059604645,
+        "p99": 1,
+        "max": 1.2999999970197678
+      },
+      "draws": 86,
+      "triangles": 42009212,
+      "workScope": "Three renderer.info.render",
+      "nativeWorkPerRaf": null,
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "assets": [
+          "/assets/models/rim/rim-city.glb",
+          "/assets/models/rim/drone-orbiter.glb"
+        ],
+        "stress": {
+          "count": 2048,
+          "representation": "instanced",
+          "partsPerModel": 67,
+          "staticPose": "Idle@0",
+          "castsShadow": false
+        },
+        "pose": "Idle@0",
+        "camera": {
+          "position": [
+            0,
+            1.7,
+            42
+          ],
+          "target": [
+            0,
+            1.7,
+            -20
+          ],
+          "fov": 65,
+          "near": 0.08,
+          "far": 350
+        },
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ],
+        "renderer": {
+          "version": "170",
+          "antialias": false,
+          "samples": 0,
+          "toneMapping": 0,
+          "toneMappingExposure": 1,
+          "outputColorSpace": "srgb",
+          "shadows": false,
+          "lights": 0,
+          "fog": false,
+          "postprocessing": false
+        },
+        "profile": "limited shared-GLB base-color; existing per-part InstancedMesh; not production PBR",
+        "gameplay": false
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "enabled": false,
+          "antialias": false,
+          "samples": 0
+        },
+        "graph": {
+          "passes": []
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:36:46.292Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:37:20.070Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "candidate-rim-common-2048-pair0.png",
+        "sha256": "74c1f29e2b8e89e36da01ef7e9314c48a33681e38f665c04a6e4d9157c9714dd"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "gl",
+      "pair": 2,
+      "renderer": "Three-WebGL2",
+      "fps": 38.601544061762475,
+      "frameIntervalMs": {
+        "count": 965,
+        "mean": 25.90569948186528,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 966,
+        "mean": 0.6950310554902993,
+        "median": 0.7999999970197678,
+        "p95": 0.9000000059604645,
+        "p99": 1,
+        "max": 1.0999999940395355
+      },
+      "draws": 86,
+      "triangles": 42009212,
+      "workScope": "Three renderer.info.render",
+      "nativeWorkPerRaf": null,
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "assets": [
+          "/assets/models/rim/rim-city.glb",
+          "/assets/models/rim/drone-orbiter.glb"
+        ],
+        "stress": {
+          "count": 2048,
+          "representation": "instanced",
+          "partsPerModel": 67,
+          "staticPose": "Idle@0",
+          "castsShadow": false
+        },
+        "pose": "Idle@0",
+        "camera": {
+          "position": [
+            0,
+            1.7,
+            42
+          ],
+          "target": [
+            0,
+            1.7,
+            -20
+          ],
+          "fov": 65,
+          "near": 0.08,
+          "far": 350
+        },
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ],
+        "renderer": {
+          "version": "170",
+          "antialias": false,
+          "samples": 0,
+          "toneMapping": 0,
+          "toneMappingExposure": 1,
+          "outputColorSpace": "srgb",
+          "shadows": false,
+          "lights": 0,
+          "fog": false,
+          "postprocessing": false
+        },
+        "profile": "limited shared-GLB base-color; existing per-part InstancedMesh; not production PBR",
+        "gameplay": false
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "enabled": false,
+          "antialias": false,
+          "samples": 0
+        },
+        "graph": {
+          "passes": []
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:37:20.092Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:37:53.624Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "candidate-rim-common-2048-pair1.png",
+        "sha256": "74c1f29e2b8e89e36da01ef7e9314c48a33681e38f665c04a6e4d9157c9714dd"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "gl",
+      "pair": 2,
+      "renderer": "native-gl",
+      "fps": 39.34900369121618,
+      "frameIntervalMs": {
+        "count": 985,
+        "mean": 25.413604060913705,
+        "median": 33.200000000004366,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 986,
+        "mean": 3.450912779140424,
+        "median": 3.5999999940395355,
+        "p95": 3.9000000059604645,
+        "p99": 4,
+        "max": 5.0999999940395355
+      },
+      "draws": 287,
+      "triangles": 39061900,
+      "workScope": "native glTF command/triangle counter",
+      "nativeWorkPerRaf": {
+        "pipelineChanges": 2,
+        "bindGroupChanges": 289,
+        "bufferUploadCalls": 0,
+        "instanceUploadBytes": 0,
+        "uniformUploadBytes": 0,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "common": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "quality": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": true,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "diagnostic workload",
+        "unmatchedThreeReference": false,
+        "loadUnit": "visible object count"
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 0,
+          "width": 0,
+          "height": 0,
+          "targets": 0,
+          "frames": 0,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": false,
+          "passes": [],
+          "transientBuffers": 0,
+          "transientTextures": 0
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:37:53.646Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:38:29.233Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "baseline-rim-common-2048-pair1.png",
+        "sha256": "f17aa4ba6f82ad5880906d7ad849006105994489dce2416ff860b9a529efbe17"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "gl",
+      "pair": 3,
+      "renderer": "native-gl",
+      "fps": 39.06952217734687,
+      "frameIntervalMs": {
+        "count": 978,
+        "mean": 25.595398773006135,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 979,
+        "mean": 3.351378958059648,
+        "median": 3.5,
+        "p95": 3.9000000059604645,
+        "p99": 4,
+        "max": 5.200000002980232
+      },
+      "draws": 287,
+      "triangles": 39061900,
+      "workScope": "native glTF command/triangle counter",
+      "nativeWorkPerRaf": {
+        "pipelineChanges": 2,
+        "bindGroupChanges": 289,
+        "bufferUploadCalls": 0,
+        "instanceUploadBytes": 0,
+        "uniformUploadBytes": 0,
+        "instancePool.buffersCreated": 0,
+        "instancePool.bindGroupsCreated": 0
+      },
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "common": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "quality": {
+          "assets": [
+            "/assets/models/rim/rim-city.glb",
+            "/assets/models/rim/drone-orbiter.glb"
+          ],
+          "droneCount": 2048,
+          "pose": "Idle@0",
+          "camera": {
+            "name": "gate",
+            "position": [
+              0,
+              1.7,
+              42
+            ],
+            "target": [
+              0,
+              1.7,
+              -20
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "fovDegrees": 65,
+            "near": 0.08,
+            "far": 350,
+            "nodeIndex": 19
+          },
+          "scale": [
+            0.29845917019761503,
+            0.29845917019761503,
+            0.29845917019761503
+          ],
+          "representation": "native shared glTF batching",
+          "profile": "limited base-color only; not production PBR",
+          "AA": "none",
+          "lights": 0,
+          "shadows": false,
+          "toneMapping": "none",
+          "fog": false,
+          "postprocessing": false,
+          "output": "sRGB",
+          "gameplay": false,
+          "experiment": {
+            "name": "production",
+            "diagnosticOnly": true,
+            "qualityReduced": true,
+            "scope": "one diagnostic axis; not a final optimization"
+          }
+        },
+        "workloadPhases": null,
+        "viewport": {
+          "width": 1280,
+          "height": 720,
+          "deviceScaleFactor": 1
+        },
+        "order": "spatial",
+        "seed": 1337,
+        "overlap": 0,
+        "insertionApplied": true,
+        "insertionAlgorithm": "LCG32 Fisher-Yates v1; alternating low/high v1; logical grid independent of insertion",
+        "firstLogicalIds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ],
+        "poseClock": "elapsed performance.now seconds",
+        "scene": "diagnostic workload",
+        "unmatchedThreeReference": false,
+        "loadUnit": "visible object count"
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "passes": 0,
+          "width": 0,
+          "height": 0,
+          "targets": 0,
+          "frames": 0,
+          "ssrWidth": 0,
+          "ssrHeight": 0,
+          "ssrPixels": 0,
+          "ssrTracePixels": 0,
+          "ssrViewportPixels": 0
+        },
+        "graph": {
+          "active": false,
+          "passes": [],
+          "transientBuffers": 0,
+          "transientTextures": 0
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:38:29.258Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:39:05.085Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "baseline-rim-common-2048-pair2.png",
+        "sha256": "f17aa4ba6f82ad5880906d7ad849006105994489dce2416ff860b9a529efbe17"
+      },
+      "gpuMs": null
+    },
+    {
+      "campaign": "gl",
+      "pair": 3,
+      "renderer": "Three-WebGL2",
+      "fps": 38.615749309433674,
+      "frameIntervalMs": {
+        "count": 966,
+        "mean": 25.89616977225673,
+        "median": 33.29999999999927,
+        "p95": 33.400000000001455,
+        "p99": 33.400000000001455,
+        "max": 33.5
+      },
+      "callbackWallMs": {
+        "count": 967,
+        "mean": 0.774663908882866,
+        "median": 0.7999999970197678,
+        "p95": 0.9000000059604645,
+        "p99": 1,
+        "max": 1.5
+      },
+      "draws": 86,
+      "triangles": 42009212,
+      "workScope": "Three renderer.info.render",
+      "nativeWorkPerRaf": null,
+      "metadata": {
+        "family": "rim-common",
+        "load": 2048,
+        "assets": [
+          "/assets/models/rim/rim-city.glb",
+          "/assets/models/rim/drone-orbiter.glb"
+        ],
+        "stress": {
+          "count": 2048,
+          "representation": "instanced",
+          "partsPerModel": 67,
+          "staticPose": "Idle@0",
+          "castsShadow": false
+        },
+        "pose": "Idle@0",
+        "camera": {
+          "position": [
+            0,
+            1.7,
+            42
+          ],
+          "target": [
+            0,
+            1.7,
+            -20
+          ],
+          "fov": 65,
+          "near": 0.08,
+          "far": 350
+        },
+        "scale": [
+          0.29845917019761503,
+          0.29845917019761503,
+          0.29845917019761503
+        ],
+        "renderer": {
+          "version": "170",
+          "antialias": false,
+          "samples": 0,
+          "toneMapping": 0,
+          "toneMappingExposure": 1,
+          "outputColorSpace": "srgb",
+          "shadows": false,
+          "lights": 0,
+          "fog": false,
+          "postprocessing": false
+        },
+        "profile": "limited shared-GLB base-color; existing per-part InstancedMesh; not production PBR",
+        "gameplay": false
+      },
+      "quality": {
+        "canvas": {
+          "width": 1280,
+          "height": 720
+        },
+        "postprocessing": {
+          "enabled": false,
+          "antialias": false,
+          "samples": 0
+        },
+        "graph": {
+          "passes": []
+        }
+      },
+      "powerBefore": {
+        "at": "2026-10-31T16:39:05.110Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "powerAfter": {
+        "at": "2026-10-31T16:39:38.882Z",
+        "battery": "Now drawing from 'AC Power'\n -InternalBattery-0 (id=23527523)\t66%; AC attached; not charging present: true\n",
+        "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n"
+      },
+      "capture": {
+        "file": "candidate-rim-common-2048-pair2.png",
+        "sha256": "74c1f29e2b8e89e36da01ef7e9314c48a33681e38f665c04a6e4d9157c9714dd"
+      },
+      "gpuMs": null
+    }
+  ],
+  "pairs": [
+    {
+      "campaign": "wg",
+      "pair": 1,
+      "nativeFps": 44.872050780470275,
+      "threeFps": 38.58731982243428,
+      "nativeVsThreeFpsRatio": 1.1628703674408118,
+      "nativeCallbackMeanMs": 2.348711110962762,
+      "threeCallbackMeanMs": 0.7172020728569575
+    },
+    {
+      "campaign": "wg",
+      "pair": 2,
+      "nativeFps": 44.98188340663863,
+      "threeFps": 38.6013896500274,
+      "nativeVsThreeFpsRatio": 1.1652918149957512,
+      "nativeCallbackMeanMs": 2.389529724946674,
+      "threeCallbackMeanMs": 0.735921325227612
+    },
+    {
+      "campaign": "wg",
+      "pair": 3,
+      "nativeFps": 44.901986633269814,
+      "threeFps": 38.601544061762475,
+      "nativeVsThreeFpsRatio": 1.1632173718602197,
+      "nativeCallbackMeanMs": 2.3404444444709354,
+      "threeCallbackMeanMs": 0.7376811594141196
+    },
+    {
+      "campaign": "gl",
+      "pair": 1,
+      "nativeFps": 39.18936733740007,
+      "threeFps": 38.601544061762475,
+      "nativeVsThreeFpsRatio": 1.0152279731271132,
+      "nativeCallbackMeanMs": 3.207942973860291,
+      "threeCallbackMeanMs": 0.7574534161675791
+    },
+    {
+      "campaign": "gl",
+      "pair": 2,
+      "nativeFps": 39.34900369121618,
+      "threeFps": 38.601544061762475,
+      "nativeVsThreeFpsRatio": 1.0193634645354541,
+      "nativeCallbackMeanMs": 3.450912779140424,
+      "threeCallbackMeanMs": 0.6950310554902993
+    },
+    {
+      "campaign": "gl",
+      "pair": 3,
+      "nativeFps": 39.06952217734687,
+      "threeFps": 38.615749309433674,
+      "nativeVsThreeFpsRatio": 1.011750979225524,
+      "nativeCallbackMeanMs": 3.351378958059648,
+      "threeCallbackMeanMs": 0.774663908882866
+    }
+  ],
+  "summary": [
+    {
+      "campaign": "wg",
+      "renderer": "native-wg",
+      "meanOfRunFps": 44.91864027345957,
+      "fpsRange": [
+        44.872050780470275,
+        44.98188340663863
+      ],
+      "meanOfRunCallbackMs": 2.35956176012679,
+      "drawRange": [
+        287,
+        287
+      ],
+      "triangleRange": [
+        39061900,
+        39061900
+      ]
+    },
+    {
+      "campaign": "wg",
+      "renderer": "Three-WebGL2",
+      "meanOfRunFps": 38.59675117807472,
+      "fpsRange": [
+        38.58731982243428,
+        38.601544061762475
+      ],
+      "meanOfRunCallbackMs": 0.7302681858328963,
+      "drawRange": [
+        86,
+        86
+      ],
+      "triangleRange": [
+        42009212,
+        42009212
+      ]
+    },
+    {
+      "campaign": "gl",
+      "renderer": "native-gl",
+      "meanOfRunFps": 39.20263106865438,
+      "fpsRange": [
+        39.06952217734687,
+        39.34900369121618
+      ],
+      "meanOfRunCallbackMs": 3.3367449036867876,
+      "drawRange": [
+        287,
+        287
+      ],
+      "triangleRange": [
+        39061900,
+        39061900
+      ]
+    },
+    {
+      "campaign": "gl",
+      "renderer": "Three-WebGL2",
+      "meanOfRunFps": 38.606279144319544,
+      "fpsRange": [
+        38.601544061762475,
+        38.615749309433674
+      ],
+      "meanOfRunCallbackMs": 0.7423827935135815,
+      "drawRange": [
+        86,
+        86
+      ],
+      "triangleRange": [
+        42009212,
+        42009212
+      ]
+    }
+  ],
+  "pixelAudit": [
+    {
+      "backend": "wg",
+      "pair": 1,
+      "width": 1280,
+      "height": 720,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "exact": false
+    },
+    {
+      "backend": "wg",
+      "pair": 2,
+      "width": 1280,
+      "height": 720,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "exact": false
+    },
+    {
+      "backend": "wg",
+      "pair": 3,
+      "width": 1280,
+      "height": 720,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "exact": false
+    },
+    {
+      "backend": "gl",
+      "pair": 1,
+      "width": 1280,
+      "height": 720,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "exact": false
+    },
+    {
+      "backend": "gl",
+      "pair": 2,
+      "width": 1280,
+      "height": 720,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "exact": false
+    },
+    {
+      "backend": "gl",
+      "pair": 3,
+      "width": 1280,
+      "height": 720,
+      "changedPixels": 50,
+      "maxChannelDelta": 255,
+      "exact": false
+    }
+  ],
+  "gpuMs": null
+}

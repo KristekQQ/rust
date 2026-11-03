@@ -419,7 +419,7 @@ const ready = async () => {
 enter.onclick = () => {
     enter.disabled = true;
     reportDiagnostic('xr-enter-click');
-    void engine.xr.enter().catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
+    void engine.xr.enter({fixedFoveation:1,...(engine.renderer_backend()==='Gl'&&new URLSearchParams(location.search).get('xrPresentation')==='shared-framebuffer'?{webglPresentation:'shared-framebuffer',sceneFoveation:true}:{})}).catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
 };
 exit.onclick = () => { void engine.xr.exit().catch(error => { status.textContent = String(error); }); };
 engine.xr.addEventListener('firstframe', event => reportDiagnostic('xr-first-frame',undefined,{.../** @type {CustomEvent} */(event).detail,postprocessing:engine.postprocessing.stats(),profile:engine.frameProfile(),graph:engine.postprocessing.graph()}));

@@ -23,6 +23,7 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:"animation-workspace",path:"tests/animation-workspace.html",status:"#result",xrReport:true},
     {name:"gltf-publication",path:"tests/gltf-publication.html",status:"#result"},
     {name:"main-view-culling",path:"tests/main-view-culling.html",status:"#result"},
     {name:"gltf-indices",path:"tests/gltf-indices.html",status:"#result"},
@@ -90,6 +91,8 @@ const suites = [
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:1800000 },
     { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
+    {name:'xr-scene-foveation',path:'tests/xr-scene-foveation.html',status:'#result',backends:['webgl'],xrReport:true},
+    {name:'xr-scene-foveation-asymmetric',path:'tests/xr-scene-foveation.html?asymmetric=1',status:'#result',backends:['webgl'],xrReport:true},
     {name:'xr-gl-presentation',path:'tests/xr-gl-presentation.html',status:'#result',backends:['webgl'],xrReport:true},
     {name:'rim-gameplay-gl-shared',path:'tests/rim-gameplay.html?presentation=shared-framebuffer',status:'#result',backends:['webgl'],xrReport:true},
     { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },

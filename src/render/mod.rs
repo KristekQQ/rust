@@ -31,4 +31,5 @@ pub mod xr_present;
 pub mod graph_probe;
 mod view_uniforms;
 
+mod xr_foveation;
 pub mod xr_gl_output;

@@ -13,6 +13,7 @@ const report=await run.execute(async test=>{
  const cube=engine.scene.createCube([-.22,1.72,-2]);cube.setScale([.35,.35,.35]);
  engine.scene.createCube([.4,1.35,-2.4]).setScale([.25,.2,.2]);
  engine.scene.createLight({position:[-2,4,0],color:[8,8,8]});
+ let invalidFramebuffersChecked=false;
  const draw=()=>{sim.frame({dt:0,head:{position:[0,1.6,0]}});test.assert(!engine.xr.lastError,'stereo frame completes',String(engine.xr.lastError));};
  const capture=async (mode,label)=>{
   let settings;const listener=e=>{settings=e.detail;};engine.xr.addEventListener('firstframe',listener);
@@ -23,6 +24,60 @@ const report=await run.execute(async test=>{
    // Enforce the opaque attachment restrictions using an ordinary simulator
    // FBO. These guards are a regression oracle, not a real headset substitute.
    const gl=sim.layer.gl,layerFb=sim.layer.framebuffer,restore=[];
+   // Chromium opaque XR FBOs have not been publicly bound yet. The simulator
+   // prebinds its regular FBO to attach storage, so inject that first-bind API
+   // behavior independently of the renderer. This is not a hardware XR test.
+   if(mode==='shared-framebuffer'){
+    let pending=true,probe=null,restored=0;
+    const isFramebuffer=gl.isFramebuffer,bindFramebuffer=gl.bindFramebuffer;
+    gl.isFramebuffer=function(fb){
+     if(fb===layerFb&&pending){probe={draw:this.getParameter(this.DRAW_FRAMEBUFFER_BINDING),read:this.getParameter(this.READ_FRAMEBUFFER_BINDING)};return false;}
+     return isFramebuffer.call(this,fb);
+    };
+    gl.bindFramebuffer=function(target,fb){
+     const result=bindFramebuffer.call(this,target,fb);
+     if(fb===layerFb&&this.getParameter(this.DRAW_FRAMEBUFFER_BINDING)===layerFb)pending=false;
+     else if(probe&&!pending&&target===this.DRAW_FRAMEBUFFER&&fb===probe.draw){
+      test.assert(this.getParameter(this.DRAW_FRAMEBUFFER_BINDING)===probe.draw&&this.getParameter(this.READ_FRAMEBUFFER_BINDING)===probe.read,'cold ownership probe restores DRAW and preserves READ');restored++;probe=null;
+     }
+     return result;
+    };
+    restore.push(()=>{gl.isFramebuffer=isFramebuffer;gl.bindFramebuffer=bindFramebuffer;});
+    test.assert(!gl.isFramebuffer(layerFb),'opaque first-bind oracle starts unrecognized');
+    restore.push(()=>{test.assert(!pending&&restored===1,'cold probe first-binds exactly once before backend presentation');});
+    if(!invalidFramebuffersChecked){
+     // The public SDK is frozen. Reuse its already-loaded raw test module,
+     // rather than modifying the production SDK or attempting to monkeypatch it.
+     const url=performance.getEntriesByType('resource').findLast(e=>/\/pkg\/webgpu_wasm\.js\?/.test(e.name))?.name;
+     if(!url)throw Error('Current WASM binding URL missing');
+     const raw=await import(url),viewports=['left','right'].map(eye=>sim.layer.getViewport({eye}));
+     raw.xr_begin_frame(0);
+     for(const [index,v] of viewports.entries()){
+      const f=1/Math.tan(65*Math.PI/360),projection=new Float32Array([f/(v.width/v.height),0,0,0,0,f,0,0,0,0,-1,-1,0,0,-.1,0]);
+      const world=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,index?.032:-.032,1.6,0,1]);
+      raw.xr_render_gl_eye(projection,world,index,v.width,v.height);
+     }
+     const args=[layerFb,sim.layer.framebufferWidth,sim.layer.framebufferHeight,viewports.map(v=>[v.x,v.y,v.width,v.height])];
+     const oldDraw=gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING),oldRead=gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+     const drawFb=gl.createFramebuffer(),readFb=gl.createFramebuffer(),deleted=gl.createFramebuffer(),incomplete=gl.createFramebuffer();
+     const foreignGl=document.createElement('canvas').getContext('webgl2'),foreign=foreignGl.createFramebuffer();
+     gl.deleteFramebuffer(deleted);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,drawFb);gl.bindFramebuffer(gl.READ_FRAMEBUFFER,readFb);
+     try{
+      test.assert(gl.getError()===gl.NO_ERROR,'negative ownership checks begin with clean GL errors');
+      for(const [fb,expected,errorCode] of [[foreign,'must belong',gl.INVALID_OPERATION],[deleted,'must belong',gl.INVALID_OPERATION],[incomplete,'not active or complete',gl.NO_ERROR]]){
+       let error;try{raw.xr_present_gl_frame(fb,...args.slice(1));}catch(e){error=e;}
+       test.assert(String(error).includes(expected),'foreign/deleted/incomplete FBO rejected before consuming eyes',String(error));
+       test.assert(gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING)===drawFb&&gl.getParameter(gl.READ_FRAMEBUFFER_BINDING)===readFb,'failed probe preserves distinct READ/DRAW bindings');
+       test.assert(gl.getError()===errorCode&&gl.getError()===gl.NO_ERROR,'only expected invalid-object bind error is produced');
+      }
+      invalidFramebuffersChecked=true;
+     }finally{
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,oldDraw);gl.bindFramebuffer(gl.READ_FRAMEBUFFER,oldRead);
+      for(const fb of [drawFb,readFb,incomplete])gl.deleteFramebuffer(fb);foreignGl.deleteFramebuffer(foreign);
+     }
+     raw.xr_present_gl_frame(...args);raw.xr_finish_frame();
+    }
+   }
    for(const name of ['framebufferTexture2D','framebufferRenderbuffer','getFramebufferAttachmentParameter','deleteFramebuffer']){
     const original=gl[name];gl[name]=function(...args){
      if(name==='deleteFramebuffer'?args[0]===layerFb:this.getParameter(this.FRAMEBUFFER_BINDING)===layerFb)throw Error('Opaque XR attachment operation: '+name);

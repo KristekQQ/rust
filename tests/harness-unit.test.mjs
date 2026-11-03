@@ -99,6 +99,42 @@ test('verification receipt survives commit but not changed inputs, arguments or 
     assert.notEqual(await verificationKey('all', [], root), key, 'Removed inputs invalidate PASS');
 });
 
+test('receipt ignores only broker transport identity while retaining browser controls', async t => {
+    const root = await mkdtemp(path.join(tmpdir(), 'rust-transport-receipt-'));
+    t.after(() => rm(root, { recursive: true, force: true }));
+    execFileSync('git', ['init', '-q', root]);
+    await mkdir(path.join(root, 'src'));
+    await writeFile(path.join(root, 'src/lib.rs'), 'unchanged');
+    const { verificationKey } = await import('../scripts/verification-cache.mjs');
+    const transport = ['BROWSER_USE_ACCESS_EXECUTOR_ID', 'BROWSER_USE_ACCESS_PIPE_PATH', 'BROWSER_USE_ACCESS_VERIFYING_IDENTITY'];
+    const controls = ['BROWSER_EXECUTABLE', 'BROWSER_NODE', 'BROWSER_CI_NO_SANDBOX', 'BROWSER_FUTURE_UNKNOWN_FLAG'];
+    const original = new Map([...transport, ...controls].map(key => [key, process.env[key]]));
+    try {
+        for (const key of transport) delete process.env[key];
+        const baseline = await verificationKey('all', [], root);
+        for (const key of transport) {
+            process.env[key] = 'test-transport-one';
+            assert.equal(await verificationKey('all', [], root), baseline, key + ' addition');
+            process.env[key] = 'test-transport-two';
+            assert.equal(await verificationKey('all', [], root), baseline, key + ' rotation');
+            delete process.env[key];
+            assert.equal(await verificationKey('all', [], root), baseline, key + ' removal');
+        }
+        for (const key of controls) {
+            process.env[key] = 'test-control-' + key;
+            assert.notEqual(await verificationKey('all', [], root), baseline, key + ' must invalidate PASS');
+            if (original.get(key) === undefined) delete process.env[key];
+            else process.env[key] = original.get(key);
+            assert.equal(await verificationKey('all', [], root), baseline, key + ' restoration');
+        }
+    } finally {
+        for (const [key, value] of original) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+        }
+    }
+});
+
 test('verification records PASS only after all steps and a repeat skips the commands', async t => {
     const root = await mkdtemp(path.join(tmpdir(), 'rust-gate-'));
     t.after(() => rm(root, { recursive: true, force: true }));
