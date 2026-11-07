@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">
+<title>Quest Stream</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#10151e;color:#eef4ff}body{max-width:1100px;margin:32px auto;padding:0 20px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:28px;margin-bottom:4px}p{color:#a6b7ce;line-height:1.5}video{display:block;width:100%;aspect-ratio:16/9;background:#06090e;border-radius:16px;margin:20px 0;object-fit:contain}button{border:0;border-radius:10px;padding:13px 20px;font:inherit;font-weight:600;cursor:pointer;background:#8de6cb;color:#082d28}button:disabled{opacity:.45;cursor:default}#full{background:#263348;color:#fff}#status{min-height:24px;color:#8de6cb}nav{display:flex;gap:12px;flex-wrap:wrap}small{color:#8c9db5}
+</style>
+<header><div><h1>Quest Stream</h1><p>Živý pohled z headsetu · místní síť</p></div><span aria-hidden="true">◉</span></header>
+<video id="video" autoplay muted playsinline aria-label="Živý obraz z Questu"></video>
+<nav><button id="start">Sledovat</button><button id="stop" disabled>Odpojit</button><button id="full">Celá obrazovka</button></nav>
+<p id="status" role="status">Připraveno. Přenos začne po stisku Sledovat.</p>
+<small>Bez zvuku. Po odpojení se můžeš připojit znovu, dokud sdílení běží v brýlích. Nejvýše dvě okna současně. Odkaz je soukromý přístupový klíč; přenos používej v důvěryhodné Wi-Fi.</small>
+<script>const s=document.createElement('script');s.src='/viewer.js?token='+encodeURIComponent(new URLSearchParams(location.search).get('token')||'');document.body.append(s);</script>
+</html>
