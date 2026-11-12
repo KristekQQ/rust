@@ -48,6 +48,7 @@ test('isolated release package has manifest checksums and replaces previous outp
     const fixture = {
         'index.html': '<!doctype html><script type="module" src="js/app.js"></script>',
         'js/app.js': 'export const value = 1 + 2;',
+        'assets/audio/neon/test.wav': 'RIFF synthetic audio fixture',
         'examples/demo/main.js': 'import "../../js/app.js";',
         'examples/rim/index.html': '<meta name="engine-build" content="working"><meta name="app-build" content="working">',
         'examples/demo/build-private.mjs': 'private build helper',
@@ -71,7 +72,7 @@ test('isolated release package has manifest checksums and replaces previous outp
         await writeFile(path.join(destination, 'obsolete.txt'), 'previous');
         const manifest = await writeProduction({ sourceRoot: directory, destination, build });
         assert.equal(manifest.profile, 'release');
-        assert.equal(manifest.files.length, 12);
+        assert.equal(manifest.files.length, 13);
         assert.ok(manifest.files.some(file=>file.path==='tools/scene-observer/publisher.js'));
         assert.ok(manifest.files.some(file=>file.path==='tools/scene-observer/protocol.mjs'));
         assert.deepEqual(await assertProductionBuild(destination), manifest);

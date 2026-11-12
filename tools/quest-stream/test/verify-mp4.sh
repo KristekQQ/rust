@@ -25,3 +25,20 @@ awk -F, '!/^#/ {gsub(/ /,"",$6); print $6}' "$tmp/expected.md5" > "$tmp/expected
 awk -F, '!/^#/ {gsub(/ /,"",$6); print $6}' "$tmp/actual.md5" > "$tmp/actual.hashes"
 cmp "$tmp/expected.hashes" "$tmp/actual.hashes"
 printf '%s\n' 'PASS ffprobe metadata and all 60 decoded frame hashes match Annex B source'
+
+ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=880:sample_rate=48000:duration=1.8' \
+  -ac 2 -c:a aac -profile:a aac_low -b:a 128k -f adts "$tmp/audio.aac"
+java -ea -cp "$tmp/classes" cz.honza.queststream.FragmentedMp4Test "$tmp/input.h264" "$tmp/av.mp4" 60 "$tmp/audio.aac"
+probe=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,channels,start_time -of default=noprint_wrappers=1 "$tmp/av.mp4")
+printf '%s\n' "$probe"
+printf '%s\n' "$probe" | grep -qx 'codec_name=aac'
+printf '%s\n' "$probe" | grep -qx 'sample_rate=48000'
+printf '%s\n' "$probe" | grep -qx 'channels=2'
+printf '%s\n' "$probe" | grep -qx 'start_time=0.120000'
+ffmpeg -hide_banner -loglevel error -i "$tmp/audio.aac" -map 0:a:0 -f s16le "$tmp/expected.pcm"
+ffmpeg -hide_banner -loglevel error -i "$tmp/av.mp4" -map 0:a:0 -f s16le "$tmp/actual.pcm"
+cmp "$tmp/expected.pcm" "$tmp/actual.pcm"
+ffmpeg -hide_banner -loglevel error -i "$tmp/av.mp4" -map 0:v:0 -f framemd5 "$tmp/av.md5"
+awk -F, '!/^#/ {gsub(/ /,"",$6); print $6}' "$tmp/av.md5" > "$tmp/av.hashes"
+cmp "$tmp/expected.hashes" "$tmp/av.hashes"
+printf '%s\n' 'PASS interleaved AVC/AAC: shared-clock 120ms offset, exact decoded PCM and all video frames'

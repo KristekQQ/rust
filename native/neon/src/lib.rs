@@ -1,6 +1,7 @@
 #[cfg(target_os = "android")]
 mod android;
 pub mod app;
+mod audio;
 pub mod benchmark_replay;
 pub mod content;
 pub mod game;

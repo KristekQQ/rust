@@ -144,3 +144,11 @@ scene-observer transport policies, and standalone Quest Stream tests. Browser
 verification builds the separate Neon simulation WASM worker when present; CI
 passes both engine and worker artifacts to its browser shards. Local PASS keys
 include native, games and tools sources in addition to the engine inputs.
+
+## Audio
+
+See [AUDIO.md](AUDIO.md) for shared sound events and output lifecycle. `npm run test:audio`
+checks journal playback policies; these checks also run with `test:sdk`. The maintained
+browser `audio` case decodes the real bank and checks stereo PCM after user-gesture
+unlock. Neon parity verifies real cuts/banking/restarts emit shared audio events.
+Quest Stream audio capture has separate tests under `tools/quest-stream`.

@@ -1,5 +1,7 @@
 const $=selector=>document.querySelector(selector);
 const frame=$('#observer'),params=new URLSearchParams(location.search);
+const viewerOnly=params.get('viewer')==='1';
+if(viewerOnly)document.querySelector('.actions').style.display='none';
 if(params.get('backend')==='webgl')frame.src+='&backend=webgl';
 if(params.get('source')==='native'){
     frame.src+='&source=native';$('#mode').textContent='BRÝLE · ČEKÁ NA TRACKING';
@@ -8,6 +10,7 @@ if(params.get('source')==='native'){
 let worker=null,metrics={},lastMode='';
 const wsUrl=new URL('/observer',location.href);wsUrl.protocol=location.protocol==='https:'?'wss:':'ws:';
 $('#demo').onclick=()=>{
+    if(viewerOnly)return;
     if(params.get('source')==='native'){location.href='./?demo=1';return;}
     worker?.terminate();worker=new Worker(new URL('./demo-worker.js',import.meta.url),{type:'module',name:'observer-demo-source'});
     worker.onmessage=({data})=>{if(data.error)$('#error').textContent=data.error;};
@@ -37,4 +40,4 @@ window.addEventListener('message',event=>{
 });
 window.addEventListener('pagehide',()=>{worker?.postMessage({type:'stop'});worker?.terminate();},{once:true});
 globalThis.observerDemo={get metrics(){return metrics;},get source(){return worker;},start:()=>$('#demo').click(),pause:()=>$('#pause').click()};
-if(params.has('demo')&&params.get('source')!=='native')$('#demo').click();
+if(!viewerOnly&&params.has('demo')&&params.get('source')!=='native')$('#demo').click();

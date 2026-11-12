@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>Audio acceptance</title><canvas id="gpu-canvas" width="64" height="64"></canvas><button id="verify">Ověřit zvuk</button><pre id="result">WAIT</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {AudioMixer} from '../js/audio.js';
+import {installAudioControls} from '../examples/shared/audio-controls.js';
+const result=document.querySelector('#result');
+try {
+ const engine=await initEngine(document.querySelector('#gpu-canvas'),{backend:'webgl'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ document.querySelector('#verify').onclick=async()=>{
+  let live,controls;
+  try {
+   // Resume is invoked directly within the real click gesture.
+   controls=installAudioControls();const unlocked=controls.enable();live=controls.mixer;
+   await unlocked;
+   if(live.context.state!=='running'||live.clips.size!==16)throw Error('Audio unlock/assets failed');
+   live.play('ui_confirm',{gain:.2});
+   async function render(position,forward=[0,0,-1]){
+    const context=new OfflineAudioContext(2,48000,48000),mixer=new AudioMixer({context});
+    for(const [id,clip]of live.clips)mixer.clips.set(id,clip);
+    mixer.listener.setPose([0,0,0],forward);
+    mixer.play('fruit_cut_hard_1',{position,gain:.6});
+    const output=await context.startRendering();
+    const energy=[0,1].map(ch=>output.getChannelData(ch).reduce((sum,v)=>sum+v*v,0));
+    const peak=Math.max(...[0,1].map(ch=>output.getChannelData(ch).reduce((max,v)=>Math.max(max,Math.abs(v)),0)));
+    if(!energy.every(Number.isFinite)||peak<=0||peak>=1)throw Error('Invalid rendered PCM/headroom');
+    return energy;
+   }
+   const right=await render([2,0,-1]),left=await render([-2,0,-1]);
+   if(!(right[1]>right[0]*2&&left[0]>left[1]*2))throw Error('Spatial sides reversed or absent');
+   const turned=await render([2,0,-1],[0,0,1]),near=await render([0,0,-1]),far=await render([0,0,-5]);
+   if(!(turned[0]>turned[1]*2))throw Error('Listener rotation does not rotate spatial sound');
+   if(!(near[0]+near[1]>(far[0]+far[1])*8))throw Error('Distant source not attenuated');
+   result.textContent='PASS: 16 WAVs decoded; real click unlocked output; nonzero stereo PCM; left/right spatialization; listener rotation; distance attenuation; headroom';
+   controls.dispose();await live.dispose();engine.dispose();
+  }catch(error){controls?.dispose();await live?.dispose();result.textContent='FAIL: '+error.stack;console.error(error);}
+ };
+}catch(error){result.textContent='FAIL: '+error.stack;console.error(error);}
+</script>

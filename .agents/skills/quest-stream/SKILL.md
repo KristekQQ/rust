@@ -27,6 +27,7 @@ Honza wants the headset to remain active when removed during streaming. Run the 
 - The current implementation supports **two simultaneous browser readers** with independent bounded queues. Reloading or disconnecting a browser does not consume a new projection token or stop the capture session. A third reader should get an explicit two-window message; close an unnecessary reader and retry **Sledovat**, without immediately asking for new consent.
 - The first prototype used single-use reader claims and the ambiguous message “Přenos už má diváka nebo skončil”. If that UI reappears, check installed APK/source identity and cached/old viewer tabs; it is not proof that Wi-Fi failed or permission expired.
 - Diagnose Wi-Fi ADB connectivity, `dumpsys media_projection`, `dumpsys power` (`mWakefulness`), authenticated `/status?token=…`, helper logs and browser video state separately. Reuse a live permission/session when possible. A genuine system stop or encoder failure needs fresh consent; a browser disconnect does not.
+- For a phone or another computer, give the current **headset LAN address**, not the laptop's localhost ADB forward. Distinguish a page that will not load from failure after **Sledovat**. If host HTTP succeeds but macOS Chrome reports `ERR_ADDRESS_UNREACHABLE`, inspect its **Privacy & Security → Local Network** permission; a disabled permission was observed in this setup. This does not diagnose a separate phone. Follow the applicable permission rules before changing it; a browser restart may be needed and can interrupt other open work.
 - Capture starts promptly after consent to avoid delayed token expiration. It continues until stopped in the headset, including when there are no viewers. Stop sharing after use; a browser tab closing alone is intentionally insufficient.
 
 ## Change and verify
@@ -35,4 +36,24 @@ Keep this as a standalone tool under `tools/quest-stream/`; do not add capture r
 
 Run `tools/quest-stream/test/verify-local.sh` and `tools/quest-stream/build.sh` for affected Java/media changes. Reuse unchanged passing evidence when only copying verified source or editing documentation. Test actual Quest playback, same-session reload, late second reader and first-reader continuity after closing the second. Check off-face behavior and sensor restoration when changing the awake helper.
 
-Evidence as of 2026-11-07: physical Quest 3 → local browser at 1280×720 over Wi-Fi, same-token reload and two simultaneous decoded viewers passed; the keep-awake helper's active/inactive transitions and Awake state were observed. Controlled native-game/WebXR-game streaming, latency, frame pacing, battery cost and long-run/doff acceptance remain separate checks. Video only, no audio. Do not claim every Windows/macOS/Linux browser was physically tested.
+Evidence as of 2026-11-07: physical Quest 3 → local browser at 1280×720 over Wi-Fi, same-token reload and two simultaneous decoded viewers passed; the keep-awake helper's active/inactive transitions and Awake state were observed. That earlier session was video-only; playback audio was added below. Controlled native-game/WebXR-game streaming, latency, frame pacing, battery cost and long-run/doff acceptance remain separate checks. Do not claim every Windows/macOS/Linux browser was physically tested.
+
+
+## Playback audio (2026-11-12)
+
+Current Quest Stream supports optional permitted-app playback capture → stereo
+AAC, in the same fragmented MP4 stream as video. It never selects a microphone
+source. Android nevertheless requires RECORD_AUDIO (shown as microphone/audio
+permission); explain this distinction. A denied permission leaves video-only
+capture, with explicit app/viewer status. Repeated denial can set USER_FIXED;
+at the user's request clear only this app's RECORD_AUDIO user-set/user-fixed
+flags, then let the user confirm the normal prompt. Never grant it silently.
+Read the fresh app URL after restarting capture. Verify H.264 + AAC status and
+real decoded media separately from subjective audibility/latency. Live Quest3
+capture was exercised and user accepted sound; no controlled performance claim.
+
+For game cues, mixer levels and observer event audio use
+[game-audio](../game-audio/SKILL.md). A LAN observer runs on the computer, while
+Quest Stream runs on the headset: their IP addresses and ports are different.
+The observer's viewer-only gateway and phone access are documented in
+[AUDIO.md](../../../docs/AUDIO.md). Never commit live session links or tokens.

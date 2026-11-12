@@ -1,3 +1,5 @@
+pub mod audio;
+pub mod audio_mixer;
 pub mod blade_physics;
 pub mod collision;
 pub mod combo_display;

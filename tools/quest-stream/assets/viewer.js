@@ -15,6 +15,9 @@ const event = (target, name, signal) => new Promise((resolve, reject) => {
   target.addEventListener(name, done, {once:true}); target.addEventListener('error', fail, {once:true});
 });
 function join(a, b) { const c = new Uint8Array(a.length + b.length); c.set(a); c.set(b, a.length); return c; }
+function hasAudio(data) {
+  return data.some((x, i) => x === 109 && data[i+1] === 112 && data[i+2] === 52 && data[i+3] === 97);
+}
 function codecFromInit(data) {
   for (let i = 4; i + 8 < data.length; i++) {
     if (data[i] === 97 && data[i+1] === 118 && data[i+2] === 99 && data[i+3] === 67 && data[i+4] === 1)
@@ -40,7 +43,7 @@ start.onclick = async () => {
     if (!response.ok) throw new Error(response.status === 409 ? 'Přenos už sledují dvě okna. Zavři jedno z nich a znovu klikni Sledovat.' : response.status === 403 ? 'Tento odkaz už neplatí. Otevři aktuální odkaz z Quest Stream.' : 'Sdílení není dostupné (' + response.status + '). Zkontroluj Quest Stream v brýlích.');
     reader = response.body.getReader();
     let pending = new Uint8Array(), init = new Uint8Array(), source, fragment;
-    let lastPruned = 0, firstFrameAt, playbackStarted = false;
+    let lastPruned = 0, firstFrameAt, playbackStarted = false, audio = false, playRejected = false;
     const append = async data => {
       const done = event(source, 'updateend', signal); source.appendBuffer(data); await done;
       if (video.buffered.length) {
@@ -56,7 +59,7 @@ start.onclick = async () => {
         const next = playbackDecision(video.currentTime, ranges);
         if (next.seek !== null) video.currentTime = next.seek;
         if (video.playbackRate !== next.rate) video.playbackRate = next.rate;
-        if (video.paused) video.play().catch(() => { status.textContent = 'Přehrávání se nepodařilo spustit. Povol přehrávání videa v prohlížeči.'; });
+        if (video.paused && !playRejected) video.play().catch(() => { playRejected = true; status.textContent = 'Pro obraz a zvuk stiskni přehrát v ovládání videa.'; });
         if (video.currentTime > 3 && video.currentTime - lastPruned >= 1 && source.buffered.length && source.buffered.start(0) < video.currentTime - 2) {
           const removed = event(source, 'updateend', signal); source.remove(0, video.currentTime - 2); await removed;
           lastPruned = video.currentTime;
@@ -76,7 +79,8 @@ start.onclick = async () => {
           init = join(init, box);
           if (init.length > 1024 * 1024) throw new Error('Příliš velká konfigurace videa.');
           if (type === 'moov') {
-            const mime = 'video/mp4; codecs="' + codecFromInit(init) + '"';
+            audio = hasAudio(init);
+            const mime = 'video/mp4; codecs="' + codecFromInit(init) + (audio ? ',mp4a.40.2' : '') + '"';
             if (!MediaSource.isTypeSupported(mime)) throw new Error('Prohlížeč nepodporuje tento H.264 profil.');
             source = media.addSourceBuffer(mime); await append(init); init = null;
           }
@@ -87,7 +91,7 @@ start.onclick = async () => {
           if (!fragment) throw new Error('Chybí hlavička video snímku.');
           // One complete frame per MSE append instead of two separate updates.
           await append(join(fragment, box)); fragment = null;
-          status.textContent = 'Živě · H.264 · bez zvuku';
+          if (!playRejected || !video.paused) status.textContent = audio ? 'Živě · H.264 + AAC · zvuk jen z aplikací, které zachytávání dovolí' : 'Živě · H.264 · bez zvuku (oprávnění nebo zachytávání není dostupné)';
         } else { throw new Error('Neočekávaný video segment.'); }
       }
     }

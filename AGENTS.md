@@ -22,6 +22,8 @@ For direct Quest WebGPU XR, runtime support, projection textures and headset dia
 
 For standalone headset mirroring to a local browser over Wi-Fi, reconnecting viewers and keeping Quest awake during off-face streaming, use [quest-stream](.agents/skills/quest-stream/SKILL.md). Its independent Android companion lives in `tools/quest-stream/`; it does not require an engine build.
 
+For shared game audio, web/native playback, observer sound and their regression checks, use [game-audio](.agents/skills/game-audio/SKILL.md). Quest Stream captures playback separately; its permission and transport workflow remains in quest-stream.
+
 For creating or tuning graphical effects, use [effect-optimization](.agents/skills/effect-optimization/SKILL.md): preserve appearance, prefer cheaper approximations and measure total cost.
 
 For physical Quest GPU/performance evidence use [quest-hardware-profiling](.agents/skills/quest-hardware-profiling/SKILL.md); GPU probes do not establish live OpenXR FPS.

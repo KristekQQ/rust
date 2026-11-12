@@ -6,7 +6,7 @@ import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import { transform } from 'esbuild';
 import { assertFreshBuild, root } from './build-fingerprint.mjs';
 
-const runtimeExtensions = new Set(['.html', '.js', '.css', '.json', '.gltf', '.glb', '.bin', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.woff', '.woff2', '.md', '.txt', '.wasm']);
+const runtimeExtensions = new Set(['.html', '.js', '.css', '.json', '.gltf', '.glb', '.bin', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.woff', '.woff2', '.wav', '.md', '.txt', '.wasm']);
 const compressExtensions = new Set(['.html', '.mjs', '.js', '.css', '.json', '.gltf', '.svg', '.wasm']);
 const extraFiles = ['index.html', 'tests/pixels.js',
     'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm', 'pkg/webgpu_wasm.d.ts', 'pkg/webgpu_wasm_bg.wasm.d.ts'];

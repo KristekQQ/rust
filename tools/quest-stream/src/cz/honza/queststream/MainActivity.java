@@ -45,7 +45,7 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL); root.setPadding(40, 32, 40, 24);
         TextView title = new TextView(this); title.setText("Quest Stream"); title.setTextSize(28); root.addView(title);
         TextView help = new TextView(this);
-        help.setText("Živý obraz do prohlížeče přes místní síť.\nPo potvrzení sdílení se tento panel zavře. Přenos poběží dál.\nPro odkaz nebo ukončení přenosu znovu otevři Quest Stream nebo jeho oznámení.\nBez zvuku. Nejvýše dvě okna současně. Odkaz umožňuje sledování; sdílej ho jen s důvěryhodnými lidmi.");
+        help.setText("Živý obraz a zvuk aplikací do prohlížeče přes místní síť.\nPo potvrzení sdílení se tento panel zavře. Přenos poběží dál.\nPro odkaz nebo ukončení přenosu znovu otevři Quest Stream nebo jeho oznámení.\nZvuk jen z aplikací, které zachytávání dovolí; bez mikrofonu. Nejvýše dvě okna současně. Odkaz umožňuje sledování; sdílej ho jen s důvěryhodnými lidmi.");
         root.addView(help);
         profile = new Spinner(this);
         profile.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item,
@@ -58,8 +58,9 @@ public final class MainActivity extends Activity {
             }
             selectedProfile = profile.getSelectedItemPosition();
             token = UUID.randomUUID().toString().replace("-", "");
-            MediaProjectionManager mgr = getSystemService(MediaProjectionManager.class);
-            startActivityForResult(mgr.createScreenCaptureIntent(), 17);
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 18);
+            else requestCapture();
         });
         Button stop = new Button(this); stop.setText("Ukončit přenos"); root.addView(stop);
         stop.setOnClickListener(v -> stopService(new Intent(this, StreamService.class)));
@@ -68,6 +69,14 @@ public final class MainActivity extends Activity {
         status = new TextView(this); status.setTextSize(18); status.setTextIsSelectable(true); root.addView(status);
         ScrollView scroll = new ScrollView(this); scroll.addView(root); setContentView(scroll);
         if (state != null) { token = state.getString("token"); selectedProfile = state.getInt("profile"); closeWhenReady = state.getBoolean("closeWhenReady"); }
+    }
+    private void requestCapture() {
+        MediaProjectionManager mgr = getSystemService(MediaProjectionManager.class);
+        startActivityForResult(mgr.createScreenCaptureIntent(), 17);
+    }
+    public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(request, permissions, results);
+        if (request == 18) requestCapture(); // A denied audio permission still permits video.
     }
     protected void onSaveInstanceState(Bundle b) { super.onSaveInstanceState(b); b.putString("token",token); b.putInt("profile", selectedProfile); b.putBoolean("closeWhenReady", closeWhenReady); }
     protected void onActivityResult(int request, int result, Intent data) {

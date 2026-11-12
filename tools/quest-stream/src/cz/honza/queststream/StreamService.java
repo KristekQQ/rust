@@ -94,6 +94,9 @@ public final class StreamService extends Service {
     }
     private void capture() {
         MediaCodec encoder = null; Surface surface = null; VirtualDisplay display = null;
+        PlaybackAudio audio = null;
+        final long originUs = System.nanoTime() / 1000;
+        String audioStatus = "bez zvuku (chybí oprávnění)";
         try {
             MediaFormat format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height);
             format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface);
@@ -119,17 +122,49 @@ public final class StreamService extends Service {
             }
             if (encoder == null) throw new IllegalStateException("Nenalezen kompatibilní hardwarový H.264 enkodér.");
             surface = encoder.createInputSurface(); encoder.start();
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                try {
+                    audio = new PlaybackAudio(projection);
+                    long deadline = System.nanoTime() + 1000000000L;
+                    while (!destroyed && audio.config() == null && System.nanoTime() < deadline) {
+                        audio.pump((data, pts) -> {});
+                        Thread.sleep(5);
+                    }
+                    if (audio.config() == null) throw new IllegalStateException("AAC nenaběhlo včas");
+                    audioStatus = "AAC · zvuk aplikací dle jejich pravidel";
+                } catch (Exception e) {
+                    if (audio != null) audio.close(); audio = null;
+                    audioStatus = "bez zvuku: " + e.getMessage();
+                }
+            }
             display = projection.createVirtualDisplay("QuestStream", width, height, getResources().getDisplayMetrics().densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, null);
-            status = "Přenáším " + width + "×" + height + " / " + fps + " fps · " + encoder.getName();
+            status = "Přenáším " + width + "×" + height + " / " + fps + " fps · " + encoder.getName() + " · " + audioStatus;
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo(); FragmentedMp4 muxer = null; boolean haveKey = false;
             while (!destroyed && !Thread.currentThread().isInterrupted()) {
-                int index = encoder.dequeueOutputBuffer(info, 100000);
+                if (audio != null) {
+                    try {
+                        final FragmentedMp4 current = muxer;
+                        audio.pump((data, pts) -> {
+                            if (current != null && pts >= originUs) hub.publish(current.audioFragment(data, pts), false, pts, true);
+                        });
+                    } catch (Exception e) {
+                        audio.close(); audio = null;
+                        status = "Přenáším obraz bez zvuku: " + e.getMessage() + ". V prohlížeči klikni znovu Sledovat.";
+                        if (muxer != null) {
+                            MediaFormat actual = encoder.getOutputFormat();
+                            muxer = new FragmentedMp4(actual.getInteger(MediaFormat.KEY_WIDTH), actual.getInteger(MediaFormat.KEY_HEIGHT), bytes(actual.getByteBuffer("csd-0")), bytes(actual.getByteBuffer("csd-1")),
+                                1000000 / fps, originUs, null, 0, 0);
+                            hub.reinitialize(muxer.initSegment());
+                        }
+                    }
+                }
+                int index = encoder.dequeueOutputBuffer(info, 5000);
                 if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     if (muxer != null) throw new IllegalStateException("Změna formátu; povol nový přenos.");
                     MediaFormat actual = encoder.getOutputFormat();
-                    muxer = new FragmentedMp4(actual.getInteger(MediaFormat.KEY_WIDTH), actual.getInteger(MediaFormat.KEY_HEIGHT), bytes(actual.getByteBuffer("csd-0")), bytes(actual.getByteBuffer("csd-1")), 1000000 / fps);
-                    hub.initialize(muxer.initSegment());
+                    muxer = new FragmentedMp4(actual.getInteger(MediaFormat.KEY_WIDTH), actual.getInteger(MediaFormat.KEY_HEIGHT), bytes(actual.getByteBuffer("csd-0")), bytes(actual.getByteBuffer("csd-1")), 1000000 / fps, originUs, audio == null ? null : audio.config(), PlaybackAudio.RATE, PlaybackAudio.CHANNELS);
+                    hub.initialize(muxer.initSegment(), audio != null);
                 } else if (index >= 0) {
                     try {
                         if (info.size > 0 && (info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
@@ -137,7 +172,7 @@ public final class StreamService extends Service {
                             if (key) haveKey = true;
                             if (muxer != null && haveKey) {
                                 ByteBuffer b = encoder.getOutputBuffer(index).duplicate(); b.position(info.offset); b.limit(info.offset + info.size);
-                                hub.publish(muxer.fragment(bytes(b), info.presentationTimeUs, key), key);
+                                hub.publish(muxer.fragment(bytes(b), info.presentationTimeUs, key), key, info.presentationTimeUs, false);
                                 capturing = true;
                             }
                         }
@@ -148,6 +183,7 @@ public final class StreamService extends Service {
         finally {
             capturing = false;
             captureDone = true;
+            if (audio != null) audio.close();
             if (display != null) display.release();
             if (encoder != null) { try { encoder.stop(); } catch (Exception ignored) {} encoder.release(); }
             if (surface != null) surface.release();

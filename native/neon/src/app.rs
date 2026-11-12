@@ -160,6 +160,7 @@ pub struct App {
     replay_targets: Vec<(u32, Vec3)>,
     view_reference: Mat4,
     glow_logged_views: u8,
+    audio: crate::audio::Audio,
 }
 impl App {
     pub fn new(
@@ -296,6 +297,7 @@ impl App {
             replay_targets: Vec::with_capacity(16),
             view_reference: Mat4::IDENTITY,
             glow_logged_views: 0,
+            audio: crate::audio::Audio::new(),
         };
         let initial = app.simulation.wait_initial()?;
         app.apply(initial);
@@ -323,6 +325,8 @@ impl App {
         self.worker_measurement = snapshot.measurement;
         self.snapshot_published = Some(snapshot.published);
         self.published = Some(snapshot.sampled);
+        self.audio
+            .snapshot(snapshot.audio, snapshot.sampled.elapsed().as_secs_f64());
         self.simulation_state = snapshot.state;
         let retired = self
             .renderer
@@ -388,6 +392,7 @@ impl HostApp for App {
         self.reference_mode == ReferenceMode::Recenterable
     }
     fn set_xr(&mut self, active: bool) {
+        self.audio.set_active(active);
         if active {
             self.simulation.new_session();
         }
@@ -434,6 +439,9 @@ impl HostApp for App {
         } else {
             input
         };
+        if let Some(head) = input.head {
+            self.audio.listener(head.to_cols_array());
+        }
         if let Some(observer) = &self.observer {
             observer.publish(input.dt, input.head, input.hands);
         }

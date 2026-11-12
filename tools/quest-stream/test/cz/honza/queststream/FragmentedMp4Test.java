@@ -56,11 +56,20 @@ public final class FragmentedMp4Test {
         FragmentedMp4 custom = new FragmentedMp4(320,240,SPS,PPS,50000);
         byte[] customFragment = custom.fragment(annex(idr),0,true);
         assert u32(customFragment, find(customFragment,"trun")+20) == 50000;
-        if (args.length >= 2) fixture(args[0], args[1], args.length >= 3 ? Integer.parseInt(args[2]) : 60);
+        FragmentedMp4 av = new FragmentedMp4(320,240,SPS,PPS,33333,9000000L,new byte[]{0x11,(byte)0x90},48000,2);
+        byte[] avVideo = av.fragment(annex(idr),9100000L,true);
+        byte[] avAudio = av.audioFragment(new byte[]{1,2},9120000L);
+        assert u64(avVideo,find(avVideo,"tfdt")+12) == 100000 : "video preserves shared origin";
+        assert u64(avAudio,find(avAudio,"tfdt")+12) == 5760 : "audio preserves 20ms A/V offset";
+        assert u32(avAudio,find(avAudio,"tfhd")+12) == 2;
+        assert u32(avAudio,find(avAudio,"trun")+20) == 1024;
+        reject(() -> av.audioFragment(new byte[]{1},8999999L));
+        if (args.length >= 2) fixture(args[0], args[1], args.length >= 3 ? Integer.parseInt(args[2]) : 60,
+                args.length >= 4 ? args[3] : null);
         System.out.println("PASS FragmentedMp4 deterministic boxes, offsets, flags, timestamps and input formats");
     }
 
-    private static void fixture(String input, String output, int expectedFrames) throws Exception {
+    private static void fixture(String input, String output, int expectedFrames, String audioFile) throws Exception {
         List<byte[]> nals = split(Files.readAllBytes(Paths.get(input)));
         byte[] sps=null, pps=null;
         List<byte[]> units = new ArrayList<>();
@@ -76,9 +85,31 @@ public final class FragmentedMp4Test {
         }
         if (slice) units.add(current.toByteArray());
         if (sps==null || pps==null || units.size()!=expectedFrames) throw new AssertionError("Expected " + expectedFrames + " AVC frames");
-        FragmentedMp4 mux = new FragmentedMp4(320,240,sps,pps);
+        List<byte[]> audio = new ArrayList<>();
+        if (audioFile != null) {
+            byte[] adts = Files.readAllBytes(Paths.get(audioFile));
+            for (int i=0;i<adts.length;) {
+                if ((adts[i]&255)!=255 || (adts[i+1]&0xf6)!=0xf0) throw new AssertionError("Invalid ADTS");
+                int size=((adts[i+3]&3)<<11)|((adts[i+4]&255)<<3)|((adts[i+5]&0xe0)>>5);
+                int header=(adts[i+1]&1)==1?7:9;
+                if (((adts[i+2]>>2)&15)!=3 || (((adts[i+2]&1)<<2)|((adts[i+3]>>6)&3))!=2)
+                    throw new AssertionError("Expected 48k stereo ADTS");
+                audio.add(Arrays.copyOfRange(adts,i+header,i+size)); i+=size;
+            }
+        }
+        long origin = audioFile == null ? 0 : 9000000L;
+        FragmentedMp4 mux = audioFile == null ? new FragmentedMp4(320,240,sps,pps) :
+            new FragmentedMp4(320,240,sps,pps,33333,origin,new byte[]{0x11,(byte)0x90},48000,2);
         ByteArrayOutputStream out = new ByteArrayOutputStream(); out.write(mux.initSegment());
-        for (int i=0;i<units.size();i++) out.write(mux.fragment(units.get(i), (i*1000000L)/30, false));
+        int a=0;
+        for (int i=0;i<units.size();i++) {
+            long videoPts = i*1000000L/30;
+            while (a<audio.size() && 120000L+a*1024000000L/48000 <= videoPts) {
+                out.write(mux.audioFragment(audio.get(a), origin+120000L+a*1024000000L/48000)); a++;
+            }
+            out.write(mux.fragment(units.get(i), origin+videoPts, false));
+        }
+        while(a<audio.size()) { out.write(mux.audioFragment(audio.get(a),origin+120000L+a*1024000000L/48000)); a++; }
         Files.write(Paths.get(output),out.toByteArray());
         System.out.println("PASS muxed " + expectedFrames + " generated AVC frames");
     }

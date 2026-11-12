@@ -39,6 +39,7 @@ pub struct WorkerMetrics {
 pub struct Snapshot {
     pub publication: RenderPublication,
     pub state: Value,
+    pub audio: webgpu_wasm::audio::AudioSnapshot,
     pub sequence: u64,
     pub simulation_ms: f64,
     pub measurement: WorkerMetrics,
@@ -104,6 +105,7 @@ impl Simulation {
                 shared.lock().unwrap_or_else(|e| e.into_inner()).latest = Some(Snapshot {
                     publication,
                     state,
+                    audio: game.audio.snapshot().clone(),
                     sequence: 0,
                     simulation_ms: start.elapsed().as_secs_f64() * 1000.,
                     measurement: WorkerMetrics::default(),
@@ -177,6 +179,7 @@ impl Simulation {
                     let snapshot = Snapshot {
                         publication,
                         state,
+                        audio: game.audio.snapshot().clone(),
                         sequence: input.sequence,
                         simulation_ms: start.elapsed().as_secs_f64() * 1000.,
                         measurement,

@@ -33,9 +33,11 @@ try{
  }
  assert(bridge.state.cuts>0&&bridge.state.score>=10,'real native Rust sword cut removes fruit and awards points in web worker');
  assert(bridge.state.fragments>0,'web renderer receives native cut fragments');
+ assert(bridge.state.audio.events.some(e=>e.clip.startsWith('fruit_cut_')&&e.position?.length===3),'real cut emits positioned audio once in shared worker');
  const score=bridge.state.score;
  const bank=sample();bank[2]=1;bridge.step(bank);await bridge.settle();
  assert(bridge.state.stocks[0]===null&&bridge.state.score===score,'trigger releases stock without awarding it twice');
+ assert(bridge.state.audio.events.some(e=>e.clip==='chain_bank'),'bank action emits its sound');
  if(!wantsXR){assertForeground(await capturePixels(document.querySelector('#gpu-canvas')),'real rendered native game in browser',500);}
  if(wantsXR){
   await engine.xr.enter();
@@ -54,6 +56,7 @@ try{
   assert(bridge.state.score===0&&!bridge.state.round.finished,'real XR A button restarts same native round');
   await engine.xr.exit();
  }
+ assert(bridge.state.audio&&Array.isArray(bridge.state.audio.events),'shared Rust sound journal present');
  // Full authored minute, genuine Rust timings/waves, without timers or JS gameplay.
  bridge.newSession();bridge.step(sample());await bridge.settle();
  for(let batch=0;batch<61;batch++){
@@ -63,6 +66,7 @@ try{
  assert(bridge.state.round.finished&&bridge.state.cueIndex===24&&bridge.state.shots===140,'same complete minute:24 cues,140 targets,finished state');
  const restart=sample();restart[3]=1;bridge.step(restart);await bridge.settle();
  assert(!bridge.state.round.finished&&bridge.state.score===0&&bridge.state.shots===6,'A starts a fresh native round');
+ assert(bridge.state.audio.events.some(e=>e.clip==='round_start'),'restart emits authoritative round sound');
  assert(bridge.stats.dropped===0,'functional replay retains every original input sample');
  bridge.restoreScores([9876,1234]);bridge.step(sample(0));await bridge.settle();
  assert(bridge.state.top5[0]===9876,'saved native TOP5 restores into real world scoreboard');

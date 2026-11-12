@@ -1,3 +1,4 @@
+import {installAudioControls} from '../../examples/shared/audio-controls.js';
 import {initEngine} from '../../js/engine.js';
 import {WireCache,decodePacket,decodeRecording} from './protocol.mjs';
 import {createHelmet,createNativeSwords} from './scene.js';
@@ -11,6 +12,7 @@ let presentation='waiting',staleTransitions=0,renderFrames=0;
 let requestedNative=false,requestedScene=false,nativeMode=false,nativeSwords=[];
 let camera=params.get('camera')??'side',lastMeta=null,lastApplied=0,offset=0,uncertainty=Infinity,receivedBytes=0,rateAt=performance.now(),rate=0;
 const samples=[];
+const audio=installAudioControls();
 const notify=value=>{if(parent!==window)parent.postMessage(value,location.origin);};
 function setCamera(name){
     camera=name;
@@ -20,10 +22,10 @@ function setCamera(name){
 }
 async function initScene(newSession,isNative=false,isScene=false){
     if(isScene&&engine&&!initializing&&session===newSession&&requestedScene===isScene){
-        transportBase=null;fatalError=null;wireRebase=isScene?appliedWireSequence:0n;
+        audio.reset();transportBase=null;fatalError=null;wireRebase=isScene?appliedWireSequence:0n;
         socket?.readyState===WebSocket.OPEN&&socket.send(JSON.stringify({type:'ready'}));return;
     }
-    fatalError=null;wireRebase=0n;appliedWireSequence=0n;
+    audio.reset();fatalError=null;wireRebase=0n;appliedWireSequence=0n;
     requestedSession=newSession;requestedNative=isNative;requestedScene=isScene;transportBase=null;initRequest++;
     if(initializing)return;
     initializing=true;
@@ -78,6 +80,10 @@ function connect(){
 function age(){return lastMeta?Math.max(0,Date.now()+offset-lastMeta.sampledAt):Infinity;}
 function renderUpdate(now){
     if(closed)return;
+    if(audio.mixer&&engine){
+        const view=engine.cameraViewState(),position=view.position,target=view.orbitTarget;
+        if(target)audio.mixer.listener.setPose(position,target.map((v,i)=>v-position[i]));
+    }
     try{
         if(replay?.ready){
             const position=replay.startTime===null?0:now-replay.startTime;
@@ -112,11 +118,13 @@ function renderUpdate(now){
                 helmet.setPosition(head.position).setRotation(head.rotation);
             }else helmet?.setPosition([0,-10000,0]);
             lastMeta=frame.meta;lastApplied=performance.now();
+            audio.mixer?.ingest(frame.meta.state?.audio,{suppressInitial:!replay,delay:cadence.duration/1000,transportAge:replay?0:Math.max(0,Date.now()+offset-frame.meta.sampledAt)/1000});
             const ageMs=age(),bound=uncertainty+(frame.meta.clockUncertaintyMs??0);
             if(!replay){samples.push({ageMs,uncertaintyMs:bound,applyMs:lastApplied-started,at:now});if(samples.length>1800)samples.shift();socket.send(JSON.stringify({type:'ack'}));}
         }
         const elapsed=now-rateAt;if(elapsed>=1000){rate=receivedBytes/1024/(elapsed/1000);receivedBytes=0;rateAt=now;}
         const sceneAge=age(),bound=uncertainty+(lastMeta?.clockUncertaintyMs??0);
+        if(document.hidden||(!replay&&sceneAge>1500))audio.mixer?.stopAll();
         const nextPresentation=fatalError?'error':!lastMeta?'waiting':replay?'replay':sceneAge+bound>1500?'paused':sceneAge+bound>250?'delayed':'live';
         if(nextPresentation!==presentation&&nextPresentation==='paused')staleTransitions++;
         presentation=nextPresentation;renderFrames++;
@@ -154,5 +162,5 @@ async function loadReplay(bytes){
     socket?.close();await initScene(packets[0].meta.session);
 }
 globalThis.sceneObserver={get engine(){return engine;},get helmet(){return helmet;},get swords(){return nativeSwords;},get meta(){return lastMeta;},get stale(){return ['waiting','paused'].includes(presentation);},get camera(){return camera;},get samples(){return samples;},get replay(){return replay;},setCamera,loadReplay};
-window.addEventListener('pagehide',()=>{closed=true;socket?.close();engine?.dispose();},{once:true});
+window.addEventListener('pagehide',()=>{closed=true;audio.dispose();socket?.close();engine?.dispose();},{once:true});
 connect();requestAnimationFrame(renderUpdate);

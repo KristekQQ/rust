@@ -13,17 +13,25 @@ public class BrowserFixture {
             if (uri.equals("/stream")) {
                 OutputStream out = socket.getOutputStream();
                 out.write("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nConnection: close\r\n\r\n".getBytes("US-ASCII"));
-                long started = System.nanoTime(); int frames = 0;
+                long started = System.nanoTime(); long lastJitterSecond = 0;
                 for (int p = 0; p < mp4.length;) {
                     int size = ByteBuffer.wrap(mp4,p,4).getInt();
-                    out.write(mp4,p,size); out.flush();
                     String type = new String(mp4,p+4,4,"US-ASCII");
-                    if (type.equals("mdat")) {
-                        frames++;
-                        long waitMs = (started + frames * 1_000_000_000L / 30 - System.nanoTime()) / 1_000_000;
-                        if (waitMs > 0) Thread.sleep(waitMs);
-                        if (frames % 30 == 0 && jitterMs > 0) Thread.sleep(jitterMs);
+                    if (type.equals("moof")) {
+                        int track=1; long timestamp=0;
+                        for(int i=p+4;i<p+size-12;i++) {
+                            String tag=new String(mp4,i,4,"US-ASCII");
+                            if(tag.equals("tfhd")) track=ByteBuffer.wrap(mp4,i+8,4).getInt();
+                            if(tag.equals("tfdt")) timestamp=ByteBuffer.wrap(mp4,i+8,8).getLong();
+                        }
+                        long nanos=timestamp*1000000000L/(track==2?48000:1000000);
+                        long waitMs=(started+nanos-System.nanoTime())/1000000;
+                        if(waitMs>0) Thread.sleep(waitMs);
+                        long second=nanos/1000000000;
+                        if(second>lastJitterSecond && jitterMs>0) Thread.sleep(jitterMs);
+                        lastJitterSecond=second;
                     }
+                    out.write(mp4,p,size); out.flush();
                     p += size;
                 }
                 Thread.sleep(15000);

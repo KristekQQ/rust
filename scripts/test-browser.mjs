@@ -93,6 +93,7 @@ const suites = [
     { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'audio', path: 'tests/audio.html', status:'#result', button:'#verify', backends:['webgl'] },
     { name: 'neon-native-parity', path: 'tests/neon-native-parity.html', status:'#result', backends:['webgl','webgpu'] },
     { name: 'neon-native-parity-xr', path: 'tests/neon-native-parity.html?xr=1', status:'#result', backends:['webgl'], xrReport:true },
     { name: 'neon-paytable-xr', path: 'tests/neon-paytable-xr.html', status: '#result', backends:['webgl'], xrReport:true },

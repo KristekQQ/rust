@@ -48,6 +48,8 @@ struct Fruit {
 }
 
 pub struct Game {
+    pub audio: webgpu_wasm::audio::AudioScene,
+    audio_swing_at: [f64; 2],
     pub player: XrPlayer,
     pub score: ComboScore,
     pub round: Option<RoundClock>,
@@ -118,6 +120,8 @@ impl Game {
             .map(id)
             .collect::<Result<_, _>>()?;
         let mut game = Self {
+            audio: Default::default(),
+            audio_swing_at: [-1.; 2],
             player,
             score,
             round: None,
@@ -144,6 +148,16 @@ impl Game {
             solid: true,
             haptics: [0.; 2],
         };
+        game.audio.set_policy(webgpu_wasm::audio::AudioPolicy {
+            groups: [("blade_swing", 2), ("fruit_cut", 12), ("", 2)]
+                .into_iter()
+                .map(|(prefix, limit)| webgpu_wasm::audio::AudioGroupPolicy {
+                    prefix: prefix.into(),
+                    limit,
+                })
+                .collect(),
+            ..Default::default()
+        });
         game.refresh_scoreboard(scene)?;
         game.apply_gallery_style(scene);
         game.refresh_indicators(scene);
@@ -193,6 +207,9 @@ impl Game {
             scene.remove_object(id);
         }
         scene.clear_cut_feedback();
+        self.audio.restart();
+        self.audio_swing_at = [-1.; 2];
+        self.audio.emit("round_start", None, 0.55, 1., 3);
         self.round = RoundClock::new(60.);
         self.score.reset();
         self.score.set_chain_mode(true);
@@ -219,6 +236,7 @@ impl Game {
             return Ok(());
         }
         let dt = input.dt;
+        self.audio.advance(dt);
         self.player.set_reference(Mat4::IDENTITY);
         self.player.update_head(scene, input.head)?;
         if !self.active {
@@ -273,6 +291,7 @@ impl Game {
             round.advance(dt);
         }
         if !was_finished && self.round.is_some_and(|r| r.finished()) {
+            self.audio.emit("round_end", None, 0.6, 1., 3);
             self.score.bank_all();
             self.display.sync_chains(scene, &self.score.chains);
             if let Err(e) = self.scores.record(self.score.score) {
@@ -309,11 +328,41 @@ impl Game {
             }
         }
         for i in 0..2 {
+            let speed = match (self.previous[i], input.hands[i]) {
+                (Some(previous), Some(current)) => {
+                    (current.w_axis.truncate() - previous.w_axis.truncate()).length() / dt
+                }
+                _ => 0.,
+            };
+            let hand_position =
+                input.hands[i].map(|m| m.transform_point3(Vec3::new(0., 0., -0.55)).to_array());
+            if speed > 2. && self.audio.clock() - self.audio_swing_at[i] > 0.28 {
+                self.audio_swing_at[i] = self.audio.clock();
+                self.audio.emit(
+                    if i == 0 {
+                        "blade_swing_1"
+                    } else {
+                        "blade_swing_2"
+                    },
+                    hand_position,
+                    0.18,
+                    1.,
+                    0,
+                );
+            }
+            let triples_before = self.score.triples;
             let report = self
                 .player
                 .update_hand(scene, i, input.hands[i], true, dt)?;
             if !report.removed.is_empty() {
                 self.haptics[i] = 0.6;
+                let variant = self.cuts % 3 + 1;
+                let clip = format!(
+                    "fruit_cut_{}_{}",
+                    if speed > 2.5 { "hard" } else { "soft" },
+                    variant
+                );
+                self.audio.emit(&clip, hand_position, 0.65, 1., 2);
                 let mut rewards = Vec::new();
                 if !self.round.is_some_and(|r| r.finished()) {
                     self.cuts = self.cuts.saturating_add(report.removed.len() as u64);
@@ -326,6 +375,9 @@ impl Game {
                         }
                     }
                     self.display.sync_chains(scene, &self.score.chains);
+                    if self.score.triples > triples_before {
+                        self.audio.emit("combo_triple", None, 0.45, 1., 3);
+                    }
                     self.refresh_indicators(scene);
                 }
                 for &piece in &report.pieces {
@@ -443,6 +495,7 @@ impl Game {
     }
     fn bank(&mut self, scene: &mut SceneManager, index: usize) {
         if self.score.bank_chain(index).is_some() {
+            self.audio.emit("chain_bank", None, 0.4, 1., 3);
             self.display.sync_chains(scene, &self.score.chains);
             self.display.notice(scene, "SERIE ULOZENA".into());
             self.refresh_indicators(scene);
@@ -512,6 +565,9 @@ impl Game {
         }
         let second = self.round.map_or(60, |r| r.remaining.ceil() as u32);
         if second != self.last_second {
+            if (1..=3).contains(&second) {
+                self.audio.emit("countdown_tick", None, 0.35, 1., 3);
+            }
             self.last_second = second;
             if let Ok(id) = self.ref_id("timerPanel") {
                 scene.update_info_panel(id, &[("", second.to_string())]);
@@ -551,7 +607,7 @@ impl Game {
         Ok(())
     }
     pub fn state(&self) -> Value {
-        json!({"active":self.active,"round":self.round.map(|r|json!({"duration":r.duration,"remaining":r.remaining,"finished":r.finished()})),"score":self.score.score,"cuts":self.cuts,"shots":self.shots,"cueIndex":self.cue_index,"flying":self.flying,"fragments":self.fragments.len(),"stocks":self.score.chains.iter().map(|c|c.as_ref().map(|c|json!({"kind":c.kind,"count":c.count,"points":c.total_points()}))).collect::<Vec<_>>(),"top5":self.scores.top})
+        json!({"audio":self.audio.snapshot(),"active":self.active,"round":self.round.map(|r|json!({"duration":r.duration,"remaining":r.remaining,"finished":r.finished()})),"score":self.score.score,"cuts":self.cuts,"shots":self.shots,"cueIndex":self.cue_index,"flying":self.flying,"fragments":self.fragments.len(),"stocks":self.score.chains.iter().map(|c|c.as_ref().map(|c|json!({"kind":c.kind,"count":c.count,"points":c.total_points()}))).collect::<Vec<_>>(),"top5":self.scores.top})
     }
 }
 fn id(v: &Value) -> Result<u32, String> {

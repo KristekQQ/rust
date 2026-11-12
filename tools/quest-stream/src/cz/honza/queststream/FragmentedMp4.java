@@ -5,14 +5,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Minimal single-track fragmented AVC MP4. Input must contain no B frames.
+/** Minimal fragmented AVC / optional AAC-LC MP4. Input must contain no B frames.
  * Each fragment contains one complete access unit. Instances are not thread safe.
  */
 public final class FragmentedMp4 {
     private static final int TIMESCALE = 1_000_000;
     private final int width, height, durationUs;
     private final byte[] sps, pps;
-    private long sequence = 1, firstPts = -1, lastDecodeTime = -1;
+    private long sequence = 1, firstPts = -1, lastDecodeTime = -1, lastAudioTime = -1;
+    private byte[] audioConfig;
+    private int audioRate, audioChannels;
 
     public FragmentedMp4(int width, int height, byte[] sps, byte[] pps) {
         this(width, height, sps, pps, 33_333);
@@ -29,11 +31,23 @@ public final class FragmentedMp4 {
         if (this.sps.length < 4) throw new IllegalArgumentException("SPS is too short");
     }
 
+    /** Both tracks use the same monotonic microsecond origin, never separate zero origins. */
+    public FragmentedMp4(int width, int height, byte[] sps, byte[] pps, int durationUs,
+                         long originUs, byte[] audioConfig, int audioRate, int audioChannels) {
+        this(width, height, sps, pps, durationUs);
+        if (originUs < 0 || (audioConfig != null && (audioRate != 48000 || audioChannels != 2)))
+            throw new IllegalArgumentException("Unsupported audio clock/configuration");
+        this.firstPts = originUs;
+        this.audioConfig = audioConfig == null ? null : audioConfig.clone();
+        this.audioRate = audioRate;
+        this.audioChannels = audioChannels;
+    }
+
     public byte[] initSegment() {
         byte[] ftyp = box("ftyp", new Bytes().ascii("isom").u32(512)
                 .ascii("isomiso6avc1mp41").array());
         byte[] mvhd = full("mvhd", 0, 0, new Bytes().u32(0).u32(0).u32(TIMESCALE)
-                .u32(0).u32(0x10000).u16(0x100).zeros(10).matrix().zeros(24).u32(2).array());
+                .u32(0).u32(0x10000).u16(0x100).zeros(10).matrix().zeros(24).u32(audioConfig == null ? 2 : 3).array());
         byte[] tkhd = full("tkhd", 0, 7, new Bytes().u32(0).u32(0).u32(1).u32(0)
                 .u32(0).zeros(8).u16(0).u16(0).u16(0).u16(0).matrix()
                 .u32((long) width << 16).u32((long) height << 16).array());
@@ -58,7 +72,51 @@ public final class FragmentedMp4 {
         byte[] trak = box("trak", join(tkhd, box("mdia", join(mdhd, hdlr, minf))));
         byte[] trex = full("trex", 0, 0, new Bytes().u32(1).u32(1).u32(durationUs)
                 .u32(0).u32(0x01010000).array());
-        return join(ftyp, box("moov", join(mvhd, trak, box("mvex", trex))));
+        byte[] audioTrex = audioConfig == null ? new byte[0] : full("trex", 0, 0,
+                new Bytes().u32(2).u32(1).u32(1024).u32(0).u32(0x02000000).array());
+        return join(ftyp, box("moov", join(mvhd, trak, audioTrack(), box("mvex", join(trex, audioTrex)))));
+    }
+
+    private byte[] audioTrack() {
+        if (audioConfig == null) return new byte[0];
+        byte[] tkhd = full("tkhd", 0, 7, new Bytes().u32(0).u32(0).u32(2).u32(0)
+                .u32(0).zeros(8).u16(0).u16(0).u16(0x100).u16(0).matrix().u32(0).u32(0).array());
+        byte[] mdhd = full("mdhd", 0, 0, new Bytes().u32(0).u32(0).u32(audioRate)
+                .u32(0).u16(0x55c4).u16(0).array());
+        byte[] hdlr = full("hdlr", 0, 0, new Bytes().u32(0).ascii("soun").zeros(12).ascii("Quest AAC").u8(0).array());
+        byte[] specific = descriptor(5, audioConfig);
+        byte[] decoder = descriptor(4, join(new Bytes().u8(0x40).u8(0x15).zeros(3).u32(128000).u32(128000).array(), specific));
+        byte[] esds = full("esds", 0, 0, descriptor(3, join(new Bytes().u16(2).u8(0).array(), decoder, descriptor(6, new byte[]{2}))));
+        byte[] mp4a = box("mp4a", new Bytes().zeros(6).u16(1).zeros(8).u16(audioChannels).u16(16)
+                .u16(0).u16(0).u32((long)audioRate << 16).bytes(esds).array());
+        byte[] stbl = box("stbl", join(full("stsd", 0, 0, join(new Bytes().u32(1).array(), mp4a)),
+                full("stts", 0, 0, new Bytes().u32(0).array()), full("stsc", 0, 0, new Bytes().u32(0).array()),
+                full("stsz", 0, 0, new Bytes().u32(0).u32(0).array()), full("stco", 0, 0, new Bytes().u32(0).array())));
+        byte[] dinf = box("dinf", full("dref", 0, 0, join(new Bytes().u32(1).array(), full("url ", 0, 1, new byte[0]))));
+        return box("trak", join(tkhd, box("mdia", join(mdhd, hdlr,
+                box("minf", join(full("smhd", 0, 0, new byte[4]), dinf, stbl))))));
+    }
+    private static byte[] descriptor(int tag, byte[] data) {
+        if (data.length > 127) throw new IllegalArgumentException("AAC descriptor too large");
+        return new Bytes().u8(tag).u8(data.length).bytes(data).array();
+    }
+    public byte[] audioFragment(byte[] accessUnit, long ptsUs) {
+        if (audioConfig == null || accessUnit.length == 0 || ptsUs < firstPts)
+            throw new IllegalArgumentException("Invalid AAC sample or timestamp");
+        long time = (ptsUs - firstPts) * audioRate / TIMESCALE;
+        // AAC-LC frames contain exactly 1024 PCM samples; preserve a real clock gap.
+        time = Math.max(time, lastAudioTime < 0 ? 0 : lastAudioTime + 1024);
+        byte[] moof = audioMoof(time, accessUnit.length, 0);
+        moof = audioMoof(time, accessUnit.length, moof.length + 8);
+        lastAudioTime = time;
+        sequence++;
+        return join(moof, box("mdat", accessUnit));
+    }
+    private byte[] audioMoof(long time, int size, int offset) {
+        return box("moof", join(full("mfhd", 0, 0, new Bytes().u32(sequence).array()),
+                box("traf", join(full("tfhd", 0, 0x020000, new Bytes().u32(2).array()),
+                        full("tfdt", 1, 0, new Bytes().u64(time).array()),
+                        full("trun", 0, 0x000701, new Bytes().u32(1).u32(offset).u32(1024).u32(size).u32(0x02000000).array())))));
     }
 
     /** PTS is normalized to zero; duplicate/backward timestamps advance by one sample.

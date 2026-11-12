@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cz.kristek.neon.nativevr" android:versionCode="11" android:versionName="0.11.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cz.kristek.neon.nativevr" android:versionCode="12" android:versionName="0.12.0">
   <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true"/>
   <uses-feature android:name="android.hardware.vulkan.version" android:version="0x00401000" android:required="true"/>
   <uses-permission android:name="android.permission.INTERNET"/>
@@ -10,7 +10,7 @@
     <intent><action android:name="org.khronos.openxr.OpenXRRuntimeService"/></intent>
     <intent><action android:name="org.khronos.openxr.OpenXRApiLayerService"/></intent>
   </queries>
-  <application android:hasCode="false" android:label="Apollo Games · Neon Arena" android:icon="@drawable/app_icon" android:banner="@drawable/app_banner" android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="true">
+  <application android:allowAudioPlaybackCapture="true" android:hasCode="false" android:label="Apollo Games · Neon Arena" android:icon="@drawable/app_icon" android:banner="@drawable/app_banner" android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="true">
     <meta-data android:name="com.oculus.supportedDevices" android:value="quest2|questpro|quest3|quest3s"/>
     <activity android:name="android.app.NativeActivity" android:exported="true" android:launchMode="singleTask" android:screenOrientation="landscape" android:resizeableActivity="false" android:configChanges="screenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation|uiMode|density" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen">
       <meta-data android:name="android.app.lib_name" android:value="kristek_neon_native"/>
