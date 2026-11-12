@@ -46,8 +46,8 @@ test('six score challenges provide choices, delayed completion, precision, timin
         assert.ok(third.targets.filter(t=>t.fruit!==fruit).length>=3);
     }
     for(const c of plan.cues.filter(c=>c.label==='PRESNOST')){
-        assert.ok(c.targets.filter(t=>values[t.fruit]>=60).every(t=>t.scale>=.075&&t.scale<=.08&&t.lifetime>=1.6&&t.lifetime<=2.2));
-        assert.ok(c.targets.filter(t=>values[t.fruit]<=25).every(t=>t.scale>=.08));
+        assert.ok(c.targets.filter(t=>values[t.fruit]>=60).every(t=>t.scale===.105&&t.lifetime>=1.6&&t.lifetime<=2.2));
+        assert.ok(c.targets.filter(t=>values[t.fruit]<=25).every(t=>t.scale===.147));
     }
     for(const c of plan.cues.filter(c=>c.label==='NACASOVANI')){
         const high=c.targets.filter(t=>values[t.fruit]>=60);
@@ -152,14 +152,14 @@ test('round validation rejects malformed authoring and every target override bou
         p=>p.cues[0].targets[0].position=[0,.94,-1],p=>p.cues[0].targets[0].position=[0,1,-.89],
         p=>p.cues[0].targets[0].position=[0,1,-1.41],p=>p.cues[0].targets[0].extra=1,
     ];
-    for(const [key,invalid] of Object.entries({scale:[.029,.106,NaN,'0.06'],lifetime:[1.19,2.61,Infinity,'2'],velocity:[[.61,.5,0],[-.61,.5,0],[0,.5,.151],[0,.5,-.151],[0,NaN,0],[0,.5],null]})){
+    for(const [key,invalid] of Object.entries({scale:[.029,.148,NaN,'0.06'],lifetime:[1.19,2.61,Infinity,'2'],velocity:[[.61,.5,0],[-.61,.5,0],[0,.5,.151],[0,.5,-.151],[0,NaN,0],[0,.5],null]})){
         for(const value of invalid)mutations.push(p=>p.cues[0].targets[0][key]=value);
     }
     for(const change of mutations){const bad=copy();change(bad);assert.throws(()=>validateRoundPlan(bad));}
     for(const bad of [null,[],{},'plan'])assert.throws(()=>validateRoundPlan(bad));
     const valid=copy();delete valid.cues[0].wave.count;delete valid.cues[0].launch;valid.cues[0].targets.forEach(t=>t.velocity[1]=.6);
     Object.assign(valid.cues[0].targets[0],{scale:.03,lifetime:1.2,velocity:[-.6,.1,-.15]});
-    Object.assign(valid.cues[0].targets[1],{scale:.105,lifetime:2.6,velocity:[.6,1,.15]});
+    Object.assign(valid.cues[0].targets[1],{scale:.147,lifetime:2.6,velocity:[.6,1,.15]});
     assert.equal(validateRoundPlan(valid).cues[0].wave.count,6);
 });
 

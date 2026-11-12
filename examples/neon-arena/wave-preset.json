@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "name": "Lexi · Minutová jízda · 60 sekund",
+  "name": "Lexi \u00b7 Minutov\u00e1 j\u00edzda \u00b7 60 sekund",
   "wave": {
     "count": 10,
     "intervalMs": 3000,
     "formation": "arc",
     "fruit": "mixed",
     "automatic": true,
-    "fruitScale": 0.09,
+    "fruitScale": 0.126,
     "width": 0.74,
     "height": 1.28,
     "depth": -1.12,

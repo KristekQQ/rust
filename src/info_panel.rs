@@ -35,17 +35,42 @@ impl PanelKind {
         }
     }
 }
+#[derive(Clone)]
 pub struct InfoPanel {
     pub kind: PanelKind,
     pub width: f32,
     pub height: f32,
-    pub mesh: ImportedMesh,
+    #[cfg(target_arch = "wasm32")]
+    pub mesh: std::rc::Rc<ImportedMesh>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub mesh: std::sync::Arc<ImportedMesh>,
     pub dirty: bool,
     pub(crate) revision: u64,
     pub(crate) font3d_bound: bool,
     rows: Vec<(&'static str, String)>,
 }
 impl InfoPanel {
+    /// Render-mirror construction; supplied geometry is never rebuilt here.
+    pub(crate) fn from_render(
+        kind: PanelKind,
+        width: f32,
+        height: f32,
+        mesh: ImportedMesh,
+        revision: u64,
+        font3d_bound: bool,
+    ) -> Self {
+        Self {
+            kind,
+            width,
+            height,
+            mesh: mesh.into(),
+            dirty: true,
+            revision,
+            font3d_bound,
+            rows: Vec::new(),
+        }
+    }
+
     pub fn new(kind: PanelKind, width: f32, height: f32) -> Result<Self, String> {
         if !width.is_finite()
             || !height.is_finite()
@@ -86,7 +111,7 @@ impl InfoPanel {
             kind,
             width,
             height,
-            mesh: geometry(kind, width, height, &rows),
+            mesh: geometry(kind, width, height, &rows).into(),
             dirty: true,
             revision: 0,
             font3d_bound: false,
@@ -103,7 +128,7 @@ impl InfoPanel {
         let mut panel = Self::new(PanelKind::Score, width, height)?;
         panel.kind = PanelKind::NumericText;
         panel.rows = vec![("", value.into())];
-        panel.mesh = geometry(panel.kind, width, height, &panel.rows);
+        panel.mesh = geometry(panel.kind, width, height, &panel.rows).into();
         Ok(panel)
     }
     pub fn text(title: &str, lines: &[String], width: f32, height: f32) -> Result<Self, String> {
@@ -119,7 +144,7 @@ impl InfoPanel {
             return Err("Text panels allow a 48 character title and 12 lines of 64 characters without control characters".into());
         }
         panel.kind = PanelKind::Text;
-        panel.mesh = text_geometry(title, lines, width, height);
+        panel.mesh = text_geometry(title, lines, width, height).into();
         Ok(panel)
     }
     pub fn update(&mut self, rows: Vec<(&'static str, String)>) -> bool {
@@ -127,9 +152,9 @@ impl InfoPanel {
             return false;
         }
         if !self.font3d_bound {
-            #[cfg(target_arch = "wasm32")]
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             let _scope = crate::render::profiler::cpu_scope("panel.geometry");
-            self.mesh = geometry(self.kind, self.width, self.height, &rows);
+            self.mesh = geometry(self.kind, self.width, self.height, &rows).into();
         }
         self.rows = rows;
         self.dirty = true;
@@ -869,7 +894,10 @@ fn numeric_glyph_ref(digit: u8) -> &'static ImportedMesh {
     &GLYPHS.get_or_init(|| std::array::from_fn(|d| build_numeric_glyph(d as u8)))[digit as usize]
 }
 /// Narrow blue axis ribbons feed one soft halo through the existing cached pass.
-#[cfg_attr(not(any(test, target_arch = "wasm32")), allow(dead_code))]
+#[cfg_attr(
+    not(any(test, target_arch = "wasm32", feature = "native-render")),
+    allow(dead_code)
+)]
 pub(crate) fn numeric_glyph_glow(digit: u8) -> ImportedMesh {
     let mut mesh = empty_mesh(5., 7.);
     for points in digit_curves(digit) {
@@ -958,7 +986,7 @@ impl InfoPanel {
     pub(crate) fn set_font3d_bound(&mut self, bound: bool) {
         self.font3d_bound = bound;
         if !bound {
-            self.mesh = geometry(self.kind, self.width, self.height, &self.rows);
+            self.mesh = geometry(self.kind, self.width, self.height, &self.rows).into();
             self.dirty = true;
         }
     }
@@ -1187,7 +1215,7 @@ mod numeric_tube_tests {
 
 // Active panel storage only: geometric growth, shrink below one quarter, no
 // inactive pool. All current payloads are 4-byte aligned. Device limit is kept.
-#[cfg(any(target_arch = "wasm32", test))]
+#[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
 pub(crate) fn buffer_capacity(required: u64, current: u64, limit: u64) -> u64 {
     let needed = required.max(4);
     if needed > current || needed < current / 4 {

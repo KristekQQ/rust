@@ -7,7 +7,7 @@ import path from 'node:path';
 import { root, assertFreshBuild } from './build-fingerprint.mjs';
 
 const inputs = ['src', 'third_party', 'js', 'examples', 'tests', 'scripts', 'assets', '.github',
-    'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml',
+    'native', 'games', 'tools', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml',
     'package.json', 'package-lock.json', 'tsconfig.json'];
 // Execution-broker transport identity is not consumed by the browser runner.
 // These can change between Codex calls despite identical verification inputs.
@@ -55,6 +55,12 @@ export async function verificationKey(mode, args, directory = root) {
     return hash.digest('hex');
 }
 export function receiptMatches(receipt, key) { return receipt?.passed === true && receipt.key === key; }
+async function workerBuild() {
+    try { await stat(path.join(root, 'games/neon-browser-worker/Cargo.toml')); }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    const {assertFreshWorkerBuild} = await import('./neon-worker-fingerprint.mjs');
+    return assertFreshWorkerBuild();
+}
 async function generatedTypes() {
     try { return createHash('sha256').update(await readFile(path.join(root, 'pkg/webgpu_wasm.d.ts'))).digest('hex'); }
     catch { return null; }
@@ -70,7 +76,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         try {
             const receipt = JSON.parse(await readFile(destination, 'utf8'));
             if (process.env.VERIFY_FORCE === '1' || !receiptMatches(receipt, key) || receipt.types !== await generatedTypes()) process.exit(1);
-            if (mode !== 'native' && JSON.stringify(receipt.build) !== JSON.stringify(await assertFreshBuild())) process.exit(1);
+            if (mode !== 'native' && (JSON.stringify(receipt.build) !== JSON.stringify(await assertFreshBuild()) || JSON.stringify(receipt.worker) !== JSON.stringify(await workerBuild()))) process.exit(1);
             console.log(`PASS reused: ${mode} ${args.join(' ')} (unchanged inputs)`);
         } catch { process.exit(1); }
     } else if (command === 'clear') {
@@ -79,6 +85,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         if (key !== expected) throw new Error('Verification inputs changed during checks; PASS not cached.');
         await mkdir(path.dirname(destination), { recursive: true });
         const build = mode === 'native' ? null : await assertFreshBuild();
-        await writeFile(destination, JSON.stringify({ passed: true, key, mode, args, build, types: await generatedTypes(), finished: new Date().toISOString() }) + '\n');
+        const worker = mode === 'native' ? null : await workerBuild();
+        await writeFile(destination, JSON.stringify({ passed: true, key, mode, args, build, worker, types: await generatedTypes(), finished: new Date().toISOString() }) + '\n');
     } else throw new Error('Expected key, check, clear or record');
 }

@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8"><title>Native scene assets, cut halves and removal</title>
+<canvas id="gpu-canvas" width="640" height="480"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+import {WireCache} from '../tools/scene-observer/protocol.mjs';
+const result=document.querySelector('#result'),canvas=document.querySelector('canvas');
+try{
+ const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.set_simulation_paused(true);engine.setDebugOverlay(false);
+ engine.set_render_effects(false,false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);
+ engine.setBackgroundColor([.01,.02,.03]);engine.setCameraView([3,2.5,4],[.5,.3,.2]);
+ // Native +X must appear right looking toward -Z. Solid mesh pixels also
+ // verify that changing projection orientation selects the correct winding.
+ const positions=[-.3,-.3,-.3,.3,-.3,-.3,.3,.3,-.3,-.3,.3,-.3,-.3,-.3,.3,.3,-.3,.3,.3,.3,.3,-.3,.3,.3];
+ const indices=[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5];
+ const left=engine.scene.createMesh({positions,indices,color:[1,0,0]}).setPosition([-1,0,0]).setEmission(1);
+ const right=engine.scene.createMesh({positions,indices,color:[0,0,1]}).setPosition([1,0,0]).setEmission(1);
+ engine.setOrbitView([0,1,4],[0,0,0]);
+ const centers=image=>{
+   let red=0,blue=0,rx=0,bx=0;
+   for(let i=0;i<image.data.length;i+=4){const [r,g,b]=image.data.subarray(i,i+3),x=(i/4)%image.width;
+     if(r>50&&r>2*g&&r>2*b){red++;rx+=x;}
+     if(b>50&&b>2*g&&b>2*r){blue++;bx+=x;}}
+   if(red<50||blue<50)throw Error('Camera handedness culled a solid marker');
+   return [rx/red,bx/blue];
+ };
+ const legacy=centers(await capturePixels(canvas));
+ if(legacy[0]<legacy[1])throw Error('Default desktop camera compatibility changed');
+ engine.setCameraHandedness('right');
+ const corrected=centers(await capturePixels(canvas));
+ if(corrected[0]>=corrected[1])throw Error('Native scene is horizontally mirrored');
+ if(engine.worldToScreen([-1,0,0])[0]>=engine.worldToScreen([1,0,0])[0])throw Error('Picking projection disagrees with pixels');
+ left.remove();right.remove();
+ const faceColors=Array.from({length:12},(_,i)=>i<2?[1,0,0]:i<4?[0,0,1]:[0,1,0]).flat();
+ const alpha=engine.scene.createMesh({positions,indices,triangleColors:faceColors}).setEmission(1).setOpacity(.45);
+ engine.setOrbitView([0,0,4],[0,0,0]);engine.setCameraHandedness('left');
+ const center=image=>Array.from(image.data.subarray((Math.floor(image.height/2)*image.width+Math.floor(image.width/2))*4)).slice(0,3);
+ const legacyAlpha=center(await capturePixels(canvas));
+ engine.setCameraHandedness('right');
+ const correctedAlpha=center(await capturePixels(canvas));
+ if(legacyAlpha[0]<10||legacyAlpha[2]<10)throw Error('Both colored alpha surfaces must contribute');
+ if(legacyAlpha.some((v,i)=>Math.abs(v-correctedAlpha[i])>3))throw Error('Camera handedness reversed translucent front/rear compositing: '+legacyAlpha+' / '+correctedAlpha);
+ alpha.remove();
+ engine.setCameraView([3,2.5,4],[.5,.3,.2]);
+ const cache=new WireCache(),peer={sequence:0,known:[new Map(),new Map(),new Map()]};
+ const apply=async name=>{
+   const r=await fetch('./fixtures/native-scene/'+name+'.nwr');if(!r.ok)throw Error('Missing Rust fixture '+name);
+   cache.ingest(new Uint8Array(await r.arrayBuffer()));engine.applySimulationPublication(cache.packetFor(peer),[]);
+   return capturePixels(canvas);
+ };
+ const initial=await apply('initial');assertForeground(initial,'shared model');
+ const cut=await apply('cut');assertForeground(cut,'cut halves');assertChanged(initial,cut,'actual Rust cut');
+ if(cache.assets[0].size!==2)throw Error('Expected exactly two detached cut meshes');
+ const removed=await apply('removed');assertChanged(cut,removed,'removed halves');
+ if(cache.assets[0].size!==0)throw Error('Detached meshes leaked after removal');
+ window.sceneSyncEvidence={model:true,cutHalves:2,removed:true};
+ result.textContent='PASS: real Rust shared model -> two cut halves -> removed, NWR3 cache, actual browser pixels';
+}catch(e){result.textContent='FAIL: '+e.message;console.error(e);}
+</script>

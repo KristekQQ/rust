@@ -47,8 +47,9 @@ function summarize(phase,windows){
 
 /** Pure controller; the caller applies effects and restores settings in onFinish. */
 export class PerformanceTest {
-    /** @param {{applyPhase:(phase:Readonly<Phase>)=>void,onUpdate?:(state:Snapshot)=>void,onFinish?:(state:Snapshot)=>void}} callbacks */
-    constructor({applyPhase,onUpdate=()=>{},onFinish=()=>{}}){
+    /** @param {{applyPhase:(phase:Readonly<Phase>)=>void,onUpdate?:(state:Snapshot)=>void,onFinish?:(state:Snapshot)=>void,phases?:readonly Readonly<Phase>[]}} callbacks */
+    constructor({applyPhase,onUpdate=()=>{},onFinish=()=>{},phases=PERFORMANCE_PHASES}){
+        this.phases=phases;
         this.applyPhase=applyPhase;this.onUpdate=onUpdate;this.onFinish=onFinish;
         this.status='idle';this.reason=null;this.phaseIndex=-1;this.settleCount=0;
         /** @type {Packet[]} */ this.windows=[];
@@ -59,7 +60,7 @@ export class PerformanceTest {
     get running(){return this.status==='running';}
     /** @returns {Snapshot} */
     snapshot(){
-        return copy({status:this.status,reason:this.reason,phase:PERFORMANCE_PHASES[this.phaseIndex]??null,
+        return copy({status:this.status,reason:this.reason,phase:this.phases[this.phaseIndex]??null,
             phaseIndex:this.phaseIndex,settleCount:this.settleCount,sampleCount:this.windows.length,
             settlePackets:SETTLE_PACKETS,samplePackets:SAMPLE_PACKETS,results:this.results});
     }
@@ -67,7 +68,7 @@ export class PerformanceTest {
         if(this.running)return false;
         this.status='running';this.reason=null;this.phaseIndex=0;this.settleCount=0;
         this.windows=[];this.results=[];this.sessionId=undefined;this.viewports=undefined;
-        this.applyPhase(PERFORMANCE_PHASES[0]);this.onUpdate(this.snapshot());
+        this.applyPhase(this.phases[0]);this.onUpdate(this.snapshot());
         return true;
     }
     /** @param {Packet} detail */
@@ -85,12 +86,12 @@ export class PerformanceTest {
         if(this.settleCount<SETTLE_PACKETS)this.settleCount++;
         else this.windows.push(copy(detail));
         if(this.windows.length===SAMPLE_PACKETS){
-            this.results.push(summarize(PERFORMANCE_PHASES[this.phaseIndex],this.windows));
-            if(this.phaseIndex===PERFORMANCE_PHASES.length-1){
+            this.results.push(summarize(this.phases[this.phaseIndex],this.windows));
+            if(this.phaseIndex===this.phases.length-1){
                 this.status='complete';this.onUpdate(this.snapshot());this.onFinish(this.snapshot());return true;
             }
             this.phaseIndex++;this.settleCount=0;this.windows=[];
-            this.applyPhase(PERFORMANCE_PHASES[this.phaseIndex]);
+            this.applyPhase(this.phases[this.phaseIndex]);
         }
         this.onUpdate(this.snapshot());return true;
     }

@@ -359,18 +359,125 @@ impl SceneManager {
             self.collect_font3d();
         }
     }
+    pub(super) fn publication_font_assets(&self) -> std::collections::BTreeSet<u32> {
+        self.font3d
+            .fonts
+            .values()
+            .flat_map(|f| f.cache.values().copied())
+            .collect()
+    }
     pub fn font3d_stats(&self) -> Value {
         json!({"fonts":self.font3d.fonts.len(), "texts":self.font3d.texts.len(), "cachedGlyphs":self.font3d.fonts.values().map(|f| f.cache.len()).sum::<usize>(), "liveGlyphs":self.font3d.children.len(), "layoutRebuilds":self.font3d.layout_rebuilds, "syncUpdates":self.font3d.sync_updates})
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn font3d_assets(&self) -> impl Iterator<Item = &u32> {
-        self.font3d.fonts.values().flat_map(|f| f.cache.values())
+        let assets = self.font3d.fonts.values().flat_map(|f| f.cache.values());
+        let assets = assets.chain(self.render_publication.font_assets.iter());
+        // A render mirror keeps its startup font registry, but publications may
+        // already have removed those registry handles from the live asset map.
+        assets.filter(|id| self.mesh_variants.contains_key(id))
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn font3d_children(&self) -> impl Iterator<Item = &u32> {
-        self.font3d.children.iter()
+        let children = self.font3d.children.iter();
+        let children = children.chain(self.render_publication.font_children.iter());
+        children.filter(|id| self.objects.contains_key(id))
     }
 
+    /// Loading-only halo sources: no scene objects, IDs, cache handles or
+    /// publication state are changed. Styles come from existing texts/bindings.
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+    pub(crate) fn font3d_glow_sources(
+        &self,
+        characters: &str,
+    ) -> Vec<(u32, crate::cutting_mesh::MeshData)> {
+        let mut result = Vec::new();
+        for (&id, font) in &self.font3d.fonts {
+            if self.render_publication.is_mirror
+                && !self.render_publication.font_owners.contains(&id)
+            {
+                continue;
+            }
+            let mut styles: BTreeSet<_> = self
+                .font3d
+                .texts
+                .values()
+                .filter(|text| text.font == id)
+                .map(|text| text.options.style())
+                .collect();
+            styles.extend(
+                self.font3d
+                    .bindings
+                    .values()
+                    .filter(|binding| binding.font == id)
+                    .map(|binding| binding.options.style()),
+            );
+            styles.extend(font.cache.keys().map(|(_, style)| *style));
+            if styles.is_empty() {
+                styles.insert(Options::default().style());
+            }
+            for style in styles {
+                let color = Vec3::new(
+                    f32::from_bits(style[0]),
+                    f32::from_bits(style[1]),
+                    f32::from_bits(style[2]),
+                );
+                let side = f32::from_bits(style[3]);
+                let mut selected: BTreeSet<_> = characters.chars().take(1024).collect();
+                selected.extend(
+                    self.font3d
+                        .texts
+                        .values()
+                        .filter(|text| text.font == id && text.options.style() == style)
+                        .flat_map(|text| text.layout.iter().map(|(ch, _)| *ch)),
+                );
+                selected.extend(
+                    font.cache
+                        .keys()
+                        .filter(|(_, cached_style)| *cached_style == style)
+                        .map(|(ch, _)| *ch),
+                );
+                for ch in selected {
+                    let Some(glyph) = font.glyphs.get(&ch) else {
+                        continue;
+                    };
+                    let Some(mesh) = glyph.mesh.as_ref().and_then(|mesh| mesh.ready_cpu()) else {
+                        continue;
+                    };
+                    let rgb: Vec<_> = glyph
+                        .front
+                        .iter()
+                        .map(|front| color * if *front { 1. } else { side })
+                        .collect();
+                    result.push((
+                        id,
+                        crate::cutting_mesh::MeshData::from(mesh.recolored(&rgb)),
+                    ));
+                    // Same bounded budget as the renderer; excess sources use
+                    // ordinary capsules until another explicit prewarm selection.
+                    if result.len() == 128 {
+                        return result;
+                    }
+                }
+            }
+        }
+        result
+    }
+    pub(super) fn publication_font_owners(&self) -> BTreeSet<u32> {
+        self.font3d.fonts.keys().copied().collect()
+    }
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+    pub(crate) fn font3d_glow_fonts(&self) -> std::collections::HashSet<u32> {
+        if self.render_publication.is_mirror {
+            self.render_publication
+                .font_owners
+                .iter()
+                .copied()
+                .collect()
+        } else {
+            self.publication_font_owners().into_iter().collect()
+        }
+    }
     pub fn register_font3d(&mut self, input: &str) -> Result<u32, String> {
         if input.len() > 16 * 1024 * 1024 || self.font3d.fonts.len() >= 64 {
             return Err("Font budget exceeded".into());
@@ -675,6 +782,9 @@ impl SceneManager {
         }
     }
     pub fn sync_font3d(&mut self) {
+        if self.render_publication.is_mirror {
+            return;
+        }
         self.sync_font3d_panel_bindings();
         let mut state = std::mem::take(&mut self.font3d);
         for (&id, text) in &mut state.texts {
@@ -712,7 +822,7 @@ impl SceneManager {
                                     * if *front { 1. } else { text.options.side }
                             })
                             .collect();
-                        let colors = rgb.iter().map(|c| [c.x, c.y, c.z, 1.]).collect();
+                        let colors: Vec<_> = rgb.iter().map(|c| [c.x, c.y, c.z, 1.]).collect();
                         // Shared renderer assets require a materialized CPU base;
                         // lazy color recipes are only used for later variants.
                         let mesh = crate::cutting_mesh::MeshData::from(
@@ -728,10 +838,10 @@ impl SceneManager {
                         self.mesh_variants.insert(
                             handle,
                             MeshVariants {
-                                variants: vec![mesh],
-                                colors,
+                                variants: vec![mesh].into(),
+                                colors: colors.into(),
                                 registered: true,
-                                varying_triangles: vec![],
+                                varying_triangles: vec![].into(),
                             },
                         );
                         handle

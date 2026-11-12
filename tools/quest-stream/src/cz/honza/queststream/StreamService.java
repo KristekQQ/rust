@@ -18,6 +18,8 @@ import java.util.concurrent.*;
 public final class StreamService extends Service {
     public static volatile String status = "Přenos je vypnutý.";
     public static volatile String token;
+    private static volatile boolean capturing;
+    public static boolean isCapturing() { return capturing; }
     private LocalServer server;
     private MediaProjection projection;
     private volatile boolean destroyed;
@@ -61,8 +63,8 @@ public final class StreamService extends Service {
             if (item.startsWith("token=")) key = item.substring(6);
         String expected = token;
         if (expected == null || !expected.equals(key)) { LocalServer.reply(socket, 403, "text/plain", "Neplatný odkaz.".getBytes(StandardCharsets.UTF_8)); return; }
-        if ("/".equals(uri.getPath()) || "/viewer.js".equals(uri.getPath())) {
-            String name = "/".equals(uri.getPath()) ? "index.html" : "viewer.js";
+        if ("/".equals(uri.getPath()) || "/viewer.js".equals(uri.getPath()) || "/playback-policy.js".equals(uri.getPath())) {
+            String name = "/".equals(uri.getPath()) ? "index.html" : uri.getPath().substring(1);
             try (InputStream in = getAssets().open(name); ByteArrayOutputStream b = new ByteArrayOutputStream()) {
                 byte[] chunk = new byte[8192]; int count;
                 while ((count = in.read(chunk)) != -1) b.write(chunk, 0, count);
@@ -136,6 +138,7 @@ public final class StreamService extends Service {
                             if (muxer != null && haveKey) {
                                 ByteBuffer b = encoder.getOutputBuffer(index).duplicate(); b.position(info.offset); b.limit(info.offset + info.size);
                                 hub.publish(muxer.fragment(bytes(b), info.presentationTimeUs, key), key);
+                                capturing = true;
                             }
                         }
                     } finally { encoder.releaseOutputBuffer(index, false); }
@@ -143,6 +146,7 @@ public final class StreamService extends Service {
             }
         } catch (Exception e) { if (!destroyed) status = "Přenos skončil: " + e.getMessage(); }
         finally {
+            capturing = false;
             captureDone = true;
             if (display != null) display.release();
             if (encoder != null) { try { encoder.stop(); } catch (Exception ignored) {} encoder.release(); }
@@ -153,6 +157,7 @@ public final class StreamService extends Service {
     }
     public void onDestroy() {
         destroyed = true;
+        capturing = false;
         if (server != null) server.close();
         hub.close();
         if (projection != null) projection.stop();

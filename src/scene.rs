@@ -9,25 +9,38 @@ mod font3d;
 #[path = "numeric_font.rs"]
 mod numeric_font;
 
+#[path = "scene_interpolation.rs"]
+mod interpolation;
+#[path = "scene_publication.rs"]
+pub mod publication;
+#[path = "scene_wire.rs"]
+pub mod wire;
+
+#[cfg(target_arch = "wasm32")]
+type AssetArray<T> = std::rc::Rc<[T]>;
+#[cfg(not(target_arch = "wasm32"))]
+type AssetArray<T> = std::sync::Arc<[T]>;
+
 pub const MAX_LIGHTS: usize = 4;
 pub const INVALID_ID: u32 = u32::MAX;
 
+#[derive(Clone)]
 pub struct TriangleObject {
     pub mesh: crate::cutting_mesh::MeshData,
     pub cuttable: bool,
     pub cap_color: Vec3,
 }
+#[derive(Clone)]
 pub(crate) struct MeshVariants {
-    pub variants: Vec<crate::cutting_mesh::MeshData>,
+    pub variants: AssetArray<crate::cutting_mesh::MeshData>,
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    pub colors: Vec<[f32; 4]>,
+    pub colors: AssetArray<[f32; 4]>,
     pub registered: bool,
-    pub varying_triangles: Vec<usize>,
+    pub varying_triangles: AssetArray<usize>,
 }
 impl MeshVariants {
     /// Only the specialized shared GPU buffer gets negative red slot markers.
     /// CPU topology/colors remain untouched for glow extraction and cutting.
-    #[cfg(any(test, target_arch = "wasm32"))]
     pub(crate) fn gpu_mesh(&self) -> crate::gltf_loader::ImportedMesh {
         let mut mesh = self.variants[0]
             .ready_cpu()
@@ -40,7 +53,6 @@ impl MeshVariants {
         }
         mesh
     }
-    #[cfg(any(test, target_arch = "wasm32"))]
     pub(crate) fn gpu_colors(&self) -> Vec<[f32; 4]> {
         self.colors
             .chunks_exact(self.variants[0].triangle_count())
@@ -140,6 +152,17 @@ pub(crate) fn normal_matrix(model: Mat4) -> Mat4 {
     model.inverse().transpose()
 }
 
+// Both inputs are affine by construction. General Mat4 inversion/multiplication
+// can round the homogeneous row, so canonicalize it before immutable wire capture.
+fn cut_birth_relative(parent_inverse: Mat4, child: Mat4) -> Mat4 {
+    let mut relative = parent_inverse * child;
+    relative.x_axis.w = 0.;
+    relative.y_axis.w = 0.;
+    relative.z_axis.w = 0.;
+    relative.w_axis.w = 1.;
+    relative
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MeshKind {
     Cube,
@@ -187,7 +210,7 @@ impl Transform {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct ShadowRevisions {
     static_casters: u64,
     dynamic_casters: u64,
@@ -239,6 +262,7 @@ struct PieceFade {
     start: f32,
 }
 
+#[derive(Clone)]
 pub struct SceneObject {
     pub transform: Transform,
     pub mesh: MeshKind,
@@ -311,6 +335,9 @@ pub(crate) struct ModelGpuChanges {
 
 #[derive(Default)]
 pub struct SceneManager {
+    pub(crate) render_publication: publication::MirrorState,
+    wire_state: wire::WireState,
+    mirror_interpolation: interpolation::MirrorInterpolation,
     pub table_tennis: Option<crate::table_tennis::Game>,
     feedback: cut_feedback::Feedback,
     numeric_font: numeric_font::NumericFont,
@@ -341,6 +368,8 @@ pub struct SceneManager {
     projectiles: BTreeMap<u32, (Vec3, f32, f32)>,
     projectile_scratch: Vec<crate::projectile::Body>,
     cut_fragments: BTreeMap<u32, CutFragment>,
+    // Presentation provenance for every live cut child, independent of gameplay tracking.
+    cut_lineage: BTreeMap<u32, (u32, Mat4)>,
     fading_pieces: BTreeMap<u32, PieceFade>,
     fade_removals: Vec<u32>,
     projectile_order: Vec<usize>,
@@ -358,6 +387,26 @@ pub struct SceneManager {
 }
 
 impl SceneManager {
+    /// Presentation handedness for complete text roots, before font synchronization.
+    /// Desktop's LH orbit and immersive RH views need opposite local horizontal signs.
+    pub fn set_text_facing(&mut self, immersive: bool) {
+        let ids: Vec<_> = self
+            .info_panels
+            .iter()
+            .filter(|(_, p)| {
+                p.kind != crate::info_panel::PanelKind::Diagnostics
+                    && p.kind != crate::info_panel::PanelKind::Scene
+            })
+            .map(|(&id, _)| id)
+            .collect();
+        for id in ids {
+            if let Some(object) = self.objects.get(&id) {
+                let mut scale = object.transform.scale;
+                scale.x = scale.x.abs() * if immersive { 1. } else { -1. };
+                self.set_object_scale(id, scale);
+            }
+        }
+    }
     pub(crate) fn visibility_index(
         &self,
         collect_stats: bool,
@@ -410,7 +459,7 @@ impl SceneManager {
         changes: &mut ModelGpuChanges,
         id: u32,
     ) {
-        if !cfg!(any(target_arch = "wasm32", test)) {
+        if !cfg!(any(target_arch = "wasm32", test, feature = "native-render")) {
             return;
         }
         if let Some(model) = models.get_mut(&id) {
@@ -420,7 +469,7 @@ impl SceneManager {
             }
         }
     }
-    #[cfg(any(target_arch = "wasm32", test))]
+    #[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
     pub(crate) fn take_model_gpu_changes(&mut self) -> ModelGpuChanges {
         let changes = std::mem::take(&mut self.model_gpu_changes);
         for id in &changes.updated {
@@ -430,7 +479,7 @@ impl SceneManager {
         }
         changes
     }
-    #[cfg(any(target_arch = "wasm32", test))]
+    #[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
     pub(crate) fn recycle_model_gpu_changes(&mut self, mut changes: ModelGpuChanges) {
         changes.updated.clear();
         changes.removed.clear();
@@ -439,7 +488,7 @@ impl SceneManager {
         changes.removed.append(&mut self.model_gpu_changes.removed);
         self.model_gpu_changes = changes;
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn model_gpu_queue_stats(&self) -> (usize, usize) {
         let changes = &self.model_gpu_changes;
         (
@@ -447,7 +496,7 @@ impl SceneManager {
             (changes.updated.capacity() + changes.removed.capacity()) * std::mem::size_of::<u32>(),
         )
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn retry_model_gpu_update(&mut self, id: u32) {
         Self::queue_model_gpu_update(&mut self.models, &mut self.model_gpu_changes, id);
     }
@@ -1030,6 +1079,12 @@ impl SceneManager {
             panel.update(rows.to_vec());
         }
     }
+    /// Update one authored panel without changing other panels of the same kind.
+    pub fn update_info_panel(&mut self, id: u32, rows: &[(&'static str, String)]) -> bool {
+        self.info_panels
+            .get_mut(&id)
+            .is_some_and(|panel| panel.update(rows.to_vec()))
+    }
     /// Stable render handles are separate from instance identities.
     pub fn mesh_exists(&self, id: u32) -> bool {
         self.object_exists(id) || self.mesh_variants.contains_key(&id)
@@ -1099,8 +1154,8 @@ impl SceneManager {
         self.mesh_variants.insert(
             id,
             MeshVariants {
-                variants,
-                colors: table,
+                variants: variants.into(),
+                colors: table.into(),
                 registered: true,
                 varying_triangles,
             },
@@ -1151,6 +1206,12 @@ impl SceneManager {
         mesh: crate::cutting::CutMesh,
     ) -> Result<u32, String> {
         self.add_mesh_data(crate::cutting_mesh::MeshData::visual_only(mesh))
+    }
+    pub(crate) fn add_prepared_visual_mesh(
+        &mut self,
+        mesh: crate::cutting_mesh::PreparedVisualMesh,
+    ) -> Result<u32, String> {
+        self.add_mesh_data(crate::cutting_mesh::MeshData::from_prepared_visual(mesh))
     }
     fn add_mesh_data(&mut self, mesh: crate::cutting_mesh::MeshData) -> Result<u32, String> {
         let total: usize = self
@@ -1943,6 +2004,16 @@ impl SceneManager {
                 )
             })
             .collect();
+        let birth_parents: BTreeMap<_, _> = removed
+            .iter()
+            .map(|&id| {
+                (
+                    id,
+                    Mat4::from_cols_array_2d(&self.objects[&id].render_data.instance.model)
+                        .inverse(),
+                )
+            })
+            .collect();
         for &id in &removed {
             self.remove_object(id);
         }
@@ -1974,6 +2045,13 @@ impl SceneManager {
                 self.set_color_cutout(id, cutoff);
                 self.set_opacity(id, opacity, opaque_above, variation, coverage);
                 self.set_cuttable(id, true, candidate.color)?;
+                self.cut_lineage.insert(
+                    id,
+                    (
+                        candidate.id,
+                        cut_birth_relative(birth_parents[&candidate.id], transform.model()),
+                    ),
+                );
                 report.pieces.push(id);
                 report.piece_directions.push(direction);
             }
@@ -2341,6 +2419,17 @@ impl SceneManager {
                 )
             })
             .collect();
+        let birth_parents: BTreeMap<_, _> = report
+            .removed
+            .iter()
+            .map(|&id| {
+                (
+                    id,
+                    Mat4::from_cols_array_2d(&self.objects[&id].render_data.instance.model)
+                        .inverse(),
+                )
+            })
+            .collect();
         for &id in &report.removed {
             self.remove_object(id);
         }
@@ -2399,6 +2488,13 @@ impl SceneManager {
                     && ((max - min) * transform.scale.abs()).min_element() >= MIN_CUT_EXTENT
             });
             let id = self.add_triangle_mesh(piece)?;
+            self.cut_lineage.insert(
+                id,
+                (
+                    source,
+                    cut_birth_relative(birth_parents[&source], transform.model()),
+                ),
+            );
             self.set_object_transform(id, transform.position, transform.rotation, transform.scale);
             self.set_render_options(id, options);
             let (emission, cutoff, opacity, opaque_above, variation, coverage) = materials[&source];
@@ -2539,11 +2635,13 @@ impl SceneManager {
         )
     }
     pub fn clear_scene(&mut self) {
+        self.mirror_interpolation.clear();
         self.table_tennis = None;
         self.feedback = cut_feedback::Feedback::default();
         self.projectiles.clear();
         self.projectile_scratch.clear();
         self.cut_fragments.clear();
+        self.cut_lineage.clear();
         self.fading_pieces.clear();
         self.projectile_order.clear();
         self.projectile_pairs.clear();
@@ -2567,7 +2665,7 @@ impl SceneManager {
         self.shadow_revisions.clear();
         self.objects.clear();
         self.model_gpu_changes.updated.clear();
-        if cfg!(any(target_arch = "wasm32", test)) {
+        if cfg!(any(target_arch = "wasm32", test, feature = "native-render")) {
             self.model_gpu_changes
                 .removed
                 .extend(self.models.keys().copied());
@@ -2612,7 +2710,9 @@ impl SceneManager {
         };
         self.shadow_revisions.changed(removed.render_options);
         self.collision_dirty |= self.colliders.remove(&id).is_some();
-        if self.models.remove(&id).is_some() && cfg!(any(target_arch = "wasm32", test)) {
+        if self.models.remove(&id).is_some()
+            && cfg!(any(target_arch = "wasm32", test, feature = "native-render"))
+        {
             self.model_gpu_changes.removed.push(id);
         }
         self.triangle_meshes.remove(&id);
@@ -2642,6 +2742,7 @@ impl SceneManager {
         self.spins.remove(&id);
         self.projectiles.remove(&id);
         self.cut_fragments.remove(&id);
+        self.cut_lineage.remove(&id);
         self.fading_pieces.remove(&id);
         self.rotations.retain(|r| r.id != id);
         self.removals
@@ -2863,6 +2964,10 @@ impl SceneManager {
         true
     }
     pub fn update(&mut self, dt: f32) {
+        if self.render_publication.is_mirror {
+            self.update_mirror_interpolation(dt);
+            return;
+        }
         if self.paused || !dt.is_finite() || dt <= 0.0 {
             return;
         }
@@ -4211,7 +4316,7 @@ mod shared_mesh_variant_tests {
             .register_mesh_variants(&p, &i, &[first, second].concat(), true)
             .unwrap();
         let asset = &scene.mesh_variants[&handle];
-        assert_eq!(asset.varying_triangles, vec![1, 3]);
+        assert_eq!(asset.varying_triangles.as_ref(), &[1, 3]);
         assert_eq!(
             asset.gpu_colors(),
             vec![

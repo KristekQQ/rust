@@ -84,6 +84,13 @@ test('verification receipt survives commit but not changed inputs, arguments or 
     execFileSync('git', ['add', 'src/lib.rs'], { cwd: root });
     execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture'], { cwd: root });
     assert.equal(await verificationKey('all', [], root), key, 'Commit/staging must not invalidate a content-identical PASS');
+    for (const file of ['native/neon/src/app.rs', 'games/neon-core/src/game.rs', 'tools/scene-observer/server.mjs']) {
+        await mkdir(path.dirname(path.join(root, file)), {recursive:true});
+        await writeFile(path.join(root, file), 'new runtime input');
+        assert.notEqual(await verificationKey('all', [], root), key, file + ' invalidates PASS');
+        await rm(path.join(root, file));
+        assert.equal(await verificationKey('all', [], root), key);
+    }
     await writeFile(path.join(root, 'README.md'), 'docs only');
     assert.equal(await verificationKey('all', [], root), key, 'Prose does not change tested inputs');
     await mkdir(path.join(root, 'scripts/__pycache__'));
@@ -220,3 +227,16 @@ test('pixel assertions reject blank presentation and unchanged deformation', asy
     assert.equal(assertForeground(geometry, 'visible target'), 200);
     assert.equal(assertChanged(black, geometry, 'deformed pose'), 200);
 });
+
+ test('Neon worker identity binds source plus ignored WASM and bindings', async t => {
+    const directory=await mkdtemp(path.join(tmpdir(),'neon-worker-identity-'));
+    t.after(()=>rm(directory,{recursive:true,force:true}));
+    const files=['games/neon-core/src/lib.rs','games/neon-core/Cargo.toml','games/neon-browser-worker/src/lib.rs','games/neon-browser-worker/Cargo.toml','games/neon-browser-worker/Cargo.lock','pkg-neon-worker/neon_browser_worker_bg.wasm','pkg-neon-worker/neon_browser_worker.js'];
+    for(const file of files){await mkdir(path.dirname(path.join(directory,file)),{recursive:true});await writeFile(path.join(directory,file),'fixture');}
+    const {workerIdentity}=await import('../scripts/neon-worker-fingerprint.mjs');
+    const engine={source:'fixture-engine',configuration:{profile:'dev'}};
+    const baseline=await workerIdentity({directory,engine});
+    for(const file of files){await writeFile(path.join(directory,file),'changed');assert.notDeepEqual(await workerIdentity({directory,engine}),baseline,file);await writeFile(path.join(directory,file),'fixture');}
+    await rm(path.join(directory,files.at(-1)));
+    await assert.rejects(workerIdentity({directory,engine}),/ENOENT/);
+ });

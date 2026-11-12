@@ -9,4 +9,7 @@ if ! "$build_node" --input-type=module -e 'import {assertFreshBuild} from "./scr
     wasm-pack build --target web --release -- --locked
     "$build_node" scripts/build-fingerprint.mjs --write
 fi
+if [[ -f games/neon-browser-worker/Cargo.toml ]]; then
+    bash scripts/build-neon-browser-worker.sh
+fi
 "$build_node" scripts/build-production.mjs

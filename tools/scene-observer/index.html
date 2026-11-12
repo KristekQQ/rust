@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Apollo · Scene Observer</title><link rel="stylesheet" href="./observer.css"></head>
+<body>
+<header><a class="brand" href="./">APOLLO<span>SCENE OBSERVER</span></a><span id="mode" class="pill">ČEKÁ NA ZDROJ</span><span class="prototype">PROTOTYP</span></header>
+<main>
+ <section class="intro"><div><p class="eyebrow">JEDEN SVĚT. TVOJE KAMERA.</p><h1>Buď u toho.<br><span>Z jiného úhlu.</span></h1><p>Skutečné objekty hry, ovoce a řezy. Pohyb v reálném čase, kamera podle tebe.</p></div>
+ <div class="actions"><button id="demo" class="primary">Spustit ukázku</button><button id="pause" disabled>Pozastavit zdroj</button><a class="button" href="?source=native">Připojit brýle</a></div></section>
+ <section class="stage"><div class="stage-title"><span><i></i> ŽIVÁ SCÉNA</span><span id="connection">Připraveno k připojení</span></div>
+ <iframe id="observer" title="Divácká kamera" src="./view.html?camera=side"></iframe>
+ <div class="camera-bar"><div class="camera-buttons" role="group" aria-label="Pozice kamery"><button data-camera="side" aria-pressed="true">Z boku</button><button data-camera="player" aria-pressed="false">Od hráče</button><button data-camera="wide" aria-pressed="false">Celá aréna</button><button data-camera="top" aria-pressed="false">Shora</button></div><button id="compare">Druhý pohled ↗</button></div>
+ </section>
+ <section class="metrics"><div><span>STÁŘÍ SCÉNY ≈</span><strong id="age">— <small>ms</small></strong><p id="latency-note">Čeká na první změnu</p></div><div><span>SYNCHRONIZOVANÉ OBJEKTY</span><strong><b id="fruit">0</b><small> ovoce + </small><b id="pieces">0</b><small> půlek · </small><b id="swords">0</b><small> meče + </small><b id="head">0</b><small> hlava</small></strong><p>Poloha i natočení · vlastní divácká kamera</p></div><div><span>PŘENOS</span><strong id="rate">— <small>KiB/s</small></strong><p>Data scény přes místní server</p></div></section>
+ <p id="notice" class="notice">Ukázkový pohyb běží na počítači ve sdílené Rust hře. Přenášejí se meče a póza hlavy. Nativní brýle zatím nejsou připojené.</p><p id="error" role="alert"></p>
+</main><script type="module" src="./dashboard.js"></script></body></html>

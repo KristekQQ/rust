@@ -71,6 +71,30 @@ is needed. Hidden legacy glyph geometry is not regenerated while bound.
 The arena selector applies this to time, total score, combo award and both stock
 scores. `?font=neon` selects the original style on load.
 
+## Cached numeric halos
+
+Native Neon and the web arena enable cached mesh-font halos. The actual 3D
+glyph body is retained; a precomputed boundary-distance texture replaces edge
+capsules only near a front/back view (within approximately 26 degrees).
+Oblique views and unsupported/unprepared geometry use the original glow.
+
+Other applications opt in explicitly, after loading their fonts and text styles:
+
+```js
+engine.setFontGlowAtlas(true);
+engine.prewarmFontGlowAtlas('0123456789+-');
+```
+
+Prewarming includes the selected characters and currently used glyphs, up to
+128 sources. Call it during loading, and again after changing font styles.
+An empty selection warms only current glyphs. Changing numeric values reuses
+the prepared content even when scene glyph handles are replaced; render-time
+preparation never bakes a missing texture. `setFontGlowAtlas(false)` releases
+the cache. Diagnostics are available in `debugStats().fontGlowAtlas`.
+
+The halo is a visual approximation, not pixel-identical to capsules. Local
+native GPU measurements are not evidence of Quest or browser FPS gains.
+
 ## Sharing and lifetime
 
 Each `(font, glyph, color, sideIntensity)` has one shared immutable renderer

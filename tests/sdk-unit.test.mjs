@@ -118,13 +118,42 @@ test('cutting commands preserve handle ownership, typed buffers and Rust piece I
     assert.equal(calls.at(-1)[2].length,0);
 });
 
+test('simulation publications preserve legacy calls and forward explicit spawn IDs without truncation', async t => {
+    const canvas = environment(t), calls = [];
+    globalThis.__sdkImport = async () => wasmMock({
+        scene_apply_worker_publication: (...args) => calls.push(['legacy', ...args]),
+        scene_apply_worker_publication_with_spawns: (...args) => calls.push(['spawns', ...args]),
+        add_cube: () => 7,
+        dispose() {},
+    });
+    const {initEngine} = await sdk();
+    const engine = await initEngine(canvas);
+    const local = engine.scene.createCube();
+    const bytes = new Uint8Array([1, 2, 3]);
+    engine.applySimulationPublication(bytes);
+    engine.applySimulationPublication(bytes, [local], []);
+    assert.deepEqual(calls, [
+        ['legacy', bytes, new Uint32Array()],
+        ['legacy', bytes, new Uint32Array([7])],
+    ]);
+    engine.applySimulationPublication(bytes, [local], [{id: 1, parentId: 0}, {id: 0, parentId: 2}]);
+    assert.deepEqual(calls.at(-1), ['spawns', bytes, new Uint32Array([7]), new Uint32Array([1, 0, 0, 2])]);
+    for (const invalid of [0.5, -1, NaN, Infinity, 0xffffffff, 0x100000000]) {
+        assert.throws(() => engine.applySimulationPublication(bytes, [], [{id: invalid, parentId: 0}]), /spawn IDs/);
+        assert.throws(() => engine.applySimulationPublication(bytes, [], [{id: 0, parentId: invalid}]), /spawn IDs/);
+    }
+    assert.equal(calls.length, 3, 'Invalid IDs must not reach or mutate the Rust boundary');
+    engine.dispose();
+});
+
 test('orbit and world/screen commands forward to Rust, including lifecycle guards',async t=>{
     const canvas=environment(t),calls=[];
-    globalThis.__sdkImport=async()=>wasmMock({set_orbit_view:(...p)=>{calls.push(p);return true;},adjust_orbit:(...p)=>{calls.push(p);return true;},camera_view_state:()=>JSON.stringify({position:[1,2,3],orbitTarget:[0,0,0]}),world_to_screen:()=>new Float32Array([.25,.75]),dispose(){}});
+    globalThis.__sdkImport=async()=>wasmMock({set_camera_handedness:v=>{calls.push(["handedness",v]);return true;},set_orbit_view:(...p)=>{calls.push(p);return true;},adjust_orbit:(...p)=>{calls.push(p);return true;},camera_view_state:()=>JSON.stringify({position:[1,2,3],orbitTarget:[0,0,0]}),world_to_screen:()=>new Float32Array([.25,.75]),dispose(){}});
     const {initEngine}=await sdk();const engine=await initEngine(canvas);
+    engine.setCameraHandedness("right");engine.setCameraHandedness("left");assert.throws(()=>engine.setCameraHandedness("invalid"));
     engine.setOrbitView([1,2,3],[0,0,0]);engine.adjustOrbit(10,-5,20);
-    assert.deepEqual(calls,[[1,2,3,0,0,0],[10,-5,20]]);assert.deepEqual(engine.worldToScreen([0,0,0]),[.25,.75]);assert.deepEqual(engine.cameraViewState().position,[1,2,3]);
-    engine.dispose();assert.throws(()=>engine.adjustOrbit(0,0,1));assert.throws(()=>engine.worldToScreen([0,0,0]));
+    assert.deepEqual(calls,[["handedness",true],["handedness",false],[1,2,3,0,0,0],[10,-5,20]]);assert.deepEqual(engine.worldToScreen([0,0,0]),[.25,.75]);assert.deepEqual(engine.cameraViewState().position,[1,2,3]);
+    engine.dispose();assert.throws(()=>engine.setCameraHandedness("right"));assert.throws(()=>engine.adjustOrbit(0,0,1));assert.throws(()=>engine.worldToScreen([0,0,0]));
 });
 function response(bytes = new Uint8Array([1]), url = '') {
     return { ok: true, url, headers: new Headers(), body: new ReadableStream({
@@ -148,6 +177,23 @@ test('Rim configuration serializes optional owned blob shadows and keeps old pay
     scene.configureRim({...base,blobShadows:null});
     assert.deepEqual(calls[2].blobShadows,[],'An explicit null remains backward compatible.');
     assert.throws(()=>scene.configureRim({...base,blobShadows:[new SceneObject({},17)]}),/patřit této scéně/);
+});
+
+test('Rim configuration serializes optional owned health drop triples', async () => {
+    const {Scene,SceneObject,ModelObject}=await sdk(),calls=[];
+    const wasm=wasmMock({configure_rim:json=>calls.push(JSON.parse(json))}),scene=new Scene(wasm);
+    const object=id=>new SceneObject(wasm,id),model=new ModelObject(wasm,11);
+    const base={enemies:[{model,kind:'drone',height:1,offset:[0,0,0],scale:[1,1,1]}],swords:[object(1),object(2)],bolts:[],beams:[],charges:[],hud:[],marker:object(3),shapes:[],obstacles:[]};
+    scene.configureRim({...base,healthDrops:[[object(20),object(21),object(22)]],stagePanel:object(23)});
+    assert.deepEqual(calls[0].healthDrops,[[20,21,22]]);
+    assert.equal(calls[0].stagePanel,23);
+    scene.configureRim(base);
+    assert.deepEqual(calls[1].healthDrops,[],'Omitting health drops defaults to an empty pool.');
+    assert.equal(calls[1].stagePanel,null);
+    scene.configureRim({...base,healthDrops:null});
+    assert.deepEqual(calls[2].healthDrops,[],'An explicit null remains compatible.');
+    assert.throws(()=>scene.configureRim({...base,healthDrops:[[object(20),new SceneObject({},21),object(22)]]}),/patřit této scéně/);
+    assert.throws(()=>scene.configureRim({...base,stagePanel:new SceneObject({},23)}),/patřit této scéně/);
 });
 
 test('3D font handles forward layout and lifetime commands to Rust', async () => {

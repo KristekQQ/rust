@@ -1,5 +1,3 @@
-#![cfg(target_arch = "wasm32")]
-
 use crate::render::data::Vertex;
 use wgpu::{BindGroupLayout, Device, RenderPipeline, TextureFormat};
 

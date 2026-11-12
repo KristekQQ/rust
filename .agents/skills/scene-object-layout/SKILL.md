@@ -48,9 +48,13 @@ nebo neblikal se souběžnou plochou.
 - Při zmenšení nebo vzdálení zkontroluj čitelnost bitmapového písma v oku headsetu.
   Pozice odpovídající požadavku sama nezaručuje čitelnost ani pohodlí.
 
-Praktický vzor společného základu a nápisů na kameni je v
-[neon-arena/scene.js](../../../examples/neon-arena/scene.js). Jeho konkrétní
-souřadnice nejsou výchozí hodnoty pro jiné scény.
+## Neon Arena: bez hrobu
+
+Rozhodnutí Honzy 2026-11-04: webová i nativní Neon Arena nemá náhrobek,
+model `codex-monument` ani připojený kredit CODEX. Neobnovuj je z historických
+receptů nebo exportů. Panel VÝKON je samostatný stereo panel ukotvený k hráčovým
+nohám (offset `[.9,.35,-1]`), nikoli k dekoraci ani k rotaci hlavy.
+Při úpravě ověř webový recept i offline autorovací snapshot nativního exportu.
 
 ## Ověření a předání
 

@@ -1,0 +1,16 @@
+<!doctype html><canvas id="gpu-canvas" width="640" height="480"></canvas><div id="veil">Loading</div><div id="caption"></div>
+<script type="module">
+import {capturePixels} from './pixels.js';
+import {encodePacket} from '../tools/scene-observer/protocol.mjs';
+import {encodeByteDelta} from '../tools/scene-observer/byte-delta.mjs';
+const frames={};for(const name of ['initial','cut'])frames[name]=new Uint8Array(await(await fetch('./fixtures/native-scene/'+name+'.nwr')).arrayBuffer());
+let active,transport=null;
+class ControlledSocket{
+ static OPEN=1;constructor(){active=this;transport=null;this.readyState=1;setTimeout(()=>{this.onopen?.();setTimeout(()=>this.onmessage?.({data:JSON.stringify({type:'session',session:'controlled-scene',native:true,scene:true})}),0)},0)}
+ send(data){const m=JSON.parse(data);if(m.type==='clock')this.onmessage?.({data:JSON.stringify({type:'clock',sentAt:m.sentAt,serverAt:Date.now()})});if(m.type==='ready')sendFrame('initial')}
+ close(){this.readyState=3}
+}
+function sendFrame(name){const raw=encodePacket({session:'controlled-scene',sampledAt:Date.now(),mode:'live',clockUncertaintyMs:0,state:{fragments:name==='cut'?2:0}},frames[name]);const encoded=encodeByteDelta(transport,raw);transport={sequence:encoded.sequence,bytes:raw};active.onmessage?.({data:encoded.payload.buffer})}
+window.WebSocket=ControlledSocket;window.deliveryFixture={sendFrame,capture:()=>capturePixels(document.querySelector('canvas')),reconnect(){active.readyState=3;active.onclose?.()}};
+await import('../tools/scene-observer/viewer.js');
+</script>

@@ -9,4 +9,6 @@ java -cp build/testclasses LocalServerTest
 javac -d build/testclasses src/cz/honza/queststream/StreamHub.java test/StreamHubTest.java
 java -cp build/testclasses StreamHubTest
 node --check assets/viewer.js
+node --test test/playback-policy.test.mjs
+python3 -B test/keep_awake_test.py
 ./test/verify-mp4.sh

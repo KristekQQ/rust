@@ -2,7 +2,7 @@
 <style>body{background:#080d1b;color:#b8eaff}canvas{width:640px;height:400px}table{border-collapse:collapse}td{padding:5px}</style>
 <canvas id="gpu-canvas"></canvas><button id="enter">VR</button><button id="exit" hidden>Exit</button>
 <label>Test<input id="benchmark" type="checkbox" checked></label>
-<label>SSR<input id="ssr" type="checkbox" checked></label>
+<label>SSR<input id="ssr" type="checkbox"></label>
 <p id="build"></p><p id="status"></p><section id="benchmark-results" hidden></section>
 <button id="benchmark-download" hidden>JSON</button><ol id="checks"></ol><pre id="result">RUNNING</pre>
 <script type="module">
@@ -20,27 +20,30 @@ await run.execute(async test=>{
     // Complete that initial render before measuring benchmark-only allocations.
     for(let frame=0;frame<2;frame++)await new Promise(requestAnimationFrame);
     test.assert(app.world.stockScorePanels.every(panel=>panel.font3DInfo.text==='+0'&&panel.font3DInfo.glyphCount===2),'stock label glyphs initialized before allocation baseline');
+    const original={glow:engine.debugStats().neonGlow.enabled,ssrChecked:document.getElementById('ssr').checked,ssrDisabled:document.getElementById('ssr').disabled};
     const before=engine.scene.objectCount;
     await engine.xr.enter();
     await sim.frame({dt:0,head:{position:[0,1.55,0],orientation:[-.25,0,0,.9682458]},controllers:{}});
     test.assert(benchmarkState().status==='running'&&!app.gameState().launching,'benchmark substitutes a fixed scene for automatic gameplay');
     test.assert(document.getElementById('ssr').disabled,'manual SSR changes locked while sampling');
     const testedScales=[];
-    for(let phase=0;phase<6;phase++){
-        test.assert(benchmarkState().phaseIndex===phase,'expected phase '+phase);
+    const phases=['base-start','glow-only','base-end'];
+    for(let phase=0;phase<phases.length;phase++){
+        test.assert(benchmarkState().phaseIndex===phase&&benchmarkState().phase.id===phases[phase],'expected phase '+phases[phase]);
         await sim.frame({dt:1000/90});
         testedScales.push(engine.postprocessing.stats());
+        test.assert(engine.debugStats().neonGlow.enabled===(phase===1),'only the glow phase enables glow');
         for(let sample=0;sample<5;sample++)engine.xr.dispatchEvent(new CustomEvent('performance',{detail:{
             frames:180,frameMs:sample<2?100:1000/90,cpuSubmitMs:2,fps:sample<2?10:90,sessionId:123,frameRate:90,
             eyeViewports:[{eye:'left',width:640,height:640},{eye:'right',width:640,height:640}],headForward:[0,-.48,-.88]
         }}));
     }
     const result=benchmarkState();
-    test.assert(result.status==='complete'&&result.results.length===6,'all six phases completed');
+    test.assert(result.status==='complete'&&result.results.length===3&&result.results.every((phase,i)=>phase.id===phases[i]),'all three production phases completed');
     test.assert(result.results.every(phase=>Math.abs(phase.fps-90)<1e-6),'warmup windows excluded from reported statistics');
-    test.assert(testedScales[2].ssrWidth===320&&testedScales[3].ssrWidth===640,'real SSR render targets switch between half and full size');
-    test.assert(engine.debugStats().neonGlow.enabled&&!document.getElementById('ssr').disabled&&document.getElementById('ssr').checked,'original effects and controls restored');
-    test.assert(!document.getElementById('benchmark-download').hidden&&document.querySelectorAll('#benchmark-results tr').length===7,'six-row results and export shown');
+    test.assert(testedScales.every(stats=>stats.passes===0&&stats.targets===0),'production benchmark never enables SSR passes or allocates intermediate targets');
+    test.assert(engine.debugStats().neonGlow.enabled===original.glow&&document.getElementById('ssr').disabled===original.ssrDisabled&&document.getElementById('ssr').checked===original.ssrChecked,'original effects and controls restored');
+    test.assert(!document.getElementById('benchmark-download').hidden&&document.querySelectorAll('#benchmark-results tr').length===4,'three-row results and export shown');
     await engine.xr.exit();
     test.assert(engine.scene.objectCount===before,'temporary test geometry and labels removed',{before,after:engine.scene.objectCount});
     document.getElementById('benchmark').checked=true;

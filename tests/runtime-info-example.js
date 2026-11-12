@@ -26,7 +26,7 @@ await run.execute(async test=>{
     await Promise.all(styles);
     document.body.append(...source.body.childNodes);
     if(!document.querySelector('#result')){const result=document.createElement('pre');result.id='result';document.body.append(result);}
-    const main=await import('../examples/'+name+'/main.js');engine=main.engine;
+    const main=await import('../examples/'+name+'/'+(name==='neon-arena'?'parallel-main.js':'main.js'));engine=main.engine;
     test.assert(Boolean(engine),'actual example exports its running engine');
     document.documentElement.dataset.rendererBackend=engine.renderer_backend();
     await main.sceneReady;

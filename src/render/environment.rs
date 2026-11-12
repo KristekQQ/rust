@@ -98,6 +98,7 @@ impl EnvironmentProbe {
                     a: 1.0,
                 }),
                 depth_load: wgpu::LoadOp::Clear(1.0),
+                depth_store: wgpu::StoreOp::Store,
             };
             renderer.render_environment(
                 RenderView {

@@ -13,6 +13,7 @@ type ImportedResources = (Vec<Vec<u8>>, Vec<Vec<u8>>);
 type AnimationFrameCallback = Rc<RefCell<Option<Closure<dyn FnMut()>>>>;
 
 thread_local! {
+    static SCENE_AUTHORING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static RUNTIME: RefCell<Option<Runtime>> = const { RefCell::new(None) };
     static STATE: RefCell<Option<Rc<RefCell<State>>>> = const { RefCell::new(None) };
     static STARTING: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
@@ -46,6 +47,7 @@ impl Drop for Runtime {
 /// Release the frame loop, input listeners, camera and GPU scene resources.
 #[wasm_bindgen]
 pub fn dispose() {
+    SCENE_AUTHORING.with(|paused| paused.set(false));
     RIM.with(|slot| slot.borrow_mut().take());
     MELEE.with(|slot| slot.borrow_mut().take());
     crate::render::profiler::reset();
@@ -459,13 +461,42 @@ pub fn set_object_color_cutout(id: u32, threshold: f32) -> bool {
             .is_some_and(|s| s.borrow_mut().scene.set_color_cutout(id, threshold))
     })
 }
-/// Optional additive geometry glow; zero disables and releases its GPU cache.
+/// Optional MAX-blended geometry glow with capability-selected optimization.
 #[wasm_bindgen]
 pub fn set_neon_glow(strength: f32, radius: f32) -> bool {
     STATE.with(|slot| {
         slot.borrow()
             .as_ref()
             .is_some_and(|state| state.borrow_mut().configure_neon_glow(strength, radius))
+    })
+}
+/// Select half-resolution halos or the original full-resolution reference.
+#[wasm_bindgen]
+pub fn set_neon_glow_resolution(scale: f32) -> bool {
+    STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().configure_neon_glow_resolution(scale))
+    })
+}
+/// Select cached mesh-font halos; ordinary edge glow remains the fallback.
+#[wasm_bindgen]
+pub fn set_font_glow_atlas(enabled: bool) -> bool {
+    STATE.with(|slot| {
+        slot.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().configure_font_glow_atlas(enabled);
+            true
+        })
+    })
+}
+/// Prepare known font styles during loading, before entering gameplay.
+#[wasm_bindgen]
+pub fn prewarm_font_glow_atlas(characters: &str) -> bool {
+    STATE.with(|slot| {
+        slot.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().prewarm_font_glow_atlas(characters);
+            true
+        })
     })
 }
 #[wasm_bindgen]
@@ -852,6 +883,7 @@ pub fn clear_all() {
             let mut state = state.borrow_mut();
             reset_scene_gameplay(&mut state.scene);
             state.scene.clear();
+            state.clear_glow_caches();
         }
     });
 }
@@ -982,6 +1014,16 @@ pub fn screen_to_plane(u: f32, v: f32, height: f32) -> Result<Vec<f32>, JsValue>
             .map(|p| p.to_array().to_vec())
             .ok_or_else(|| JsValue::from_str("Pointer ray does not intersect plane"));
         result
+    })
+}
+
+#[wasm_bindgen]
+pub fn set_camera_handedness(right_handed: bool) -> bool {
+    CAMERA.with(|camera| {
+        camera.borrow().as_ref().is_some_and(|c| {
+            c.borrow_mut().set_right_handed(right_handed);
+            true
+        })
     })
 }
 
@@ -1219,6 +1261,7 @@ pub fn clear_scene() {
             reset_scene_gameplay(&mut state.scene);
             state.clear_combo_display();
             state.scene.clear_scene();
+            state.clear_glow_caches();
             state.combo_score = Default::default();
             state.clear_combo_indicators();
         }
@@ -1233,6 +1276,13 @@ pub fn add_info_panel(kind: &str, width: f32, height: f32) -> Result<u32, JsValu
         let state = slot
             .as_ref()
             .ok_or_else(|| JsValue::from_str("Engine is not initialized"))?;
+        if SCENE_AUTHORING.with(|flag| flag.get()) {
+            return state
+                .borrow_mut()
+                .scene
+                .add_info_panel(kind, width, height)
+                .map_err(|e| JsValue::from_str(&e));
+        }
         let result = state.borrow_mut().add_info_panel(kind, width, height);
         result
     })
@@ -1329,6 +1379,38 @@ fn cutting_command<T>(
         let result = command(&mut engine.borrow_mut().scene).map_err(|e| JsValue::from_str(&e));
         result
     })
+}
+
+/// Hold desktop presentation while an async authored scene is assembled atomically.
+#[wasm_bindgen]
+pub fn set_scene_authoring_paused(paused: bool) -> Result<(), JsValue> {
+    if XR_ACTIVE.with(|active| active.get()) {
+        return Err(JsValue::from_str("Scene authoring must finish before XR"));
+    }
+    SCENE_AUTHORING.with(|flag| flag.set(paused));
+    Ok(())
+}
+
+/// Opt-in render-only smoothing for a remotely mirrored scene. Zero disables it.
+#[wasm_bindgen]
+pub fn set_scene_interpolation(duration_ms: f32, max_distance: f32) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_mirror_interpolation(duration_ms, max_distance))
+}
+
+/// Apply an experimental ordered worker publication without advancing simulation.
+#[wasm_bindgen]
+pub fn scene_apply_worker_publication(bytes: &[u8], local_ids: &[u32]) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.apply_wire_publication(bytes, local_ids))
+}
+
+/// Apply explicit child/removed-parent provenance without changing wire bytes.
+#[wasm_bindgen]
+pub fn scene_apply_worker_publication_with_spawns(
+    bytes: &[u8],
+    local_ids: &[u32],
+    spawn_pairs: &[u32],
+) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.apply_wire_publication_with_spawns(bytes, local_ids, spawn_pairs))
 }
 
 #[wasm_bindgen]
@@ -1498,7 +1580,23 @@ pub fn play_cut_feedback_facing(
     mirror_text: bool,
     size: Option<f32>,
     score_label: Option<String>,
+    fade_delay: Option<f32>,
+    fade_duration: Option<f32>,
+    dissolve: Option<bool>,
 ) -> Result<String, JsValue> {
+    if let Some(duration) = fade_duration {
+        let delay = fade_delay.unwrap_or(0.15);
+        if !duration.is_finite()
+            || duration <= 0.
+            || !delay.is_finite()
+            || delay < 0.
+            || !(delay + duration).is_finite()
+        {
+            return Err(JsValue::from_str("Invalid piece fade timing"));
+        }
+    } else if fade_delay.is_some() {
+        return Err(JsValue::from_str("Piece fade duration is required"));
+    }
     let rewards = if matches!(score_label.as_deref(), Some("hit-points" | "stock-total")) {
         Some(
             STATE
@@ -1551,6 +1649,13 @@ pub fn play_cut_feedback_facing(
                 label.as_deref(),
             )?
         };
+        if let Some(duration) = fade_duration {
+            if dissolve.unwrap_or(false) {
+                scene.dissolve_cut_pieces(pieces, fade_delay.unwrap_or(0.15), duration)?;
+            } else {
+                scene.fade_cut_pieces(pieces, fade_delay.unwrap_or(0.15), duration)?;
+            }
+        }
         Ok(serde_json::json!({"objects":objects,"duration":0.65}).to_string())
     })
 }
@@ -3035,7 +3140,7 @@ async fn start_runtime(generation: u64) -> Result<(), JsValue> {
             (now - *prev_time_c.borrow()) as f32 / 1000.0
         };
         *prev_time_c.borrow_mut() = now;
-        if !XR_ACTIVE.with(|active| active.get()) {
+        if !XR_ACTIVE.with(|active| active.get()) && !SCENE_AUTHORING.with(|paused| paused.get()) {
             let mut cam = camera_c.borrow_mut();
             let mut st = state_c.borrow_mut();
             let prepare_start = perf_c.now();

@@ -447,7 +447,7 @@
       "targets": [
         {
           "position": [
-            0.48,
+            0.5,
             1.08,
             -1.12
           ],
@@ -579,7 +579,7 @@
       "targets": [
         {
           "position": [
-            -0.48,
+            -0.5,
             1.08,
             -1.12
           ],
@@ -650,7 +650,7 @@
             -1.071
           ],
           "fruit": "watermelon",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             -0.0725,
@@ -665,7 +665,7 @@
             -1.121
           ],
           "fruit": "cherry",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             -0.0725,
             0,
@@ -679,7 +679,7 @@
             -1.071
           ],
           "fruit": "watermelon",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.06,
@@ -694,7 +694,7 @@
             -1.121
           ],
           "fruit": "cherry",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.06,
             0,
@@ -708,7 +708,7 @@
             -1.071
           ],
           "fruit": "watermelon",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.0725,
@@ -723,7 +723,7 @@
             -1.121
           ],
           "fruit": "cherry",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.0725,
             0,
@@ -751,7 +751,7 @@
             -1.071
           ],
           "fruit": "grapes",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.0475,
@@ -766,7 +766,7 @@
             -1.121
           ],
           "fruit": "lime",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             -0.0725,
             0,
@@ -780,7 +780,7 @@
             -1.071
           ],
           "fruit": "grapes",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.06,
@@ -795,7 +795,7 @@
             -1.121
           ],
           "fruit": "lime",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             -0.06,
             0,
@@ -809,7 +809,7 @@
             -1.071
           ],
           "fruit": "grapes",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.0725,
@@ -824,7 +824,7 @@
             -1.121
           ],
           "fruit": "lime",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             -0.0475,
             0,
@@ -852,7 +852,7 @@
             -1.071
           ],
           "fruit": "watermelon",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             -0.0725,
@@ -867,7 +867,7 @@
             -1.121
           ],
           "fruit": "lemon",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.0475,
             0,
@@ -881,7 +881,7 @@
             -1.071
           ],
           "fruit": "watermelon",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             -0.06,
@@ -896,7 +896,7 @@
             -1.121
           ],
           "fruit": "lemon",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.06,
             0,
@@ -910,7 +910,7 @@
             -1.071
           ],
           "fruit": "watermelon",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             -0.0475,
@@ -925,7 +925,7 @@
             -1.121
           ],
           "fruit": "lemon",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.0725,
             0,
@@ -953,7 +953,7 @@
             -1.071
           ],
           "fruit": "grapes",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             -0.0725,
@@ -968,7 +968,7 @@
             -1.121
           ],
           "fruit": "orange",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             -0.0725,
             0,
@@ -982,7 +982,7 @@
             -1.071
           ],
           "fruit": "grapes",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.06,
@@ -997,7 +997,7 @@
             -1.121
           ],
           "fruit": "orange",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.06,
             0,
@@ -1011,7 +1011,7 @@
             -1.071
           ],
           "fruit": "grapes",
-          "scale": 0.075,
+          "scale": 0.105,
           "lifetime": 2.1,
           "velocity": [
             0.0725,
@@ -1026,7 +1026,7 @@
             -1.121
           ],
           "fruit": "orange",
-          "scale": 0.105,
+          "scale": 0.147,
           "velocity": [
             0.0725,
             0,
@@ -1050,7 +1050,7 @@
         {
           "position": [
             0,
-            1.18,
+            1.14,
             -1.13
           ],
           "fruit": "grapes",
@@ -1104,7 +1104,7 @@
         {
           "position": [
             0,
-            1.64,
+            1.68,
             -1.13
           ],
           "fruit": "grapes",
@@ -1145,7 +1145,7 @@
         {
           "position": [
             0,
-            1.18,
+            1.14,
             -1.118
           ],
           "fruit": "watermelon",
@@ -1185,7 +1185,7 @@
         },
         {
           "position": [
-            0.38,
+            0.47,
             1.1,
             -1.008
           ],
@@ -1199,7 +1199,7 @@
         {
           "position": [
             0,
-            1.64,
+            1.68,
             -1.118
           ],
           "fruit": "watermelon",
@@ -1240,7 +1240,7 @@
         {
           "position": [
             0,
-            1.18,
+            1.14,
             -1.106
           ],
           "fruit": "pear",
@@ -1294,7 +1294,7 @@
         {
           "position": [
             0,
-            1.64,
+            1.68,
             -1.106
           ],
           "fruit": "pear",
@@ -1335,7 +1335,7 @@
         {
           "position": [
             0,
-            1.18,
+            1.14,
             -1.094
           ],
           "fruit": "watermelon",
@@ -1375,7 +1375,7 @@
         },
         {
           "position": [
-            0.38,
+            0.47,
             1.1,
             -0.984
           ],
@@ -1389,7 +1389,7 @@
         {
           "position": [
             0,
-            1.64,
+            1.68,
             -1.094
           ],
           "fruit": "watermelon",

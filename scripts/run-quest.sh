@@ -22,4 +22,8 @@ printf 'Production release: https://%s:%s/examples/neon-arena/?backend=auto\n' "
 echo 'No tunnel is started. Quest must be on a reachable local network.'
 echo 'Confirm the local certificate on the headset, or trust the development CA there.'
 echo 'Press Ctrl+C to stop.'
-exec python3 scripts/serve-local.py "$port" --host "$lan_ip" --cert "$cert" --key "$key" --production --directory output/production
+server=(python3 scripts/serve-local.py "$port" --host "$lan_ip" --cert "$cert" --key "$key" --production --directory output/production --score-file "${QUEST_SCORE_FILE:-$PWD/output/scoreboard/neon-arena.json}")
+if [[ -n "${QUEST_SHARED_ROOT:-}" ]]; then
+    server=(python3 scripts/serve-quest-shared.py "$port" --host "$lan_ip" --cert "$cert" --key "$key" --fallback-root "$QUEST_SHARED_ROOT" --arena-root "$PWD/output/production" --score-file "${QUEST_SCORE_FILE:-$PWD/output/scoreboard/neon-arena.json}")
+fi
+exec "${server[@]}"

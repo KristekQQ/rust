@@ -1,0 +1,45 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Neon: zadní levá tabule</title>
+<canvas id="gpu-canvas"></canvas><button id="enter" hidden></button><button id="exit" hidden></button><button id="shoot" hidden></button><span id="cuts">0</span><p id="status"></p><pre id="result">RUNNING</pre><canvas id="stereo"></canvas><ol id="checks"></ol>
+<script type="module">
+import {PAYTABLE_ORIGIN,PAYTABLE_YAW} from '../examples/neon-arena/scene.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {XRTestRun,publishXRReport,pixelDifference} from './xr/testkit.js';
+const sim=installXRSimulator({profile:{eyeWidth:640,eyeHeight:640}});
+const run=new XRTestRun('neon-paytable-xr',sim,publishXRReport);
+let app;
+const report=await run.execute(async test=>{
+    app=await import('../examples/neon-arena/main.js');
+    const {engine,world}=app;
+    await world.loadDecorations();await engine.xr.enter();app.stopLaunches();
+    const board=[...world.galleryIcons,...world.galleryLabels,...world.galleryFrames,...world.galleryEarnedFrames,world.comboRules,world.logo];
+    const origins=board.map(object=>object.meshInfo.position);
+    test.assert(board.length>=82&&origins.every(p=>p[0]<-2.2&&p[2]>.8),'complete paytable stays behind the left shoulder');
+    const pose=(degrees,x=0)=>({dt:0,head:{position:[x,1.55,0],orientation:[0,Math.sin(degrees*Math.PI/360),0,Math.cos(degrees*Math.PI/360)]},controllers:{}});
+    // Imported models have no triangle-mesh transform getter. Reconstruct the authored housing anchor.
+    const housingDepth=Math.sin(world.boardTilt)*(2.65-1.2)+Math.cos(world.boardTilt)*(-.25);
+    const housingOrigin=[PAYTABLE_ORIGIN[0]+Math.sin(PAYTABLE_YAW)*housingDepth,PAYTABLE_ORIGIN[1]+Math.cos(world.boardTilt)*(2.65-1.2)-Math.sin(world.boardTilt)*(-.25),PAYTABLE_ORIGIN[2]+Math.cos(PAYTABLE_YAW)*housingDepth];
+    const hide=()=>{board.forEach(object=>object.setPosition([100,100,100]));world.scoreDisplay.setPosition([100,100,100]);};
+    const restore=()=>{board.forEach((object,i)=>object.setPosition(origins[i]));world.scoreDisplay.setPosition(housingOrigin);};
+    const evidence=[];
+    for(const [degrees,x] of [[0,0],[20,0],[20,-.2]]){
+        const view=pose(degrees,x);sim.frame(view);
+        const before=[sim.pixels('left'),sim.pixels('right')],draws=engine.debugStats().mainDrawCalls;
+        hide();sim.frame(view);
+        const differences=before.map((pixels,i)=>pixelDifference(pixels,sim.pixels(i?'right':'left'),3));
+        const hiddenDraws=engine.debugStats().mainDrawCalls;
+        test.assert(differences.every(value=>value===0),`whole board absent in BOTH eyes at yaw ${degrees}, x ${x}`);
+        test.assert(draws>0&&draws===hiddenDraws,`offscreen board adds no main-view draw calls at yaw ${degrees}, x ${x}`);
+        evidence.push({degrees,x,differences,draws,hiddenDraws});restore();
+    }
+    const view=pose(120);sim.frame(view);
+    const left=sim.pixels('left'),right=sim.pixels('right'),canvas=document.getElementById('stereo');
+    canvas.width=left.width+right.width;canvas.height=left.height;
+    const ctx=canvas.getContext('2d');ctx.putImageData(left,0,0);ctx.putImageData(right,left.width,0);
+    hide();sim.frame(view);
+    test.assert(pixelDifference(left,sim.pixels('left'),3)>150&&pixelDifference(right,sim.pixels('right'),3)>150,'turning behind the left shoulder reveals the board in BOTH eyes');
+    restore();test.report.evidence={...test.report.evidence,views:evidence,boardObjects:board.length+1};
+    await engine.xr.exit();
+});
+if(app?.engine.xr.isPresenting)await app.engine.xr.exit();
+app?.engine.dispose();sim.dispose();publishXRReport(report);
+</script></html>

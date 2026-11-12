@@ -27,20 +27,21 @@ impl InstanceData {
     /// Fading opaque surfaces join the existing transparent overlay as well.
     pub fn needs_translucent_overlay(&self) -> bool {
         self.visual_fade() > 0.0
-            && (self.visual_fade() < 1.0
+            && ((self.normal_matrix[3][3] >= 0.0 && self.visual_fade() < 1.0)
                 || (self.emission[2] < 1.0
                     && (self.emission[2] > 0.0 || self.surface_params[0] > 0.0)))
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct ObjectRenderData {
-    instance: InstanceData,
-    center: Vec3,
-    half_extent: Vec3,
+    pub(crate) instance: InstanceData,
+    pub(crate) center: Vec3,
+    pub(crate) half_extent: Vec3,
 }
 impl ObjectRenderData {
     /// Reuse the same published root transform for glTF and primitive rendering.
-    #[cfg(any(target_arch = "wasm32", test))]
+    #[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
     pub(crate) fn model(&self) -> Mat4 {
         Mat4::from_cols_array_2d(&self.instance.model)
     }
@@ -102,7 +103,7 @@ impl Frustum {
     }
     /// Strict containment is a proof that every child AABB is also visible.
     /// Touching/partial/invalid bounds must retain the individual test path.
-    #[cfg(any(test, target_arch = "wasm32"))]
+    #[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn fully_contains_aabb(&self, center: Vec3, half_extent: Vec3) -> bool {
         center.is_finite()
             && half_extent.is_finite()
@@ -843,9 +844,9 @@ mod tests {
         for fade in [1.0, 0.75, 0.0] {
             data.instance.normal_matrix[3][3] = -(1.0 + fade);
             assert_eq!(data.instance.visual_fade(), fade);
-            assert_eq!(
-                data.instance.needs_translucent_overlay(),
-                fade > 0.0 && fade < 1.0
+            assert!(
+                !data.instance.needs_translucent_overlay(),
+                "opaque dissolve is a depth-writing cutout"
             );
             let transformed =
                 Mat4::from_cols_array_2d(&data.instance.normal_matrix).transform_vector3(normal);
@@ -855,6 +856,12 @@ mod tests {
         data.instance.normal_matrix[3][3] = 1.0;
         data.instance.emission[2] = 0.06;
         assert!(data.instance.needs_translucent_overlay());
+        data.instance.normal_matrix[3][3] = -1.5;
+        assert!(
+            data.instance.needs_translucent_overlay(),
+            "dissolving glass retains authored alpha"
+        );
+        data.instance.normal_matrix[3][3] = 1.0;
         data.instance.emission[2] = 0.0;
         assert!(!data.instance.needs_translucent_overlay());
         data.instance.surface_params[0] = 1.0;

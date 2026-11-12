@@ -1,0 +1,4 @@
+interface:
+  display_name: "Quest hardware profiling"
+  short_description: "Měření rendereru přímo na GPU Questu"
+  default_prompt: "Use $quest-hardware-profiling to compare renderer changes on physical Quest hardware and distinguish GPU time from live OpenXR FPS."

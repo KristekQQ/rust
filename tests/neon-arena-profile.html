@@ -33,7 +33,7 @@ const report=await run.execute(async test=>{
     const stats=engine.postprocessing.stats();
     test.report.evidence={environment:'desktop simulated stereo XR; includes synchronous pixel readback, not headset FPS',eyeSize:[1024,1024],glowSettings:NEON_GLOW,targetNames:names,targetTriangles:targets.reduce((sum,p)=>sum+p.meshInfo.triangles,0),catalogTriangles:world.fruits.reduce((sum,f)=>sum+f.geometry.indices.length/3,0),results};
     document.querySelector('#measurements').textContent=JSON.stringify(test.report.evidence,null,2);
-    test.assert(stats.passes===2&&stats.targets>0,'production tiled floor uses half-resolution trace and composite');
+    test.assert(stats.passes===0&&stats.targets===0,'production tiled floor renders without postprocessing passes or intermediate targets');
     await engine.xr.exit();
 });
 app?.engine.dispose();sim.dispose();publishXRReport(report);

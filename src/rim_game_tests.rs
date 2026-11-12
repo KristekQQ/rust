@@ -104,6 +104,8 @@ fn fixture_with_shadow_pool(playing: bool, blobs: bool) -> (Game, SceneManager) 
             } else {
                 Vec::new()
             },
+            health_drops: Vec::new(),
+            stage_panel: None,
             hud,
             marker,
             shapes,
@@ -133,32 +135,33 @@ fn original_models_normalize_and_wave_waits_for_every_orbiter() {
         let (min, max) = crate::gltf_animation::model_bounds(&model.asset, &model.pose).unwrap();
         assert!(((max.y - min.y) * e.spec.scale[1] - e.spec.height).abs() < 0.01);
     }
+    game.wave = 1;
     start(&mut game, &mut scene);
-    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 6);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 2);
     assert!(game
         .enemies
         .iter()
         .filter(|e| e.phase == 1)
         .all(|e| e.spec.kind == "drone-orbiter"));
     let serial = game.enemies[0].serial;
-    for i in 0..5 {
+    for i in 0..1 {
         game.defeat(&mut scene, i, Vec3::X);
         game.enemies[i].age = 3.21;
     }
     game.tick(&mut scene, 0.01, None, [None; 2]);
-    assert_eq!(game.wave, 0);
-    assert_eq!(game.kills, 5);
+    assert_eq!(game.wave, 1);
+    assert_eq!(game.kills, 1);
     assert_eq!(game.enemies[0].serial, serial);
-    assert_eq!(game.enemies[5].phase, 1);
-    game.defeat(&mut scene, 5, Vec3::Y);
-    game.enemies[5].age = 3.21;
+    assert_eq!(game.enemies[1].phase, 1);
+    game.defeat(&mut scene, 1, Vec3::Y);
+    game.enemies[1].age = 3.21;
     game.cut_failed(); // This test retires deaths without a worker.
     game.tick(&mut scene, 0.01, None, [None; 2]);
-    assert_eq!(game.wave, 1);
-    assert_eq!(game.kills, 6);
+    assert_eq!(game.wave, 2);
+    assert_eq!(game.kills, 2);
     assert!(game.enemies.iter().all(|e| e.serial == serial + 1));
     let active: Vec<_> = game.enemies.iter().filter(|e| e.phase == 1).collect();
-    assert_eq!(active.len(), 2);
+    assert_eq!(active.len(), 1);
     assert_eq!(active[0].spec.kind, "core-tank");
 }
 
@@ -228,7 +231,7 @@ fn death_respawns_after_three_real_seconds() {
     game.tick(&mut scene, 0.02, None, [None; 2]);
     assert_eq!(game.health, 100.);
     assert_eq!(game.enemies[0].serial, serial + 1);
-    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 6);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 1);
 }
 
 #[test]
@@ -256,7 +259,7 @@ fn xr_tracking_discontinuity_does_not_sweep_through_enemy() {
 #[test]
 fn worker_batches_cover_full_original_mesh_and_ignore_late_serials() {
     let (mut game, mut scene) = fixture();
-    game.wave = 2;
+    game.wave = 4;
     start(&mut game, &mut scene);
     let owner = 11;
     assert_eq!(game.enemies[owner].phase, 1);
@@ -266,7 +269,7 @@ fn worker_batches_cover_full_original_mesh_and_ignore_late_serials() {
         .parts
         .iter()
         .map(|&(_, p)| {
-            let p = &task.model.asset.primitives[p];
+            let p = &task.source.asset.primitives[p];
             if p.mode == crate::gltf_model::PrimitiveMode::Triangles {
                 p.indices.len() / 3
             } else {
@@ -425,7 +428,7 @@ fn assert_pool_frozen(game: &Game, scene: &mut SceneManager) {
 fn pooled_animations_freeze_and_spawn_restarts_each_kind() {
     let (mut game, mut scene) = fixture_with_playing_pool(true);
     assert_pool_frozen(&game, &mut scene);
-    for (wave, name) in [(0, "Idle"), (1, "Idle"), (2, "Run"), (3, "Idle")] {
+    for (wave, name) in [(0, "Idle"), (1, "Idle"), (4, "Run"), (3, "Idle")] {
         game.wave = wave;
         game.spawn(&mut scene);
         for e in game.enemies.iter().filter(|e| e.phase == 1) {
@@ -449,9 +452,91 @@ fn pooled_animations_freeze_and_spawn_restarts_each_kind() {
 }
 
 #[test]
+fn owned_snapshot_worker_matches_binary_geometry_and_waits_for_uploads() {
+    let (mut web, mut web_scene) = fixture();
+    let (mut native, mut native_scene) = fixture();
+    for (game, scene) in [(&mut web, &mut web_scene), (&mut native, &mut native_scene)] {
+        start(game, scene);
+        game.defeat(scene, 0, Vec3::X);
+    }
+    loop {
+        let bytes = web.take_cut_job().unwrap();
+        if bytes.is_empty() {
+            break;
+        }
+        web.accept_cut(&mut web_scene, &crate::rim_cut::split(&bytes).unwrap())
+            .unwrap();
+    }
+    while let Some(work) = native.take_cut_work().unwrap() {
+        let owner = std::thread::current().id();
+        let prepared = std::thread::spawn(move || {
+            assert_ne!(owner, std::thread::current().id());
+            work.execute().unwrap()
+        })
+        .join()
+        .unwrap();
+        native
+            .accept_prepared_cut(&mut native_scene, prepared)
+            .unwrap();
+    }
+    for _ in 0..20 {
+        native.tick(&mut native_scene, 0.001, None, [None; 2]);
+        assert!(
+            native.pieces.is_empty(),
+            "worker completion does not bypass GPU acknowledgement"
+        );
+    }
+    finish_cut_staging(&mut web, &mut web_scene);
+    finish_cut_staging(&mut native, &mut native_scene);
+    fn vertices(game: &Game, scene: &SceneManager, sign: f32) -> Vec<[u32; 9]> {
+        game.pieces
+            .iter()
+            .filter(|id| game.piece_motion[id].direction.x * sign > 0.)
+            .flat_map(|id| {
+                scene.triangle_meshes()[id]
+                    .mesh
+                    .cpu()
+                    .unwrap()
+                    .render_mesh()
+                    .vertices
+            })
+            .map(|v| {
+                [
+                    v.position[0],
+                    v.position[1],
+                    v.position[2],
+                    v.normal[0],
+                    v.normal[1],
+                    v.normal[2],
+                    v.color[0],
+                    v.color[1],
+                    v.color[2],
+                ]
+                .map(f32::to_bits)
+            })
+            .collect()
+    }
+    for sign in [-1., 1.] {
+        assert_eq!(
+            vertices(&native, &native_scene, sign),
+            vertices(&web, &web_scene, sign)
+        );
+    }
+    for id in native.pieces {
+        let data = &native_scene.triangle_meshes()[&id].mesh;
+        assert!(
+            data.prepared_render().is_some(),
+            "XR upload reuses worker-prepared vertices"
+        );
+        assert!(data.contact_shape().is_none());
+    }
+}
+
+#[test]
 fn death_impact_pose_stays_intact_until_atomic_cut_publication() {
     for mode in ["cut", "dissolve"] {
         let (mut game, mut scene) = fixture_with_playing_pool(true);
+        game.wave = 1;
         start(&mut game, &mut scene);
         game.death_mode = mode.into();
         let id = game.enemies[0].spec.id;
@@ -494,6 +579,7 @@ fn death_impact_pose_stays_intact_until_atomic_cut_publication() {
 #[test]
 fn death_timeout_and_teardown_pause_pool_and_reject_late_cut_results() {
     let (mut game, mut scene) = fixture_with_playing_pool(true);
+    game.wave = 1;
     start(&mut game, &mut scene);
     game.defeat(&mut scene, 0, Vec3::Y);
     game.enemies[0].age = 3.21;
@@ -509,8 +595,9 @@ fn death_timeout_and_teardown_pause_pool_and_reject_late_cut_results() {
     game.accept_cut(&mut scene, &late).unwrap();
     assert!(game.pieces.is_empty());
     assert_pool_frozen(&game, &mut scene);
+    game.wave = 1;
     start(&mut game, &mut scene);
-    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 6);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 2);
     assert!(game.enemies.iter().filter(|e| e.phase == 1).all(|e| {
         scene
             .model(e.spec.id)
@@ -523,16 +610,15 @@ fn death_timeout_and_teardown_pause_pool_and_reject_late_cut_results() {
 }
 
 #[test]
-fn health_damage_is_nonfatal_until_zero_and_resets_for_all_six_waves() {
+fn health_damage_is_nonfatal_until_zero_and_resets_for_all_intro_types() {
     let (mut game, mut scene) = fixture();
     start(&mut game, &mut scene);
     for (wave, kind, count, hp) in [
-        (0, "drone-orbiter", 6, 100.),
-        (1, "core-tank", 2, 200.),
-        (2, "blade-wraith", 2, 150.),
-        (3, "drone-orbiter", 8, 100.),
-        (4, "core-tank", 3, 200.),
-        (5, "blade-wraith", 3, 150.),
+        (0, "drone-orbiter", 1, 100.),
+        (1, "drone-orbiter", 2, 100.),
+        (2, "core-tank", 1, 200.),
+        (4, "blade-wraith", 1, 150.),
+        (6, "core-tank", 2, 200.),
     ] {
         game.wave = wave;
         game.spawn(&mut scene);
@@ -607,7 +693,7 @@ fn blade_entry_cooldown_two_hands_and_desktop_strike_identity() {
 #[test]
 fn returned_bolt_removes_exactly_one_hundred_tank_hp() {
     let (mut game, mut scene) = fixture();
-    game.wave = 1;
+    game.wave = 2;
     start(&mut game, &mut scene);
     let i = 8;
     let center = game.enemies[i].position + Vec3::Y * game.enemies[i].spec.height * 0.5;
@@ -847,22 +933,22 @@ fn single_huge_primitive_prepares_only_requested_triangles() {
         .parts
         .iter()
         .find(|&&(_, p)| {
-            let p = &task.model.asset.primitives[p];
+            let p = &task.source.asset.primitives[p];
             p.mode == crate::gltf_model::PrimitiveMode::Triangles && p.vertices.len() > 6
         })
         .unwrap();
-    let p = &task.model.asset.primitives[primitive];
+    let p = &task.source.asset.primitives[primitive];
     let triangle = p.indices[..3].to_vec();
     let full = crate::gltf_animation::deformed_vertices(
-        &task.model.asset,
-        &task.model.pose,
+        &task.source.asset,
+        &task.source.pose,
         node,
         primitive,
     )
     .unwrap();
     let subset = crate::gltf_animation::deformed_vertex_subset(
-        &task.model.asset,
-        &task.model.pose,
+        &task.source.asset,
+        &task.source.pose,
         node,
         primitive,
         triangle.iter().copied(),
@@ -877,7 +963,7 @@ fn single_huge_primitive_prepares_only_requested_triangles() {
         .find(|i| !triangle.contains(&(*i as u32)))
         .unwrap();
     let first_vertex = p.vertices.start;
-    let asset = Arc::make_mut(&mut task.model.asset);
+    let asset = Arc::make_mut(&mut Arc::get_mut(&mut task.source).unwrap().asset);
     asset.primitives[primitive].indices = triangle.repeat(10_001);
     // Whole-primitive deformation now fails: bounded subset must never touch this vertex.
     asset.vertices[first_vertex + unused].position = [f32::NAN; 3];
@@ -1002,6 +1088,7 @@ fn published_halves_separate_before_dissolve_then_evaporate() {
 #[test]
 fn lost_worker_and_upload_ack_expire_only_the_stalled_enemy_in_real_time() {
     let (mut game, mut scene) = fixture();
+    game.wave = 1;
     start(&mut game, &mut scene);
     game.defeat(&mut scene, 0, Vec3::X);
     let stale = crate::rim_cut::split(&game.take_cut_job().unwrap()).unwrap();
@@ -1047,8 +1134,9 @@ fn lost_worker_and_upload_ack_expire_only_the_stalled_enemy_in_real_time() {
 #[test]
 fn every_kill_finishes_real_slicing_then_advances_the_wave() {
     let (mut game, mut scene) = fixture();
+    game.wave = 1;
     start(&mut game, &mut scene);
-    for i in 0..6 {
+    for i in 0..2 {
         game.defeat(&mut scene, i, Vec3::X);
     }
     while !game.tasks.is_empty() {
@@ -1059,20 +1147,20 @@ fn every_kill_finishes_real_slicing_then_advances_the_wave() {
         let ids: Vec<_> = game.staged_cut_ids().collect();
         game.ack_cut_uploads(&ids);
         game.tick(&mut scene, 0.001, None, [None; 2]);
-        if game.commits == 6 {
+        if game.commits == 2 {
             break;
         }
     }
-    assert_eq!(game.commits, 6);
+    assert_eq!(game.commits, 2);
     assert!(!game.pieces.is_empty());
-    assert_eq!(game.wave, 0);
+    assert_eq!(game.wave, 1);
     for e in game.enemies.iter_mut().filter(|e| e.phase == 3) {
         e.age = 3.21;
     }
     game.tick(&mut scene, 0.01, None, [None; 2]);
-    assert_eq!(game.kills, 6);
-    assert_eq!(game.wave, 1);
-    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 2);
+    assert_eq!(game.kills, 2);
+    assert_eq!(game.wave, 2);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 1);
     assert!(game
         .enemies
         .iter()
@@ -1083,8 +1171,9 @@ fn every_kill_finishes_real_slicing_then_advances_the_wave() {
 #[test]
 fn failed_cuts_cannot_block_wave_during_continuous_bullet_time() {
     let (mut game, mut scene) = fixture();
+    game.wave = 1;
     start(&mut game, &mut scene);
-    for i in 0..6 {
+    for i in 0..2 {
         game.defeat(&mut scene, i, Vec3::Y);
     }
     game.set_xr(true);
@@ -1094,11 +1183,11 @@ fn failed_cuts_cannot_block_wave_during_continuous_bullet_time() {
         game.tick(&mut scene, 0.05, Some(head), [None; 2]);
     }
     assert_eq!(
-        game.wave, 1,
+        game.wave, 2,
         "real-time inactivity retires deaths even when sim time barely advances"
     );
-    assert_eq!(game.cut_errors, 6);
-    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 2);
+    assert_eq!(game.cut_errors, 2);
+    assert_eq!(game.enemies.iter().filter(|e| e.phase == 1).count(), 1);
 }
 
 #[test]
@@ -1250,4 +1339,159 @@ fn stress_count_is_bounded_preserves_combat_reset_and_clears_on_teardown() {
     assert_eq!(game.stress_count(), 128);
     game.teardown(&mut scene);
     assert_eq!(game.stress_count(), 0);
+}
+
+fn recovery_fixture() -> (Game, SceneManager) {
+    let (mut game, mut scene) = fixture();
+    game.health_drop_ids = (0..4)
+        .map(|_| std::array::from_fn(|_| scene.add_cube(HIDDEN)))
+        .collect();
+    game.health_drops = vec![None; 4];
+    game.stage_panel = Some(scene.add_info_panel("debug-text", 0.34, 0.025).unwrap());
+    (game, scene)
+}
+#[test]
+fn introductory_waves_teach_single_types_before_bounded_mixed_groups() {
+    let (mut game, mut scene) = fixture();
+    for (wave, expected) in [
+        (0, [1, 0, 0]),
+        (1, [2, 0, 0]),
+        (2, [0, 1, 0]),
+        (3, [2, 1, 0]),
+        (4, [0, 0, 1]),
+        (5, [3, 0, 1]),
+    ] {
+        game.wave = wave;
+        game.spawn(&mut scene);
+        let mut population = [0; 3];
+        for e in game.enemies.iter().filter(|e| e.phase == 1) {
+            population[kind_index(&e.spec.kind)] += 1;
+        }
+        assert_eq!(population, expected);
+    }
+    for wave in 0..1000 {
+        let counts = wave_population(wave);
+        assert!(counts[0] <= 8 && counts[1] <= 3 && counts[2] <= 3);
+        assert!((1..=10).contains(&counts.iter().sum::<usize>()));
+    }
+}
+#[test]
+fn completed_waves_and_spatial_stage_text_advance_only_after_all_enemies_retire() {
+    let (mut game, mut scene) = recovery_fixture();
+    start(&mut game, &mut scene);
+    game.tick(&mut scene, 0.01, None, [None; 2]);
+    let panel = game.stage_panel.unwrap();
+    assert!(
+        !scene
+            .info_panels
+            .get_mut(&panel)
+            .unwrap()
+            .update(vec![("", "VLNA 1  HOTOVO 0".into())]),
+        "same expected text is already cached"
+    );
+    game.defeat(&mut scene, 0, Vec3::Y);
+    assert_eq!(game.state()["completedWaves"], 0);
+    game.enemies[0].age = 3.21;
+    game.cut_failed();
+    game.tick(&mut scene, 0.01, None, [None; 2]);
+    assert_eq!(game.state()["completedWaves"], 1);
+    assert!(
+        !scene
+            .info_panels
+            .get_mut(&panel)
+            .unwrap()
+            .update(vec![("", "VLNA 2  HOTOVO 1".into())]),
+        "completed wave is already published in text"
+    );
+    game.set_xr(true);
+    game.tick(&mut scene, 0.01, None, [None; 2]);
+    assert_eq!(scene.objects()[&panel].transform.position, HIDDEN);
+    game.teardown(&mut scene);
+    assert_eq!(scene.objects()[&panel].transform.position, HIDDEN);
+}
+#[test]
+fn third_kill_can_drop_health_and_pickup_heals_once_without_overhealing() {
+    let (mut game, mut scene) = recovery_fixture();
+    start(&mut game, &mut scene);
+    for kill in 1..=3 {
+        game.enemies[0].phase = 1;
+        game.enemies[0].hp = 100.;
+        game.enemies[0].position = Vec3::new(0., 1., 36.);
+        game.hurt_enemy(&mut scene, 0, 100., Vec3::Y);
+        assert_eq!(game.kills, kill);
+        assert_eq!(game.drops_spawned, if kill == 3 { 1 } else { 0 });
+    }
+    game.defeat(&mut scene, 0, Vec3::Y);
+    assert_eq!(game.drops_spawned, 1, "same dead actor never pays twice");
+    let drop = game.health_drops[0].unwrap();
+    let head = drop.ground + Vec3::Y * 1.7;
+    game.sync_health_drops(&mut scene);
+    assert!(game.health_drop_ids[0]
+        .iter()
+        .all(|id| scene.objects()[id].transform.position.y > 0.));
+    game.health = 70.;
+    game.update_health_drops(0.2, head);
+    assert_eq!(game.health, 70.);
+    game.update_health_drops(0.2, head);
+    assert_eq!(game.health, 95.);
+    assert_eq!(game.drops_collected, 1);
+    game.update_health_drops(1., head);
+    assert_eq!(game.health, 95.);
+    game.health = 100.;
+    game.maybe_drop_health(Vec3::new(0., 1., 36.));
+    game.update_health_drops(0.5, head);
+    assert!(
+        game.health_drops[0].is_some(),
+        "full HP keeps pickup available"
+    );
+    game.health = 90.;
+    game.update_health_drops(0.01, head);
+    assert_eq!(game.health, 100.);
+    assert_eq!(game.healed, 35.);
+    assert_eq!(game.drops_collected, 2);
+}
+#[test]
+fn health_drops_persist_into_next_wave_expire_and_clear_on_death_or_teardown() {
+    let (mut game, mut scene) = recovery_fixture();
+    start(&mut game, &mut scene);
+    game.kills = 3;
+    game.maybe_drop_health(Vec3::new(0., 1., 36.));
+    assert_eq!(game.drops_spawned, 1);
+    game.wave += 1;
+    game.spawn(&mut scene);
+    assert!(game.health_drops[0].is_some());
+    game.update_health_drops(DROP_LIFETIME, Vec3::new(15., 1.7, 42.));
+    game.sync_health_drops(&mut scene);
+    assert!(game.health_drops.iter().all(Option::is_none));
+    assert!(game
+        .health_drop_ids
+        .iter()
+        .flatten()
+        .all(|id| scene.objects()[id].transform.position == HIDDEN));
+    game.maybe_drop_health(Vec3::new(0., 1., 36.));
+    let ground = game.health_drops[0].unwrap().ground;
+    game.health = 80.;
+    game.update_health_drops(0.5, ground + Vec3::Y * 6.);
+    assert_eq!(game.health, 80., "cannot collect from another floor");
+    game.damage(100.);
+    assert!(game.health_drops.iter().all(Option::is_none));
+    game.update_health_drops(1., ground + Vec3::Y * 1.7);
+    assert_eq!(game.health, 0., "pickup never resurrects a dead player");
+    game.health = 50.;
+    for _ in 0..10 {
+        game.maybe_drop_health(Vec3::new(0., 1., 36.));
+    }
+    assert_eq!(game.health_drops.iter().filter(|d| d.is_some()).count(), 4);
+    game.teardown(&mut scene);
+    assert!(game.health_drops.iter().all(Option::is_none));
+    assert!(game
+        .health_drop_ids
+        .iter()
+        .flatten()
+        .all(|id| scene.objects()[id].transform.position == HIDDEN));
+    let drops = (3..1000).filter(|k| health_drop_roll(*k)).count();
+    assert!(
+        (200..400).contains(&drops),
+        "deterministic occasional drops, not every enemy"
+    );
 }

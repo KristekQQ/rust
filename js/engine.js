@@ -222,11 +222,12 @@ export class Scene {
     /** @param {import('./engine.d.ts').RimOptions|null} options */
     configureRim(options){
         if(options===null){this.#wasm.configure_rim('null');return;}
-        const {enemies,swords,bolts,beams,charges,healthBars=[],blobShadows=null,hud,marker,shapes,obstacles}=options;
+        const {enemies,swords,bolts,beams,charges,healthBars=[],healthDrops=[],stagePanel=null,blobShadows=null,hud,marker,shapes,obstacles}=options;
         const shadows=blobShadows??[];
-        const handles=[...enemies.map(e=>e.model),...swords,...bolts,...beams,...charges,...healthBars.flat(),...shadows,...hud,marker];
+        const drops=healthDrops??[];
+        const handles=[...enemies.map(e=>e.model),...swords,...bolts,...beams,...charges,...healthBars.flat(),...drops.flat(),...(stagePanel?[stagePanel]:[]),...shadows,...hud,marker];
         if(handles.some(o=>handleBindings.get(o)!==this.#wasm))throw new Error('Objekty Říma musí patřit této scéně.');
-        this.#wasm.configure_rim(JSON.stringify({enemies:enemies.map(({model,...spec})=>({...spec,id:model.id})),swords:swords.map(o=>o.id),bolts:bolts.map(o=>o.id),beams:beams.map(o=>o.id),charges:charges.map(o=>o.id),healthBars:healthBars.map(pair=>pair.map(o=>o.id)),blobShadows:shadows.map(o=>o.id),hud:hud.map(o=>o.id),marker:marker.id,shapes,obstacles}));
+        this.#wasm.configure_rim(JSON.stringify({enemies:enemies.map(({model,...spec})=>({...spec,id:model.id})),swords:swords.map(o=>o.id),bolts:bolts.map(o=>o.id),beams:beams.map(o=>o.id),charges:charges.map(o=>o.id),healthBars:healthBars.map(pair=>pair.map(o=>o.id)),healthDrops:drops.map(triple=>triple.map(o=>o.id)),stagePanel:stagePanel?.id??null,blobShadows:shadows.map(o=>o.id),hud:hud.map(o=>o.id),marker:marker.id,shapes,obstacles}));
     }
     /** @param {import('./engine.d.ts').RimInput} input */
     rimInput(input){this.#wasm.rim_input(JSON.stringify(input));}
@@ -379,12 +380,21 @@ export class Scene {
         return {...result, pieces: result.pieces.map((/** @type {number} */ id) => this.#create(id))};
     }
     /** Explicit bounded Rust burst and fragment presentation.
-     * @param {SceneObject[]} pieces @param {{mirrorText?: boolean,size?: number,scoreLabel?: 'pending-bonus'|'hit-points'|'stock-total'}} [options] @returns {{objects: SceneObject[], duration: number}} */
-    playCutFeedback(pieces, {mirrorText = false, size = 1, scoreLabel = undefined} = {}) {
+     * @param {SceneObject[]} pieces @param {{mirrorText?: boolean,size?: number,scoreLabel?: 'pending-bonus'|'hit-points'|'stock-total',fadePieces?: {delay?:number,duration?:number,style?:'fade'|'dissolve'}}} [options] @returns {{objects: SceneObject[], duration: number}} */
+    playCutFeedback(pieces, {mirrorText = false, size = 1, scoreLabel = undefined, fadePieces = undefined} = {}) {
         if (pieces.some(p => handleBindings.get(p) !== this.#wasm)) throw new Error('Fragmenty musí patřit této scéně.');
         if (scoreLabel !== undefined && scoreLabel !== 'pending-bonus' && scoreLabel !== 'hit-points' && scoreLabel !== 'stock-total') throw new Error('Neznamy bodovy popisek.');
         const ids = new Uint32Array(pieces.map(p => p.id));
-        const result = JSON.parse(scoreLabel === undefined ? this.#wasm.play_cut_feedback_facing(ids, mirrorText, size) : this.#wasm.play_cut_feedback_facing(ids, mirrorText, size, scoreLabel));
+        if (fadePieces !== undefined) {
+            if (fadePieces.style !== undefined && fadePieces.style !== 'fade' && fadePieces.style !== 'dissolve') throw new Error('Invalid piece fade style');
+            const delay = fadePieces.delay ?? .15, duration = fadePieces.duration ?? .6;
+            if (!Number.isFinite(delay) || delay < 0 || !Number.isFinite(duration) || duration <= 0 || !Number.isFinite(delay + duration)) throw new Error('Invalid piece fade timing');
+        }
+        const result = JSON.parse(fadePieces !== undefined
+            ? (fadePieces.style === 'dissolve'
+                ? this.#wasm.play_cut_feedback_facing(ids, mirrorText, size, scoreLabel, fadePieces.delay ?? .15, fadePieces.duration ?? .6, true)
+                : this.#wasm.play_cut_feedback_facing(ids, mirrorText, size, scoreLabel, fadePieces.delay ?? .15, fadePieces.duration ?? .6))
+            : scoreLabel === undefined ? this.#wasm.play_cut_feedback_facing(ids, mirrorText, size) : this.#wasm.play_cut_feedback_facing(ids, mirrorText, size, scoreLabel));
         return {objects: result.objects.map((/** @type {number} */ id) => this.#create(id)), duration: result.duration};
     }
     clearCutFeedback() { this.#wasm.clear_cut_feedback(); }
@@ -563,6 +573,21 @@ async function initializeEngine(canvas, backend, initialization) {
     const engine = Object.freeze({
         scene,
         xr,
+        /** Keep async scene authoring atomic before entering XR. @param {boolean} paused */
+        setSceneAuthoringPaused(paused) { wasm.set_scene_authoring_paused(paused); },
+        /** Render-only smoothing for a remote mirror; duration0 disables it.
+         * @param {{durationMs?:number,maxDistance?:number}} [options] */
+        setSceneInterpolation({durationMs=60,maxDistance=2}={}) { wasm.set_scene_interpolation(durationMs,maxDistance); },
+        /** Apply a versioned worker publication; state validation lives in Rust.
+         * @param {Uint8Array} bytes @param {SceneObject[]} localObjects
+         * @param {{id:number,parentId:number}[]} spawns Explicit source provenance. */
+        applySimulationPublication(bytes, localObjects=[], spawns=[]) {
+            if(!(bytes instanceof Uint8Array)||localObjects.some(object=>handleBindings.get(object)!==wasm))throw new TypeError('Invalid simulation publication/owner');
+            if(!Array.isArray(spawns)||spawns.some(pair=>!pair||![pair.id,pair.parentId].every(id=>Number.isInteger(id)&&id>=0&&id<0xffffffff)))throw new TypeError('Invalid simulation spawn IDs');
+            const localIds=Uint32Array.from(localObjects,object=>object.id);
+            if(spawns.length===0)wasm.scene_apply_worker_publication(bytes,localIds);
+            else wasm.scene_apply_worker_publication_with_spawns(bytes,localIds,Uint32Array.from(spawns.flatMap(pair=>[pair.id,pair.parentId])));
+        },
         dispose() {
             if (disposed) return;
             xr.dispose();
@@ -578,6 +603,9 @@ async function initializeEngine(canvas, backend, initialization) {
         /** Geometry glow in both eyes, independent of postprocessing. Zero strength releases caches.
          * @param {{strength?:number,radius?:number}} [options] */
         setNeonGlow({strength=.6,radius=.015} = {}) { accepted(wasm.set_neon_glow(strength,radius)); },
+        setNeonGlowResolution(scale=.5) { accepted(wasm.set_neon_glow_resolution(scale)); },
+        setFontGlowAtlas(enabled=true) { accepted(wasm.set_font_glow_atlas(!!enabled)); },
+        prewarmFontGlowAtlas(characters='') { accepted(wasm.prewarm_font_glow_atlas(characters)); },
         // Thin commands only: pass order, resources and execution live in Rust.
         postprocessing: Object.freeze({
             /** @param {import("./engine.d.ts").PostEffectName} name */
@@ -653,6 +681,12 @@ async function initializeEngine(canvas, backend, initialization) {
         set_camera_mode: wasm.set_camera_mode,
         /** @param {Vector3} position @param {Vector3} target */
         setCameraView(position, target) { accepted(wasm.set_camera_view(...position, ...target)); },
+        /** Built-in desktop cameras only; native/XR view matrices are independent.
+         * @param {"left"|"right"} handedness */
+        setCameraHandedness(handedness) {
+            if (handedness !== 'left' && handedness !== 'right') throw new Error('Camera handedness must be left or right');
+            accepted(wasm.set_camera_handedness(handedness === 'right'));
+        },
         /** @param {Vector3} position @param {Vector3} target */
         setOrbitView(position,target) {accepted(wasm.set_orbit_view(...position,...target));},
         /** @param {number} dx @param {number} dy @param {number} [zoom] */

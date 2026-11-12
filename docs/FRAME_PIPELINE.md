@@ -58,6 +58,13 @@ Bez skutečných overlays poslední efekt běží bez depth attachmentu. Cache p
 rozlišuje barevný formát a volitelný formát hloubky. WebGPU může současně vzorkovat
 read-only scene depth; WebGL vzorkuje samostatnou packed-depth barevnou texturu,
 nikoli svůj připojený depth attachment (zamezení framebuffer feedback loopu).
+`RenderTarget.depth_store` explicitně určuje životnost hloubky po hlavním průchodu.
+WebXR, postprocessing a opakovaně použité cíle zachovávají `Store`. Nativní host
+předává compositoru pouze barvu a před každým okem hloubku vymaže, proto jeho
+koncový cíl používá `Discard`. Hloubkové testy geometrie, průhlednosti a glow
+uvnitř průchodu zůstávají stejné. Přidání následného čtení hloubky nebo compositor
+depth vrstvy vyžaduje změnit tento cíl na `Store`; mezicíl postprocessingu již
+hloubku uchovává. Výkonový přínos se ověřuje na zařízení, ne počtem příkazů.
 Graf postprocessingu neznamená, že všechny engine průchody již mají jeden encoder.
 
 WebGPU XR dokončí každé oko do vlastního color/depth cíle a následně odešle

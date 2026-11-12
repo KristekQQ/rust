@@ -56,11 +56,11 @@ public final class FragmentedMp4Test {
         FragmentedMp4 custom = new FragmentedMp4(320,240,SPS,PPS,50000);
         byte[] customFragment = custom.fragment(annex(idr),0,true);
         assert u32(customFragment, find(customFragment,"trun")+20) == 50000;
-        if (args.length == 2) fixture(args[0], args[1]);
+        if (args.length >= 2) fixture(args[0], args[1], args.length >= 3 ? Integer.parseInt(args[2]) : 60);
         System.out.println("PASS FragmentedMp4 deterministic boxes, offsets, flags, timestamps and input formats");
     }
 
-    private static void fixture(String input, String output) throws Exception {
+    private static void fixture(String input, String output, int expectedFrames) throws Exception {
         List<byte[]> nals = split(Files.readAllBytes(Paths.get(input)));
         byte[] sps=null, pps=null;
         List<byte[]> units = new ArrayList<>();
@@ -75,12 +75,12 @@ public final class FragmentedMp4Test {
             if (type>=1 && type<=5) slice=true;
         }
         if (slice) units.add(current.toByteArray());
-        if (sps==null || pps==null || units.size()!=60) throw new AssertionError("Expected 60 AVC frames");
+        if (sps==null || pps==null || units.size()!=expectedFrames) throw new AssertionError("Expected " + expectedFrames + " AVC frames");
         FragmentedMp4 mux = new FragmentedMp4(320,240,sps,pps);
         ByteArrayOutputStream out = new ByteArrayOutputStream(); out.write(mux.initSegment());
         for (int i=0;i<units.size();i++) out.write(mux.fragment(units.get(i), (i*1000000L)/30, false));
         Files.write(Paths.get(output),out.toByteArray());
-        System.out.println("PASS muxed 60 generated AVC frames");
+        System.out.println("PASS muxed " + expectedFrames + " generated AVC frames");
     }
     private static List<byte[]> split(byte[] data) {
         List<byte[]> out=new ArrayList<>(); int begin=-1;

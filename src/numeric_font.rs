@@ -1,25 +1,38 @@
 //! Scene-owned opt-in numeric font. Immutable glyph assets, ordinary shared instances.
 use super::*;
 use std::collections::BTreeSet;
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(super) struct NumericFont {
-    assets: Option<[u32; 10]>,
+    pub(super) assets: Option<[u32; 10]>,
     panels: BTreeMap<u32, Panel>,
-    children: BTreeSet<u32>,
+    pub(super) children: BTreeSet<u32>,
 }
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 struct Key {
     revision: u64,
     matrix: [f32; 16],
     options: RenderOptions,
     material: [f32; 7],
 }
+#[derive(Clone)]
 struct Panel {
     key: Key,
     children: Vec<(u8, u32)>,
 }
 impl SceneManager {
+    pub(super) fn set_numeric_render_tags(
+        &mut self,
+        assets: Option<[u32; 10]>,
+        children: BTreeSet<u32>,
+    ) {
+        self.numeric_font.assets = assets;
+        self.numeric_font.children = children;
+        self.numeric_font.panels.clear();
+    }
     pub(crate) fn is_numeric_panel(&self, id: u32) -> bool {
+        if self.render_publication.font_texts.contains(&id) {
+            return true;
+        }
         self.font3d.texts.contains_key(&id)
             || self.info_panels.get(&id).is_some_and(|p| p.numeric())
     }
@@ -27,11 +40,14 @@ impl SceneManager {
         self.numeric_font.children.contains(&id)
     }
     pub(crate) fn is_text_object(&self, id: u32) -> bool {
+        if self.render_publication.font_children.contains(&id) {
+            return true;
+        }
         self.info_panels.contains_key(&id)
             || self.numeric_font.children.contains(&id)
             || self.font3d.children.contains(&id)
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn numeric_font_digit(&self, handle: u32) -> Option<u8> {
         self.numeric_font
             .assets
@@ -40,11 +56,11 @@ impl SceneManager {
             .position(|&id| id == handle)
             .map(|digit| digit as u8)
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn numeric_font_assets(&self) -> impl Iterator<Item = &u32> {
         self.numeric_font.assets.iter().flatten()
     }
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     pub(crate) fn numeric_font_children(&self) -> impl Iterator<Item = &u32> {
         self.numeric_font.children.iter()
     }
@@ -102,6 +118,9 @@ impl SceneManager {
     }
     /// Call before uploading/extracting a frame. Unchanged panels allocate nothing.
     pub fn sync_numeric_font(&mut self) {
+        if self.render_publication.is_mirror {
+            return;
+        }
         let mut font = std::mem::take(&mut self.numeric_font);
         // Use the panel map directly on the unchanged path: no per-frame ID collection.
         let mut cursor = None;
@@ -156,9 +175,9 @@ impl SceneManager {
                                     [c[0], c[1], c[2], 1.]
                                 })
                                 .collect(),
-                            variants: vec![source],
+                            variants: vec![source].into(),
                             registered: true,
-                            varying_triangles: vec![],
+                            varying_triangles: vec![].into(),
                         },
                     );
                     *handle = id;

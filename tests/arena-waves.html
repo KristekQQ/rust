@@ -22,7 +22,7 @@ await run.execute(async test=>{
     let fruit=app.gameState().liveApples;
     test.assert(fruit.length===10&&app.gameState().shots===10,'VR immediately shows ten actual cuttable fruit');
     test.assert(sim.timerCountForDelay(100)===1,'one automatic wave timer');
-    test.assert(fruit.every(object=>Math.abs(object.meshInfo.scale[0]-.09)<1e-6),'all ten fruit use the larger comfortable physical meshes');
+    test.assert(fruit.every(object=>Math.abs(object.meshInfo.scale[0]-.126)<1e-6),'all ten fruit use the larger comfortable physical meshes');
     test.assert(fruit[9].meshInfo.position[1]-fruit[0].meshInfo.position[1]>.3&&fruit[4].meshInfo.position[1]>(fruit[0].meshInfo.position[1]+fruit[9].meshInfo.position[1])/2+.15,'targets form a sloped curved stroke in XR coordinates');
     const left=sim.pixels('left'),right=sim.pixels('right');
     const canvas=document.getElementById('evidence');canvas.width=left.width+right.width;canvas.height=left.height;

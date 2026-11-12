@@ -6,8 +6,8 @@ import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
 import { transform } from 'esbuild';
 import { assertFreshBuild, root } from './build-fingerprint.mjs';
 
-const runtimeExtensions = new Set(['.html', '.js', '.css', '.json', '.gltf', '.glb', '.bin', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.woff', '.woff2', '.md', '.txt']);
-const compressExtensions = new Set(['.html', '.js', '.css', '.json', '.gltf', '.svg', '.wasm']);
+const runtimeExtensions = new Set(['.html', '.js', '.css', '.json', '.gltf', '.glb', '.bin', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.woff', '.woff2', '.md', '.txt', '.wasm']);
+const compressExtensions = new Set(['.html', '.mjs', '.js', '.css', '.json', '.gltf', '.svg', '.wasm']);
 const extraFiles = ['index.html', 'tests/pixels.js',
     'pkg/webgpu_wasm.js', 'pkg/webgpu_wasm_bg.wasm', 'pkg/webgpu_wasm.d.ts', 'pkg/webgpu_wasm_bg.wasm.d.ts'];
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -34,11 +34,11 @@ export async function minifyRuntimeFile(relativePath, bytes, build, releaseId) {
         return Buffer.from(bytes.toString('utf8').replace(/^[ \t]*<div class="help"><a href="tests\/[^"<>]+">[^<>]*<\/a><\/div>[ \t]*\r?\n/gm, ''));
     }
     const extension = path.extname(relativePath);
-    if (extension !== '.js' && extension !== '.css') return bytes;
+    if (extension !== '.js' && extension !== '.mjs' && extension !== '.css') return bytes;
     const result = await transform(bytes.toString('utf8'), {
-        loader: extension === '.js' ? 'js' : 'css',
+        loader: extension === '.css' ? 'css' : 'js',
         minify: true, target: 'es2022', legalComments: 'inline',
-        ...(extension === '.js' ? { format: 'esm' } : {}),
+        ...(extension !== '.css' ? { format: 'esm' } : {}),
     });
     return Buffer.from(result.code);
 }
@@ -63,7 +63,13 @@ async function runtimeFiles(sourceRoot, directory) {
 }
 
 async function productionFiles(sourceRoot) {
-    return [...new Set([...extraFiles, ...await runtimeFiles(sourceRoot, 'js'),
+    const workers = await lstat(path.join(sourceRoot,'pkg-neon-worker')).then(
+        () => runtimeFiles(sourceRoot,'pkg-neon-worker'),
+        error => { if(error.code==='ENOENT')return []; throw error; });
+    const observer = await lstat(path.join(sourceRoot,'tools/scene-observer/publisher.js')).then(
+        () => ['tools/scene-observer/publisher.js','tools/scene-observer/protocol.mjs'],
+        error => { if(error.code==='ENOENT')return []; throw error; });
+    return [...new Set([...extraFiles, ...workers, ...observer, ...await runtimeFiles(sourceRoot, 'js'),
         ...await runtimeFiles(sourceRoot, 'examples'), ...await runtimeFiles(sourceRoot, 'assets')])].sort();
 }
 

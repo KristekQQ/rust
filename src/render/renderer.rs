@@ -584,7 +584,11 @@ pub struct SceneRenderer {
     overlay_selection_reference: bool,
     overlay_selection: OverlaySelectionStats,
     neon_glow: Option<super::neon_glow::NeonGlow>,
+    half_glow: super::half_glow::HalfGlow,
     neon_meshes: HashMap<u32, Option<super::neon_glow::GlowMesh>>,
+    font_glow: Option<super::font_glow::FontGlow>,
+    font_glow_params: [f32; 2],
+    font_glow_atlas_opt_out: bool,
     neon_draws: usize,
     neon_segments: usize,
     gltf_gpu: super::gltf_gpu::GltfGpu,
@@ -740,7 +744,11 @@ impl SceneRenderer {
             overlay_selection_reference: true,
             overlay_selection: OverlaySelectionStats::default(),
             neon_glow: None,
+            half_glow: Default::default(),
             neon_meshes: HashMap::new(),
+            font_glow: None,
+            font_glow_params: [0., 0.015],
+            font_glow_atlas_opt_out: false,
             neon_draws: 0,
             neon_segments: 0,
             gltf_gpu,
@@ -814,6 +822,7 @@ impl SceneRenderer {
     }
 
     /// Advance simulation once per frame, independently of the number of views.
+    #[cfg(target_arch = "wasm32")]
     pub fn install_resident(
         &mut self,
         id: u32,
@@ -927,10 +936,16 @@ impl SceneRenderer {
                     - upload_before) as usize;
                 if panel.kind.neon() {
                     if self.neon_glow.as_ref().is_some_and(|glow| glow.enabled()) {
-                        self.neon_meshes.insert(
-                            id,
-                            super::neon_glow::GlowMesh::new(&self.device, &panel.mesh),
-                        );
+                        let glow = if let Some(prepared) =
+                            self.scene.render_publication.panel_glow.get(&id)
+                        {
+                            prepared.as_ref().and_then(|p| {
+                                super::neon_glow::GlowMesh::from_prepared(&self.device, p)
+                            })
+                        } else {
+                            super::neon_glow::GlowMesh::new(&self.device, &panel.mesh)
+                        };
+                        self.neon_meshes.insert(id, glow);
                     } else {
                         self.neon_meshes.remove(&id);
                     }
@@ -945,6 +960,13 @@ impl SceneRenderer {
     pub fn advance_scene_with_elapsed(&mut self, elapsed: f32, simulation_dt: f32) {
         self.advance_scene_timed(elapsed, simulation_dt);
         self.finish_scene_updates();
+    }
+    /// Begin a frame whose CPU simulation is owned by an external worker.
+    /// No simulation, contact solver or mesh slicing runs on this path.
+    pub fn begin_external_scene_frame(&mut self, elapsed: f32) {
+        self.upload_bytes = 0;
+        self.gltf_gpu.begin_frame();
+        self.frame_metrics.record(elapsed);
     }
     pub fn advance_xr_scene(&mut self, elapsed: f32, time_scale: f32) {
         // Tracked paddle physics needs the current frame hand poses.
@@ -964,6 +986,11 @@ impl SceneRenderer {
     pub fn finish_scene_updates(&mut self) {
         let _cpu_scope = super::profiler::cpu_scope("scene.gpuUpdates");
         self.sync_triangle_meshes();
+        if let Some(atlas) = &mut self.font_glow {
+            let ids = self.scene.font3d_assets().copied().collect();
+            atlas.retain(&ids);
+            atlas.retain_fonts(&self.scene.font3d_glow_fonts());
+        }
         let changes = self.scene.take_model_gpu_changes();
         let mut removed = std::collections::HashSet::new();
         for id in &changes.removed {
@@ -1024,7 +1051,7 @@ impl SceneRenderer {
                     Ok(bytes) => self.upload_bytes += bytes,
                     Err(error) => {
                         self.scene.retry_model_gpu_update(*id);
-                        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&error));
+                        super::platform::report_error(&error);
                     }
                 }
             }
@@ -1068,19 +1095,41 @@ impl SceneRenderer {
         // New meshes are immutable per stable ID. Upload only once; all passes share
         // the same existing imported-mesh path, bounds and cache invalidation.
         for (&handle, asset) in &self.scene.mesh_variants {
-            if self.variant_colors.contains_key(&handle) {
+            let source = &asset.variants[0];
+            if self.variant_colors.contains_key(&handle)
+                && self
+                    .cpu_mesh_sources
+                    .get(&handle)
+                    .is_some_and(|old| old.same_source(source))
+            {
                 continue;
             }
-            let source = &asset.variants[0];
+            self.neon_meshes.remove(&handle);
+            self.alpha_indices.remove(&handle);
             // Numeric tubes use canonical render-only geometry and a per-fragment
             // neon material; their cutting recipe stays independent of shading.
-            let mesh = self
-                .scene
-                .numeric_font_digit(handle)
-                .map_or_else(|| asset.gpu_mesh(), crate::info_panel::numeric_glyph);
+            let prepared = self.scene.prepared_variant_mesh(handle);
+            let generated;
+            let mesh = if let Some(prepared) = prepared {
+                prepared
+            } else {
+                generated = self
+                    .scene
+                    .numeric_font_digit(handle)
+                    .map_or_else(|| asset.gpu_mesh(), crate::info_panel::numeric_glyph);
+                &generated
+            };
             self.imported_meshes
-                .insert(handle, Mesh::imported(&self.device, &mesh));
+                .insert(handle, Mesh::imported(&self.device, mesh));
             self.cpu_mesh_sources.insert(handle, source.clone());
+            let prepared_colors = self.scene.prepared_variant_colors(handle);
+            let generated_colors;
+            let colors = if let Some(colors) = prepared_colors {
+                colors
+            } else {
+                generated_colors = asset.gpu_colors();
+                &generated_colors
+            };
             self.variant_colors.insert(
                 handle,
                 VariantColors::new(
@@ -1088,7 +1137,7 @@ impl SceneRenderer {
                     &self.queue,
                     &self.bind_group_layout,
                     &self.grid_uniform_buffer,
-                    &asset.gpu_colors(),
+                    colors,
                 ),
             );
         }
@@ -1107,17 +1156,57 @@ impl SceneRenderer {
             if unchanged && self.imported_meshes.contains_key(&id) {
                 continue;
             }
-            let Some(cpu) = object.mesh.ready_cpu() else {
-                continue;
-            };
             let _upload_scope = super::profiler::cpu_scope("mesh.upload");
-            let render_mesh = cpu.render_mesh();
+            let generated;
+            let render_mesh = if let Some(prepared) = object.mesh.prepared_render() {
+                prepared
+            } else {
+                let Some(cpu) = object.mesh.ready_cpu() else {
+                    continue;
+                };
+                generated = cpu.render_mesh();
+                &generated
+            };
+            self.neon_meshes.remove(&id);
             self.upload_bytes += render_mesh.vertices.len() * 36 + render_mesh.indices.len() * 4;
             self.imported_meshes
-                .insert(id, Mesh::imported(&self.device, &render_mesh));
+                .insert(id, Mesh::imported(&self.device, render_mesh));
             self.cpu_mesh_sources.insert(id, object.mesh.clone());
             self.alpha_indices.remove(&id);
         }
+    }
+
+    /// Register an existing scene model without changing its gameplay identity.
+    /// Hosts call this after authoring/import; ordinary frame updates never scan
+    /// or implicitly upload newly-created model roots.
+    pub fn register_gltf_model(&mut self, id: u32) -> Result<(), String> {
+        if self.gltf_models.contains_key(&id) {
+            return Ok(());
+        }
+        let model = self.scene.model(id).ok_or("Unknown glTF scene model")?;
+        let object = self.scene.objects().get(&id).ok_or("Missing glTF root")?;
+        let options = object.render_options;
+        let mut gpu = self
+            .gltf_gpu
+            .upload(&self.device, &self.queue, &model.asset)?;
+        gpu.opaque_reorderable = options.opaque_reorderable;
+        self.gltf_gpu.update(
+            &self.queue,
+            &mut gpu,
+            &model.asset,
+            &model.render_bounds_cache,
+            &model.pose,
+            model.revision,
+            object.render_data.model(),
+            [
+                options.reflectivity,
+                if options.receives_shadow { 1.0 } else { 0.0 },
+                0.0,
+                0.0,
+            ],
+        )?;
+        self.gltf_models.insert(id, gpu);
+        Ok(())
     }
 
     pub fn import_gltf_model(
@@ -1222,7 +1311,7 @@ impl SceneRenderer {
 
         // No additional clock reads or BVH counters when diagnostics are off.
         let clock = (self.debug_enabled && is_main)
-            .then(|| web_sys::window().and_then(|w| w.performance()))
+            .then(super::platform::performance)
             .flatten();
         if is_main {
             if cache.key == Some(key) {
@@ -1410,16 +1499,93 @@ impl SceneRenderer {
         {
             return false;
         }
+        self.font_glow_params = [strength, radius];
         if strength == 0.0 {
             self.neon_glow = None;
             self.neon_meshes.clear();
+            self.half_glow.clear();
             self.neon_draws = 0;
             self.neon_segments = 0;
             return true;
         }
+        if !self.font_glow_atlas_opt_out {
+            self.font_glow
+                .get_or_insert_with(|| super::font_glow::FontGlow::new(&self.device));
+        }
         self.neon_glow
             .get_or_insert_with(|| super::neon_glow::NeonGlow::new(&self.device))
             .configure(strength, radius)
+    }
+    /// Ordinary-edge halo resolution (default 0.5). Only 1.0 and 0.5 are supported;
+    /// unsupported targets/backends retain the original full-resolution path.
+    pub fn configure_neon_glow_resolution(&mut self, scale: f32) -> bool {
+        if scale != 1.0 && scale != 0.5 {
+            return false;
+        }
+        if self.half_glow.requested != scale {
+            self.half_glow.requested = scale;
+            self.half_glow.clear();
+        }
+        true
+    }
+    /// Local boundary-distance halos for prepared general mesh fonts only.
+    /// Glow configuration enables this by default; explicit false persists.
+    /// Baking remains an explicit loading-time prewarm operation.
+    pub fn configure_font_glow_atlas(&mut self, enabled: bool) {
+        self.font_glow_atlas_opt_out = !enabled;
+        if enabled {
+            self.font_glow
+                .get_or_insert_with(|| super::font_glow::FontGlow::new(&self.device));
+        } else {
+            self.font_glow = None;
+        }
+    }
+    /// Release scene-dependent glow resources while retaining configuration.
+    pub fn clear_glow_caches(&mut self) {
+        self.half_glow.clear();
+        self.neon_meshes.clear();
+        if self.font_glow.is_some() {
+            self.font_glow = Some(super::font_glow::FontGlow::new(&self.device));
+        }
+        self.neon_draws = 0;
+        self.neon_segments = 0;
+    }
+    /// Bake selected characters plus currently used mesh-font glyphs during
+    /// loading (empty string: used glyphs only). Never allocates scene IDs or
+    /// mutates layout/publication. Call again after font/style changes.
+    /// Unprepared runtime sources safely retain original geometric halos.
+    pub fn prewarm_font_glow_atlas(&mut self, characters: &str) {
+        let Some(atlas) = &mut self.font_glow else {
+            return;
+        };
+        let sources = self.scene.font3d_glow_sources(characters);
+        let fonts = self.scene.font3d_glow_fonts();
+        atlas.prewarm(&self.device, &self.queue, sources, &fonts);
+    }
+    fn prepare_font_glow(&mut self, target: &RenderTarget<'_>) {
+        let Some(atlas) = &mut self.font_glow else {
+            return;
+        };
+        let ids: std::collections::HashSet<_> = self.scene.font3d_assets().copied().collect();
+        atlas.retain(&ids);
+        for id in ids {
+            if let Some(asset) = self.scene.mesh_variants.get(&id) {
+                atlas.bind_source(id, &asset.variants[0]);
+            }
+        }
+        let cache = &self.passes[self.active_cache];
+        atlas.prepare(
+            &self.device,
+            &self.queue,
+            RenderView {
+                view_projection: cache.key.expect("prepared font view").0,
+                camera_position: cache.camera_position,
+            },
+            target,
+            self.font_glow_params[0],
+            self.font_glow_params[1],
+            &cache.queue.imported,
+        );
     }
     fn has_neon_geometry(&self, id: u32) -> bool {
         self.scene.triangle_meshes().contains_key(&id)
@@ -1431,6 +1597,10 @@ impl SceneRenderer {
                 .is_some_and(|panel| panel.kind.neon())
     }
     fn prepare_neon_glow(&mut self, target: &RenderTarget<'_>) {
+        if self.font_glow.is_some() && self.neon_glow.as_ref().is_some_and(|g| g.enabled()) {
+            self.prepare_font_glow(target);
+        }
+        let _scope = super::profiler::cpu_scope("neon.prepare");
         let Some(glow) = &mut self.neon_glow else {
             return;
         };
@@ -1442,7 +1612,11 @@ impl SceneRenderer {
             if self.neon_meshes.contains_key(id) || !instances.iter().any(|i| i.emission[0] > 0.0) {
                 continue;
             }
-            if let Some(digit) = self.scene.numeric_font_digit(*id) {
+            if let Some(digit) = self
+                .scene
+                .numeric_font_digit(*id)
+                .filter(|_| self.scene.wire_publication_sequence() == 0)
+            {
                 self.neon_meshes.insert(
                     *id,
                     super::neon_glow::GlowMesh::new(
@@ -1452,35 +1626,43 @@ impl SceneRenderer {
                 );
                 continue;
             }
-            if let Some(mesh) = self
+            if let Some(source) = self
                 .scene
                 .triangle_meshes()
                 .get(id)
-                .map(|object| &object.mesh)
-                .or_else(|| {
-                    self.scene
-                        .mesh_variants
-                        .get(id)
-                        .map(|asset| &asset.variants[0])
-                })
-                .and_then(|mesh| mesh.ready_cpu())
+                .map(|o| &o.mesh)
+                .or_else(|| self.scene.mesh_variants.get(id).map(|a| &a.variants[0]))
             {
-                self.neon_meshes.insert(
-                    *id,
-                    super::neon_glow::GlowMesh::new(&self.device, &mesh.render_mesh()),
-                );
-            } else if let Some(panel) = self
-                .scene
-                .info_panels
-                .get(id)
-                .filter(|panel| panel.kind.neon())
-            {
-                // Disabling glow releases its cache. Restore unchanged opt-in text
-                // once on re-enable; dirty text is replaced by refresh_info_panel_meshes.
-                self.neon_meshes.insert(
-                    *id,
-                    super::neon_glow::GlowMesh::new(&self.device, &panel.mesh),
-                );
+                if let Some(prepared) = source.prepared_glow() {
+                    self.neon_meshes.insert(
+                        *id,
+                        prepared.as_ref().and_then(|p| {
+                            super::neon_glow::GlowMesh::from_prepared(&self.device, p)
+                        }),
+                    );
+                    continue;
+                }
+                if let Some(cpu) = source.ready_cpu() {
+                    let generated;
+                    let mesh = if let Some(mesh) = source.prepared_render() {
+                        mesh
+                    } else {
+                        generated = cpu.render_mesh();
+                        &generated
+                    };
+                    self.neon_meshes
+                        .insert(*id, super::neon_glow::GlowMesh::new(&self.device, mesh));
+                }
+            } else if let Some(panel) = self.scene.info_panels.get(id).filter(|p| p.kind.neon()) {
+                let mesh = if let Some(prepared) = self.scene.render_publication.panel_glow.get(id)
+                {
+                    prepared
+                        .as_ref()
+                        .and_then(|p| super::neon_glow::GlowMesh::from_prepared(&self.device, p))
+                } else {
+                    super::neon_glow::GlowMesh::new(&self.device, &panel.mesh)
+                };
+                self.neon_meshes.insert(*id, mesh);
             }
         }
         self.neon_meshes.retain(|id, _| self.scene.mesh_exists(*id));
@@ -1504,14 +1686,75 @@ impl SceneRenderer {
         let Some(glow) = &self.neon_glow else {
             return (0, 0);
         };
+        self.encode_neon_glow_subset(pass, cache_index, glow, 0)
+    }
+    fn glow_subset_eligible(&self, id: u32, instances: &[InstanceData], subset: u8) -> bool {
+        if instances.is_empty()
+            || !instances.iter().any(|i| i.emission[0] > 0.)
+            || self.scene.is_cut_feedback_ring(id)
+        {
+            return false;
+        }
+        if subset == 0 {
+            return true;
+        }
+        // A mixed instance stream conservatively stays full resolution.
+        let font = instances.iter().any(|i| i.material[3] < -0.5)
+            || self.scene.is_text_object(id)
+            || self.scene.font3d_assets().any(|asset| *asset == id)
+            || self.scene.numeric_font_digit(id).is_some();
+        if subset == 1 {
+            !font
+        } else {
+            font
+        }
+    }
+    fn prepare_half_glow(&mut self, cache_index: usize, target: &RenderTarget<'_>) -> bool {
+        let cache = &self.passes[cache_index];
+        if !cache.queue.imported.iter().any(|(id, instances)| {
+            self.glow_subset_eligible(*id, instances, 1)
+                && self.neon_meshes.get(id).is_some_and(Option::is_some)
+        }) {
+            self.half_glow.reset();
+            self.half_glow.fallback_reason = Some("no-ordinary-glow");
+            return false;
+        }
+        self.half_glow.prepare(
+            &self.device,
+            &self.queue,
+            cache_index,
+            target,
+            RenderView {
+                view_projection: cache.key.expect("prepared halo view").0,
+                camera_position: cache.camera_position,
+            },
+            self.font_glow_params[0],
+            self.font_glow_params[1],
+        )
+    }
+    // subset 0: all original halos, 1: ordinary only, 2: fonts/panels only.
+    fn encode_neon_glow_subset<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        cache_index: usize,
+        glow: &'a super::neon_glow::NeonGlow,
+        subset: u8,
+    ) -> (usize, usize) {
         let cache = &self.passes[cache_index];
         let mut stats = (0, 0);
         let mut bound = false;
         for (id, instances) in &cache.queue.imported {
-            if instances.is_empty()
-                || !instances.iter().any(|i| i.emission[0] > 0.)
-                || self.scene.is_cut_feedback_ring(*id)
+            if !self.glow_subset_eligible(*id, instances, subset) {
+                continue;
+            }
+            if subset != 1
+                && self.font_glow.as_ref().is_some_and(|atlas| {
+                    atlas.draw(pass, *id, cache.imported.slice(id), instances.len() as u32)
+                })
             {
+                stats.0 += 1;
+                stats.1 += instances.len();
+                bound = false; // Atlas changed pipeline/groups; rebind ordinary capsules next.
                 continue;
             }
             if let Some(Some(mesh)) = self.neon_meshes.get(id) {
@@ -1701,6 +1944,13 @@ impl SceneRenderer {
                 "geometryBytes": self.variant_colors.keys().filter_map(|id| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
                 "instanceGeometryBytes": self.scene.variant_instances.values().filter_map(|(id, _)| self.imported_meshes.get(id)).map(|mesh| mesh.vertex_buffer.size() + mesh.index_buffer.size()).sum::<u64>(),
             },
+            "fontGlowAtlas": self.font_glow.as_ref().map(|atlas| atlas.stats()),
+            "halfGlow": {"requestedScale": self.half_glow.requested,
+                "activeScale": if self.half_glow.active {0.5} else {1.0},
+                "effectivePath": if self.half_glow.active {"half-resolution"} else {"full-resolution"},
+                "fallbackReason": self.half_glow.fallback_reason,
+                "cachedViews": self.half_glow.cached_views(),
+                "draws": self.half_glow.draws, "width": self.half_glow.size[0], "height": self.half_glow.size[1]},
             "neonGlow": {"enabled":self.neon_glow.is_some(),"draws":self.neon_draws,"segments":self.neon_segments,
                 "cachedMeshes":self.neon_meshes.len(), "bufferBytes":self.neon_meshes.values().flatten().map(|mesh|mesh.vertices as usize * std::mem::size_of::<Vertex>() + mesh.indices as usize * 4).sum::<usize>()},
             "panelBufferReuse": self.panel_buffer_reuse,
@@ -1857,6 +2107,101 @@ impl SceneRenderer {
             s.dynamic_updates_by_light[3] as f64,
         ]
     }
+    /// Compile the standard main-target mesh pipelines during loading. Reuses the
+    /// exact lazy-render caches; does not allocate targets, advance the scene or
+    /// change the active view. Other target modes and glTF remain demand-driven.
+    pub fn prewarm_main_pipelines(
+        &mut self,
+        color_format: wgpu::TextureFormat,
+        depth_format: wgpu::TextureFormat,
+        negative_projection: bool,
+    ) {
+        let effects = self
+            .effects
+            .take()
+            .expect("renderer effects available during loading");
+        self.ensure_color_pipelines(
+            (
+                color_format,
+                depth_format,
+                negative_projection,
+                false,
+                false,
+            ),
+            &effects.layout,
+        );
+        self.ensure_translucent_pipelines(color_format, depth_format, &effects.layout);
+        if let Some(glow) = self.neon_glow.as_mut().filter(|glow| glow.enabled()) {
+            glow.prewarm(&self.device, color_format, depth_format);
+        }
+        self.effects = Some(effects);
+    }
+
+    fn ensure_color_pipelines(&mut self, key: ColorPipelineKey, effects: &wgpu::BindGroupLayout) {
+        self.pipelines.entry(key).or_insert_with(|| {
+            let _scope = super::profiler::cpu_scope("pipeline.main.create");
+            (
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    effects,
+                    key.2,
+                    key.3,
+                    key.4,
+                    false,
+                ),
+                pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    effects,
+                    !key.2,
+                    key.3,
+                    key.4,
+                    false,
+                ),
+                pipeline::build(
+                    &self.device,
+                    key.0,
+                    key.1,
+                    &self.bind_group_layout,
+                    effects,
+                    key.2,
+                    key.3,
+                    key.4,
+                    true,
+                ),
+            )
+        });
+    }
+
+    fn ensure_translucent_pipelines(
+        &mut self,
+        color_format: wgpu::TextureFormat,
+        depth_format: wgpu::TextureFormat,
+        effects: &wgpu::BindGroupLayout,
+    ) {
+        self.translucent_pipelines
+            .entry((color_format, depth_format))
+            .or_insert_with(|| {
+                // LH winding: cull front-facing (CW geometric backs) second.
+                [wgpu::Face::Back, wgpu::Face::Front].map(|cull| {
+                    pipeline::build_translucent(
+                        &self.device,
+                        color_format,
+                        depth_format,
+                        &self.bind_group_layout,
+                        effects,
+                        cull,
+                    )
+                })
+            });
+    }
+
     /// Auxiliary views have independent culling/buffer caches; simulation advances separately.
     /// Submit each pass before preparing another view, preserving shared uniform write ordering.
     pub fn render_view(
@@ -2057,6 +2402,23 @@ impl SceneRenderer {
         if !reflected && !target.material_mask {
             self.prepare_neon_glow(target);
         }
+        self.half_glow.reset();
+        let cache_index = self.active_cache;
+        let has_neon = !reflected
+            && !target.material_mask
+            && target.auxiliary.is_none()
+            && self.neon_glow.as_ref().is_some_and(|glow| glow.enabled())
+            && self.passes[cache_index]
+                .queue
+                .imported
+                .iter()
+                .any(|(id, instances)| {
+                    !instances.is_empty()
+                        && instances.iter().any(|instance| instance.emission[0] > 0.)
+                        && !self.scene.is_cut_feedback_ring(*id)
+                        && self.neon_meshes.get(id).is_some_and(Option::is_some)
+                });
+        let half_active = has_neon && self.prepare_half_glow(cache_index, target);
         self.neon_draws = 0;
         self.neon_segments = 0;
         let mut neon_stats = (0, 0);
@@ -2070,44 +2432,7 @@ impl SceneRenderer {
             target.material_mask,
             target.auxiliary.is_some(),
         );
-        self.pipelines.entry(key).or_insert_with(|| {
-            (
-                pipeline::build(
-                    &self.device,
-                    key.0,
-                    key.1,
-                    &self.bind_group_layout,
-                    &effects.layout,
-                    key.2,
-                    key.3,
-                    key.4,
-                    false,
-                ),
-                pipeline::build_lines(&self.device, key.0, key.1, &self.bind_group_layout),
-                pipeline::build(
-                    &self.device,
-                    key.0,
-                    key.1,
-                    &self.bind_group_layout,
-                    &effects.layout,
-                    !key.2,
-                    key.3,
-                    key.4,
-                    false,
-                ),
-                pipeline::build(
-                    &self.device,
-                    key.0,
-                    key.1,
-                    &self.bind_group_layout,
-                    &effects.layout,
-                    key.2,
-                    key.3,
-                    key.4,
-                    true,
-                ),
-            )
-        });
+        self.ensure_color_pipelines(key, &effects.layout);
         let gltf_key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
             depth_format: target.depth_format,
@@ -2202,6 +2527,9 @@ impl SceneRenderer {
         } else {
             "scene.main"
         });
+        let surface_stamp = super::profiler::section(&self.device, "surface");
+        let alpha_stamp = super::profiler::section(&self.device, "translucency");
+        let glow_stamp = super::profiler::section(&self.device, "neon");
         {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render"),
@@ -2210,7 +2538,11 @@ impl SceneRenderer {
                     view: target.depth,
                     depth_ops: Some(wgpu::Operations {
                         load: target.depth_load,
-                        store: wgpu::StoreOp::Store,
+                        store: if half_active {
+                            wgpu::StoreOp::Store
+                        } else {
+                            target.depth_store
+                        },
                     }),
                     stencil_ops: None,
                 }),
@@ -2218,6 +2550,9 @@ impl SceneRenderer {
                 timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
                 multiview_mask: None,
             });
+            if let Some(s) = &surface_stamp {
+                s.begin_section(&mut rp);
+            }
             rp.set_viewport(
                 target.viewport.x as f32,
                 target.viewport.y as f32,
@@ -2287,7 +2622,11 @@ impl SceneRenderer {
                         (Mat4::from_cols_array_2d(&instance.model).determinant() < 0.0)
                             != (Mat4::from_cols_array_2d(&instances[0].model).determinant() < 0.0)
                     });
+                let dissolving = instances.iter().any(|instance| {
+                    instance.normal_matrix[3][3] > -2.0 && instance.normal_matrix[3][3] < -1.0
+                });
                 let pipeline_index = if mixed_winding
+                    || dissolving
                     || (instances
                         .iter()
                         .any(|instance| instance.emission[1] > 0.0 || instance.emission[2] < 1.0)
@@ -2331,17 +2670,38 @@ impl SceneRenderer {
                     self.active_cache,
                 );
             }
+            if let Some(s) = &surface_stamp {
+                s.end_section(&mut rp);
+            }
+            if let Some(s) = &alpha_stamp {
+                s.begin_section(&mut rp);
+            }
             if !reflected && !target.material_mask {
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 rp.set_bind_group(1, &effects.scene_group, &[]);
                 draws += self.draw_translucent(&mut rp, self.active_cache, target);
+            }
+            if let Some(s) = &alpha_stamp {
+                s.end_section(&mut rp);
+            }
+            if let Some(s) = &glow_stamp {
+                s.begin_section(&mut rp);
+            }
+            if !half_active && !reflected && !target.material_mask {
                 neon_stats = self.encode_neon_glow(&mut rp, self.active_cache);
                 draws += neon_stats.0;
             }
-            if draw_rings {
+            if let Some(s) = &glow_stamp {
+                s.end_section(&mut rp);
+            }
+            if !half_active && draw_rings {
                 draws += self.draw_cut_feedback(&mut rp, self.active_cache, &rings, target);
             }
-            if !reflected && !target.material_mask && (self.draw_grid || self.draw_light_helpers) {
+            if !half_active
+                && !reflected
+                && !target.material_mask
+                && (self.draw_grid || self.draw_light_helpers)
+            {
                 rp.set_pipeline(&pipelines.1);
                 rp.set_bind_group(0, &self.grid_bind_group, &[]);
                 if !target.material_mask && self.draw_grid {
@@ -2356,6 +2716,77 @@ impl SceneRenderer {
                 }
             }
         }
+        if half_active {
+            // All preparation happened before encoding. Half and sharp halos
+            // own distinct uniforms; neither can overwrite the other's view.
+            let half_stats = self.encode_half_glow_edges(&mut encoder, cache_index);
+            draws += half_stats.0 + 1; // edges and conservative depth reduction
+            let stamp = super::profiler::stamp("final.direct.overlays");
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("direct half halo composite and overlays"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: target.color,
+                    resolve_target: None,
+                    depth_slice: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Load,
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: target.depth,
+                    depth_ops: None,
+                    stencil_ops: None,
+                }),
+                timestamp_writes: stamp.as_ref().map(|stamp| stamp.writes()),
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            pass.set_viewport(
+                target.viewport.x as f32,
+                target.viewport.y as f32,
+                target.viewport.width as f32,
+                target.viewport.height as f32,
+                0.,
+                1.,
+            );
+            pass.set_scissor_rect(
+                target.viewport.x,
+                target.viewport.y,
+                target.viewport.width,
+                target.viewport.height,
+            );
+            self.half_glow.view(cache_index).composite(&mut pass);
+            draws += 1;
+            neon_stats = self.encode_neon_glow_subset(
+                &mut pass,
+                cache_index,
+                self.neon_glow.as_ref().unwrap(),
+                2,
+            );
+            draws += neon_stats.0;
+            if draw_rings {
+                draws += self.draw_cut_feedback(&mut pass, cache_index, &rings, target);
+            }
+            if self.draw_grid || self.draw_light_helpers {
+                pass.set_pipeline(&pipelines.1);
+                pass.set_bind_group(0, &self.grid_bind_group, &[]);
+                if self.draw_grid {
+                    pass.set_vertex_buffer(0, self.grid_vertex_buffer.slice(..));
+                    pass.draw(0..self.grid_vertex_count, 0..1);
+                    draws += 1;
+                }
+                if self.draw_light_helpers {
+                    pass.set_vertex_buffer(0, self.light_vertex_buffer.slice(..));
+                    pass.draw(0..self.light_vertex_count, 0..1);
+                    draws += 1;
+                }
+            }
+            drop(pass);
+            self.half_glow.draws = half_stats.0;
+            neon_stats.0 += half_stats.0;
+            neon_stats.1 += half_stats.1;
+        }
         self.neon_draws = neon_stats.0;
         self.neon_segments = neon_stats.1;
         self.draw_calls += draws;
@@ -2363,6 +2794,38 @@ impl SceneRenderer {
             self.main_draw_calls += draws;
         }
         Ok(encoder.finish())
+    }
+    /// Encode only after scene depth is stored; all resources are prepared
+    /// beforehand and remain independent from full-resolution glow uniforms.
+    fn encode_half_glow_edges(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        cache_index: usize,
+    ) -> (usize, usize) {
+        let half = self.half_glow.view(cache_index);
+        half.reduce(encoder);
+        let half_stamp = super::profiler::stamp("neon.half.edges");
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("half halo ordinary edges"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &half.color_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &half.depth_view,
+                depth_ops: None,
+                stencil_ops: None,
+            }),
+            timestamp_writes: half_stamp.as_ref().map(|stamp| stamp.writes()),
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        self.encode_neon_glow_subset(&mut pass, cache_index, &half.glow, 1)
     }
     /// Fixed pool: reuse the existing imported mesh/instance buffers, at most two rings.
     fn cut_feedback_rings(&self, cache_index: usize) -> [Option<u32>; 2] {
@@ -2492,10 +2955,16 @@ impl SceneRenderer {
                 continue;
             }
             self.alpha_indices.remove(id);
-            let Some(cpu) = source.ready_cpu() else {
-                continue;
+            let generated;
+            let rendered = if let Some(prepared) = source.prepared_render() {
+                prepared
+            } else {
+                let Some(cpu) = source.ready_cpu() else {
+                    continue;
+                };
+                generated = cpu.render_mesh();
+                &generated
             };
-            let rendered = cpu.render_mesh();
             let indices = if let Some(asset) = self.scene.mesh_variants.get(id) {
                 crate::translucency::variant_alpha_indices(
                     &asset.colors,
@@ -2503,7 +2972,7 @@ impl SceneRenderer {
                     threshold,
                 )
             } else {
-                let Some(indices) = crate::translucency::alpha_indices(&rendered, threshold) else {
+                let Some(indices) = crate::translucency::alpha_indices(rendered, threshold) else {
                     continue;
                 };
                 indices
@@ -2532,21 +3001,7 @@ impl SceneRenderer {
                 },
             );
         }
-        self.translucent_pipelines
-            .entry((target.color_format, target.depth_format))
-            .or_insert_with(|| {
-                // LH winding: cull front-facing (CW geometric backs) second.
-                [wgpu::Face::Back, wgpu::Face::Front].map(|cull| {
-                    pipeline::build_translucent(
-                        &self.device,
-                        target.color_format,
-                        target.depth_format,
-                        &self.bind_group_layout,
-                        effects,
-                        cull,
-                    )
-                })
-            });
+        self.ensure_translucent_pipelines(target.color_format, target.depth_format, effects);
     }
 
     fn draw_translucent<'a>(
@@ -2654,8 +3109,10 @@ impl SceneRenderer {
                 pass.set_index_buffer(mesh.index_buffer.slice(..), mesh.index_format);
             }
             // Convex fruit: rear then front surface, with depth tests and no depth writes.
+            // Both model mirroring and an RH/XR projection reverse face winding.
+            let view_mirrored = cache.key.is_some_and(|key| key.0.determinant() < 0.0);
             for side in 0..2 {
-                pass.set_pipeline(&pipelines[side ^ usize::from(*mirrored)]);
+                pass.set_pipeline(&pipelines[side ^ usize::from(*mirrored ^ view_mirrored)]);
                 pass.draw_indexed(0..index_count, 0, *instance..*instance + 1);
             }
             submitted_draws += 2;
@@ -2799,6 +3256,8 @@ impl SceneRenderer {
             self.prepare_translucent(target, &effects.layout);
             self.effects = Some(effects);
         }
+        self.half_glow.reset();
+        let half_active = has_neon && self.prepare_half_glow(cache_index, target);
         let cache = &self.passes[self.last_main_cache];
         let key = super::gltf_gpu::PipelineKey {
             format: target.color_format,
@@ -2839,6 +3298,11 @@ impl SceneRenderer {
             });
         let mut draws = 0;
         let mut neon_stats = (0, 0);
+        let mut half_stats = (0, 0);
+        if half_active {
+            half_stats = self.encode_half_glow_edges(&mut encoder, cache_index);
+            draws += half_stats.0 + 1;
+        }
         let label = if has_overlays {
             "final.postprocess.overlays"
         } else {
@@ -2905,7 +3369,18 @@ impl SceneRenderer {
             }
             draws += self.draw_cut_feedback(&mut pass, cache_index, &rings, target);
             if has_neon {
-                neon_stats = self.encode_neon_glow(&mut pass, cache_index);
+                if half_active {
+                    self.half_glow.view(cache_index).composite(&mut pass);
+                    draws += 1;
+                    neon_stats = self.encode_neon_glow_subset(
+                        &mut pass,
+                        cache_index,
+                        self.neon_glow.as_ref().unwrap(),
+                        2,
+                    );
+                } else {
+                    neon_stats = self.encode_neon_glow(&mut pass, cache_index);
+                }
                 draws += neon_stats.0;
             }
             if has_helpers {
@@ -2923,8 +3398,9 @@ impl SceneRenderer {
                 }
             }
         }
-        self.neon_draws = neon_stats.0;
-        self.neon_segments = neon_stats.1;
+        self.half_glow.draws = half_stats.0;
+        self.neon_draws = neon_stats.0 + half_stats.0;
+        self.neon_segments = neon_stats.1 + half_stats.1;
         self.draw_calls += draws;
         self.main_draw_calls += draws;
         Ok(encoder.finish())

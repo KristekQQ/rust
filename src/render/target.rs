@@ -59,6 +59,9 @@ pub struct RenderTarget<'a> {
     /// Use Load for additional views sharing an attachment; Clear clears the whole attachment.
     pub color_load: wgpu::LoadOp<wgpu::Color>,
     pub depth_load: wgpu::LoadOp<f32>,
+    /// Preserve depth for later passes/readback. Discard only when no consumer
+    /// needs this attachment after this color pass; depth testing still works.
+    pub depth_store: wgpu::StoreOp,
 }
 impl RenderTarget<'_> {
     pub fn validate(&self) -> Result<(), String> {

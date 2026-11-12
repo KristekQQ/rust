@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>Observer delay keeps the last frame visible</title><pre id="result">RUNNING</pre><iframe id="view" style="width:640px;height:480px;border:0"></iframe>
+<script type="module">
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+const result=document.querySelector('#result'),iframe=document.querySelector('iframe');
+const origin=location.origin,backend=new URLSearchParams(location.search).get('backend')||'auto';
+const wait=async check=>{for(let i=0;i<600;i++){if(check())return;await new Promise(r=>setTimeout(r,10));}throw Error('Fixture condition timeout');};
+try{
+ iframe.src='./scene-observer-delivery-frame.html?backend='+encodeURIComponent(backend);
+ await wait(()=>iframe.contentWindow.sceneObserver?.meta);
+ const w=iframe.contentWindow,doc=iframe.contentDocument,canvas=doc.querySelector('canvas');
+ document.documentElement.dataset.rendererBackend=doc.documentElement.dataset.rendererBackend;
+ w.sceneObserver.engine.setOrbitView([0,1,4],[0,0,0]);
+ await capturePixels(canvas);
+ if(w.sceneObserver.engine.worldToScreen([-1,0,0])[0]>=w.sceneObserver.engine.worldToScreen([1,0,0])[0])throw Error('Live observer did not enable native camera handedness');
+ w.sceneObserver.engine.resize(640,480);w.sceneObserver.engine.set_grid_visible(false);w.sceneObserver.engine.setCameraView([3,2.5,4],[.5,.3,.2]);
+ const initial=await w.deliveryFixture.capture();assertForeground(initial,'initial scene');
+ await new Promise(r=>setTimeout(r,400));
+ if(!doc.querySelector('#veil').hidden)throw Error('A short delay covered the scene');
+ if(doc.querySelector('#delivery-state').hidden)throw Error('Delay was not labelled');
+ await new Promise(r=>setTimeout(r,1250));
+ if(!doc.querySelector('#veil').hidden)throw Error('A pause covered the last known scene');
+ if(!doc.querySelector('#delivery-state').textContent.includes('Pozastaveno'))throw Error('Paused source is presented as live');
+ const paused=await w.deliveryFixture.capture();assertForeground(paused,'last known paused scene');
+ // Exercise the 4Hz presentation interval while keeping this controlled connection idle.
+ w.sceneObserver.engine.setSceneInterpolation({durationMs:250,maxDistance:2});
+ w.deliveryFixture.sendFrame('cut');await wait(()=>w.sceneObserver.meta?.state.fragments===2);
+ const resumed=await w.deliveryFixture.capture();assertChanged(paused,resumed,'delta resume with cut halves');
+ if(!doc.querySelector('#veil').hidden)throw Error('Resume still covers scene');
+ // Real viewer has no demo provenance arguments: lineage must arrive through wire + delta relay.
+ await new Promise(r=>setTimeout(r,110));const movingHalves=await w.deliveryFixture.capture();
+ assertChanged(resumed,movingHalves,'global viewer cut halves move without another packet');
+ const existingEngine=w.sceneObserver.engine;
+ w.deliveryFixture.reconnect();
+ await new Promise(r=>setTimeout(r,200));
+ if(!doc.querySelector('#veil').hidden)throw Error('Reconnect covered existing scene');
+ await wait(()=>w.sceneObserver.meta?.state.fragments===0);
+ if(w.sceneObserver.engine!==existingEngine)throw Error('Same-session reconnect recreated GPU engine');
+ if(!doc.querySelector('#veil').hidden)throw Error('Reconnect failed to resume visible scene');
+ result.textContent='PASS: delay/pause keeps rendered scene visible and labelled; NDP1 resumes actual Rust cut';
+}catch(e){result.textContent='FAIL: '+e.message;console.error(e);}
+</script>

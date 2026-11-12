@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><title>Remote scene transform interpolation</title><canvas id="gpu-canvas" width="640" height="480"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+import {WireCache} from '../tools/scene-observer/protocol.mjs';
+const result=document.querySelector('#result'),canvas=document.querySelector('canvas');
+try{
+ const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.setDebugOverlay(false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_render_effects(false,false);
+ engine.setBackgroundColor([.01,.02,.03]);engine.setCameraView([3,2.5,4],[.5,.3,.2]);
+ engine.setSceneInterpolation({durationMs:200,maxDistance:3});
+ const cache=new WireCache(),peer={sequence:0,known:[new Map(),new Map(),new Map()]};
+ const apply=async(name,sequence,spawns=[])=>{const r=await fetch('./fixtures/native-scene/'+name+'.nwr');if(!r.ok)throw Error('Missing Rust fixture '+name);const bytes=new Uint8Array(await r.arrayBuffer());if(sequence)new DataView(bytes.buffer).setBigUint64(8,BigInt(sequence),true);cache.ingest(bytes);engine.applySimulationPublication(cache.packetFor(peer),[],spawns);};
+ await apply('initial');const before=await capturePixels(canvas);assertForeground(before,'initial model');
+ await apply('motion');const middle=await capturePixels(canvas);assertChanged(before,middle,'intermediate motion');
+ await new Promise(r=>setTimeout(r,240));const end=await capturePixels(canvas);assertChanged(middle,end,'motion without another packet');
+ const stable=await capturePixels(canvas);
+ let changed=0;for(let i=0;i<end.data.length;i++)if(end.data[i]!==stable.data[i])changed++;
+ if(changed>10)throw Error('Interpolation extrapolates after target reached');
+ await apply('cut',3);const cut=await capturePixels(canvas);assertChanged(end,cut,'real cut topology');
+ if(cache.assets[0].size!==2)throw Error('Expected two cut pieces');
+ await apply('removed',4);const removed=await capturePixels(canvas);assertChanged(cut,removed,'piece removal');
+ if(cache.assets[0].size)throw Error('Removed cut geometry retained');
+ // A new child must move immediately during the FIRST packet interval after a split.
+ engine.setSceneInterpolation({durationMs:250,maxDistance:3});
+ await apply('initial',5);await new Promise(r=>setTimeout(r,270));
+ const ids=await (await fetch('./fixtures/native-scene/ids.json')).json();
+ await apply('cut',6,ids.halves.map(id=>({id,parentId:ids.source})));
+ const birth=await capturePixels(canvas);const seq=cache.sequence;
+ await new Promise(r=>setTimeout(r,110));const moving=await capturePixels(canvas);
+ if(cache.sequence!==seq)throw Error('Spawn test received an unexpected second packet');
+ assertChanged(birth,moving,'cut halves move before a second packet arrives');
+ for(const id of ids.halves)if(!engine.scene.getObject(id).exists)throw Error('Cut half missing');
+ let gone=false;try{engine.scene.getObject(ids.source);}catch{gone=true;}if(!gone)throw Error('Cut parent retained');
+ engine.setSceneInterpolation({durationMs:0});
+ result.textContent='PASS: Rust render-only interpolation moves between source packets, settles, and preserves actual cut/removal and moves new halves before the second packet';
+}catch(e){result.textContent='FAIL: '+e.message;console.error(e);}
+</script>

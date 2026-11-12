@@ -58,6 +58,8 @@ test('isolated release package has manifest checksums and replaces previous outp
         'pkg/webgpu_wasm.d.ts': 'export default function init(): void;',
         'pkg/webgpu_wasm_bg.wasm.d.ts': 'export const memory: WebAssembly.Memory;',
         'pkg/verification-build.json': 'private fingerprint',
+        'tools/scene-observer/publisher.js': 'import {version} from "./protocol.mjs"; export const publisher = version;',
+        'tools/scene-observer/protocol.mjs': 'export const version = 4;',
         '.private-token': 'secret',
     };
     try {
@@ -69,7 +71,9 @@ test('isolated release package has manifest checksums and replaces previous outp
         await writeFile(path.join(destination, 'obsolete.txt'), 'previous');
         const manifest = await writeProduction({ sourceRoot: directory, destination, build });
         assert.equal(manifest.profile, 'release');
-        assert.equal(manifest.files.length, 10);
+        assert.equal(manifest.files.length, 12);
+        assert.ok(manifest.files.some(file=>file.path==='tools/scene-observer/publisher.js'));
+        assert.ok(manifest.files.some(file=>file.path==='tools/scene-observer/protocol.mjs'));
         assert.deepEqual(await assertProductionBuild(destination), manifest);
         assert.deepEqual(JSON.parse(await readFile(path.join(destination, 'production-manifest.json'))), manifest);
         for (const excluded of ['obsolete.txt', '.private-token', 'pkg/verification-build.json', 'examples/demo/build-private.mjs']) {

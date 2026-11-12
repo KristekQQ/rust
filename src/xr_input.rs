@@ -141,6 +141,11 @@ impl TrackedController {
             endpoints: blade.map(|p| pose.transform_point3(p * self.scale)),
         };
         self.apply(scene, id, sample);
+        // A render mirror receives trails, contacts and cut results from its
+        // simulation owner. Local late tracking only changes the equipment pose.
+        if !self.cutting && scene.is_render_mirror() {
+            return Ok(CutReport::default());
+        }
         scene.sample_blade_trail(id, sample.endpoints, dt);
         scene.release_fragment_blade(id, sample.endpoints, !pressed);
         let previous_centers =
@@ -1051,11 +1056,20 @@ mod tests {
                     assert!((total - volume).abs() < 1e-5);
                     let moving = scene.play_cut_feedback(&pieces).unwrap();
                     let moving_radius = scene.objects()[&moving[0]].transform.scale.x;
+                    scene.set_cut_feedback_speed(&pieces, 3.6);
+                    let reference = scene.play_cut_feedback(&pieces).unwrap();
+                    let reference_radius = scene.objects()[&reference[0]].transform.scale.x;
+                    assert!(
+                        (moving_radius - reference_radius).abs() < 1e-5,
+                        "tracked stroke must propagate the measured 3.6m/s into feedback"
+                    );
                     scene.set_cut_feedback_speed(&pieces, 0.);
                     let base = scene.play_cut_feedback(&pieces).unwrap();
                     let base_radius = scene.objects()[&base[0]].transform.scale.x;
                     assert!(
-                        (moving_radius / base_radius - 16.666667).abs() < 1e-4,
+                        // Strong pulses use the authored apparent-size cap:
+                        // (2 / (0.6 + 2)) / 0.12, rather than raw strength / 0.12.
+                        (moving_radius / base_radius - 6.4102564).abs() < 1e-4,
                         "actual 3.6m/s tracked stroke must visibly exceed a stationary hit"
                     );
                 }
@@ -2168,6 +2182,59 @@ mod tests {
                 .is_empty());
         }
         assert!(scene.object_exists(target));
+    }
+
+    #[test]
+    fn xr_input_render_mirror_binding_only_tracks_pose() {
+        let (mut scene, mut controller, target, sword) = setup();
+        scene.set_blade_trail(sword, true).unwrap();
+        controller.bind(&mut scene, Some(sword), false).unwrap();
+        let publication = crate::scene::publication::RenderPublisher::default().capture(&mut scene);
+        scene.apply_render_publication(publication, &[sword]);
+        let untouched: BTreeMap<_, _> = scene
+            .objects()
+            .iter()
+            .filter(|(id, _)| **id != sword)
+            .map(|(&id, object)| (id, object.transform.model()))
+            .collect();
+        for pressed in [false, true] {
+            let grip = Mat4::from_rotation_translation(
+                Quat::from_rotation_y(0.4),
+                Vec3::new(if pressed { 0.15 } else { 0.1 }, 1.0, -0.2),
+            );
+            let report = controller.update(&mut scene, Some(grip), pressed).unwrap();
+            assert!(report.removed.is_empty());
+            assert!(scene.object_exists(target));
+            assert_eq!(
+                scene.objects()[&sword].transform.position,
+                grip.w_axis.truncate()
+            );
+            assert!(
+                controller.target_centers.is_empty(),
+                "render binding gathered contact geometry"
+            );
+            assert!(
+                controller.target_positions.is_empty(),
+                "render binding scanned target positions"
+            );
+            assert!(controller.previous.is_none());
+            for (&id, &transform) in &untouched {
+                assert_eq!(
+                    scene.objects()[&id].transform.model(),
+                    transform,
+                    "render tracking mutated a simulation-owned object"
+                );
+            }
+        }
+        controller.update(&mut scene, None, false).unwrap();
+        assert_eq!(scene.objects()[&sword].transform.position, HIDDEN);
+        // Rebinding to a real cutter must still start with a fresh stroke.
+        controller.bind(&mut scene, Some(sword), true).unwrap();
+        controller
+            .update(&mut scene, Some(Mat4::IDENTITY), true)
+            .unwrap();
+        assert!(controller.previous.is_some());
+        assert!(controller.target_centers.contains_key(&target));
     }
 
     #[test]

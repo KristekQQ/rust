@@ -1,0 +1,72 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Neon native/web gameplay parity</title>
+<style>body{background:#101521;color:#fff}#gpu-canvas{width:640px;height:480px}button{display:none}</style>
+<canvas id="gpu-canvas"></canvas><button id="enter"></button><button id="exit"></button><p id="status"></p><p id="error"></p><p id="build"></p><a id="backend"></a><pre id="result">RUNNING</pre><ul id="checks"></ul><canvas id="stereo"></canvas>
+<script type="module">
+import {matrixFromPose} from './xr/poses.js';
+import {installXRSimulator} from './xr/simulator.js';
+import {assertForeground,capturePixels} from './pixels.js';
+const wantsXR=new URLSearchParams(location.search).has('xr');
+const sim=wantsXR?installXRSimulator({clockTimers:false,profile:{eyeWidth:512,eyeHeight:512}}):null;
+const checks=[];
+function assert(ok,message){checks.push({status:ok?'PASS':'FAIL',message});if(!ok)throw new Error(message);}
+const result=document.querySelector('#result');
+try{
+ const app=await import('../examples/neon-arena/parallel-main.js');
+ const {engine,world,bridge}=app;
+ assert(!('monument'in world)&&!('credits'in world),'native/web both omit grave and credit');
+ assert(world.sword.meshInfo.triangles===364&&world.leftSword.meshInfo.triangles===364,'both new cyber swords have complete native geometry');
+ const sample=(dt=1/120)=>{const a=new Float32Array(88);a[0]=dt;a[1]=1;a.set(matrixFromPose({position:[0,1.55,0]}),8);return a;};
+ bridge.newSession();bridge.step(sample());await bridge.settle();
+ assert(bridge.state.shots===6&&bridge.state.cueIndex===1,'same native first cue launches six real projectiles');
+ const remaining=bridge.state.round.remaining;
+ bridge.step(sample(0));await bridge.settle();
+ assert(bridge.state.round.remaining===remaining,'paused valid-head frame does not advance native round');
+ const manifest=await(await fetch('../examples/neon-arena/parallel-assets/scene.json')).json();
+ const first=manifest.runtime.minutePlan.cues[0].recipes[0];
+ // Authored fruit launches from below the arena; wait for its real ascent.
+ for(let i=0;i<60;i++){bridge.step(sample());await bridge.settle();}
+ for(let step=0;step<60&&bridge.state.cuts===0;step++){
+  const frame=sample();frame[1]|=4;
+  const t=.5+step/120;
+  frame.set(matrixFromPose({position:[first.position[0]+first.velocity[0]*t,.5+step*.025,-.45]}),40);
+  bridge.step(frame);await bridge.settle();
+ }
+ assert(bridge.state.cuts>0&&bridge.state.score>=10,'real native Rust sword cut removes fruit and awards points in web worker');
+ assert(bridge.state.fragments>0,'web renderer receives native cut fragments');
+ const score=bridge.state.score;
+ const bank=sample();bank[2]=1;bridge.step(bank);await bridge.settle();
+ assert(bridge.state.stocks[0]===null&&bridge.state.score===score,'trigger releases stock without awarding it twice');
+ if(!wantsXR){assertForeground(await capturePixels(document.querySelector('#gpu-canvas')),'real rendered native game in browser',500);}
+ if(wantsXR){
+  await engine.xr.enter();
+  const still={dt:1000/120,head:{position:[0,1.55,0]},controllers:{left:{position:[-.25,1.25,-.4],trigger:false},right:{position:[.25,1.25,-.4],trigger:false}}};
+  for(let i=0;i<3;i++){sim.frame(still);await bridge.settle();}
+  sim.frame(still);
+  const left=sim.pixels('left'),right=sim.pixels('right');assertForeground(left,'left native game eye',500);assertForeground(right,'right native game eye',500);
+  let different=0;for(let i=0;i<left.data.length;i++)if(left.data[i]!==right.data[i])different++;
+  assert(different>1000,'native game has distinct real stereo eye images');
+  const c=document.querySelector('#stereo');c.width=left.width+right.width;c.height=left.height;const ctx=c.getContext('2d');ctx.putImageData(left,0,0);ctx.putImageData(right,left.width,0);
+  assert(Math.abs(world.infoPanel.meshInfo.position[0]-.9)<.02&&Math.abs(world.infoPanel.meshInfo.position[1]-.35)<.02,'same independent feet-anchored info panel');
+  const beforeReset=bridge.state.cuts;
+  sim.resetReferenceSpace();sim.frame(still);await bridge.settle();
+  assert(bridge.state.cuts===beforeReset,'recenter resets worker blade history without phantom cut');
+  sim.frame({...still,controllers:{...still.controllers,right:{...still.controllers.right,buttons:[0,0,0,0,1,0]}}});await bridge.settle();
+  assert(bridge.state.score===0&&!bridge.state.round.finished,'real XR A button restarts same native round');
+  await engine.xr.exit();
+ }
+ // Full authored minute, genuine Rust timings/waves, without timers or JS gameplay.
+ bridge.newSession();bridge.step(sample());await bridge.settle();
+ for(let batch=0;batch<61;batch++){
+  for(let i=0;i<120;i++)bridge.step(sample());
+  await bridge.settle();
+ }
+ assert(bridge.state.round.finished&&bridge.state.cueIndex===24&&bridge.state.shots===140,'same complete minute:24 cues,140 targets,finished state');
+ const restart=sample();restart[3]=1;bridge.step(restart);await bridge.settle();
+ assert(!bridge.state.round.finished&&bridge.state.score===0&&bridge.state.shots===6,'A starts a fresh native round');
+ assert(bridge.stats.dropped===0,'functional replay retains every original input sample');
+ bridge.restoreScores([9876,1234]);bridge.step(sample(0));await bridge.settle();
+ assert(bridge.state.top5[0]===9876,'saved native TOP5 restores into real world scoreboard');
+ window.xrTestReport={suite:'neon-native-parity',status:'PASS',checks};
+ result.textContent='PASS: '+checks.map(x=>x.message).join('\n');
+}catch(error){window.xrTestReport={suite:'neon-native-parity',status:'FAIL',checks,error:String(error)};result.textContent='FAIL: '+error.stack;console.error(error);}
+</script></html>

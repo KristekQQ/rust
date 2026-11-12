@@ -138,3 +138,9 @@ Reporty a přehratelné stopy jsou v `output/verification/*-report.json` a
 `*-trace.json`. Pomalé přehrávání lze ověřit stejným runnerem přes `--xr-slow`.
 `webxr-preview` zůstává běžný WebGL náhled. Automatika nepotvrzuje skutečný
 Quest compositor, tracking, důvěru certifikátu, komfort ani výkon headsetu.
+
+The full gate also checks the shared Neon core, native Rim/Neon library tests,
+scene-observer transport policies, and standalone Quest Stream tests. Browser
+verification builds the separate Neon simulation WASM worker when present; CI
+passes both engine and worker artifacts to its browser shards. Local PASS keys
+include native, games and tools sources in addition to the engine inputs.

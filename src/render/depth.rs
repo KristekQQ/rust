@@ -1,5 +1,3 @@
-#![cfg(target_arch = "wasm32")]
-
 use wgpu::{Device, Texture, TextureFormat, TextureView};
 
 pub fn create(device: &Device, w: u32, h: u32, format: TextureFormat) -> (Texture, TextureView) {

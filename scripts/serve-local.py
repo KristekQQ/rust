@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static development server with revalidated module responses."""
 import argparse
+import importlib.util
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -130,6 +131,7 @@ if __name__ == '__main__':
     parser.add_argument('--directory', default='.', help='static document root')
     parser.add_argument('--production', action='store_true', help='serve precompressed release assets')
     parser.add_argument('--test-directory', help='explicit test-only mount for the browser verification runner')
+    parser.add_argument('--score-file', type=Path, help='persistent Neon TOP5')
     args = parser.parse_args()
     if not 0 <= args.port <= 65535:
         parser.error('port must be between 0 and 65535 (0 selects a free port)')
@@ -140,6 +142,11 @@ if __name__ == '__main__':
         if not args.production:
             parser.error('--test-directory requires --production')
         ProductionHandler.test_directory = str(Path(args.test_directory).resolve())
+    if args.score_file:
+        score_spec = importlib.util.spec_from_file_location('neon_scoreboard', Path(__file__).with_name('neon_scoreboard.py'))
+        score_module = importlib.util.module_from_spec(score_spec)
+        score_spec.loader.exec_module(score_module)
+        handler = score_module.make_scoreboard_handler(handler, args.score_file.resolve())
     with ThreadingHTTPServer((args.host, args.port), partial(handler, directory=args.directory)) as server:
         scheme = 'https' if args.cert else 'http'
         if args.cert:

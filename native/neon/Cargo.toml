@@ -1,0 +1,41 @@
+[package]
+name = "kristek-neon-native"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+frame-profiling = ["kristek-rim-native/frame-profiling"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "neon-preview"
+path = "src/main.rs"
+
+[dependencies]
+neon-core = { path = "../../games/neon-core" }
+kristek-rim-native = { path = "../rim", default-features = false }
+webgpu_wasm = { path = "../..", features = ["native-render"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["std", "wgsl", "vulkan", "vulkan-portability"] }
+glam = { version = "0.34.0", default-features = false, features = ["libm", "serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+pollster = "0.4"
+openxr = "0.19"
+log = "0.4"
+png = "0.18"
+
+[target.'cfg(target_os = "android")'.dependencies]
+libc = "0.2"
+ndk-glue = "0.7"
+ndk = "0.7"
+android_logger = "0.15"
+
+[patch.crates-io]
+wgpu = { path = "../../third_party/wgpu" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+panic = "abort"

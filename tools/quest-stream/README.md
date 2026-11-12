@@ -19,7 +19,7 @@ APK is locally development-signed; preserve `build/development.keystore` for upd
 1. Open **Quest Stream** in the headset's installed/unknown-source apps.
 2. Choose 720p/30fps/3Mb/s or 540p/24fps/2Mb/s; press **Povolit přenos** and accept the system capture prompt. Choose the entire display if offered app-only sharing.
 3. Open the displayed `http://QUEST_IP:8088/?token=…` on a computer on the same LAN. Current desktop Chrome/Edge is the initial viewer target.
-4. Press **Sledovat**, then return to the VR game. The URL includes the required per-session access key.
+4. Once capture produces its first encoded frame, Quest Stream closes its own panel. The foreground service, system sharing indication and notification stop action remain active. Reopen Quest Stream to read the URL or stop capture; **Zavřít panel (přenos pokračuje)** closes only the panel again. Press **Sledovat** in the browser, then return to the VR game. The URL includes the required per-session access key.
 5. **Odpojit** or closing/reloading the viewer only disconnects that browser. Click **Sledovat** again using the same link while headset sharing is active. The headset **Ukončit přenos** button, notification action, encoder error or OS capture revocation ends the session. Concurrent OS casting can revoke this session.
 
 The codec and capture Surface start immediately after system consent, so a delayed first browser connection does not reuse an expired consent token. A session allows two browser viewers with independent bounded sixteen-packet queues and bounded socket send buffers. Each viewer begins at the next key frame with a fresh MP4 init segment. A slow viewer is disconnected without ending capture or affecting the other viewer. A static screen is requested to repeat at most after one second to detect dead connections. Stream profile is a requested cap; actual codec/compositor behavior must be checked on the device. There is no reconnect using a consumed projection token, recording, cloud relay, or audio capture. Encoding continues until sharing is stopped in the headset, including when no browser is viewing.
@@ -32,6 +32,12 @@ Find the current Quest address over USB with `adb -s USB_SERIAL shell ip -f inet
 
 `adb -s QUEST_IP:5555 forward tcp:8088 tcp:8088` lets the laptop open `http://localhost:8088/?token=CURRENT_TOKEN` while the headset connection remains wireless. Read the actual token from the app after consent; do not reuse historical links. If an existing ADB daemon cannot connect despite a successful host TCP probe, an isolated `adb -P 5038 connect QUEST_IP:5555` may help; include the same `-P 5038` in subsequent commands and the awake helper. Do not restart other tasks' servers. Direct Quest-IP URLs remain available on the LAN.
 
+## Receiver buffering
+
+The viewer collects about 300 ms of contiguous video before playback (sparse/static capture may start after 600 ms on the next frame). It tolerates normal network bursts using playback rates from 0.97 to 1.03; only a backlog above 1.5 seconds or a real timeline gap requires a seek. Recovery keeps about 350 ms of reserve where the buffered range allows it. This trades a small receiver-side delay for fewer seek jumps, without raising capture resolution, encoder FPS or bitrate. Complete MP4 fragments use one MediaSource append per frame; old data is pruned at most once per media second.
+
+These thresholds are initial receiver policy, not a measured Quest performance improvement. Game frame times and end-to-end video latency still require a matched hardware comparison.
+
 ## Verification
 
 ```sh
@@ -39,7 +45,7 @@ test/verify-local.sh
 ./build.sh
 ```
 
-The JVM checks validate MP4 boxes and offsets, AVC conversion, timestamps and a real baseline AVC fixture. ffprobe validates metadata and all 60 decoded frame hashes match the source. HTTP regression checks also verify that shutdown closes both active and queued peers. `test/serve-fixture.sh` prints a temporary local URL for browser QA using the shipped viewer and server with synthetic video; it exits after ten minutes. These checks do not prove a live headset stream or its performance.
+The JVM checks validate MP4 boxes and offsets, AVC conversion, timestamps and a real baseline AVC fixture. ffprobe validates metadata and all 60 decoded frame hashes match the source. HTTP regression checks also verify that shutdown closes both active and queued peers. `test/serve-fixture.sh` prints a temporary local URL for browser QA using the shipped viewer and server with synthetic video; it exits after ten minutes. The fixture lasts 12 seconds; `QUEST_STREAM_FIXTURE_JITTER_MS=150 test/serve-fixture.sh` simulates a short delivery pause once per second followed by catch-up at the original source cadence. These checks do not prove a live headset stream or its performance.
 
 Physical check on 2026-11-07: Quest 3 hardware encoder `c2.qti.avc.encoder` streamed 1280×720 over Wi-Fi to the in-app browser. Same-token page reload resumed decoding; a second concurrent viewer decoded, and the first continued after closing the second. The keep-awake helper restored the sensor while capture was inactive, then applied the override for active capture; the headset reported Awake. Actual doffing duration and long-run endurance were not independently confirmed. Desktop Chrome playback had also been observed; Windows/Linux receiver compatibility was not physically tested.
 
@@ -54,4 +60,18 @@ For remaining device acceptance: test permission cancellation/revocation, both p
 
 With an authorized Wi-Fi ADB connection, run `python3 keep-awake.py --serial QUEST_IP:5555` (use `--adb /path/to/adb --adb-port 5038` when needed). The helper polls MediaProjection ownership every two seconds, enables Meta’s `prox_close` override only while Quest Stream owns capture and restores the physical sensor with `automation_disable` when capture stops or the helper exits. A lost ADB connection prevents restoration until it reconnects; reboot also resets this temporary override. This is a development-device helper, not an Android app permission.
 
+To keep one current native game process awake as well, use the **same single helper** with `--keep-app cz.kristek.neon.nativevr --app-pid CURRENT_PID`. Capture remains supported: the override stays active while Quest Stream owns capture **or** that exact package PID exists. Without `--app-pid`, the helper captures one current PID on its first successful check. Once that process exits, the game lease ends permanently; a restarted process needs a newly selected lease. Going Home does not end a lease if Android keeps the process alive. There is no permanent power setting or app reinstall. On shutdown even an initially unknown/adopted override is restored. Stop an old helper gracefully and wait for its restoration to finish before starting a replacement; never run competing helpers. Test policy changes with `python3 test/keep_awake_test.py`. Physical off-face Awake/Wi-Fi acceptance is separate from these tests.
+
+
+For an explicitly authorized development session across native app restarts,
+add `--follow-app` to `--keep-app cz.kristek.neon.nativevr`. The single helper
+follows new PIDs for that package and holds the override for up to 30 seconds
+between processes. If the app stays stopped and capture is inactive, it restores
+the sensor; a later app launch reactivates the override. This does not require
+an APK change. Stop the helper to end this development session. A disconnected
+ADB link still prevents restoration until reconnection; this is not a permanent
+headset setting and does not solve room-tracking loss.
+
 The helper intentionally keeps the headset active when removed during sharing. Stop sharing in Quest Stream after use. References: [Meta off-face setup and restoration](https://developers.meta.com/vr/documentation/unity/meta-xr-operator/quest/#test-with-the-headset-off-your-face).
+
+After an ADB polling failure the helper marks its proximity state unknown. On reconnection it reapplies the current capture/native-app policy, even if a headset reboot cleared the old override. The existing app lease remains intact during an outage. Wi-Fi ADB itself may need re-enabling over USB after a headset reboot.

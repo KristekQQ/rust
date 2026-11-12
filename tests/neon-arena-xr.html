@@ -35,7 +35,7 @@ const report=await run.execute(async test=>{
     engine.xr.addEventListener('cut',event=>reports.push({...event.detail,info:event.detail.pieces.map(p=>p.meshInfo),colors:event.detail.pieces.map(p=>p.meshSnapshot.colors)}));
     await engine.xr.enter();
     test.assert(app.gameState().shots===1 && sim.timerCountForDelay(100)===1,'VR starts one automatic fruit launch timer');
-    test.assert(app.gameState().liveApples[0].meshInfo.scale.every(value=>Math.abs(value-FRUIT_SCALE)<1e-6)&&Math.abs(FRUIT_SCALE-.09)<1e-6,'production fruit uses the larger comfortable gameplay scale');
+    test.assert(app.gameState().liveApples[0].meshInfo.scale.every(value=>Math.abs(value-FRUIT_SCALE)<1e-6)&&Math.abs(FRUIT_SCALE-.126)<1e-6,'production fruit uses the larger comfortable gameplay scale');
     const restartPose=world.restartButton.meshInfo.position;
     test.assert(Math.abs(restartPose[0])<.05&&restartPose[2]>.8&&restartPose[2]<1.05&&restartPose[1]>1.05&&restartPose[1]<1.35,'restart is behind the player at chest height within stationary sword reach');
     test.assert(engine.xr.roundState.duration===60,'Rust owns a 60 second round');
@@ -167,6 +167,8 @@ const report=await run.execute(async test=>{
     test.assert(person.head.object?.id===world.infoPanel.id&&diagnosticOrigin.every((v,i)=>Math.abs(v-expectedDiagnostic[i])<.003)&&world.infoPanel.meshInfo.scale.every(v=>v===1),'native diagnostics stay unmirrored at the right-foot VR anchor');
     test.assert(origins.every(pos=>Math.abs(pos[0])<.01&&pos[2]<-2)&&origins[0][1]>origins[1][1]&&origins[1][1]>COMBO_DISPLAY_ORIGIN[1],'front countdown is above score and active triple');
     test.assert(!('monument' in world)&&!('credits' in world),'decorative gravestone and its inscription are absent');
+    // Decorations deliberately load outside playable startup; await the asset under test.
+    await world.loadDecorations();
     test.assert(world.scoreDisplay.info.textures===0 && world.logo.meshInfo.triangles>20,'central score housing and bitmap APOLLO GAMES lettering');
     const logoPosition=world.logo.meshInfo.position;
     sim.frame(leftLook);const sideLogo=sim.pixels('left');
@@ -185,7 +187,7 @@ const report=await run.execute(async test=>{
     for(let i=0;i<blackFrame.data.length;i+=4)if(blackFrame.data[i]<3&&blackFrame.data[i+1]<3&&blackFrame.data[i+2]<3)blackPixels++;
     test.assert(blackPixels>blackFrame.width*blackFrame.height*.3,'stereo scene has a real black background');
     const postprocessing=engine.postprocessing.stats();
-    test.assert(postprocessing.passes===2&&postprocessing.targets>0&&postprocessing.ssrWidth===postprocessing.width/2,'SSR traces half-resolution then composites into full-size XR');
+    test.assert(postprocessing.passes===0&&postprocessing.targets===0,'production XR keeps postprocessing disabled without intermediate targets');
     // Look down into the playable space and prove the real tiled floor contributes to both eye images.
     const down={...still,head:{position:[0,1.55,0],orientation:[-Math.sin(Math.PI/6),0,0,Math.cos(Math.PI/6)]}};
     sim.frame(down);const floorLeft=sim.pixels('left'),floorRight=sim.pixels('right');

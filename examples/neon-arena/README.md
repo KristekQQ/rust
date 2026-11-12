@@ -1,60 +1,51 @@
-# Ovocná aréna s neonem a lesklou podlahou
+# Ovocná aréna se sdílenou Rust simulací
+
+Výchozí webový vstup používá stejnou Rust simulaci a export scény jako nativní Neon.
+Podrobnosti jsou v [native/web parity](../../docs/NEON_NATIVE_WEB_PARITY.md).
+Autorské a SDK ovládání zůstává v `legacy.html`.
 
 Aktuální hra používá [dva rostoucí zásobníky](#dva-zásobníky-prototyp-rostoucích-sérií).
 Starší popisy automatických trojic a historie níže popisují zachovaný SDK režim
 `legacy`; nejsou pravidly výchozí arény.
 
+## Scoreboard na notebooku
+
+Po dokončení kola se na lokální server odešle pouze číselné skóre.
+`/scoreboard` zobrazuje výsledky od nejvyššího; `/__neon_scores` vrací JSON pole,
+například `[420,280,0]`. Nejsou v něm jména ani časy.
+Pět nejvyšších skóre je také přímo ve scéně na prostorové tabulce vpravo
+před hráčem. Načte se při otevření hry a aktualizuje po dokončení kola.
+Soubor je v `output/scoreboard/neon-arena.json`, mimo produkční balíček,
+takže jej refresh ani přestavění hry nepřepíše. Scoreboard je dostupný na adrese `/scoreboard`; autorský náhled navíc
+zobrazuje odkaz a potvrzení úspěšného uložení nebo chybu přenosu.
+Quest používá adresu notebooku a port aktuálně spuštěného HTTPS serveru.
+
 ## Font skóre a času
 
 Výchozí Cynatar používá skutečné 3D znaky se zářícími plochami a barevnými boky.
-Volba **Font skóre a času** přepíná časovač, skóre, bonus a oba zásobníky mezi
+Autorský náhled `legacy.html` nabízí volbu **Font skóre a času**, která přepíná časovač, skóre, bonus a oba zásobníky mezi
 Cynatarem a původním neonem. `?font=neon` otevře původní styl. Hodnoty i rozložení
 aktualizuje Rust; opakované znaky sdílejí geometrii. Cynatar je pouze pro osobní použití.
 
-## Automatické srovnání odrazů v brýlích
+## Sdílená dlaždicová podlaha a porovnání glow
 
-Před vstupem do VR zaškrtni **Srovnávací test před hrou**. Místo hry vznikne
-stejná nehybná sada šesti plodů nad podlahou; simulace se pozastaví a automatické
-vystřelování neběží. Dívej se stále na odrazy před sebou a nehýbej ovladači.
-Test projde bez efektů → glow → SSR 50 % → SSR 100 % → SSR 50 % + glow → bez efektů.
-Procenta znamenají poměr šířky i výšky SSR textury, nikoli hlavního obrazu.
+Web i nativní export zachovávají stejných 80 zkosených dlaždic v jednom
+statickém meshi (960 trojúhelníků) a samostatné zapuštěné spáry (12 trojúhelníků).
+Tím zůstávají shodné vzhled, pořadí objektů i jejich ID pro sdílenou simulaci.
+Výchozí webový vstup má SSR vypnuté; při explicitním zapnutí zůstává dlaždicová
+podlaha platným odrazivým receiverem. Vypnuté SSR nepřipravuje mezicíle ani
+trace/composite průchody. Skutečný dopad na FPS Questu se měří odděleně.
 
-Každá fáze zahodí dvě telemetrická okna a změří další tři (180 snímků v okně).
-FPS a CPU ms vážíme počtem snímků/dobou; medián a minimum jsou statistiky **oken**,
-nikoli 1% low nebo per-frame percentily. Po výstupu z VR uvidíš tabulku a stáhneš
-JSON. Stejný souhrn se jednou odešle místnímu `/__diagnostics` jako
-`xr-benchmark-result`. Neodesíláme další data za každý snímek.
-Poslední směr pohledu každého okna je zaznamenán, pohyb hlavy není uzamčený.
-
-Test trvá zhruba 1–2 minuty; původní SSR/glow obnoví i při předčasném ukončení.
-Po třech minutách bez dostatečných vzorků skončí s částečnými výsledky.
-Změna XR relace či rozlišení měření zruší. Srovnej zvlášť WebGPU a WebGL,
-se stejným pohledem, stavem profilování a po podobném zahřátí zařízení.
-Základ zopakovaný na konci ukazuje možný časový drift; neurčuje jeho příčinu.
-Pevná scéna izoluje náklady renderování a nenahrazuje FPS celé dynamické hry.
-
-Řadič je volitelný diagnostický nástroj v `performance-test.js`, ne herní simulace
-v SDK. `tests/neon-arena-benchmark.html` ověřuje přepínání skutečného SSR,
-statistiky ze syntetických paketů, obnovu nastavení a úklid v simulovaném XR.
-Nejde o naměřený výkon Questu.
+Volitelný srovnávací test prochází pouze bez efektů → glow → bez efektů.
+Žádná z fází SSR nezapíná. Výsledky jsou statistiky telemetrických oken,
+nikoli GPU čas nebo 1% low.
 
 Aktuální ukázka používá čisté černé pozadí. Obsahuje devět druhů ovoce včetně dvojice třešní, banánu, hroznů,
 pomeranče a limetky; dvě katany,
-60sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Nízký žulový náhrobek vpravo mimo prostor galerie nese kredit CODEX a živou
-diagnostiku FPS, FRAME MS, CPU MS, CULL MS, VISIBLE, CULLED, OBJECTS a DRAWS.
+60sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Samostatný panel VÝKON u hráčových nohou zobrazuje diagnostiku FPS, FRAME MS, CPU MS, CULL MS, VISIBLE, CULLED, OBJECTS a DRAWS.
 
-Aplikace neimportuje `environment.js`, nestahuje barevné/emisní stěny cubemapy,
-má ale skutečnou kachličkovou podlahu se zapnutým SSR (`strength:.92`).
-Osmdesát tmavých kachliček se zkosenými hranami má reflektivitu .94, oddělují je
-matné spáry. Podlaha pokrývá 6 × 7,5 m na Y=0; její geometrie je jediný statický mesh.
-Odrazy používají aktuální barvu a hloubku každého oka, takže reagují na pohyb ovoce.
-Objekty mimo obraz mohou v SSR chybět. Bloom zůstává vypnutý; postprocessing má
-dva SSR průchody: trace v poloviční šířce/výšce a depth-aware composite v plném
-rozlišení. `configureSSR({resolutionScale:1})` umožňuje porovnání s původní kvalitou;
-`.5` je nastavení arény. Ovoce a texty zůstávají v původním rozlišení.
-SSR je omezeno na prostředních 20 kachliček (3 × 3,75 m z celkových 6 × 7,5 m).
-Každé oko má vlastní ořez výpočtu. Mimo odraznou oblast zůstávají kachličky matné;
-při pohledu mimo ni se celý SSR řetězec přeskočí. Hlavní scéna se tím nezmenšuje.
+Aplikace neimportuje `environment.js` ani obrázky cubemapy. Tmavá dlaždicová
+podlaha zachovává orientaci prostoru i shodu s nativním exportem.
 Původní obrazové podklady a offline
 build skripty zůstávají uložené v příkladu, ale herní stránka je nepoužívá.
 
@@ -97,8 +88,7 @@ a otočení +90° kolem Y. Její střed je vlevo na [−2,75;1,2;−0,4]; při p
 dopředu je mimo zorné pole, zobrazí se při otočení hlavy doleva.
 Získané symboly i jejich samostatné zlaté rámečky používají emisi 8,0 místo
 klidové 0,65; zvýraznění stále řídí skutečný postup série v Rustu.
-Galerie je viditelná v obou očích po otočení doleva; diagnostický kámen je vpravo
-na X=3 m, aby ji nezakrýval. Restart zůstává před hráčem na [0;0,20;−1,45].
+Galerie je viditelná v obou očích po otočení doleva; diagnostika má vlastní panel u pravé nohy. Restart zůstává před hráčem na [0;0,20;−1,45].
 Výchozí nástroj nyní posílá až deset plodů najednou každé 3 s; viz Ovocné vlny níže. Rust vlastní fyziku, řezy,
 čas i skóre. Objekt DALSI KOLO lze aktivovat mečem nebo namířením a triggerem.
 Při odchodu z XR se výstřely zastaví a náhledové ovoce se vrátí.
@@ -258,11 +248,9 @@ nápis bez pozadí. `scene.createInfoPanel('diagnostics',options)` obnovuje hodn
 nejvýše čtyřikrát za sekundu a přestavuje mesh jen při změně obsahu. Font5×7
 obsahuje A–Z a číslice, texty příkladu používají zápis bez diakritiky.
 
-Modely vytvoří `node examples/neon-arena/build-monument.mjs`; materiál žuly je
-`assets/granite.png`, vygenerovaný vestavěným ImageGen. [Původ assetů](assets/ASSETS.md).
-
-Náhrobek stojí ve VR vpravo na [2.2,0,-4.4] m a má výšku přibližně1.46 m. Diagnostika je přibližně0.66 m nad zemí; texty sledují společné natočení a měřítko kamene.
-
+Náhrobek a jeho kredit CODEX byly odstraněny z webové i nativní arény.
+Panel VÝKON je nezávislý, s offsetem `[.9,.35,-1]` od hráčova referenčního rámce.
+Historický generátor modelů se při spuštění arény nepoužívá.
 
 ## Rychlé ladění zásahu
 
@@ -490,3 +478,31 @@ pokrývá `neon-arena-xr`; oddělení diagnostiky není potvrzení, že chyba zm
 Po vypršení kola se stejné tlačítko `START` přesune 0,95 m před aktuální
 vodorovný směr hlavy, přibližně na výšku hrudi. Meč i trigger spustí další kolo;
 za hry se tlačítko vrátí za hráče, aby nepřekáželo řezání.
+
+### Progressive loading and VR entry
+
+The floating goggles control enters VR directly from its trusted click gesture.
+Playable geometry, font and round setup are ready before optional decorative glTF
+score-display model start loading on the idle task queue.
+`world.loadDecorations()` shares in-flight work, retries failure and is awaited by
+visual tests; `scoreDisplay` is null until it completes. Page cleanup
+cancels the scheduled load and disposes in-flight engine requests.
+The XR browser scenario verifies the separate feet-anchored diagnostics and absence of grave handles.
+
+### Comfortable targets and blade angles
+
+Playable fruit is 40% larger than the .09 baseline: default .126, precision .105,
+large .147. Gallery/stock icons keep their independent size. Built-in saved .06/.09
+presets migrate to .126; custom named presets keep their values. The common Rust
+blade gate accepts about 66 degrees off the edge in assisted mode and 53 degrees
+in one-sided strict mode. A real finite sweep is still required; flat, stationary
+and strict reverse strokes do not cut.
+
+### Cyber katany (rev50)
+
+Obě ruce mají vlastní barevně rozlišenou procedurální katanu: oranžové ostří vpravo,
+tyrkysové vlevo. Hranatá špička, kovový výbrus, tmavé panely, žebrovaný grip
+a stavové články jsou součástí jednoho neprůhledného meshe na ruku (364 trojúhelníků).
+Bez textur; původní délka řezu a orientace ostré hrany jsou zachované.
+Vizuální inspirace: [oficiální termální katana CDPR](https://eu.gear.cdprojektred.com/en-as/products/cyberpunk-2077-thermal-errata-katana).
+Jde o vlastní geometrii a vizuální motiv napájeného ostří, bez nové tepelné mechaniky.

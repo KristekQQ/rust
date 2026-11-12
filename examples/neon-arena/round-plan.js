@@ -35,7 +35,7 @@ function validateCue(input) {
         const [x,y,z]=target.position;
         if(x<-.8||x>.8||y<.95||y>1.7||z< -1.4||z>-.9)throw new Error('Cil je mimo dosah pred hracem.');
         if(target.fruit!==undefined&&(typeof target.fruit!=='string'||!FRUIT_KINDS.includes(target.fruit)))throw new Error('Nezname ovoce cile.');
-        if(target.scale!==undefined&&(typeof target.scale!=='number'||!Number.isFinite(target.scale)||target.scale<.03||target.scale>.105))throw new Error('Meritko cile musi byt .03 az .105.');
+        if(target.scale!==undefined&&(typeof target.scale!=='number'||!Number.isFinite(target.scale)||target.scale<.03||target.scale>.147))throw new Error('Meritko cile musi byt .03 az .147.');
         if(target.lifetime!==undefined&&(typeof target.lifetime!=='number'||!Number.isFinite(target.lifetime)||target.lifetime<1.2||target.lifetime>2.6))throw new Error('Zivotnost cile musi byt 1.2 az 2.6 s.');
         if(target.velocity!==undefined){
             if(!Array.isArray(target.velocity)||target.velocity.length!==3||target.velocity.some(v=>typeof v!=='number'||!Number.isFinite(v)))throw new Error('Rychlost musi mit tri konecna cisla.');

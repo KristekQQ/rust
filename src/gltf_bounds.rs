@@ -280,7 +280,7 @@ impl RenderBoundsCache {
     }
 
     /// Conservative bounds in draw coordinates. Unknown inputs disable culling.
-    #[cfg(any(target_arch = "wasm32", test))]
+    #[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
     pub(crate) fn primitive_bounds(
         &self,
         asset: &ModelAsset,
@@ -328,7 +328,7 @@ impl RenderBoundsCache {
         asset: &ModelAsset,
         pose: &ModelPose,
     ) -> Result<(Vec3, Vec3), String> {
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
         let _scope = crate::render::profiler::cpu_scope("gltf.bounds");
         self.cached_bounds(asset, pose)
             .map(Ok)

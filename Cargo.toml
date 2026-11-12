@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 # Runtime speed first; production JS/compression is handled separately.
 [profile.release]
@@ -20,6 +20,8 @@ wasm-opt = ["-O3"]
 [features]
 # Native diagnostic allocator; excluded from normal and WASM builds.
 animation-allocation-probe = []
+# Opt-in native renderer; browser defaults remain unchanged.
+native-render = ["wgpu/vulkan", "wgpu/vulkan-portability"]
 
 [dependencies]
 bytemuck = { version = "1.25", features = ["derive"] }

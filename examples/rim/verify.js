@@ -15,10 +15,10 @@ export async function verify(){
   assert(release==='working'||/^[a-f0-9]{10}$/.test(release||''),'Explicit complete application version');
   assert(document.getElementById('backend')?.textContent?.includes(release==='working'?'pracovní sestava':'sestava '+release),'Visible build identity matches packaged metadata');
 
-  assert(content.environment.info.primitives===19,'Original city geometry');assert(game.collision.shapes.length===1065,'Original convex roofs/arches/columns');
+  assert(content.environment.info.primitives===19,'Original city geometry');assert(game.collision.shapes.length===1065,'Original convex roofs/arches/columns');assert(game.healthDrops.length===4&&Number.isInteger(game.stagePanel.id),'Authored pooled HP pickups and stage panel');
   view('gate');const city=await capturePixels(canvas);assertForeground(city,'Actual Roman city',40000);
   view('forum');assertChanged(city,await capturePixels(canvas),'Original camera landmarks',20000);
-  view('gate');play();await frames();assert(state().enemies.filter(e=>e.phase!==3).length===6,'First wave: six small orbiters');
+  view('gate');play();await frames();assert(state().enemies.filter(e=>e.phase!==3).length===1,'First wave: one small orbiter');
   const start=state().player.position;window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW'}));await frames(30);window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW'}));
   assert(state().player.position.z<start.z-.5,'Real keyboard drives collision-aware native player '+JSON.stringify({start,current:state().player}));
   const beforeDash=state().player.position.z;engine.scene.rimInput({dash:true});await frames(18);assert(state().player.dash.count===1&&state().player.position.z<beforeDash-4.8,'5m native dash');
@@ -54,6 +54,6 @@ export async function verify(){
   assert(!performance.getEntriesByType('resource').some(r=>r.name.includes('three.module')),'No Three runtime');
   assert(content.characters.every(({model})=>!model.info.lastError),'No model animation failures');
   engine.scene.rimInput({reset:true,pause:true});view('gate');
-  result.textContent=`PASS: ${engine.renderer_backend()} · original city + 1065 convex shapes, native movement/dash/stamina/jump, six orbiters, two gladius swings, actual Rust worker split geometry, synchronized frame pixels`;
+  result.textContent=`PASS: ${engine.renderer_backend()} · original city + 1065 convex shapes, native movement/dash/stamina/jump, one introductory orbiter, two gladius swings, actual Rust worker split geometry, synchronized frame pixels`;
  }catch(error){engine.scene.rimInput({reset:true,pause:true});result.textContent=`FAIL: ${error instanceof Error?error.message:String(error)}`;console.error(error);}
 }

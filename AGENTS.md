@@ -22,6 +22,10 @@ For direct Quest WebGPU XR, runtime support, projection textures and headset dia
 
 For standalone headset mirroring to a local browser over Wi-Fi, reconnecting viewers and keeping Quest awake during off-face streaming, use [quest-stream](.agents/skills/quest-stream/SKILL.md). Its independent Android companion lives in `tools/quest-stream/`; it does not require an engine build.
 
+For creating or tuning graphical effects, use [effect-optimization](.agents/skills/effect-optimization/SKILL.md): preserve appearance, prefer cheaper approximations and measure total cost.
+
+For physical Quest GPU/performance evidence use [quest-hardware-profiling](.agents/skills/quest-hardware-profiling/SKILL.md); GPU probes do not establish live OpenXR FPS.
+
 For frame scheduling, transient textures/buffers, pass dependencies and CPU/GPU profiling use [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md); the extension guide is [FRAME_PIPELINE.md](docs/FRAME_PIPELINE.md). For quality-preserving render optimization, keep resolution/effects fixed and compare deterministic before/after pixels on each affected backend. Pass/submit reductions and desktop timings are evidence of changed work, not proof of Quest FPS gains.
 
 For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-player-equipment/SKILL.md). For cut-impact visuals and speed tuning use [cut-feedback-tuning](.agents/skills/cut-feedback-tuning/SKILL.md); prefer existing configuration knobs for numeric iteration.

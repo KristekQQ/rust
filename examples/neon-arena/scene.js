@@ -1,18 +1,20 @@
 import {VR_DEBUG_PANEL_WIDTH,VR_DEBUG_PANEL_HEIGHT} from '../shared/vr-debug-panel.js';
-export const ARENA_REVISION='cynatar-arena-47';
+export const ARENA_REVISION='cynatar-arena-51';
 import { swordGeometry, neonFrameGeometry, fruitGeometries, createFruitPatternCatalog, FRUIT_PATTERN_COUNT } from './geometry.js';
 export const NEON_GLOW=Object.freeze({strength:.4,radius:.045});
-export const PAYTABLE_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([-2.75,1.2,-.40]);
+// Behind the left shoulder (+Z): inspect by turning, keep forward gameplay clear.
+export const PAYTABLE_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([-2.75,1.2,1.60]);
 export const PAYTABLE_YAW=Math.PI/2;
 export const COMBO_DISPLAY_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([0,1.42,-2.15]);
-export const FRUIT_SCALE=.09; // Comfortable playable targets; gallery/UI scale is independent.
+export const FRUIT_SCALE=.126; // Comfortable playable targets; gallery/UI scale is independent.
 export const FRUIT_OPACITY=.06;
 export const FRUIT_OPACITY_VARIATION=1;
 export const RESTART_POSITION=/** @type {import('../../js/engine.d.ts').Vector3} */([0,1.20,.95]);
 export const FLOOR_SSR=Object.freeze({strength:.92});
-export const FLOOR_SSR_BOUNDS={min:/** @type {import('../../js/engine.d.ts').Vector3} */([-1.5,-.03,-3]),max:/** @type {import('../../js/engine.d.ts').Vector3} */([1.5,.03,.75])};
+export const FLOOR_SSR_BOUNDS={min:/** @type {import('../../js/engine.d.ts').Vector3} */([-2,-.03,-4.5]),max:/** @type {import('../../js/engine.d.ts').Vector3} */([2,.03,1.5])};
 // Gentle hits only; fast attacks keep their full effect. Tune from the Quest URL (?hitSize=0.08) without rebuilding WASM.
 const requestedHitSize=Number(new URLSearchParams(location.search).get('hitSize')??'0.15');
+export const CUT_PIECE_FADE=Object.freeze({delay:0,duration:.75,style:/** @type {const} */('dissolve')});
 export const CUT_EFFECT_SIZE=Number.isFinite(requestedHitSize)&&requestedHitSize>=.01&&requestedHitSize<=2?requestedHitSize:.15;
 
 
@@ -27,7 +29,7 @@ export function createFruitMesh(scene,fruit) {
     return recipe?recipe.asset.createInstance(recipe.index):scene.createMesh(fruit.geometry);
 }
 
-/** Vlastní scéna v metrech. Černé okolí a lesklá kachličková podlaha.
+/** Vlastní scéna v metrech. Černé okolí a jednoduchá matná podlaha.
  * @param {import('../../js/engine.js').Scene} scene */
 export async function createScene(scene) {
     scene.clear();
@@ -134,16 +136,15 @@ export async function createScene(scene) {
     // Existing preview/verification handles refer to the actual gallery fruit.
     const apples=fruits.map(fruit=>galleryIcons[catalog.indexOf(fruit)*3]);
     const previewPositions=fruits.map(fruit=>galleryPositions[catalog.indexOf(fruit)*3]);
-    const blade = swordGeometry();
-    const sword = scene.createMesh(blade).setPosition([0.45, 1.1, -0.2])
+    const blade = swordGeometry('right');
+    const sword = scene.createMesh(blade).setPosition([0.45, 1.1, -0.2]).setEmission(1.4)
         .setCutter({base:[0,0,-0.1],tip:[0,0,-0.95]}).setBladePhysics({edge:[0,-1,0]}).setCutAssist(.35).setBladeContactResponse(true).setBladeTrail(true);
-    const leftSword = scene.createMesh(blade).setPosition([-0.45, 1.1, -0.2])
+    const leftSword = scene.createMesh(swordGeometry('left')).setPosition([-0.45, 1.1, -0.2]).setEmission(1.4)
         .setCutter({base:[0,0,-0.1],tip:[0,0,-0.95]}).setBladePhysics({edge:[0,-1,0]}).setCutAssist(.35).setBladeContactResponse(true).setBladeTrail(true);
     scene.createLight({ position: [2, 5, 1], color: [1, 0.95, 0.9] });
     scene.createLight({ position: [-3, 3, -2], color: [0.25, 0.4, 0.7] });
-    const scoreDisplay=await scene.loadModel(new URL('./assets/score-display.gltf', import.meta.url));
-    scoreDisplay.setPosition(onBoard(0,2.65,-.25)).setRotation([boardTilt,PAYTABLE_YAW,0]).setRenderOptions({isStatic:true,castsShadow:false});
-    const infoPanel=scene.createInfoPanel('diagnostics',{position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT});
+    // Diagnostics are independently anchored to the player's feet on XR entry.
+    const infoPanel = scene.createInfoPanel('diagnostics', {position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT});
     const timerPanel=scene.createInfoPanel('countdown',{position:[0,2.36,-2.15],width:1.18,height:.50})
         .setEmission(8).setRenderOptions({castsShadow:false,receivesShadow:false});
     const scorePanel=scene.createInfoPanel('score',{position:[0,1.90,-2.15],width:1.55,height:.25})
@@ -152,6 +153,31 @@ export async function createScene(scene) {
         .setRenderOptions({castsShadow:false,receivesShadow:false});
     const currentLabel=scene.createTextPanel({title:'DVA ZASOBNIKY',lines:['REZ +10 / SERIE = BONUS'],position:[0,1.07,-2.15],width:1.35,height:.17})
         .setEmission(1.2).setRenderOptions({castsShadow:false,receivesShadow:false});
+    // Fixed front-right scoreboard, clear of the central play lane.
+    const scoreboardOrigin=/** @type {import('../../js/engine.d.ts').Vector3} */([1.6,1.6,-2.2]);
+    const scoreboardYaw=Math.atan2(-scoreboardOrigin[0],-scoreboardOrigin[2]);
+    const scoreboardTitle=scene.createTextPanel({title:'NEJVYSSI SKORE',lines:[],
+        position:[scoreboardOrigin[0],scoreboardOrigin[1]+.59,scoreboardOrigin[2]],width:1.3,height:.15})
+        .setRotation([0,scoreboardYaw,0]).setEmission(1.2)
+        .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false});
+    const scoreboardPanels=[scoreboardTitle];
+    let scoreboardKey='';
+    /** Rebuild static text geometry only when the visible saved TOP5 changes.
+     * @param {number[]} scores */
+    const updateScoreboard=scores=>{
+        const top=scores.filter(score=>Number.isSafeInteger(score)&&score>=0).sort((a,b)=>b-a).slice(0,5);
+        const key=JSON.stringify(top);
+        if(key===scoreboardKey)return;
+        scoreboardKey=key;
+        const facing=scoreboardTitle.meshInfo.scale;
+        scoreboardPanels.splice(1).forEach(panel=>panel.remove());
+        const labels=top.length?top.map((score,index)=>`${index+1}. ${score}`):['ZATIM BEZ SKORE'];
+        labels.forEach((title,index)=>scoreboardPanels.push(scene.createTextPanel({title,lines:[],
+            position:[scoreboardOrigin[0],scoreboardOrigin[1]+.34-index*.22,scoreboardOrigin[2]],width:1.22,height:.16})
+            .setRotation([0,scoreboardYaw,0]).setScale(facing).setEmission(.9)
+            .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false})));
+    };
+    updateScoreboard([]);
     const awardPanels=[0,1,2].map(row=>scene.createInfoPanel(row<2?'debug-text':'combo-award',{
         position:[.90,COMBO_DISPLAY_ORIGIN[1]-(row+1)*.35,-2.15],width:row<2?.18:.55,height:row<2?.05:.18})
         .setRenderOptions({castsShadow:false,receivesShadow:false}));
@@ -190,7 +216,20 @@ export async function createScene(scene) {
         },
     };
     arenaFont.set('cynatar');
-    return {arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, scoreDisplay, logo, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
+    /** Decorative assets are not part of the playable startup barrier.
+     * @type {import('../../js/engine.d.ts').ModelObject|null} */
+    let scoreDisplay=null;
+    /** @type {Promise<void>|undefined} */
+    let decorationsPromise;
+    const loadDecorations=()=>{
+        if(decorationsPromise)return decorationsPromise;
+        decorationsPromise=scene.loadModel(new URL('./assets/score-display.gltf',import.meta.url)).then(display=>{
+            scoreDisplay=display;
+            scoreDisplay.setPosition(onBoard(0,2.65,-.25)).setRotation([boardTilt,PAYTABLE_YAW,0]).setRenderOptions({isStatic:true,castsShadow:false});
+        }).catch(error=>{decorationsPromise=undefined;throw error;});
+        return decorationsPromise;
+    };
+    return {arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,scoreboardPanels,updateScoreboard,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, get scoreDisplay(){return scoreDisplay;}, loadDecorations, get decorationsReady(){return scoreDisplay!==null;}, logo, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
 }
 
 // Points per completed triple; adapted ranking, not the slot's cash payouts.
@@ -238,6 +277,6 @@ export function previewSlice(scene,fruit,size=CUT_EFFECT_SIZE,solid=true) {
     try {
         const report=scene.cutWith(cutter,{motion:[0,-.85,0],separation:.03});
         if(!report.removed.length)throw new Error('Náhledový řez neprotnul ovoce.');
-        return {report,feedback:scene.playCutFeedback(report.pieces,{mirrorText:true,size})};
+        return {report,feedback:scene.playCutFeedback(report.pieces,{mirrorText:true,size,fadePieces:CUT_PIECE_FADE})};
     } finally {cutter.remove();if(source.exists)source.remove();}
 }

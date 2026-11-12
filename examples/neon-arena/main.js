@@ -1,32 +1,42 @@
+import {VR_DEBUG_PANEL_OFFSET} from '../shared/vr-debug-panel.js';
 import {reportDiagnostic,probeWebGpuXR} from '../shared/diagnostics.js';
 import { initEngine } from '../../js/engine.js';
-import {installRuntimeInfo} from '../shared/runtime-info.js';
-import {VR_DEBUG_PANEL_OFFSET,VR_DEBUG_PANEL_WIDTH,VR_DEBUG_PANEL_HEIGHT} from '../shared/vr-debug-panel.js';
-import { ARENA_REVISION, createScene, createFruitMesh, launchApple, previewSlice, FRUIT_SCALE, RESTART_POSITION, FRUIT_OPACITY, FRUIT_OPACITY_VARIATION, CUT_EFFECT_SIZE, NEON_GLOW, FLOOR_SSR, FLOOR_SSR_BOUNDS } from './scene.js';
+import { ARENA_REVISION, createScene, createFruitMesh, launchApple, previewSlice, FRUIT_SCALE, RESTART_POSITION, FRUIT_OPACITY, FRUIT_OPACITY_VARIATION, CUT_EFFECT_SIZE, CUT_PIECE_FADE, NEON_GLOW } from './scene.js';
 import {PerformanceTest,PERFORMANCE_PHASES} from './performance-test.js';
 import {planWave} from './wave-plan.js';
 import {validateRoundPlan,planCue} from './round-plan.js';
 import {createArenaTools,installArenaPanel,installArenaBridge} from './arena-tools.js';
 import {fetchPreset} from './arena-presets.js';
+import {installScoreboard,loadScoreboard} from './scoreboard.js';
 
+let pageClosed=false;
 const canvas = document.getElementById('gpu-canvas');
 const status = document.getElementById('status');
 const enter = document.getElementById('enter');
 const exit = document.getElementById('exit');
 if (!(canvas instanceof HTMLCanvasElement) || !status || !(enter instanceof HTMLButtonElement) || !(exit instanceof HTMLButtonElement)) throw new Error('Chybí UI.');
 
+const ARENA_PERFORMANCE_PHASES=PERFORMANCE_PHASES.filter(phase=>!phase.ssr);
 const parameters=new URLSearchParams(location.search);
 const backend = parameters.get('backend') === 'webgl' ? 'webgl' : 'auto';
-let enableSSR=parameters.get('ssr')!=='0';
+let enableSSR=false;
 let enableGlow=parameters.get('glow')!=='0';
 const revision=ARENA_REVISION;
 let solidFruit=true;
-export const engine = await initEngine(canvas, {backend,profiling:parameters.get('info')!=='0'&&parameters.get('profile')==='1'});
-engine.setDebugOverlay(false);
+export const engine = await initEngine(canvas, {backend,profiling:parameters.get('profile')==='1'});
+const scoreboardStatus = document.createElement('p');
+scoreboardStatus.id = 'scoreboard-status';
+scoreboardStatus.setAttribute('role', 'status');
+const scoreboardLink = document.createElement('a');
+scoreboardLink.href = '/scoreboard';
+scoreboardLink.textContent = 'Scoreboard na notebooku';
+status.after(scoreboardLink, scoreboardStatus);
+const disposeScoreboard = installScoreboard(engine.xr, {onStatus: text => { scoreboardStatus.textContent = text; }, onScores: scores => world.updateScoreboard(scores)});
+window.addEventListener('pagehide', disposeScoreboard, {once: true});
 /** @type {PerformanceTest|null} */
 let performanceTest=null;
 document.documentElement.dataset.rendererBackend = engine.renderer_backend();
-reportDiagnostic('engine-ready',undefined,{ssr:enableSSR,glow:enableGlow,revision,profiling:engine.frameProfile().enabled});
+reportDiagnostic('engine-ready',undefined,{ssr:enableSSR,glow:enableGlow,revision,profiling:parameters.get('profile')==='1'});
 engine.xr.addEventListener('gpuerror',event=>{const detail=/** @type {CustomEvent} */(event).detail;reportDiagnostic('gpu-validation',new Error(detail.message),detail);});
 engine.xr.addEventListener('gpulost',event=>{performanceTest?.cancel('GPU ztraceno');const detail=/** @type {CustomEvent} */(event).detail;reportDiagnostic('gpu-lost',new Error(detail.message),detail);});
 engine.xr.addEventListener('performance',event=>{
@@ -44,37 +54,31 @@ engine.set_render_effects(false, false);
 engine.set_grid_visible(false);
 engine.setBackgroundColor([0,0,0]);
 engine.setNeonGlow(enableGlow?NEON_GLOW:{strength:0});
-engine.postprocessing.configureSSR({resolutionScale:.5,receiverBounds:FLOOR_SSR_BOUNDS});
-if(enableSSR)engine.postprocessing.enable('ssr',FLOOR_SSR);
+engine.setFontGlowAtlas(true);
+engine.postprocessing.disable('ssr');
 const ssrToggle=document.getElementById('ssr');
 const build=document.getElementById('build');
 const releaseBuild=document.querySelector('meta[name="build-profile"]')?.getAttribute('content')==='release';
 const showBuild=()=>{if(build)build.textContent=`Verze ${revision}${releaseBuild?' · PRODUCTION RELEASE':''} · ${engine.renderer_backend()==='BrowserWebGpu'?'WebGPU':'WebGL'} · SSR ${enableSSR?'zapnuto':'vypnuto'}`;};
 showBuild();
-if(ssrToggle instanceof HTMLInputElement){
-    ssrToggle.checked=enableSSR;
-    ssrToggle.addEventListener('change',()=>{
-        enableSSR=ssrToggle.checked;
-        reportDiagnostic('ssr-changed',undefined,{enabled:enableSSR,revision,atMs:performance.now()});
-        if(enableSSR)engine.postprocessing.enable('ssr',FLOOR_SSR);
-        else engine.postprocessing.disable('ssr');
-        showBuild();
-    });
-}
 
 engine.set_light_helpers_visible(false);
 engine.setDebugOverlay(false);
 const home = () => engine.setOrbitView([0,1.75,1.2],[0,1.45,-1.6]);
 home();
 export const world = await createScene(engine.scene);
+void loadScoreboard().then(scores=>{if(!pageClosed)world.updateScoreboard(scores);}).catch(()=>{if(!pageClosed)scoreboardStatus.textContent='Scoreboard se nepodařilo načíst z notebooku.';});
+const diagnosticHome={position:world.infoPanel.meshInfo.position,rotation:world.infoPanel.meshInfo.rotation};
 const fontSelect=document.getElementById('arena-font');
 const initialFont=parameters.get('font')==='neon'?'neon':'cynatar';
 if(initialFont!==world.arenaFont.selected)world.arenaFont.set(initialFont);
+if(world.arenaFont.selected==='cynatar')engine.prewarmFontGlowAtlas('0123456789+-');
 if(fontSelect instanceof HTMLSelectElement){
     fontSelect.disabled=false;fontSelect.value=world.arenaFont.selected;
     fontSelect.addEventListener('change',()=>{
         try{
             world.arenaFont.set(fontSelect.value==='neon'?'neon':'cynatar');
+            if(world.arenaFont.selected==='cynatar')engine.prewarmFontGlowAtlas('0123456789+-');
             reportDiagnostic('font-changed',undefined,{font:world.arenaFont.selected,revision});
         }catch(error){fontSelect.value=world.arenaFont.selected;reportDiagnostic('font-change',error);}
     });
@@ -99,7 +103,7 @@ if(fruitStyle instanceof HTMLInputElement){
 // Desktop orbit and immersive eye views use opposite horizontal handedness.
 // Keep this preview correction local to the example's world-space text.
 const setPanelFacing = (/** @type {boolean} */ immersive) => {
-    for (const panel of [...world.phasePanels.map(item=>item.object),...world.stockScorePanels,world.timerPanel,world.scoreLabel,world.scorePanel,world.currentLabel,...world.awardPanels,world.comboRules,...world.galleryLabels,world.restartButton,world.logo])
+    for (const panel of [...world.scoreboardPanels,...world.phasePanels.map(item=>item.object),world.infoPanel,...world.stockScorePanels,world.timerPanel,world.scoreLabel,world.scorePanel,world.currentLabel,...world.awardPanels,world.comboRules,...world.galleryLabels,world.restartButton,world.logo])
         panel.setScale([immersive ? 1 : -1,1,1]);
 
 };
@@ -111,16 +115,13 @@ if(verify instanceof HTMLButtonElement)verify.onclick=async()=>{
     try{
         if(result)result.textContent='RUNNING: pixelové kontroly';
         const {verifyArena}=await import('./verify.js');
+        await world.loadDecorations();
         const evidence=await verifyArena(engine,world,canvas,previewCut);
         const shared=evidence.sharedMeshes;
         if(result)result.textContent=`PASS: ovoce, řezy, SSR, sdílení ${shared.liveInstances} → ${shared.gpuMeshes}; geometrie ${(shared.geometryBytes/1024).toFixed(1)} KiB místo ${(shared.instanceGeometryBytes/1024).toFixed(1)} KiB, paleta ${(shared.colorTableBytes/1024).toFixed(1)} KiB`;
     }catch(error){if(result)result.textContent=`FAIL: ${error instanceof Error?error.stack:error}`;}
 };
 export const player = engine.xr.player;
-const vrInfoToggle=document.getElementById('vr-info');
-const runtimeInfo=installRuntimeInfo(engine,{panel:world.infoPanel,toggle:vrInfoToggle instanceof HTMLInputElement?vrInfoToggle:null});
-const syncVrInfo=()=>runtimeInfo.setVisible(vrInfoToggle instanceof HTMLInputElement?vrInfoToggle.checked:runtimeInfo.visible);
-
 player.equip('right', world.sword, {cutting: true, requireTrigger: false, haptics:true});
 player.equip('left', world.leftSword, {cutting: true, requireTrigger: false, haptics:true});
 engine.xr.bindButton(world.restartButton);
@@ -277,8 +278,8 @@ let benchmarkTimeout=0;
 export const benchmarkState=()=>performanceTest?.snapshot()??null;
 function benchmarkLabel(/** @type {string} */ title,/** @type {string[]} */ lines) {
     if(benchmarkPanel?.exists)benchmarkPanel.remove();
-    benchmarkPanel=engine.scene.createTextPanel({title,lines,position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT}).setEmission(.7);
-    if(engine.xr.isPresenting)player.bindHead(benchmarkPanel,{anchor:'feet',offset:VR_DEBUG_PANEL_OFFSET});
+    benchmarkPanel=engine.scene.createTextPanel({title,lines,position:[0,-10000,0],width:.66,height:.40}).setEmission(.7);
+    engine.xr.player.bindHead(benchmarkPanel,{offset:VR_DEBUG_PANEL_OFFSET,anchor:'feet'});
 }
 function startBenchmark(){
     const original={ssr:enableSSR,glow:enableGlow};
@@ -295,11 +296,12 @@ function startBenchmark(){
         .setRenderOptions({castsShadow:false,receivesShadow:false}));
     let lastPhase=-1;
     performanceTest=new PerformanceTest({
+        phases:ARENA_PERFORMANCE_PHASES,
         applyPhase:phase=>{
-            enableSSR=phase.ssr;enableGlow=phase.glow;
+            enableSSR=false;enableGlow=phase.glow;
             engine.setNeonGlow(enableGlow?NEON_GLOW:{strength:0});
-            engine.postprocessing.configureSSR({resolutionScale:/** @type {.5|1} */(phase.resolutionScale),receiverBounds:FLOOR_SSR_BOUNDS});
-            if(enableSSR)engine.postprocessing.enable('ssr',FLOOR_SSR);else engine.postprocessing.disable('ssr');
+
+            engine.postprocessing.disable('ssr');
             if(ssrToggle instanceof HTMLInputElement)ssrToggle.checked=enableSSR;
             showBuild();
         },
@@ -307,9 +309,9 @@ function startBenchmark(){
             if(snapshot.status==='running'){
                 if(snapshot.phaseIndex!==lastPhase){
                     lastPhase=snapshot.phaseIndex;
-                    benchmarkLabel(`TEST ${snapshot.phaseIndex+1}/${PERFORMANCE_PHASES.length}`,['DRZ POHLED NA ODRAZY PRED SEBOU']);
+                    benchmarkLabel(`TEST ${snapshot.phaseIndex+1}/${ARENA_PERFORMANCE_PHASES.length}`,['DRZ STEJNY POHLED PRED SEBOU']);
                 }
-                const progress=`Test ${snapshot.phaseIndex+1}/${PERFORMANCE_PHASES.length}: ${snapshot.phase?.label}. ${snapshot.sampleCount}/${snapshot.samplePackets} vzorků. Drž stejný pohled na odrazy; nehýbej ovladači.`;
+                const progress=`Test ${snapshot.phaseIndex+1}/${ARENA_PERFORMANCE_PHASES.length}: ${snapshot.phase?.label}. ${snapshot.sampleCount}/${snapshot.samplePackets} vzorků. Drž stejný pohled; nehýbej ovladači.`;
                 if(status)status.textContent=progress;
                 if(benchmarkResults){benchmarkResults.hidden=false;benchmarkResults.textContent=progress;}
             }
@@ -318,14 +320,15 @@ function startBenchmark(){
             window.clearTimeout(benchmarkTimeout);benchmarkTimeout=0;
             enableSSR=original.ssr;enableGlow=original.glow;
             engine.setNeonGlow(enableGlow?NEON_GLOW:{strength:0});
-            engine.postprocessing.configureSSR({resolutionScale:.5,receiverBounds:FLOOR_SSR_BOUNDS});
-            if(enableSSR)engine.postprocessing.enable('ssr',FLOOR_SSR);else engine.postprocessing.disable('ssr');
+
+            engine.postprocessing.disable('ssr');
             if(ssrToggle instanceof HTMLInputElement){ssrToggle.checked=enableSSR;ssrToggle.disabled=ssrDisabled;}
             showBuild();engine.set_simulation_paused(false);
             for(const object of benchmarkObjects)if(object.exists)object.remove();
             benchmarkObjects=[];
-            if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;syncVrInfo();
-            const report={...snapshot,revision,production:releaseBuild,renderer:engine.renderer_backend(),profiling:engine.frameProfile().enabled,created:new Date().toISOString(),
+            if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;
+            if(engine.xr.isPresenting)engine.xr.player.bindHead(world.infoPanel,{offset:VR_DEBUG_PANEL_OFFSET,anchor:'feet'});
+            const report={...snapshot,revision,production:releaseBuild,renderer:engine.renderer_backend(),profiling:parameters.get('profile')==='1',created:new Date().toISOString(),
                 note:'FPS a medián/minimum oken po 180 snímcích; nejde o 1% low ani GPU čas. Pohled a pohyb hlavy nejsou uzamčené.'};
             benchmarkReport=JSON.stringify(report,null,2);
             reportDiagnostic('xr-benchmark-result',undefined,report);
@@ -339,7 +342,7 @@ function startBenchmark(){
                     const row=table.insertRow();for(const value of cells)row.insertCell().textContent=value;
                 }
                 benchmarkResults.append(table);
-                if(snapshot.results.length===PERFORMANCE_PHASES.length){
+                if(snapshot.results.length===ARENA_PERFORMANCE_PHASES.length){
                     const drift=document.createElement('p');
                     const first=snapshot.results[0].fps,last=snapshot.results.at(-1)?.fps??first;
                     drift.textContent=`Kontrolní základ na konci: ${(100*(last/first-1)).toFixed(1)} % oproti začátku. Rozdíl může znamenat změnu pohledu nebo zahřátí zařízení. Medián se počítá z oken, nikoli jednotlivých snímků.`;
@@ -397,7 +400,7 @@ engine.xr.addEventListener('buttonpress', () => startRound());
 engine.xr.addEventListener('cut', event => {
     const report = /** @type {CustomEvent<import('../../js/engine.d.ts').XRCutReport>} */(event).detail;
     for (const piece of report.pieces) piece.setEmission(1.1);
-    feedback=engine.scene.playCutFeedback(report.pieces,{mirrorText:!engine.xr.isPresenting,size:CUT_EFFECT_SIZE,scoreLabel:engine.xr.roundState?.mode==='chains'?'stock-total':undefined});
+    feedback=engine.scene.playCutFeedback(report.pieces,{mirrorText:!engine.xr.isPresenting,size:CUT_EFFECT_SIZE,fadePieces:CUT_PIECE_FADE,scoreLabel:engine.xr.roundState?.mode==='chains'?'stock-total':undefined});
     cuts += report.removed.length;
     const count = document.getElementById('cuts'); if (count) count.textContent = String(engine.xr.roundState?.score ?? 0);
 });
@@ -412,28 +415,44 @@ const ready = async () => {
             ? (!isSecureContext ? 'Pro VR je potřeba důvěryhodné HTTPS nebo localhost přes USB/ADB.'
                 : missingGpuBinding ? 'WebGPU náhled běží, ale prohlížeč neposkytuje WebGPU pro VR (XRGPUBinding). V chrome://flags zkontroluj WebXR Experiments a potom restartuj prohlížeč. Pokud volba není dostupná, použij WebGL / WebXR.'
                 : 'VR není pro tuto konfiguraci dostupné. Použij odkaz WebGL / WebXR.')
-            : 'Připraveno. Sekej katanami v obou rukou. Neonové ovoce vystřeluje samo.'+(runtimeInfo.visible?' Statistiky jsou uvnitř VR vpravo u nohou.':' Statistiky ve VR jsou vypnuté.');
+            : 'Připraveno. Sekej katanami v obou rukou. Neonové ovoce vystřeluje samo, informace o scéně vidíš i ve VR.';
     } catch (error) { status.textContent = String(error); }
-    reportDiagnostic('xr-ready',undefined,{available:!enter.disabled,hint:status.textContent});
 };
 enter.onclick = () => {
     enter.disabled = true;
-    reportDiagnostic('xr-enter-click');
-    void engine.xr.enter({fixedFoveation:1,...(engine.renderer_backend()==='Gl'&&new URLSearchParams(location.search).get('xrPresentation')==='shared-framebuffer'?{webglPresentation:'shared-framebuffer',sceneFoveation:true}:{})}).catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
+    void engine.xr.enter().catch(async error => { status.textContent = String(error); reportDiagnostic('xr-enter',error); enter.disabled = !(await engine.xr.isSupported().catch(()=>false)); });
 };
 exit.onclick = () => { void engine.xr.exit().catch(error => { status.textContent = String(error); }); };
 engine.xr.addEventListener('firstframe', event => reportDiagnostic('xr-first-frame',undefined,{.../** @type {CustomEvent} */(event).detail,postprocessing:engine.postprocessing.stats(),profile:engine.frameProfile(),graph:engine.postprocessing.graph()}));
-engine.xr.addEventListener('start', () => { document.body.classList.add('xr');syncVrInfo();reportDiagnostic('xr-start'); if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=true; if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=true; setPanelFacing(true); exit.hidden = false; if(benchmarkToggle instanceof HTMLInputElement&&benchmarkToggle.checked)startBenchmark();else startRound(); });
+engine.xr.addEventListener('start', () => { enter.hidden=true;reportDiagnostic('xr-start'); if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=true; if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=true; setPanelFacing(true); engine.xr.player.bindHead(world.infoPanel,{offset:VR_DEBUG_PANEL_OFFSET,anchor:'feet'}); exit.hidden = false; if(benchmarkToggle instanceof HTMLInputElement&&benchmarkToggle.checked)startBenchmark();else startRound(); });
 engine.xr.addEventListener('roundend', () => {
     stopLaunches();showPhase('');showStartButton();
     const count=document.getElementById('cuts');if(count)count.textContent=String(engine.xr.roundState?.score??0);
     world.apples.forEach((fruit,i)=>fruit.setPosition(world.previewPositions[i]));
     status.textContent = `Konec kola — skóre ${engine.xr.roundState?.score ?? 0}, trojic ${engine.xr.roundState?.triples ?? 0}. Před tebou je START — klepni mečem nebo namiř a stiskni trigger.`;
 });
-engine.xr.addEventListener('end', () => { document.body.classList.remove('xr');syncVrInfo();performanceTest?.cancel('VR ukončeno');if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=false;if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=false; parkStartButton();setPanelFacing(false); stopLaunches();showPhase(''); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
+engine.xr.addEventListener('end', () => { performanceTest?.cancel('VR ukončeno');if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=false;if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=false; parkStartButton();engine.xr.player.bindHead(null);world.infoPanel.setPosition(diagnosticHome.position).setRotation(diagnosticHome.rotation);setPanelFacing(false); stopLaunches();showPhase(''); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; enter.hidden=false;void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
 engine.xr.addEventListener('error', () => { performanceTest?.cancel('Chyba XR');stopLaunches();showPhase('');status.textContent = `VR se zastavilo: ${engine.xr.lastError}`; reportDiagnostic('xr-frame',engine.xr.lastError); });
-window.addEventListener('pagehide', () => { performanceTest?.cancel('Stránka zavřena');disconnectArenaBridge();stopLaunches(); window.removeEventListener('resize', fit); engine.dispose(); }, { once: true });
+let decorationFrame=0;
+let decorationIdle=0;
+const loadDecorations=()=>{
+    if(pageClosed)return;
+    void world.loadDecorations().catch(error=>{
+        if(!pageClosed){reportDiagnostic('decorations',error);if(status)status.textContent='Hra je připravena, dekorace se nepodařilo načíst.';}
+    });
+};
+window.addEventListener('pagehide', () => { pageClosed=true;cancelAnimationFrame(decorationFrame);if(decorationIdle)window.cancelIdleCallback?.(decorationIdle);performanceTest?.cancel('Stránka zavřena');disconnectArenaBridge();stopLaunches(); window.removeEventListener('resize', fit); engine.dispose(); }, { once: true });
 await ready();
+// Let controls and the first playable frame paint before optional model/texture IO.
+decorationFrame=requestAnimationFrame(()=>{
+    decorationFrame=requestAnimationFrame(()=>{
+        if(pageClosed)return;
+        if(typeof window.requestIdleCallback==='function')decorationIdle=window.requestIdleCallback(loadDecorations,{timeout:1500});
+        else loadDecorations();
+    });
+});
+// A later interaction retries a failed decoration load without delaying XR activation.
+enter.addEventListener('pointerenter',loadDecorations);
 
 const diagnostics=document.getElementById('xr-diagnostics');
 if(diagnostics instanceof HTMLButtonElement)diagnostics.onclick=()=>{

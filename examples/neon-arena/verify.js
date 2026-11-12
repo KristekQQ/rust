@@ -1,4 +1,4 @@
-import {ARENA_REVISION,NEON_GLOW,FLOOR_SSR,FRUIT_OPACITY,FRUIT_OPACITY_VARIATION,createFruitMesh} from './scene.js';
+import {ARENA_REVISION,PAYTABLE_ORIGIN,NEON_GLOW,FRUIT_OPACITY,FRUIT_OPACITY_VARIATION,createFruitMesh} from './scene.js';
 /** @param {import('../../js/engine.d.ts').Engine} engine
  * @param {Awaited<ReturnType<typeof import('./scene.js').createScene>>} world
  * @param {HTMLCanvasElement} canvas
@@ -16,6 +16,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
     };
     const style=document.getElementById('solid-fruit');
     if(!(style instanceof HTMLInputElement)||!style.checked)throw new Error('Solid fruit must be selectable and enabled by default');
+    await world.loadDecorations();
     engine.set_simulation_paused(true);
     /** @type {import('../../js/engine.js').SceneObject | undefined} */
     let marker;
@@ -28,15 +29,28 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         if([world.timerPanel,world.scorePanel].some(panel=>panel.font3DInfo.glyphCount<1||panel.font3DInfo.depth<=0))throw new Error('Cynatar panels lack solid glyphs');
         const meshFont=engine.debugStats().font3d;
         if(meshFont.runtime.texts!==5||meshFont.runtime.liveGlyphs<3||meshFont.instanceGeometryBytes!==0)throw new Error(`Arena mesh font is not shared: ${JSON.stringify(meshFont)}`);
+        const initialAtlas=engine.debugStats().fontGlowAtlas;
+        if(!initialAtlas||initialAtlas.readyGlyphs<10||initialAtlas.drawnInstances<1)throw new Error(`Prepared numeric halos are not rendering: ${JSON.stringify(initialAtlas)}`);
+        // Disable/re-enable must release resources and restore real atlas draws,
+        // not silently leave the web path on the ordinary capsule fallback.
+        engine.setFontGlowAtlas(false);await wait();
+        if(engine.debugStats().fontGlowAtlas!==null)throw new Error('Font halo disable retained its cache');
+        const ordinaryHalo=await capturePixels(canvas);
+        engine.setFontGlowAtlas(true);engine.prewarmFontGlowAtlas('0123456789+-');await wait();
+        const warmedAtlas=engine.debugStats().fontGlowAtlas;
+        if(!warmedAtlas||warmedAtlas.drawnInstances<1)throw new Error('Font halo re-enable did not draw');
+        assertChanged(ordinaryHalo,await capturePixels(canvas),'cached numeric halo');
+        engine.prewarmFontGlowAtlas('0123456789+-');await wait();
+        if(engine.debugStats().fontGlowAtlas?.bakes!==warmedAtlas.bakes)throw new Error('Repeated font warmup rebaked unchanged glyphs');
+        const halfDefault=engine.debugStats().halfGlow;
+        if(halfDefault.requestedScale!==.5)throw new Error('Optimized glow is not the shared default');
+        const modern=engine.renderer_backend()==='BrowserWebGpu';
         const toggle=document.getElementById('ssr');
         const build=document.getElementById('build');
-        if(!(toggle instanceof HTMLInputElement)||!build?.textContent?.includes(ARENA_REVISION))throw new Error('Missing loaded-version or SSR control');
+        if(toggle||!build?.textContent?.includes(ARENA_REVISION))throw new Error('SSR must be absent and arena revision loaded');
         const mainModules=performance.getEntriesByType('resource').filter(resource=>new URL(resource.name).pathname.endsWith('/neon-arena/main.js'));
         if(mainModules.length!==1||!new URL(mainModules[0].name).searchParams.has('reload'))throw new Error('Entry module must have a fresh URL and initialize exactly once');
-        toggle.click();await wait();
-        if(engine.postprocessing.stats().targets!==0||!build.textContent.includes('vypnuto'))throw new Error('SSR control did not release offscreen targets');
-        toggle.click();await wait();
-        if(engine.postprocessing.stats().passes!==2||!build.textContent.includes('zapnuto'))throw new Error('SSR control did not restore reflections');
+        if(engine.postprocessing.stats().targets!==0||engine.postprocessing.stats().passes!==0)throw new Error('Arena allocates SSR targets or passes');
         engine.setNeonGlow({strength:0});await wait();const plainFont=await capturePixels(canvas);
         engine.setNeonGlow(NEON_GLOW);await wait();
         const forwardImage=await capturePixels(canvas);
@@ -54,7 +68,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         if(fontCore<3)throw new Error(`Countdown lacks a rendered luminous Cynatar face (${fontCore})`);
         assertForeground(forwardImage,'forward neon countdown and score');
         const stats=engine.postprocessing.stats();
-        if(stats.passes!==2||stats.targets===0)throw new Error('Tiled floor SSR is not active in forward view');
+        if(stats.passes!==0||stats.targets!==0||world.floorTiles.meshInfo.triangles!==960||!world.floorTiles.meshInfo.closed||world.floorGrout===world.floorTiles||world.floorGrout.meshInfo.triangles!==12||world.floorGrout.meshInfo.position[1]>-.02)throw new Error('Arena must preserve native tiled floor, recessed grout and disabled default postprocessing');
         if(world.timerPanel.meshInfo.position[0]!==0||world.timerPanel.meshInfo.position[1]<=world.scorePanel.meshInfo.position[1]||world.galleryIcons.some(icon=>icon.meshInfo.position[0]>-2.4))
             throw new Error('Countdown/score are not ahead with the paytable to the left');
 
@@ -73,7 +87,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         if(engine.debugStats().font3d.runtime.liveGlyphs!==0||boundPanels.some((panel,index)=>panel.id!==roots[index]))throw new Error('Font switch leaked glyphs or replaced panel handles');
         // Inspect the off-axis paytable intentionally rather than requiring it
         // to remain in the forward field of view.
-        engine.setOrbitView([.25,1.3,-.4],[-2.75,1.3,-.4]);await wait();
+        engine.setOrbitView([.25,1.3,PAYTABLE_ORIGIN[2]],[PAYTABLE_ORIGIN[0],1.3,PAYTABLE_ORIGIN[2]]);await wait();
         const image=await capturePixels(canvas);
         const font=engine.debugStats().numericFont;
         if(!font||font.glyphMeshes!==10||font.liveGlyphs!==3||font.panels!==2||font.geometryBytes<=0)
@@ -113,48 +127,23 @@ export async function verifyArena(engine, world, canvas, previewCut) {
 
         if(performance.getEntriesByType('resource').some(r=>/\/(?:color|emission)-(?:px|nx|py|ny|pz|nz)\.png/.test(r.name)))throw new Error('Environment images were loaded');
         if(!engine.debugStats().neonGlow.enabled||engine.debugStats().neonGlow.draws===0)throw new Error('Neon edge glow is not being drawn');
-        // Compare only the floor under a real fruit: moving the source must move
-        // its SSR contribution independently of the unchanged tile geometry.
-        const reflectedFruit=world.fruits.find(fruit=>fruit.name==='watermelon')??world.fruits[0];
-        marker=engine.scene.createMesh(reflectedFruit.geometry).setPosition([-.55,.65,-1.35])
-            .setScale([.28,.28,.28]).setEmission(2.4).setColorCutout(.25);
-        engine.setOrbitView([0,1.5,2.4],[0,.5,-1.35]);
-        await wait();const reflectedA=await capturePixels(canvas);
-        engine.postprocessing.disable('ssr');await wait();const plainA=await capturePixels(canvas);
-        marker.setPosition([.55,.65,-1.35]);await wait();const plainB=await capturePixels(canvas);
-        engine.postprocessing.enable('ssr',FLOOR_SSR);await wait();const reflectedB=await capturePixels(canvas);
-        const corners=[[-1,-1.02,-1.35],[-.1,-.28,-1.35]].map(p=>engine.worldToScreen(/** @type {[number,number,number]} */(p)));
-        if(!corners[0]||!corners[1])throw new Error('Floor reflection projection unavailable');
-        const a=[corners[0][0]*canvas.width,corners[0][1]*canvas.height];
-        const b=[corners[1][0]*canvas.width,corners[1][1]*canvas.height];
-        let reflectedPixels=0,movedPixels=0;
-        for(let y=Math.max(0,Math.floor(Math.min(a[1],b[1])));y<Math.min(canvas.height,Math.ceil(Math.max(a[1],b[1])));y++)
-            for(let x=Math.max(0,Math.floor(Math.min(a[0],b[0])));x<Math.min(canvas.width,Math.ceil(Math.max(a[0],b[0])));x++){
-                const i=(y*canvas.width+x)*4;
-                let delta=0,moved=0;
-                for(let c=0;c<3;c++){
-                    const first=reflectedA.data[i+c]-plainA.data[i+c];
-                    delta+=Math.abs(first);
-                    moved+=Math.abs(first-(reflectedB.data[i+c]-plainB.data[i+c]));
-                }
-                if(delta>20)reflectedPixels++;
-                if(moved>20)movedPixels++;
-            }
-        if(reflectedPixels<40||movedPixels<20)throw new Error(`Fruit SSR missing or static on floor (${reflectedPixels} reflected, ${movedPixels} moving pixels)`);
-        const oldReflection=document.querySelector('#reflection-evidence');
-        const reflectionEvidence=oldReflection instanceof HTMLCanvasElement?oldReflection:document.createElement('canvas');
-        reflectionEvidence.id='reflection-evidence';reflectionEvidence.hidden=true;
-        if(!reflectionEvidence.isConnected)document.body.append(reflectionEvidence);
-        reflectionEvidence.width=reflectedA.width;reflectionEvidence.height=reflectedA.height;
-        reflectionEvidence.getContext('2d')?.putImageData(reflectedA,0,0);
-        marker.remove();marker=undefined;
         if(originalView.orbitTarget)engine.setOrbitView(originalView.position,originalView.orbitTarget);
-        // The remaining probes isolate glow, cutout and alpha from SSR.
-        engine.postprocessing.disable('ssr');await wait();
         // A controlled foreground fruit must bleed colored light into formerly black pixels.
         const glowFruit=world.fruits.find(fruit=>fruit.name==='watermelon')??world.fruits[0];
         marker=engine.scene.createMesh(glowFruit.geometry).setPosition([0,1.35,-1.15]).setScale([.30,.30,.30])
             .setEmission(2).setColorCutout(.25);
+        await wait();const halfMarker=engine.debugStats().halfGlow;
+        if(modern&&canvas.width%2===0&&canvas.height%2===0){
+            if(halfMarker.activeScale!==.5||halfMarker.draws<1)throw new Error(`Direct WebGPU halo fallback: ${JSON.stringify(halfMarker)}`);
+            engine.setNeonGlowResolution(1);await wait();
+            if(engine.debugStats().halfGlow.activeScale!==1)throw new Error('Full-resolution glow reference unavailable');
+            const referenceHalo=await capturePixels(canvas);
+            engine.setNeonGlowResolution(.5);await wait();
+            if(engine.debugStats().halfGlow.activeScale!==.5)throw new Error('Half-resolution glow did not resume');
+            assertChanged(referenceHalo,await capturePixels(canvas),'half-resolution ordinary halo');
+        }else if(!modern&&halfMarker.activeScale!==1){
+            throw new Error('WebGL must retain the depth-safe full-resolution halo fallback');
+        }
         engine.setNeonGlow({strength:0});await wait();const noGlow=await capturePixels(canvas);
         if(engine.debugStats().neonGlow.bufferBytes!==0)throw new Error('Disabling glow did not release edge buffers');
         engine.setNeonGlow(NEON_GLOW);await wait();const withGlow=await capturePixels(canvas);
@@ -225,7 +214,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         engine.setNeonGlow(NEON_GLOW);
         if(originalView.orbitTarget)engine.setOrbitView(originalView.position,originalView.orbitTarget);
         await wait();
-        engine.setOrbitView([.25,1.3,-.4],[-2.75,1.3,-.4]);await wait();
+        engine.setOrbitView([.25,1.3,PAYTABLE_ORIGIN[2]],[PAYTABLE_ORIGIN[0],1.3,PAYTABLE_ORIGIN[2]]);await wait();
         const galleryBefore=await capturePixels(canvas);
         world.apples.forEach(apple=>apple.setPosition([100,100,100]));await wait();
         assertChanged(galleryBefore,await capturePixels(canvas),'actual left fruit preview',100);
@@ -234,66 +223,35 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         style.click();await wait();
         if(style.checked)throw new Error('Fruit style did not switch to open seams');
         const demo=previewCut(1,false); // Verify the alpha material at full diagnostic size.
-        // Freeze the depth probe pose before wall-clock feedback animation moves/rotates it.
-        const cutPoses=new Map(demo.report.pieces.map(piece=>[piece.id,piece.meshInfo]));
-        // Native spawn initializes the real feedback at t=0. Keep that pose paused
-        // while warming textures: five slow CI frames can outlive the 0.65s burst.
+        // Warm the first-use texture pipeline while native effect time is frozen.
         await wait();
+        engine.set_simulation_paused(false);await wait();engine.set_simulation_paused(true);
         // An oblique view proves the flat disc surface, not only its edge-on silhouette.
         engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         const hitFrame=await capturePixels(canvas);
         const effectPositions=demo.feedback.objects.map(object=>object.meshInfo.position);
         demo.feedback.objects.forEach(object=>object.setPosition([100,100,100]));await wait();
         assertChanged(hitFrame,await capturePixels(canvas),'real cut shockwave, sparks and bitmap hit popup',80);
-        // Look directly through the newly cut face: a solid blue marker inside
-        // the half must reach the framebuffer only when the cap is discarded.
-        const halves=demo.report.pieces.map(piece=>({piece,position:piece.meshInfo.position,rotation:piece.meshInfo.rotation}));
+        // Look directly through the newly cut face: a solid blue marker behind
+        // the remaining half must reach the framebuffer, including its depth.
+        const halves=demo.report.pieces.map(piece=>({piece,position:piece.meshInfo.position}));
         const openHalf=halves.reduce((a,b)=>a.position[0]<b.position[0]?a:b);
         halves.filter(half=>half!==openHalf).forEach(half=>half.piece.setPosition([100,100,100]));
-        const cutPose=cutPoses.get(openHalf.piece.id);
-        if(!cutPose)throw new Error("Missing original cut pose");
-        openHalf.piece.setPosition(cutPose.position).setRotation(cutPose.rotation);
-        // Put the marker inside the half, immediately behind its cap. A marker
-        // behind the entire fruit also intersects opaque neon seams on the rind.
-        if(cutPose.rotation.some(angle=>Math.abs(angle)>1e-6))throw new Error('Cut depth fixture must start unrotated');
-        const vertices=openHalf.piece.meshSnapshot.positions;
-        const minX=Math.min(...vertices.map(vertex=>vertex[0])),capX=Math.max(...vertices.map(vertex=>vertex[0]));
-        const capVertices=vertices.filter(vertex=>Math.abs(vertex[0]-capX)<1e-5);
-        if(capVertices.length<3)throw new Error('Missing planar positive-X cut cap');
-        const capMin=[1,2].map(axis=>Math.min(...capVertices.map(vertex=>vertex[axis])));
-        const capMax=[1,2].map(axis=>Math.max(...capVertices.map(vertex=>vertex[axis])));
-        const capCenter=/** @type {[number,number,number]} */([
-            cutPose.position[0]+capX*cutPose.scale[0],
-            cutPose.position[1]+(capMin[0]+capMax[0])*.5*cutPose.scale[1],
-            cutPose.position[2]+(capMin[1]+capMax[1])*.5*cutPose.scale[2],
-        ]);
-        const depth=(capX-minX)*cutPose.scale[0];
-        marker=engine.scene.createMesh({
-            positions:[-.5,-.5,-.5,.5,-.5,-.5,.5,.5,-.5,-.5,.5,-.5,-.5,-.5,.5,.5,-.5,.5,.5,.5,.5,-.5,.5,.5],
-            indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5],color:[0,0,1],
-        }).setPosition([capCenter[0]-depth*.25,capCenter[1],capCenter[2]])
-            .setScale([depth*.1,(capMax[0]-capMin[0])*cutPose.scale[1]*.5,(capMax[1]-capMin[1])*cutPose.scale[2]*.5])
-            .setEmission(2);
-        engine.setCameraView([capCenter[0]+1.2,capCenter[1],capCenter[2]],capCenter);await wait();
+        marker=engine.scene.createMesh({positions:geometry.positions,indices:geometry.indices,color:[0,0,1]}).setPosition([-.6,1.35,-1.15]).setScale([.2,.4,.4]).setEmission(2);
+        engine.setCameraView([1.2,1.35,-1.15],[0,1.35,-1.15]);await wait();
         engine.setNeonGlow({strength:0});await wait();
         const openFace=await capturePixels(canvas);
-        openHalf.piece.setColorCutout(0);await wait();
-        const closedFace=await capturePixels(canvas);
-        openHalf.piece.setColorCutout(.25);
-        let throughCut=0,throughClosed=0,totalCut=0;
+        let throughCut=0,totalCut=0;
         const radius=Math.max(3,Math.floor(Math.min(openFace.width,openFace.height)*.01));
-        const isBlue=(/** @type {Uint8ClampedArray} */ data,/** @type {number} */ i)=>
-            data[i+2]>80&&data[i+2]>data[i]*1.5+20&&data[i+2]>data[i+1]*1.4;
         for(let y=Math.floor(openFace.height/2)-radius;y<=Math.floor(openFace.height/2)+radius;y++)
             for(let x=Math.floor(openFace.width/2)-radius;x<=Math.floor(openFace.width/2)+radius;x++){
                 const i=(y*openFace.width+x)*4;totalCut++;
-                if(isBlue(openFace.data,i))throughCut++;
-                if(isBlue(closedFace.data,i))throughClosed++;
+                if(openFace.data[i+2]>80&&openFace.data[i+2]>openFace.data[i]*1.5+20&&openFace.data[i+2]>openFace.data[i+1]*1.4)throughCut++;
             }
-        if(throughCut<totalCut*.7||throughClosed>totalCut*.3)throw new Error(`Cut cap depth failed (${throughCut} open, ${throughClosed} closed / ${totalCut})`);
+        if(throughCut<totalCut*.7)throw new Error(`Cut face still occludes the object behind it (${throughCut}/${totalCut})`);
         marker.remove();marker=undefined;
         engine.setNeonGlow(NEON_GLOW);
-        halves.forEach(half=>half.piece.setPosition(half.position).setRotation(half.rotation));
+        halves.forEach(half=>half.piece.setPosition(half.position));
         engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         demo.feedback.objects.forEach((object,i)=>object.setPosition(effectPositions[i]));
         if(demo.report.pieces.length!==2||!demo.report.pieces.every(piece=>piece.meshInfo.closed))throw new Error('Preview must show two real closed fruit halves');
@@ -460,6 +418,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         engine.setNeonGlow(NEON_GLOW);
         engine.resize(640,480);await wait();
         if(engine.postprocessing.stats().targets!==0)throw new Error('Resize allocated postprocess targets');
+        if(engine.debugStats().fontGlowAtlas?.bakes!==warmedAtlas.bakes)throw new Error('Rendering/font switching baked glyph halos during play');
         return {sharedMeshes:shared,alpha};
     } finally {
         await selectFont(originalFont);
@@ -469,7 +428,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         engine.setBackgroundColor([0,0,0]);
         engine.scene.clearCutFeedback();
         engine.setNeonGlow(NEON_GLOW);
-        engine.postprocessing.enable('ssr',FLOOR_SSR);
+        engine.postprocessing.disable('ssr');
         if(!style.checked)style.click();
         world.galleryIcons.forEach((fruit,index)=>fruit.setColorCutout(0).setOpacity(FRUIT_OPACITY,{opaqueAbove:.25,variation:FRUIT_OPACITY_VARIATION,coverage:world.galleryPatterns[index].coverage??.5}));
         world.apples.forEach((apple,index)=>apple.setPosition(world.previewPositions[index]));

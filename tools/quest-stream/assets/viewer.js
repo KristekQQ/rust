@@ -29,6 +29,8 @@ start.onclick = async () => {
   const signal = controller.signal;
   let reader;
   try {
+    const {playbackDecision} = await import('/playback-policy.js?token=' + encodeURIComponent(token));
+    if (signal.aborted) throw new DOMException('Odpojeno', 'AbortError');
     status.textContent = 'Připojuji obraz z Questu…';
     const media = new MediaSource();
     if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -37,15 +39,27 @@ start.onclick = async () => {
     const response = await fetch('/stream?token=' + encodeURIComponent(token), {signal, cache:'no-store'});
     if (!response.ok) throw new Error(response.status === 409 ? 'Přenos už sledují dvě okna. Zavři jedno z nich a znovu klikni Sledovat.' : response.status === 403 ? 'Tento odkaz už neplatí. Otevři aktuální odkaz z Quest Stream.' : 'Sdílení není dostupné (' + response.status + '). Zkontroluj Quest Stream v brýlích.');
     reader = response.body.getReader();
-    let pending = new Uint8Array(), init = new Uint8Array(), source;
+    let pending = new Uint8Array(), init = new Uint8Array(), source, fragment;
+    let lastPruned = 0, firstFrameAt, playbackStarted = false;
     const append = async data => {
       const done = event(source, 'updateend', signal); source.appendBuffer(data); await done;
       if (video.buffered.length) {
-        const end = video.buffered.end(video.buffered.length - 1);
-        if (end - video.currentTime > 0.45) video.currentTime = Math.max(video.buffered.start(0), end - 0.12);
+        const ranges = Array.from({length: video.buffered.length}, (_, i) => ({start:video.buffered.start(i), end:video.buffered.end(i)}));
+        if (!playbackStarted) {
+          firstFrameAt ??= performance.now();
+          const first = ranges[0];
+          // Start with reserve; a sparse/static capture must still be allowed to start.
+          if (first.end - first.start < 0.3 && performance.now() - firstFrameAt < 600) return;
+          video.currentTime = first.start;
+          playbackStarted = true;
+        }
+        const next = playbackDecision(video.currentTime, ranges);
+        if (next.seek !== null) video.currentTime = next.seek;
+        if (video.playbackRate !== next.rate) video.playbackRate = next.rate;
         if (video.paused) video.play().catch(() => { status.textContent = 'Přehrávání se nepodařilo spustit. Povol přehrávání videa v prohlížeči.'; });
-        if (video.currentTime > 3 && source.buffered.length && source.buffered.start(0) < video.currentTime - 2) {
+        if (video.currentTime > 3 && video.currentTime - lastPruned >= 1 && source.buffered.length && source.buffered.start(0) < video.currentTime - 2) {
           const removed = event(source, 'updateend', signal); source.remove(0, video.currentTime - 2); await removed;
+          lastPruned = video.currentTime;
         }
       }
     };
@@ -66,7 +80,15 @@ start.onclick = async () => {
             if (!MediaSource.isTypeSupported(mime)) throw new Error('Prohlížeč nepodporuje tento H.264 profil.');
             source = media.addSourceBuffer(mime); await append(init); init = null;
           }
-        } else { await append(box); if (type === 'mdat') status.textContent = 'Živě · H.264 · bez zvuku'; }
+        } else if (type === 'moof') {
+          if (fragment) throw new Error('Neúplný video snímek.');
+          fragment = box;
+        } else if (type === 'mdat') {
+          if (!fragment) throw new Error('Chybí hlavička video snímku.');
+          // One complete frame per MSE append instead of two separate updates.
+          await append(join(fragment, box)); fragment = null;
+          status.textContent = 'Živě · H.264 · bez zvuku';
+        } else { throw new Error('Neočekávaný video segment.'); }
       }
     }
     status.textContent = 'Spojení se přerušilo. Zkus znovu Sledovat; pokud sdílení skončilo i v brýlích, povol nový přenos.';
@@ -75,7 +97,7 @@ start.onclick = async () => {
   } finally {
     controller.abort();
     if (reader) try { await reader.cancel(); } catch {}
-    video.pause(); video.removeAttribute('src'); video.load();
+    video.pause(); video.playbackRate = 1; video.removeAttribute('src'); video.load();
     if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
     start.disabled = false; stop.disabled = true;
   }

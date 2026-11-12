@@ -200,6 +200,45 @@ Geometrie se cachuje podle stabilních ID a po odstranění objektů se uvolní.
 Nejde o HDR bloom ani objemový rozptyl; glTF, resident GPU cutting a probe captures
 nemají tento automatický glow. Headsetový výkon je třeba změřit na zařízení.
 
+### Levnější měkká záře: half-resolution rendering + depth-aware upsampling
+
+Pro měkký glow lze použít **vizuálně podobnou aproximaci s nižšími náklady**:
+zář vykreslit do cíle s poloviční šířkou a výškou a zvětšit ji s kontrolou
+hloubky. Ostré 3D hrany, plochy ovoce a řezy zůstávají v plném rozlišení.
+Menší cíl obsahuje čtvrtinu pixelů; nejde o čtyřnásobné FPS. Záře se dál
+odvozuje ze skutečných hran, takže reaguje na otáčení i rozříznutí ovoce.
+
+Zapnutí glow nyní ve společném rendereru standardně volí poloviční rozlišení
+měkké záře a atlas pro připravené mesh fonty. Platí pro Vulkan a WebGPU se
+vzorkovatelnou 2D Depth32Float a sudými rozměry, s postprocessingem i bez něj.
+Číslice a panely zůstávají v plném rozlišení; jiné backendy/pohledy mají původní
+fallback. WebGL používá atlas písma, ale záři ostatních hran v plném rozlišení.
+`engine.setNeonGlowResolution(1)` / `configure_neon_glow_resolution(1.0)` volí
+referenční cestu; `.5` obnoví optimalizovanou. `setFontGlowAtlas(false)` zachová
+výslovné vypnutí atlasu i při dalším zapnutí glow. Znaky a styly je dál potřeba
+připravit pomocí `prewarmFontGlowAtlas` při načítání; renderování je nedopéká.
+
+`debugStats().halfGlow` ukazuje požadovanou a skutečnou cestu, důvod fallbacku
+a počet cachovaných pohledů. Bez viditelných běžných hran se menší vrstva vůbec
+nevykresluje. GPU vazby se znovu používají, dokud se nezmění zdroj hloubky;
+změna rozměrů, přepnutí režimu a vyčištění scény cache odpovídajícím způsobem
+uvolní. Vypnutí samotného glow zachová již připravený atlas písma.
+
+**Ověření na Questu 3 (2026-11-09):** tři páry po 600 měřených snímcích
+snížily celkový GPU čas testované stereo scény o 1,6 %, 14,9 % a 13,7 %,
+včetně nových průchodů. Honza při hraní nepozoruje rozdíl na ovoci a FPS mu
+připadají lepší. Jde o hráčské potvrzení vzhledu a měření GPU času, nikoli
+změřený nárůst herních FPS nebo záruku pixelové shody. U zakrývajících hran
+může být záře místy užší.
+
+Tento postup zvažuj při další optimalizaci měkkého glow; porovnej výsledný
+vzhled a celkovou cenu na cílovém zařízení. Reprodukce:
+`scripts/quest-hardware-probe.py --experiment half-glow` s požadovanými
+argumenty zařízení a sestavení; řezy ověřuje `--view cut --cut-age 0.4`.
+Důkazy jsou v `output/measurement/half-glow-20261109/` v příslušném pracovním
+checkoutu. Obecné rozhodování popisuje
+[effect-optimization](../.agents/skills/effect-optimization/SKILL.md).
+
 ## Průsvitné barevné plošky
 
 `mesh.setOpacity(.06,{opaqueAbove:.25,variation:1,coverage:.3})` nastaví skutečné alpha blending pro

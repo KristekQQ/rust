@@ -202,6 +202,7 @@ impl XrAttachments {
             viewport: Viewport::full(self.width, self.height),
             color_load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
             depth_load: wgpu::LoadOp::Clear(1.),
+            depth_store: wgpu::StoreOp::Store,
         }
     }
 }

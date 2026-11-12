@@ -9,7 +9,7 @@ const assert=(condition,label)=>{if(!condition)throw new Error(label);const item
 const until=async predicate=>{const end=performance.now()+20000;while(!predicate()){if(performance.now()>end)throw new Error('Timed out waiting for arena');await new Promise(resolve=>setTimeout(resolve,30));}};
 try{
     localStorage.removeItem(ARENA_STORAGE_KEY);
-    const url=new URL('../examples/neon-arena/?backend=webgl',location.href);frame.src=url.href;
+    const url=new URL('../examples/neon-arena/legacy.html?backend=webgl',location.href);frame.src=url.href;
     await until(()=>frame.contentWindow?.arenaTools);
     let tools=frame.contentWindow.arenaTools;
     document.documentElement.dataset.rendererBackend=frame.contentDocument.documentElement.dataset.rendererBackend;

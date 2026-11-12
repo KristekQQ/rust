@@ -16,6 +16,8 @@ calculations and rendering; the JS SDK expresses commands and semantic intent.
 This skill guides architecture, not permission to implement, deploy or push.
 Keep discussion-only requests as discussion.
 
+For individual graphical effects, follow [effect-optimization](../effect-optimization/SKILL.md): Honza prefers cheaper approximations with the same perceived appearance, verified visually and by measured total cost.
+
 ## Prepare from properties, not game names
 
 Inspect the current scene revisions, transform/bounds caches, instancing streams,

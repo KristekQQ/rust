@@ -2,6 +2,9 @@
 //! Geometry is materialized only for explicit CPU fallback/diagnostics.
 use crate::{cutting::CutMesh, scene::Transform};
 use glam::Vec3;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::{Arc as Rc, OnceLock as OnceCell};
+#[cfg(target_arch = "wasm32")]
 use std::{cell::OnceCell, rc::Rc};
 
 #[derive(Clone, Copy)]
@@ -56,8 +59,40 @@ struct MeshNode {
     source: MeshSource,
     support: Option<SupportCurve>,
     contact: Option<Rc<crate::contact_shape::ContactShape>>,
+    prepared_render: OnceCell<crate::gltf_loader::ImportedMesh>,
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+    prepared_glow: OnceCell<Option<crate::render::neon_glow::PreparedGlowMesh>>,
+}
+/// Owned, thread-transferable visual geometry. Expensive conversion and stats
+/// are computed before the scene owner wraps the result in its local Rc node.
+pub(crate) struct PreparedVisualMesh {
+    pub(crate) mesh: CutMesh,
+    pub(crate) render: crate::gltf_loader::ImportedMesh,
+    pub(crate) stats: MeshStats,
+}
+impl PreparedVisualMesh {
+    pub(crate) fn new(render: crate::gltf_loader::ImportedMesh) -> Self {
+        let mesh = CutMesh::from_render_mesh(&render);
+        // Preserve the established triangle-color/normal conversion exactly;
+        // cache its render output here instead of rebuilding it on the XR thread.
+        let render = mesh.render_mesh();
+        let (min, max) = mesh.bounds();
+        let stats = MeshStats {
+            min,
+            max,
+            triangles: mesh.triangles.len(),
+            vertices: mesh.positions.len(),
+            volume: mesh.volume(),
+        };
+        Self {
+            mesh,
+            render,
+            stats,
+        }
+    }
 }
 enum MeshSource {
+    RenderOnly,
     Cpu(CutMesh),
     Colored {
         parent: MeshData,
@@ -95,6 +130,42 @@ impl From<CutMesh> for MeshData {
     }
 }
 impl MeshData {
+    pub(crate) fn from_prepared_visual(prepared: PreparedVisualMesh) -> Self {
+        Self(Rc::new(MeshNode {
+            stats: prepared.stats,
+            source: MeshSource::Cpu(prepared.mesh),
+            support: None,
+            contact: None,
+            prepared_render: OnceCell::from(prepared.render),
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+            prepared_glow: OnceCell::new(),
+        }))
+    }
+    /// Decode an already prepared worker asset without cutting/contact/bounds work.
+    pub(crate) fn from_render_only(
+        stats: MeshStats,
+        render: crate::gltf_loader::ImportedMesh,
+    ) -> Self {
+        Self(Rc::new(MeshNode {
+            stats,
+            source: MeshSource::RenderOnly,
+            support: None,
+            contact: None,
+            prepared_render: OnceCell::from(render),
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+            prepared_glow: OnceCell::new(),
+        }))
+    }
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+    pub(crate) fn set_prepared_glow(
+        &self,
+        glow: Option<crate::render::neon_glow::PreparedGlowMesh>,
+    ) {
+        let _ = self.0.prepared_glow.set(glow);
+    }
+    pub(crate) fn prepared_render(&self) -> Option<&crate::gltf_loader::ImportedMesh> {
+        self.0.prepared_render.get()
+    }
     /// Noninteractive death fragments retain their exact render geometry, without
     /// baking a convex collision proxy that will never be queried.
     pub(crate) fn visual_only(mesh: CutMesh) -> Self {
@@ -120,6 +191,9 @@ impl MeshData {
             stats,
             source: MeshSource::Cpu(mesh),
             support: None,
+            prepared_render: OnceCell::new(),
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+            prepared_glow: OnceCell::new(),
         }))
     }
 }
@@ -129,6 +203,9 @@ impl MeshData {
             contact: self.0.contact.clone(),
             stats: self.0.stats,
             support: None,
+            prepared_render: OnceCell::new(),
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+            prepared_glow: OnceCell::new(),
             source: MeshSource::Colored {
                 parent: self.clone(),
                 colors,
@@ -147,11 +224,31 @@ impl MeshData {
             stats,
             source: MeshSource::Resident { recipe, side },
             support: Some(support),
+            prepared_render: OnceCell::new(),
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+            prepared_glow: OnceCell::new(),
         }))
     }
-    #[cfg(target_arch = "wasm32")]
     pub(crate) fn same_source(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
+    }
+    pub(crate) fn prepare_render(&self) {
+        if !self.is_resident() && !matches!(self.0.source, MeshSource::RenderOnly) {
+            let _render = self
+                .0
+                .prepared_render
+                .get_or_init(|| self.cpu().expect("CPU publication mesh").render_mesh());
+            #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+            self.0
+                .prepared_glow
+                .get_or_init(|| crate::render::neon_glow::PreparedGlowMesh::new(_render));
+        }
+    }
+    #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+    pub(crate) fn prepared_glow(
+        &self,
+    ) -> Option<&Option<crate::render::neon_glow::PreparedGlowMesh>> {
+        self.0.prepared_glow.get()
     }
     pub fn stats(&self) -> MeshStats {
         self.0.stats
@@ -183,6 +280,7 @@ impl MeshData {
     }
     pub fn ready_cpu(&self) -> Option<&CutMesh> {
         match &self.0.source {
+            MeshSource::RenderOnly => None,
             MeshSource::Cpu(mesh) => Some(mesh),
             MeshSource::Colored { mesh, .. } => mesh.get(),
             MeshSource::Resident { recipe, side } => recipe.result.get()?.as_ref().ok()?.get(*side),
@@ -190,6 +288,7 @@ impl MeshData {
     }
     pub fn cpu(&self) -> Result<&CutMesh, String> {
         match &self.0.source {
+            MeshSource::RenderOnly => Err("Render mirror has no CPU cutting mesh".into()),
             MeshSource::Cpu(mesh) => Ok(mesh),
             MeshSource::Colored {
                 parent,

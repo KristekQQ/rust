@@ -17,13 +17,17 @@ struct GlowEdge {
     first_normal: Vec3,
     crease: bool,
 }
-impl GlowMesh {
-    pub fn new(device: &wgpu::Device, mesh: &ImportedMesh) -> Option<Self> {
+/// CPU-only edge extraction; native simulation prepares this before publication.
+pub(crate) struct PreparedGlowMesh {
+    pub(crate) vertices: Vec<Vertex>,
+    pub(crate) indices: Vec<u32>,
+}
+impl PreparedGlowMesh {
+    pub(crate) fn new(mesh: &ImportedMesh) -> Option<Self> {
         let mut vertices = Vec::new();
         let mut indices = Vec::<u32>::new();
         let mut edges = BTreeMap::<[[u32; 3]; 2], GlowEdge>::new();
-        let max_vertices = (device.limits().max_buffer_size / std::mem::size_of::<Vertex>() as u64)
-            .min(u32::MAX as u64) as usize;
+        let max_vertices = u32::MAX as usize;
         for triangle in mesh.indices.as_chunks::<3>().0 {
             let Some(a) = mesh.vertices.get(triangle[0] as usize) else {
                 continue;
@@ -102,18 +106,37 @@ impl GlowMesh {
         if vertices.is_empty() {
             return None;
         }
+        Some(Self { vertices, indices })
+    }
+}
+impl GlowMesh {
+    pub fn new(device: &wgpu::Device, mesh: &ImportedMesh) -> Option<Self> {
+        Self::from_prepared(device, &PreparedGlowMesh::new(mesh)?)
+    }
+    pub(crate) fn from_prepared(
+        device: &wgpu::Device,
+        prepared: &PreparedGlowMesh,
+    ) -> Option<Self> {
+        let vertices = &prepared.vertices;
+        let indices = &prepared.indices;
+        if vertices.len() as u64 * std::mem::size_of::<Vertex>() as u64
+            > device.limits().max_buffer_size
+            || indices.len() as u64 * 4 > device.limits().max_buffer_size
+        {
+            return None;
+        }
         let count = u32::try_from(vertices.len()).ok()?;
         Some(Self {
             buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("neon glow edge capsules"),
-                contents: bytemuck::cast_slice(&vertices),
+                contents: bytemuck::cast_slice(vertices),
                 usage: wgpu::BufferUsages::VERTEX,
             }),
             vertices: count,
             indices: u32::try_from(indices.len()).ok()?,
             index_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("neon glow capsule indices"),
-                contents: bytemuck::cast_slice(&indices),
+                contents: bytemuck::cast_slice(indices),
                 usage: wgpu::BufferUsages::INDEX,
             }),
         })
@@ -202,22 +225,13 @@ impl NeonGlow {
         self.strength > 0.0
     }
 
-    pub fn prepare(
+    /// Populate only the pipeline cache; leave uniforms and the active eye alone.
+    pub(super) fn prewarm(
         &mut self,
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        view: RenderView,
-        target: &super::target::RenderTarget<'_>,
+        color_format: wgpu::TextureFormat,
+        depth_format: wgpu::TextureFormat,
     ) {
-        let color_format = target.color_format;
-        let depth_format = target.depth_format;
-        debug_assert!(target.auxiliary.is_none());
-        let width = target.viewport.width;
-        let height = target.viewport.height;
-        if !self.enabled() || width == 0 || height == 0 {
-            self.active = None;
-            return;
-        }
         let key = (color_format, depth_format);
         self.pipelines.entry(key).or_insert_with(|| {
             let shader = device.create_shader_module(wgpu::include_wgsl!("neon_glow.wgsl"));
@@ -275,6 +289,37 @@ impl NeonGlow {
                 cache: None,
             })
         });
+    }
+
+    pub fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        view: RenderView,
+        target: &super::target::RenderTarget<'_>,
+    ) {
+        self.prepare_scaled(device, queue, view, target, 1.0);
+    }
+
+    pub(super) fn prepare_scaled(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        view: RenderView,
+        target: &super::target::RenderTarget<'_>,
+        scale: f32,
+    ) {
+        let color_format = target.color_format;
+        let depth_format = target.depth_format;
+        debug_assert!(target.auxiliary.is_none());
+        let width = target.viewport.width;
+        let height = target.viewport.height;
+        if !self.enabled() || width == 0 || height == 0 {
+            self.active = None;
+            return;
+        }
+        let key = (color_format, depth_format);
+        self.prewarm(device, color_format, depth_format);
         let vp = view.view_projection;
         let projection_x =
             Vec3::new(vp.x_axis.x, vp.y_axis.x, vp.z_axis.x).length() * width as f32 * 0.5;
@@ -291,7 +336,7 @@ impl NeonGlow {
                     self.strength,
                     self.radius * projection_x.max(projection_y),
                 ],
-                font_profile: [self.radius, crate::info_panel::TUBE_RADIUS, 0., 0.],
+                font_profile: [self.radius, crate::info_panel::TUBE_RADIUS, scale, 0.],
             }),
         );
         self.active = Some(key);

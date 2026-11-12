@@ -2,8 +2,11 @@
 //! caps may be concave, but nested contours (holes) are rejected transactionally.
 use crate::spatial::{Bounds, Bvh};
 use glam::{Mat4, Vec2, Vec3};
+#[cfg(target_arch = "wasm32")]
 use std::cell::OnceCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::OnceLock as OnceCell;
 
 pub const MAX_TRIANGLES: usize = 20_000;
 const EPS: f32 = 1e-5;
@@ -913,6 +916,41 @@ fn triangulate_cap(
                 break;
             }
         }
+        if ear.is_none() && normal.is_finite() && normal.length_squared() > 0. {
+            // Preserve the established triangulation whenever it succeeds.
+            // A shallow incision can have a valid contour much smaller than
+            // the legacy absolute area tolerances. Retry with scale-independent
+            // projected f64 predicates; retain every original boundary vertex.
+            let axis = if normal.x.abs() >= normal.y.abs() && normal.x.abs() >= normal.z.abs() {
+                0
+            } else if normal.y.abs() >= normal.z.abs() {
+                1
+            } else {
+                2
+            };
+            let winding = if normal[axis] < 0. { -1. } else { 1. };
+            for k in 0..ring.len() {
+                let ids = [
+                    ring[(k + ring.len() - 1) % ring.len()],
+                    ring[k],
+                    ring[(k + 1) % ring.len()],
+                ];
+                let [a, b, c] = ids.map(|i| positions[i as usize]);
+                if cap_turn(a, b, c, axis, winding) <= 0 {
+                    continue;
+                }
+                let occupied = ring.iter().filter(|i| !ids.contains(i)).any(|&i| {
+                    let p = positions[i as usize];
+                    cap_turn(a, b, p, axis, winding) >= 0
+                        && cap_turn(b, c, p, axis, winding) >= 0
+                        && cap_turn(c, a, p, axis, winding) >= 0
+                });
+                if !occupied {
+                    ear = Some((k, ids));
+                    break;
+                }
+            }
+        }
         let (k, indices) = ear.ok_or("Cannot triangulate cut cap")?;
         result.push(Triangle {
             indices,
@@ -927,6 +965,25 @@ fn triangulate_cap(
         normals: Some([normal; 3]),
     });
     Ok(result)
+}
+
+/// Dominant-axis projection avoids a nearly edge-on cap. The error bound scales
+/// with the two determinant products, rather than imposing a world-space area.
+/// Uncertain/collinear points stay on the boundary and block an unsafe ear.
+fn cap_turn(a: Vec3, b: Vec3, c: Vec3, axis: usize, winding: f64) -> i8 {
+    let u = (axis + 1) % 3;
+    let v = (axis + 2) % 3;
+    let left = (f64::from(b[u]) - f64::from(a[u])) * (f64::from(c[v]) - f64::from(a[v]));
+    let right = (f64::from(b[v]) - f64::from(a[v])) * (f64::from(c[u]) - f64::from(a[u]));
+    let det = (left - right) * winding;
+    let error = (3. + 16. * f64::EPSILON) * f64::EPSILON * (left.abs() + right.abs());
+    if det > error {
+        1
+    } else if det < -error {
+        -1
+    } else {
+        0
+    }
 }
 
 fn components(triangles: Vec<Triangle>) -> Vec<Vec<Triangle>> {
@@ -1409,6 +1466,102 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cutting_tiny_player_incisions_preserve_boundary_and_cap_area() {
+        // Captured from an ordinary authored fruit at60Hz with one stale
+        // publication frame. Absolute ear tolerances rejected this simple ring.
+        let points = [
+            Vec3::new(-0.5567455, 0.06254052, -2.643018e-06),
+            Vec3::new(-0.5567212, 0.06253698, -5.54645e-05),
+            Vec3::new(-0.5568066, 0.062475435, -1.8424318e-05),
+            Vec3::new(-0.55681723, 0.06247467, 3.0226394e-17),
+            Vec3::new(-0.5568166, 0.062475868, 1.155402e-06),
+            Vec3::new(-0.55681103, 0.062485766, 1.0676314e-05),
+            Vec3::new(-0.55680317, 0.0625, 2.4372563e-05),
+            Vec3::new(-0.5568022, 0.06250069, 2.395087e-05),
+            Vec3::new(-0.5567871, 0.062511615, 1.7415998e-05),
+            Vec3::new(-0.5567468, 0.0625407, 3.021776e-17),
+        ];
+        let normal = Vec3::new(-0.64237034, 0.68576086, -0.34218767);
+        for permutation in 0..3 {
+            let rotate = |p: Vec3| match permutation {
+                0 => p,
+                1 => Vec3::new(p.z, p.x, p.y),
+                _ => Vec3::new(p.y, p.z, p.x),
+            };
+            let points = points.map(rotate);
+            let normal = rotate(normal);
+            let signed_area = |a: Vec3, b: Vec3, c: Vec3, n: Vec3| {
+                let a = a.to_array().map(f64::from);
+                let b = b.to_array().map(f64::from);
+                let c = c.to_array().map(f64::from);
+                let u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+                let v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+                (u[1] * v[2] - u[2] * v[1]) * f64::from(n.x)
+                    + (u[2] * v[0] - u[0] * v[2]) * f64::from(n.y)
+                    + (u[0] * v[1] - u[1] * v[0]) * f64::from(n.z)
+            };
+            for scale in [1., 16., 256.] {
+                for reverse in [false, true] {
+                    let mut positions: Vec<_> = points.iter().map(|p| *p * scale).collect();
+                    let mut original: Vec<_> = (0..positions.len() as u32).collect();
+                    let normal = if reverse {
+                        original.reverse();
+                        -normal
+                    } else {
+                        normal
+                    };
+                    let origin = positions[original[0] as usize];
+                    let polygon_area: f64 = (0..original.len())
+                        .map(|k| {
+                            signed_area(
+                                origin,
+                                positions[original[k] as usize],
+                                positions[original[(k + 1) % original.len()] as usize],
+                                normal,
+                            )
+                        })
+                        .sum();
+                    assert!(polygon_area > 0.);
+                    let boundary: BTreeSet<_> = (0..original.len())
+                        .map(|k| edge(original[k], original[(k + 1) % original.len()]))
+                        .collect();
+                    let triangles =
+                        triangulate_cap(&mut original.clone(), &mut positions, normal, Vec3::X)
+                            .unwrap();
+                    assert_eq!(
+                        triangles.len(),
+                        original.len() - 2 + 2 * (positions.len() - points.len())
+                    );
+                    let mut edges = BTreeMap::<_, (usize, i32)>::new();
+                    let mut area = 0.0_f64;
+                    for triangle in triangles {
+                        let [a, b, c] = triangle.indices.map(|i| positions[i as usize]);
+                        let face_area = signed_area(a, b, c, normal);
+                        assert!(face_area > 0., "cap winding or degenerate face changed");
+                        area += face_area;
+                        assert_eq!(triangle.normals, Some([normal; 3]));
+                        for k in 0..3 {
+                            let a = triangle.indices[k];
+                            let b = triangle.indices[(k + 1) % 3];
+                            let value = edges.entry(edge(a, b)).or_default();
+                            value.0 += 1;
+                            value.1 += if a < b { 1 } else { -1 };
+                        }
+                    }
+                    assert!((area - polygon_area).abs() <= polygon_area * 2e-6);
+                    assert!(boundary
+                        .iter()
+                        .all(|e| edges.get(e).is_some_and(|v| v.0 == 1)));
+                    assert!(edges.iter().all(|(e, v)| if boundary.contains(e) {
+                        v.0 == 1
+                    } else {
+                        v.0 == 2 && v.1 == 0
+                    }));
+                }
+            }
+        }
+    }
     #[test]
     fn cutting_closes_caps_and_conserves_volume() {
         let cube = cube();

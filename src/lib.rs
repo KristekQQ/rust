@@ -9,40 +9,42 @@ pub mod cutting_mesh;
 pub mod cutting_tool;
 pub mod debug_overlay;
 pub mod frame_graph;
+pub mod frame_input;
 pub mod frame_metrics;
 pub mod gltf_animation;
 mod gltf_bounds;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod gltf_indices;
 pub mod gltf_loader;
 pub mod gltf_model;
 pub mod info_panel;
 pub mod input;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod instance_upload;
 pub mod melee_encounter;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod ordinal_merge;
 pub mod postprocess_plan;
 mod projectile;
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", feature = "native-render"))]
 pub mod render;
 pub mod render_appearance;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod render_batch;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod render_lights;
 pub mod render_math;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod render_overlap;
 pub mod rim_cut;
+mod rim_cut_work;
 pub mod rim_game;
 pub mod rim_movement;
 pub mod scene;
 mod spatial;
 pub mod table_tennis;
 pub mod table_tennis_contact;
-#[cfg(any(test, target_arch = "wasm32"))]
+#[cfg(any(test, target_arch = "wasm32", feature = "native-render"))]
 mod translucency;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]
@@ -54,12 +56,12 @@ pub mod xr_player;
 pub mod xr_round;
 
 // Exercise the actual GPU mesh data and uniform layout on the native test host.
-#[cfg(test)]
+#[cfg(all(test, not(any(target_arch = "wasm32", feature = "native-render"))))]
 #[allow(dead_code)]
 #[path = "render/data.rs"]
 mod render_data_tests;
 
-#[cfg(test)]
+#[cfg(all(test, not(any(target_arch = "wasm32", feature = "native-render"))))]
 #[allow(dead_code)]
 #[path = "render/target.rs"]
 mod render_target_tests;

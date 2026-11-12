@@ -1,4 +1,5 @@
 //! Aurelia encounter and equipment simulation. Browser code only supplies input and worker messages.
+pub use crate::rim_cut_work::{CutWork, PreparedCut};
 use crate::{
     rim_movement::{Player, Shape, World},
     scene::SceneManager,
@@ -28,6 +29,10 @@ pub struct Config {
     pub health_bars: Vec<[u32; 2]>,
     #[serde(default, rename = "blobShadows")]
     pub blob_shadows: Vec<u32>,
+    #[serde(default, rename = "healthDrops")]
+    pub health_drops: Vec<[u32; 3]>,
+    #[serde(default, rename = "stagePanel")]
+    pub stage_panel: Option<u32>,
     pub hud: Vec<u32>,
     pub marker: u32,
     pub shapes: Vec<Shape>,
@@ -86,7 +91,7 @@ struct Bolt {
     friendly: bool,
 }
 struct CutTask {
-    model: crate::gltf_model::ModelInstance,
+    source: std::sync::Arc<crate::rim_cut_work::CutSource>,
     root: Mat4,
     parts: Vec<(usize, usize)>,
     triangle_offset: usize,
@@ -109,6 +114,7 @@ struct CompletedCut {
     counts: [usize; 2],
     side: usize,
     offset: usize,
+    prepared: Option<VecDeque<(usize, crate::cutting_mesh::PreparedVisualMesh)>>,
 }
 struct PieceMotion {
     direction: Vec3,
@@ -121,6 +127,61 @@ struct StagedCut {
 }
 type ConfigIds = ([u32; 2], Vec<u32>, Vec<u32>, Vec<u32>, Vec<u32>, u32);
 
+const HEALTH_PICKUP: f32 = 25.;
+const DROP_LIFETIME: f32 = 30.;
+#[derive(Clone, Copy)]
+struct HealthDrop {
+    ground: Vec3,
+    age: f32,
+}
+
+// Teach each enemy before combining them; later waves grow within existing pools.
+fn wave_population(wave: usize) -> [usize; 3] {
+    const INTRO: [[usize; 3]; 12] = [
+        [1, 0, 0],
+        [2, 0, 0],
+        [0, 1, 0],
+        [2, 1, 0],
+        [0, 0, 1],
+        [3, 0, 1],
+        [0, 2, 0],
+        [3, 1, 0],
+        [2, 0, 2],
+        [4, 1, 1],
+        [4, 2, 1],
+        [5, 2, 2],
+    ];
+    if let Some(population) = INTRO.get(wave) {
+        return *population;
+    }
+    let tier = ((wave - INTRO.len()) / 3).min(3);
+    match (wave - INTRO.len()) % 3 {
+        0 => [(6 + tier).min(8), 0, 0],
+        1 => [4 + tier, 2, 0],
+        _ => [3 + tier, 1, 2],
+    }
+}
+fn kind_index(kind: &str) -> usize {
+    match kind {
+        "core-tank" => 1,
+        "blade-wraith" => 2,
+        _ => 0,
+    }
+}
+fn health_drop_roll(kill: u32) -> bool {
+    if kill < 3 {
+        return false;
+    }
+    if kill == 3 {
+        return true;
+    }
+    let mut hash = kill.wrapping_mul(0x9e3779b9);
+    hash ^= hash >> 16;
+    hash = hash.wrapping_mul(0x85ebca6b);
+    hash ^= hash >> 13;
+    hash % 100 < 30
+}
+
 pub struct Game {
     pub player: Player,
     world: World,
@@ -128,6 +189,13 @@ pub struct Game {
     enemies: Vec<Enemy>,
     health_bars: Vec<[u32; 2]>,
     blob_shadows: Vec<u32>,
+    health_drop_ids: Vec<[u32; 3]>,
+    health_drops: Vec<Option<HealthDrop>>,
+    drops_spawned: u32,
+    drops_collected: u32,
+    healed: f32,
+    stage_panel: Option<u32>,
+    stage_shown_wave: Option<usize>,
     shadow_options: Vec<(u32, crate::scene::RenderOptions)>,
     obstacles: Vec<[f32; 4]>,
     corners: Vec<Vec2>,
@@ -185,7 +253,8 @@ pub struct Game {
 }
 impl Game {
     pub fn new(config: Config, scene: &mut SceneManager) -> Result<Self, String> {
-        if config.enemies.len() != 14
+        if config.health_drops.len() > 4
+            || config.enemies.len() != 14
             || config.bolts.len() != 32
             || config.beams.len() != 14
             || config.charges.len() != 14
@@ -216,12 +285,22 @@ impl Game {
             .chain(config.hud.iter().copied())
             .chain(config.health_bars.iter().flatten().copied())
             .chain(config.blob_shadows.iter().copied())
+            .chain(config.health_drops.iter().flatten().copied())
+            .chain(config.stage_panel)
             .chain([config.marker])
         {
             if ids.contains(&id) || !scene.object_exists(id) {
                 return Err("Distinct scene-owned Aurelia objects required".into());
             }
             ids.push(id);
+        }
+        if config.stage_panel.is_some_and(|id| {
+            !scene
+                .info_panels
+                .get(&id)
+                .is_some_and(|p| p.kind == crate::info_panel::PanelKind::DebugText)
+        }) {
+            return Err("Stage panel must be a scene-owned debug-text info panel".into());
         }
         if config.enemies.iter().any(|e| {
             !matches!(
@@ -314,6 +393,13 @@ impl Game {
             enemies,
             health_bars: config.health_bars,
             blob_shadows: config.blob_shadows,
+            health_drops: vec![None; config.health_drops.len()],
+            health_drop_ids: config.health_drops,
+            drops_spawned: 0,
+            drops_collected: 0,
+            healed: 0.,
+            stage_panel: config.stage_panel,
+            stage_shown_wave: None,
             shadow_options: Vec::new(),
             obstacles,
             corners,
@@ -405,6 +491,11 @@ impl Game {
     }
     /// Release pooled visuals and asynchronous work before removing this encounter.
     pub fn teardown(&mut self, scene: &mut SceneManager) {
+        self.health_drops.fill(None);
+        self.sync_health_drops(scene);
+        if let Some(id) = self.stage_panel {
+            scene.set_object_position(id, HIDDEN);
+        }
         self.active = false;
         self.stress_count = 0;
         self.tasks.clear();
@@ -533,6 +624,10 @@ impl Game {
             proj * glam::camera::rh::view::look_at_mat4(p, p + self.player.forward(), Vec3::Y),
             p,
         )
+    }
+    /// Read-only lifecycle query for platform hosts; gameplay still owns damage.
+    pub fn is_dead(&self) -> bool {
+        self.health <= 0.
     }
     pub fn playing(&self) -> bool {
         self.active && !self.paused
@@ -682,6 +777,9 @@ impl Game {
         self.sim_dt = sim;
         if self.xr && head.is_none() {
             self.blades = [None; 2];
+            if let Some(id) = self.stage_panel {
+                scene.set_object_position(id, HIDDEN);
+            }
             return 0.;
         }
         self.advance_piece_motion(scene, sim);
@@ -705,6 +803,7 @@ impl Game {
             self.visual_frame = self.frame;
             return sim;
         }
+        self.update_health_drops(dt, hp);
         let samples = self.sample_blades(scene, head, hands, dt);
         self.blade_speed = 0.;
         let mut sword_hits = Vec::new();
@@ -867,6 +966,7 @@ impl Game {
         self.hits += 1;
         if self.health <= 0. {
             self.deaths += 1;
+            self.health_drops.fill(None);
             self.dead_age = 0.;
             self.bolts.clear();
             self.aim = false;
@@ -897,22 +997,20 @@ impl Game {
             e.last_strikes = [0; 2];
             hide_enemy(scene, e.spec.id);
         }
-        let (kind, count) = match self.wave % 6 {
-            0 => ("drone-orbiter", 6),
-            1 => ("core-tank", 2),
-            2 => ("blade-wraith", 2),
-            3 => ("drone-orbiter", 8),
-            4 => ("core-tank", 3),
-            _ => ("blade-wraith", 3),
-        };
+        let population = wave_population(self.wave);
+        let count: usize = population.iter().sum();
+        let mut admitted = [0usize; 3];
         let head = self.player.head(1.7);
         let f = self.player.forward();
         let f = Vec2::new(f.x, f.z).normalize_or_zero();
         let mut slot = 0;
         for e in &mut self.enemies {
-            if e.spec.kind != kind || slot >= count {
+            let kind = e.spec.kind.as_str();
+            let index = kind_index(kind);
+            if admitted[index] >= population[index] {
                 continue;
             }
+            admitted[index] += 1;
             let angle = (slot as f32 - (count - 1) as f32 * 0.5) * 0.32;
             let f = Vec2::from_angle(-angle).rotate(f);
             let mut chosen = None;
@@ -1216,6 +1314,7 @@ impl Game {
         e.cut_idle = 0.;
         e.beam_age = -1.;
         self.kills += 1;
+        let drop_at = e.position;
         // Freeze the exact impact pose while the bounded worker transaction runs.
         // Explode moves individual nodes apart before slicing and destroys the silhouette.
         let _ = scene.pause_model_animation(e.spec.id, true);
@@ -1239,7 +1338,10 @@ impl Game {
                 })
                 .collect();
             self.tasks.push_back(CutTask {
-                model,
+                source: std::sync::Arc::new(crate::rim_cut_work::CutSource {
+                    asset: model.asset,
+                    pose: model.pose,
+                }),
                 root: scene.objects()[&e.spec.id].transform.model(),
                 parts,
                 triangle_offset: 0,
@@ -1249,18 +1351,20 @@ impl Game {
                 serial: e.serial,
             });
         }
+        self.maybe_drop_health(drop_at);
     }
-    pub fn take_cut_job(&mut self) -> Result<Vec<u8>, String> {
+    /// Reserve bounded index ranges only; deformation/packing can run off-thread.
+    pub fn take_cut_work(&mut self) -> Result<Option<CutWork>, String> {
         let Some(task) = self.tasks.front_mut() else {
-            return Ok(Vec::new());
+            return Ok(None);
         };
-        let mut data = Vec::new();
+        let mut ranges = Vec::new();
         let mut triangles = 0;
         while triangles < PREPARE_TRIANGLES {
             let Some(&(node, primitive)) = task.parts.last() else {
                 break;
             };
-            let p = &task.model.asset.primitives[primitive];
+            let p = &task.source.asset.primitives[primitive];
             if p.mode != crate::gltf_model::PrimitiveMode::Triangles {
                 task.parts.pop();
                 task.triangle_offset = 0;
@@ -1268,28 +1372,8 @@ impl Game {
             }
             let start = task.triangle_offset * 3;
             let end = (start + (PREPARE_TRIANGLES - triangles) * 3).min(p.indices.len() / 3 * 3);
-            let vertices = crate::gltf_animation::deformed_cut_vertex_subset(
-                &task.model.asset,
-                &task.model.pose,
-                node,
-                primitive,
-                p.indices[start..end].iter().copied(),
-            )?;
-            let matrix =
-                task.root * crate::gltf_animation::node_render_matrix(&task.model.pose, node);
-            let nm = matrix.inverse().transpose();
-            let material = p.material.map(|m| &task.model.asset.materials[m]);
-            for v in &vertices {
-                let position = matrix.transform_point3(Vec3::from_array(v.position));
-                let normal = nm
-                    .transform_vector3(Vec3::from_array(v.normal))
-                    .normalize_or_zero();
-                let color = Vec3::from_slice(&v.color)
-                    * material.map_or(Vec3::ONE, |m| Vec3::from_slice(&m.base_color_factor));
-                data.extend_from_slice(&[
-                    position.x, position.y, position.z, normal.x, normal.y, normal.z, color.x,
-                    color.y, color.z,
-                ]);
+            if end > start {
+                ranges.push((node, primitive, start, end));
             }
             triangles += (end - start) / 3;
             if end == p.indices.len() / 3 * 3 {
@@ -1321,19 +1405,60 @@ impl Game {
                 normal,
             },
         );
-        let mut output = Vec::with_capacity(32 + data.len() * 4);
-        output.extend_from_slice(&token.to_le_bytes());
-        output.extend_from_slice(&(triangles as u32).to_le_bytes());
-        for v in [normal.x, normal.y, normal.z, point.x, point.y, point.z]
-            .into_iter()
-            .chain(data)
-        {
-            output.extend_from_slice(&v.to_le_bytes());
-        }
+        let work = CutWork {
+            token,
+            source: task.source.clone(),
+            root: task.root,
+            normal,
+            point,
+            ranges,
+        };
         if task.parts.is_empty() {
             self.tasks.pop_front();
         }
-        Ok(output)
+        Ok(Some(work))
+    }
+    pub fn take_cut_job(&mut self) -> Result<Vec<u8>, String> {
+        match self.take_cut_work()? {
+            Some(work) => work.encode(),
+            None => Ok(Vec::new()),
+        }
+    }
+    /// Prepared native replies contain immutable CPU/render meshes. The scene
+    /// owner only registers them under the same staging/upload/atomic commit gate.
+    pub fn accept_prepared_cut(
+        &mut self,
+        _scene: &mut SceneManager,
+        result: PreparedCut,
+    ) -> Result<(), String> {
+        let Some(pending) = self.pending.remove(&result.token) else {
+            return Ok(());
+        };
+        let e = &self.enemies[pending.owner];
+        if e.serial != pending.serial || e.phase != 3 {
+            return Ok(());
+        }
+        if !self
+            .staged
+            .iter()
+            .any(|s| s.pending.owner == pending.owner && s.pending.serial == pending.serial)
+        {
+            self.staged.push(StagedCut {
+                pending,
+                ids: Vec::new(),
+                uploaded: BTreeSet::new(),
+            });
+        }
+        self.enemies[pending.owner].cut_idle = 0.;
+        self.completed.push_back(CompletedCut {
+            pending,
+            bytes: Vec::new(),
+            counts: [0; 2],
+            side: 0,
+            offset: 0,
+            prepared: Some(result.meshes),
+        });
+        Ok(())
     }
     /// Worker callbacks only validate framing and enqueue; geometry work runs in tick.
     pub fn accept_cut(&mut self, _scene: &mut SceneManager, bytes: &[u8]) -> Result<(), String> {
@@ -1379,6 +1504,7 @@ impl Game {
             counts,
             side: 0,
             offset: 0,
+            prepared: None,
         });
         Ok(())
     }
@@ -1490,6 +1616,32 @@ impl Game {
                 self.completed.pop_front();
                 continue;
             }
+            if let Some(prepared) = &mut result.prepared {
+                let Some((_, mesh)) = prepared.front() else {
+                    self.completed.pop_front();
+                    continue;
+                };
+                let count = mesh.stats.vertices;
+                if count > budget {
+                    break;
+                }
+                let (side, mesh) = prepared.pop_front().unwrap();
+                let id = scene.add_prepared_visual_mesh(mesh)?;
+                scene.set_object_position(id, HIDDEN);
+                self.staged
+                    .iter_mut()
+                    .find(|s| {
+                        s.pending.owner == result.pending.owner
+                            && s.pending.serial == result.pending.serial
+                    })
+                    .expect("prepared cut has stage")
+                    .ids
+                    .push((id, side));
+                self.enemies[result.pending.owner].cut_idle = 0.;
+                budget -= count;
+                self.staged_vertices += count;
+                continue;
+            }
             if result.side == 2 {
                 self.completed.pop_front();
                 continue;
@@ -1599,7 +1751,80 @@ impl Game {
         self.pending.clear();
         self.completed.clear();
     }
+    fn maybe_drop_health(&mut self, at: Vec3) {
+        if self.health <= 0. || !health_drop_roll(self.kills) {
+            return;
+        }
+        let Some(slot) = self.health_drops.iter().position(Option::is_none) else {
+            return;
+        };
+        let toward = (self.player.position - at).with_y(0.).normalize_or_zero();
+        for distance in [0., 0.8, 1.6] {
+            let p = at + toward * distance;
+            let Some(hit) = self.world.cast(p + Vec3::Y * 0.2, p - Vec3::Y * 20.) else {
+                continue;
+            };
+            let ground = hit.point + Vec3::Y * 0.002;
+            if hit.normal.y > 0.5 && self.world.clear(ground, 1.7) {
+                self.health_drops[slot] = Some(HealthDrop { ground, age: 0. });
+                self.drops_spawned += 1;
+                return;
+            }
+        }
+    }
+    fn update_health_drops(&mut self, dt: f32, head: Vec3) {
+        if self.health <= 0. {
+            return;
+        }
+        for slot in &mut self.health_drops {
+            let Some(drop) = slot.as_mut() else {
+                continue;
+            };
+            drop.age += dt;
+            if drop.age >= DROP_LIFETIME {
+                *slot = None;
+                continue;
+            }
+            let horizontal = (head - drop.ground).with_y(0.).length_squared();
+            let height = head.y - drop.ground.y;
+            if self.health < 100.
+                && drop.age >= 0.35
+                && horizontal <= 0.85 * 0.85
+                && (0.3..=2.7).contains(&height)
+                && self.world.cast(head, drop.ground + Vec3::Y * 0.6).is_none()
+            {
+                let before = self.health;
+                self.health = (self.health + HEALTH_PICKUP).min(100.);
+                self.healed += self.health - before;
+                self.drops_collected += 1;
+                *slot = None;
+            }
+        }
+    }
+    fn sync_health_drops(&self, scene: &mut SceneManager) {
+        for (ids, drop) in self.health_drop_ids.iter().zip(&self.health_drops) {
+            for (bar, id) in ids.iter().enumerate() {
+                if let Some(drop) = drop {
+                    let center = drop.ground + Vec3::Y * (0.6 + (drop.age * 2.5).sin() * 0.08);
+                    let scale = match bar {
+                        0 => Vec3::new(0.09, 0.36, 0.09),
+                        1 => Vec3::new(0.36, 0.09, 0.09),
+                        _ => Vec3::new(0.09, 0.09, 0.36),
+                    };
+                    scene.set_object_transform(
+                        *id,
+                        center,
+                        Vec3::new(0., drop.age * 0.65, 0.),
+                        scale,
+                    );
+                } else {
+                    scene.set_object_position(*id, HIDDEN);
+                }
+            }
+        }
+    }
     fn sync(&mut self, scene: &mut SceneManager, head: Option<Mat4>) {
+        self.sync_health_drops(scene);
         for &id in &self.config_ids.1 {
             scene.set_object_position(id, HIDDEN);
         }
@@ -1725,6 +1950,27 @@ impl Game {
                 scale,
             );
         }
+        if let Some(id) = self.stage_panel {
+            if self.stage_shown_wave != Some(self.wave) {
+                if let Some(panel) = scene.info_panels.get_mut(&id) {
+                    panel.update(vec![(
+                        "",
+                        format!("VLNA {}  HOTOVO {}", self.wave + 1, self.wave),
+                    )]);
+                }
+                self.stage_shown_wave = Some(self.wave);
+            }
+            scene.set_object_transform(
+                id,
+                if self.playing() {
+                    head.transform_point3(Vec3::new(0., -0.345, -0.65))
+                } else {
+                    HIDDEN
+                },
+                Vec3::new(x, y, z),
+                Vec3::ONE,
+            );
+        }
         scene.set_object_position(
             self.config_ids.5,
             if self.player.aiming {
@@ -1738,7 +1984,7 @@ impl Game {
         self.stress_count
     }
     pub fn state(&self) -> Value {
-        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"stressModels":self.stress_count,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
+        json!({"blade":{"contactSamples":self.blade_contacts,"hits":self.blade_hits,"slowSamples":self.blade_slow,"discontinuities":self.blade_breaks,"maxSpeedForFrame":self.blade_speed},"input":{"movement":self.axis,"aim":self.aim,"sprint":self.sprint},"simDt":self.sim_dt,"active":self.active,"paused":self.paused,"health":self.health,"maxHealth":100,"dead":self.health<=0.,"wave":self.wave+1,"completedWaves":self.wave,"wavePopulation":wave_population(self.wave),"healthDrops":{"healAmount":HEALTH_PICKUP,"spawned":self.drops_spawned,"collected":self.drops_collected,"healed":self.healed,"active":self.health_drops.iter().enumerate().filter_map(|(slot,d)|d.as_ref().map(|d|json!({"slot":slot,"ground":d.ground.to_array(),"position":(d.ground+Vec3::Y*(0.6+(d.age*2.5).sin()*0.08)).to_array(),"remaining":(DROP_LIFETIME-d.age).max(0.)}))).collect::<Vec<_>>()},"kills":self.kills,"deaths":self.deaths,"hitsTaken":self.hits,"player":self.player.describe(),"frame":{"simulation":self.frame,"visual":self.visual_frame},"deathMode":self.death_mode,"stressModels":self.stress_count,"enemies":self.enemies.iter().filter(|e|e.phase!=0).map(|e|json!({"id":e.spec.id,"slug":e.spec.kind,"position":e.position.to_array(),"height":e.spec.height,"hp":e.hp,"maxHp":e.max_hp,"phase":e.phase,"shotTimer":e.shot,"plasma":e.beam_age})).collect::<Vec<_>>(),"projectiles":{"active":self.bolts.len(),"fired":self.fired,"reflected":self.reflected,"hitEnemies":self.returned,"blockedWorld":self.blocked,"bolts":self.bolts.iter().map(|b|json!({"position":b.position.to_array(),"velocity":b.velocity.to_array(),"friendly":b.friendly})).collect::<Vec<_>>()},"cuts":{"queued":self.tasks.len(),"pending":self.pending.len(),"pieces":self.pieces.len(),"motion":self.piece_motion.iter().map(|(id,m)|json!({"id":id,"age":m.age,"direction":m.direction.to_array(),"distance":(m.age*0.52).min(0.65)})).collect::<Vec<_>>(),"errors":self.cut_errors,"staging":self.staged.len(),"stagedMeshes":self.staged_cut_ids().count(),"preparedTriangles":self.prepared_triangles,"stagedVertices":self.staged_vertices,"commits":self.commits,"stageMs":self.stage_ms,"stageMaxMs":self.stage_max_ms},"xr":self.xr})
     }
 }
 fn max_hp(kind: &str) -> f32 {

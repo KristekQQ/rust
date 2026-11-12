@@ -3,6 +3,17 @@
 use super::*;
 
 pub const DURATION: f32 = 0.65;
+// Keep score captions readable; the physical impact is a brief, compact pulse.
+const IMPACT_DURATION: f32 = 0.28;
+const RING_SIZE: f32 = 1.5;
+// Softly bounded apparent size keeps ordinary hits readable without a giant fast-hit halo.
+fn impact_scale(strength: f32) -> f32 {
+    if strength <= 0.4 {
+        strength
+    } else {
+        strength / (0.6 + strength)
+    }
+}
 const HIDDEN: Vec3 = Vec3::new(0., -10000., 0.);
 const DEFAULT_LABEL: &str = "CISTY REZ";
 #[derive(Clone, Copy)]
@@ -44,34 +55,131 @@ pub(super) struct Feedback {
     retired_pieces: Vec<u32>,
 }
 
-#[cfg(any(target_arch = "wasm32", test))]
+#[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
 pub(crate) const TEXTURE_SIZE: u32 = 256;
 
-/// Rasterized once per GPU renderer; smooth alpha, broken energy arcs and a soft rim.
-/// The transparent image is sampled by the dedicated depth-tested FX material.
-#[cfg(any(target_arch = "wasm32", test))]
+/// Shared native/web RGBA decal, rasterized once per renderer. Broken, jagged
+/// lightning paths have white cores, cyan/violet bloom and sparse forked branches.
+#[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
 pub(crate) fn ring_texture() -> Vec<u8> {
-    let mut pixels = Vec::with_capacity((TEXTURE_SIZE * TEXTURE_SIZE * 4) as usize);
-    for y in 0..TEXTURE_SIZE {
-        for x in 0..TEXTURE_SIZE {
-            let u = (x as f32 + 0.5) / TEXTURE_SIZE as f32 * 2. - 1.;
-            let v = (y as f32 + 0.5) / TEXTURE_SIZE as f32 * 2. - 1.;
-            let r = u.hypot(v);
-            let a = v.atan2(u);
-            let gaussian = |center: f32, width: f32| (-((r - center) / width).powi(2)).exp();
-            let noise = (a * 17. + (a * 7.).sin() * 2. + r * 24.).sin() * 0.5 + 0.5;
-            let arcs = (a * 9. + r * 19. + (a * 3.).sin()).sin().max(0.).powi(3);
-            let filaments = gaussian(0.79 + (a * 11.).sin() * 0.018, 0.013) * (0.25 + 0.75 * arcs);
-            let rim = gaussian(0.87 + (a * 7.).sin() * 0.006, 0.017);
-            let mist = gaussian(0.76, 0.12) * (0.18 + 0.22 * noise);
-            let streaks = gaussian(0.68, 0.10) * arcs * 0.3;
-            let boundary = ((r - 0.465) / 0.09).clamp(0., 1.) * ((1. - r) / 0.09).clamp(0., 1.);
-            let alpha = ((rim * 0.9 + filaments * 0.6 + mist + streaks) * boundary).clamp(0., 0.95);
-            let hot = (rim + filaments).clamp(0., 1.);
+    use glam::Vec2;
+    let size = TEXTURE_SIZE as usize;
+    let mut glow = vec![0f32; size * size];
+    let mut core = vec![0f32; size * size];
+    let mut seed = 0x6e65_6f6eu32;
+    let mut random = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed as f32 / u32::MAX as f32
+    };
+    let polar = |angle: f32, radius: f32| Vec2::new(angle.cos(), angle.sin()) * radius;
+    let mut segments = Vec::new();
+    let palette = [
+        Vec3::new(0.03, 0.76, 1.),
+        Vec3::new(0.10, 0.42, 1.),
+        Vec3::new(0.52, 0.23, 1.),
+        Vec3::new(0.03, 0.68, 1.),
+    ];
+    for (arc, color) in palette.into_iter().enumerate() {
+        let start = arc as f32 * std::f32::consts::TAU / 4. + random() * 0.13;
+        let span = [0.94, 0.69, 1.03, 0.55][arc];
+        let radius = 0.73 + random() * 0.06;
+        let mut previous = polar(start, radius);
+        for step in 1..=12 {
+            let angle = start + span * step as f32 / 12.;
+            // Large uneven kinks create distinct bolts rather than a neon wire.
+            let point = polar(angle, radius + (random() - 0.5) * 0.17);
+            let power = 0.78 + random() * 0.22;
+            let width = 0.006 + random() * 0.006;
+            segments.push((previous, point, power, width, color));
+            if step == 4 || (step == 9 && arc != 3) {
+                let direction = if step == 4 { 1. } else { -1. };
+                let mut branch = point;
+                let branch_span = 0.15 + random() * 0.08;
+                for twig in 1..=5 {
+                    let tip = polar(
+                        angle - twig as f32 * 0.028 + (random() - 0.5) * 0.065,
+                        (point.length()
+                            + direction * branch_span * twig as f32 / 5.
+                            + (random() - 0.5) * 0.055)
+                            .clamp(0.52, 0.96),
+                    );
+                    let branch_color = if arc == 2 && step == 4 && twig >= 4 {
+                        Vec3::new(1., 0.57, 0.13)
+                    } else {
+                        color
+                    };
+                    segments.push((
+                        branch,
+                        tip,
+                        0.82 - twig as f32 * 0.075,
+                        width * (0.8 - twig as f32 * 0.07),
+                        branch_color,
+                    ));
+                    // One additional fork makes the discharge visibly branch.
+                    if twig == 2 && step == 4 {
+                        let fork = polar(angle + 0.10, (tip.length() + 0.07).min(0.96));
+                        segments.push((tip, fork, 0.47, width * 0.45, color));
+                    }
+                    branch = tip;
+                }
+            }
+            previous = point;
+        }
+        // Detached short sparks continue the gesture without closing the ring.
+        let spark_angle = start + span + 0.15;
+        segments.push((
+            polar(spark_angle, 0.82),
+            polar(spark_angle + 0.045, 0.90),
+            0.58,
+            0.004,
+            color,
+        ));
+    }
+    let mut colors = vec![Vec3::ZERO; size * size];
+    for (a, b, power, width, color) in segments {
+        let margin = Vec2::splat(0.15);
+        let lower = ((a.min(b) - margin + Vec2::ONE) * (size as f32 * 0.5)).max(Vec2::ZERO);
+        let upper = ((a.max(b) + margin + Vec2::ONE) * (size as f32 * 0.5))
+            .min(Vec2::splat((size - 1) as f32));
+        let delta = b - a;
+        for y in lower.y as usize..=upper.y as usize {
+            for x in lower.x as usize..=upper.x as usize {
+                let p = (Vec2::new(x as f32, y as f32) + Vec2::splat(0.5)) / size as f32 * 2.
+                    - Vec2::ONE;
+                let t = ((p - a).dot(delta) / delta.length_squared()).clamp(0., 1.);
+                let distance = p.distance(a + delta * t);
+                let index = y * size + x;
+                let halo = ((-(distance / (0.026 + width)).powi(2)).exp()
+                    + (-(distance / 0.075).powi(2)).exp() * 0.16)
+                    * power;
+                if halo > glow[index] {
+                    glow[index] = halo;
+                    colors[index] = color;
+                }
+                // Max union avoids beads where jagged segments meet.
+                core[index] = core[index].max((-(distance / width).powi(2)).exp() * power);
+            }
+        }
+    }
+    let mut pixels = Vec::with_capacity(size * size * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let index = y * size + x;
+            let p =
+                (Vec2::new(x as f32, y as f32) + Vec2::splat(0.5)) / size as f32 * 2. - Vec2::ONE;
+            let boundary = ((p.length() - 0.47) / 0.06).clamp(0., 1.)
+                * ((1. - p.length()) / 0.05).clamp(0., 1.);
+            let hot = core[index];
+            let alpha = ((glow[index] * 0.58 + hot * 0.65) * boundary).clamp(0., 1.);
+            // Most energy is blue/cyan, with violet secondary bolts and one
+            // restrained warm fork. Color follows bolts, never a rainbow rim.
+            let color = colors[index].lerp(Vec3::ONE, hot * 0.88);
             pixels.extend_from_slice(&[
-                ((0.08 + hot * 0.65) * 255.) as u8,
-                ((0.55 + hot * 0.45) * 255.) as u8,
-                255,
+                (color.x * 255.) as u8,
+                (color.y * 255.) as u8,
+                (color.z * 255.) as u8,
                 (alpha * 255.) as u8,
             ]);
         }
@@ -130,13 +238,22 @@ impl SceneManager {
             }
         }
     }
-    #[cfg(any(target_arch = "wasm32", test))]
+    /// Stable render-material tags; no motion, lifetime or gameplay state is copied.
+    pub(crate) fn cut_feedback_ring_ids(&self) -> [Option<u32>; 2] {
+        self.feedback.bursts.map(|burst| {
+            burst
+                .map(|burst| burst.ids[0])
+                .filter(|id| self.triangle_meshes.contains_key(id))
+        })
+    }
+    #[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
     pub(crate) fn is_cut_feedback_ring(&self, id: u32) -> bool {
-        self.feedback
-            .bursts
-            .iter()
-            .flatten()
-            .any(|burst| burst.ids[0] == id)
+        self.cut_feedback_ring_ids().contains(&Some(id))
+            || (self.is_render_mirror()
+                && self
+                    .render_publication
+                    .cut_feedback_rings
+                    .contains(&Some(id)))
     }
     fn park_feedback(&mut self, id: u32) {
         self.set_object_position(id, HIDDEN);
@@ -488,7 +605,7 @@ impl SceneManager {
             let result = (|| {
                 ids[0] = self.effect_mesh(ring()?)?;
                 for id in &mut ids[1..7] {
-                    *id = self.effect_mesh(diamond(Vec3::new(0.75, 0.22, 1.))?)?;
+                    *id = self.effect_mesh(diamond(Vec3::new(0.25, 0.85, 1.))?)?;
                 }
                 ids[7] = self.add_text_panel(label.unwrap_or(DEFAULT_LABEL), &[], 0.55, 0.24)?;
                 self.park_feedback(ids[7]);
@@ -614,6 +731,11 @@ impl SceneManager {
             let t = (b.elapsed / DURATION).min(1.);
             if before <= DURATION {
                 for (i, id) in b.ids.into_iter().enumerate() {
+                    let t = if i == 7 {
+                        t
+                    } else {
+                        (b.elapsed / IMPACT_DURATION).min(1.)
+                    };
                     if t >= 1. {
                         self.park_feedback(id);
                         continue;
@@ -621,7 +743,10 @@ impl SceneManager {
                     let (offset, mut scale) = if i == 0 {
                         // Fast initial spread, then ease out while the same disc fades.
                         let spread = 1.4 + 1.8 * (1. - (1. - t).powi(2));
-                        (Vec3::ZERO, Vec3::splat(b.radius * spread * b.strength))
+                        (
+                            Vec3::ZERO,
+                            Vec3::splat(b.radius * spread * impact_scale(b.strength) * RING_SIZE),
+                        )
                     } else if i == 7 {
                         (
                             Vec3::new(0., b.title_height + 0.18 * t, 0.),
@@ -632,8 +757,8 @@ impl SceneManager {
                         (
                             b.orientation
                                 * Vec3::new(a.cos(), a.sin(), 0.)
-                                * (b.radius * (1.5 + 2.2 * t) * b.strength),
-                            Vec3::splat(0.032 * (1. - 0.8 * t) * b.strength),
+                                * (b.radius * (1.0 + 0.1 * t) * b.strength),
+                            Vec3::new(0.006, 0.020, 0.006) * (1. - 0.8 * t) * b.strength,
                         )
                     };
                     if i == 7 && b.mirror_text {
@@ -642,11 +767,18 @@ impl SceneManager {
                     let rotation = if i == 0 {
                         let (y, x, z) = b.orientation.to_euler(glam::EulerRot::YXZ);
                         Vec3::new(x, y, z)
-                    } else {
+                    } else if i == 7 {
                         Vec3::ZERO
+                    } else {
+                        let angle = (i - 1) as f32 * std::f32::consts::TAU / 6.
+                            - std::f32::consts::FRAC_PI_2;
+                        let (y, x, z) = (b.orientation * glam::Quat::from_rotation_z(angle))
+                            .to_euler(glam::EulerRot::YXZ);
+                        Vec3::new(x, y, z)
                     };
                     self.set_object_transform(id, b.center + offset, rotation, scale);
-                    self.set_emission(id, 2.8 * (1. - t));
+                    let peak_emission = if (1..7).contains(&i) { 1.4 } else { 2.8 };
+                    self.set_emission(id, peak_emission * (1. - t));
                 }
             }
             for p in &mut b.pieces {
@@ -981,19 +1113,63 @@ mod tests {
             let burst = scene.feedback.bursts[1].unwrap();
             assert!((burst.strength - expected).abs() < 1e-6);
             assert!(
-                (scene.objects[&ids[0]].transform.scale.x / (burst.radius * 1.4) - expected).abs()
+                (scene.objects[&ids[0]].transform.scale.x / (burst.radius * 1.4 * 1.5)
+                    - impact_scale(expected))
+                .abs()
                     < 1e-5
             );
-            scene.update_cut_feedback(DURATION * 0.5);
+            scene.update_cut_feedback(IMPACT_DURATION * 0.5);
             assert!(
-                (scene.objects[&ids[0]].transform.scale.x / (burst.radius * 2.75) - expected).abs()
+                (scene.objects[&ids[0]].transform.scale.x / (burst.radius * 2.75 * 1.5)
+                    - impact_scale(expected))
+                .abs()
                     < 1e-5
             );
         }
     }
     #[test]
+    fn cut_feedback_brief_impact_does_not_hide_caption_or_retire_fruit() {
+        let mut scene = SceneManager::default();
+        let halves = pieces(&mut scene);
+        let ids = scene.play_cut_feedback(&halves).unwrap();
+        // A visible early phase and a fixed wall-clock deadline protect the
+        // snappy presentation independently of the caption/debris lifetimes.
+        scene.update(0.06);
+        assert!(scene.objects[&ids[0]].transform.position.y > 0.);
+        scene.update(0.23);
+        for id in &ids[..7] {
+            assert!(
+                scene.objects[id].transform.position.y < -1000.,
+                "impact and glints finish promptly"
+            );
+        }
+        assert!(
+            scene.objects[&ids[7]].transform.position.y > 0.,
+            "score caption remains readable"
+        );
+        for id in halves {
+            assert!(
+                scene.object_exists(id),
+                "short flash must not shorten physical debris lifetime"
+            );
+            assert_eq!(scene.objects[&id].visual_fade, 1.);
+        }
+    }
+
+    #[test]
     fn cut_feedback_texture_has_soft_alpha_and_clear_center() {
         let texture = ring_texture();
+        // Optional exact source asset for visual QA; normal checks write nothing.
+        if let Some(path) = std::env::var_os("CUT_FEEDBACK_TEXTURE_DUMP") {
+            image::save_buffer(
+                path,
+                &texture,
+                TEXTURE_SIZE,
+                TEXTURE_SIZE,
+                image::ColorType::Rgba8,
+            )
+            .unwrap();
+        }
         assert_eq!(texture.len(), (TEXTURE_SIZE * TEXTURE_SIZE * 4) as usize);
         let alpha = |x: u32, y: u32| texture[((y * TEXTURE_SIZE + x) * 4 + 3) as usize];
         assert_eq!(alpha(TEXTURE_SIZE / 2, TEXTURE_SIZE / 2), 0);
@@ -1008,6 +1184,19 @@ mod tests {
                 > 8000
         );
         assert!(texture.as_chunks::<4>().0.iter().any(|p| p[3] > 210));
+        let visible = || texture.as_chunks::<4>().0.iter().filter(|p| p[3] > 80);
+        assert!(
+            visible().any(|p| p[2] > 180 && p[1] > p[0].saturating_add(40)),
+            "electric texture retains cyan regions"
+        );
+        assert!(
+            visible().any(|p| p[0] > 100 && p[2] > 150 && p[1] < 150),
+            "electric texture retains violet secondary regions"
+        );
+        assert!(
+            visible().any(|p| p[0] > 150 && p[1] > p[2].saturating_add(30)),
+            "electric texture retains a visible warm accent"
+        );
         let mut scene = SceneManager::default();
         let pieces = pieces(&mut scene);
         let effects = scene.play_cut_feedback(&pieces).unwrap();
@@ -1219,7 +1408,11 @@ mod tests {
         queue.extract(&scene, glam::Mat4::IDENTITY, false);
         let packed = queue.imported[&ids[0]][0].normal_matrix[3][3];
         assert!((packed + 1.84375).abs() < 1e-6);
-        assert!(queue.imported[&ids[0]][0].needs_translucent_overlay());
+        assert!((queue.imported[&ids[0]][0].visual_fade() - 0.84375).abs() < 1e-6);
+        assert!(
+            !queue.imported[&ids[0]][0].needs_translucent_overlay(),
+            "opaque dissolve must remain a depth-writing cutout"
+        );
         for _ in 0..3 {
             scene.update(0.25);
         }
@@ -1337,7 +1530,12 @@ mod tests {
             let ids = scene.play_cut_feedback(&pieces).unwrap();
             let ring = &scene.objects[&ids[0]];
             assert!(ring.transform.position.distance(origin) < 1e-5);
-            assert!((ring.transform.scale.x - (projected_radius + 0.025) * 1.4 * 0.2).abs() < 1e-5);
+            assert!(
+                (ring.transform.scale.x
+                    - (projected_radius + 0.025) * 1.4 * impact_scale(0.2) * 1.5)
+                    .abs()
+                    < 1e-5
+            );
             radii[sample] = ring.transform.scale.x;
             let text = &scene.objects[&ids[7]];
             assert!((text.transform.position.z - origin.z).abs() < 1e-5);
@@ -1361,7 +1559,7 @@ mod tests {
                         >= projected_radius * 0.2
                 );
             }
-            scene.update(0.2);
+            scene.update(IMPACT_DURATION * 0.75);
             assert!(scene.objects[&ids[0]].transform.position.distance(origin) < 1e-5);
         }
         assert!(radii[1] > radii[0] * 2.);
@@ -1440,7 +1638,7 @@ mod tests {
             assert!((ejection + motion.cap_normal * 0.6).length() < 1e-6);
         }
         let before = (centers[1] - centers[0]).dot(expected_normal).abs();
-        scene.update(0.3);
+        scene.update(IMPACT_DURATION * 0.5);
         assert!(
             scene.objects[&effects[0]].transform.scale.x > rim.scale.x * 1.8,
             "impact disc must expand substantially beyond the fruit"

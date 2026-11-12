@@ -18,7 +18,7 @@ pub struct ModelVertex {
 }
 /// Exact identity only: retained CPU colors remain authoritative for cutting/deformation.
 /// Test all vertices, including unindexed ones. NaN/infinity are never identities.
-#[cfg(any(target_arch = "wasm32", test))]
+#[cfg(any(target_arch = "wasm32", test, feature = "native-render"))]
 pub(crate) fn exact_white_vertex_colors(vertices: &[ModelVertex]) -> bool {
     !vertices.is_empty()
         && vertices

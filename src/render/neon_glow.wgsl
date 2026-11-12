@@ -64,7 +64,10 @@ struct VertexOutput {
         let projected_scale = glow.params.w/max(base_world_radius,0.000001);
         projected_radius = (base_world_radius+glyph_world_radius)*projected_scale;
     }
-    let radius = clamp(projected_radius/min(a.w,b.w),0.75,128.0);
+    // Full-resolution preparation uses scale 1 and preserves the original
+    // bounds. The opt-in low-resolution target scales the pixel bounds too.
+    let resolution_scale = glow.font_profile.z;
+    let radius = clamp(projected_radius/min(a.w,b.w),0.75*resolution_scale,128.0*resolution_scale);
     var corner = vec2<f32>(-1.0, -1.0);
     switch vertex_index % 4u {
         case 1u: { corner = vec2<f32>(1.0, -1.0); }

@@ -46,6 +46,19 @@ export class XRPlayer {
 }
 
 export class WebXRHost extends EventTarget {
+    #simulationHandler=null;
+    #simulationReset=false;
+    #simulationSample=new Float32Array(88);
+    setSimulationFrameHandler(handler) {
+        if(handler!==null&&typeof handler!=='function')throw new TypeError('Invalid simulation frame handler');
+        this.#simulationHandler=handler;
+    }
+    pulseHaptics(strengths) {
+        for(let i=0;i<2;i++) {
+            const value=Math.max(0,Math.min(1,Number(strengths[i])||0));
+            if(value>0)void this.#sources[i]?.gamepad?.hapticActuators?.[0]?.pulse?.(value,20)?.catch?.(()=>{});
+        }
+    }
     #gpuErrorDevice=null;
     #onGpuError=event=>this.dispatchEvent(new CustomEvent('gpuerror',{detail:{message:event.error.message,type:event.error.constructor.name}}));
     #player;
@@ -85,6 +98,7 @@ export class WebXRHost extends EventTarget {
     #haptics = [false, false];
     #contactActive = [false, false];
     #resetInputs = () => {
+        if(this.#simulationHandler)this.#simulationReset=true;
         this.#engine.xr_cancel_locomotion?.();
         this.#pressed = [null, null];
         this.#bladePoses = [null, null];
@@ -140,7 +154,7 @@ export class WebXRHost extends EventTarget {
             [l[l.length>=4?2:0]??0,l[l.length>=4?3:1]??0,r[r.length>=4?2:0]??0],
             !!ray&&!!right.gamepad.buttons[4]?.pressed,changed||!!right?.gamepad?.buttons[5]?.pressed,dt);
     }
-    #updateControllers(session, frame, space, tracking) {
+    #updateControllers(session, frame, space, tracking, sample=null) {
         const sources = [...(session.inputSources ?? [])];
         for (let index = 0; index < 2; index++) {
             const hand = index === 0 ? 'left' : 'right';
@@ -154,6 +168,17 @@ export class WebXRHost extends EventTarget {
                 this.#contactActive[index] = false;
             }
             const pose = tracking && source ? frame.getPose(source.gripSpace, space) : null;
+            if(sample&&source) {
+                if(pose){sample[1]|=index===0?2:4;sample.set(pose.transform.matrix,index===0?24:40);}
+                const aim=tracking&&source.targetRaySpace?frame.getPose(source.targetRaySpace,space):null;
+                if(aim){sample[1]|=index===0?8:16;sample.set(aim.transform.matrix,index===0?56:72);}
+                if(pose&&source.gamepad?.buttons?.[0]?.pressed)sample[2]|=1<<index;
+                if(index===1&&pose&&source.gamepad?.buttons?.[4]?.pressed)sample[3]|=1;
+                if(index===0&&pose&&source.gamepad?.buttons?.[5]?.pressed)sample[7]=1;
+                const axes=source.gamepad?.axes??[];
+                if(index===0){sample[4]=axes[axes.length>=4?2:0]??0;sample[5]=axes[axes.length>=4?3:1]??0;}
+                else sample[6]=axes[axes.length>=4?2:0]??0;
+            }
             const pressed = !!pose && !!source.gamepad?.buttons[0]?.pressed;
             const report = JSON.parse(this.#engine.xr_update_controller(index, pose ? pose.transform.matrix : new Float32Array(), !!pose && (pressed || !this.#requireTrigger[index])));
             const contact = !!pose && report.bladeContacts > 0;
@@ -378,7 +403,10 @@ export class WebXRHost extends EventTarget {
                         this.dispatchEvent(new CustomEvent('roundend', {detail: round}));
                     }
                     this.#engine.xr_update_head(tracked ? pose.transform.matrix : new Float32Array());
-                    this.#updateControllers(session, xrFrame, space, !!pose && (!session.visibilityState || session.visibilityState === 'visible'));
+                    const sample=this.#simulationHandler?this.#simulationSample:null;
+                    if(sample){sample.fill(0);sample[0]=tracked?elapsed/1000:0;sample[3]=this.#simulationReset?4:0;this.#simulationReset=false;if(tracked){sample[1]=1;sample.set(pose.transform.matrix,8);}}
+                    this.#updateControllers(session, xrFrame, space, tracked, sample);
+                    if(sample)this.#simulationHandler(sample);
                     this.#engine.xr_prepare_gameplay?.();
                     if (gpu) {
                         const images=[];
@@ -474,6 +502,7 @@ export class WebXRHost extends EventTarget {
     }
     async exit() { if (this.#session) await this.#session.end(); }
     dispose() {
+        this.#simulationHandler=null;
         if (this.#disposed) return;
         this.#disposed = true;
         this.#gpuErrorDevice?.removeEventListener('uncapturederror',this.#onGpuError);

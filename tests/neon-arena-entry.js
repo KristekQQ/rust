@@ -8,7 +8,7 @@ const source=new DOMParser().parseFromString(await response.text(),'text/html');
 for(const script of source.querySelectorAll('script'))script.remove();
 for(const node of source.head.querySelectorAll('style,meta[name="build-profile"]'))document.head.append(node);
 document.body.append(...source.body.childNodes);
-const {engine,world}=await import('../examples/neon-arena/main.js');
+const {engine,world}=await import('../examples/neon-arena/parallel-main.js');
 const checks=[];
 const assert=(condition,name)=>{checks.push({name,status:condition?'PASS':'FAIL'});if(!condition)throw Error(name);};
 const near=(a,b)=>a.length===b.length&&a.every((v,i)=>Math.abs(v-b[i])<.003);

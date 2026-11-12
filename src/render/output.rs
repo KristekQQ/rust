@@ -328,6 +328,7 @@ impl CanvasOutput {
                 a: 1.0,
             }),
             depth_load: wgpu::LoadOp::Clear(1.0),
+            depth_store: wgpu::StoreOp::Store,
         }
     }
     pub fn present(&mut self, frame: CanvasFrame, device: &wgpu::Device, queue: &wgpu::Queue) {

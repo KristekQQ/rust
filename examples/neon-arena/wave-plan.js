@@ -1,9 +1,9 @@
 /** Authoring recipes only. Rust integrates all projectile motion and mesh cuts. */
 export const FRUIT_KINDS = Object.freeze(['cherry','lime','lemon','orange','banana','plum','pear','grapes','watermelon']);
 export const FORMATIONS = Object.freeze(['line','arc','cross','rain']);
-export const DEFAULT_WAVE = Object.freeze({count:10,intervalMs:3000,formation:'arc',fruit:'mixed',automatic:true,program:'minute',fruitScale:.09,width:.74,height:1.28,depth:-1.12,curve:.2,slope:.16,lift:.6,gravity:.8,lifetime:2.6});
+export const DEFAULT_WAVE = Object.freeze({count:10,intervalMs:3000,formation:'arc',fruit:'mixed',automatic:true,program:'minute',fruitScale:.126,width:.74,height:1.28,depth:-1.12,curve:.2,slope:.16,lift:.6,gravity:.8,lifetime:2.6});
 /** @typedef {{count:number,intervalMs:number,formation:string,fruit:string,automatic:boolean,program:'minute'|'practice',fruitScale:number,width:number,height:number,depth:number,curve:number,slope:number,lift:number,gravity:number,lifetime:number}} WaveConfig */
-export const WAVE_RANGES = Object.freeze({fruitScale:[.03,.105],width:[.45,.9],height:[1.1,1.6],depth:[-1.4,-.9],curve:[0,.25],slope:[0,.2],lift:[.2,.8],gravity:[.5,1.6],lifetime:[1.5,3.5]});
+export const WAVE_RANGES = Object.freeze({fruitScale:[.03,.147],width:[.45,.9],height:[1.1,1.6],depth:[-1.4,-.9],curve:[0,.25],slope:[0,.2],lift:[.2,.8],gravity:[.5,1.6],lifetime:[1.5,3.5]});
 /** @param {unknown} input @param {WaveConfig} [base] @returns {WaveConfig} */
 export function validateWave(input,base=DEFAULT_WAVE) {
     if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Očekávám nastavení vlny.');

@@ -290,11 +290,19 @@ fn authored_surface_translucent(input: VertexOutput) -> bool {
     return input.transparency.x < 1.0 && max(max(input.color.r, input.color.g), input.color.b) < input.transparency.y;
 }
 fn surface_translucent(input: VertexOutput) -> bool {
-    return visual_remaining(input.visual_fade) < 1.0 || authored_surface_translucent(input);
+    // Negative fade encodes spatial cutout dissolution, not alpha fading.
+    // Surviving opaque surfaces retain depth writes and occlude rear fragments.
+    return (input.visual_fade >= 0.0 && input.visual_fade < 1.0) || authored_surface_translucent(input);
 }
 fn opaque_surface(input: VertexOutput) -> vec4<f32> {
     if (surface_translucent(input)) { discard; }
-    let color=shade_surface(input);
+    var surface = input;
+    if (input.visual_fade > -2.0 && input.visual_fade < -1.0) {
+        // Open cut geometry keeps the same camera-facing interior lighting as
+        // the former two-pass translucent path while using one depth-writing draw.
+        surface.world_normal = select(-input.world_normal, input.world_normal, dot(input.world_normal, scene.camera_pos - input.world_pos) >= 0.0);
+    }
+    let color=shade_surface(surface);
     return vec4(appearance_color(color.rgb,1.0/input.pos.w),color.a);
 }
 fn shade_surface(input: VertexOutput) -> vec4<f32> {

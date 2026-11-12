@@ -14,7 +14,7 @@ jobs:
     env:
       BROWSER_CI_NO_SANDBOX: '1'
       VERIFY_WASM_PROFILE: release
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,6 +33,12 @@ jobs:
           name: verified-wasm
           path: pkg/
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-neon-worker
+          path: pkg-neon-worker/
+          if-no-files-found: error
+          include-hidden-files: true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -63,6 +69,10 @@ jobs:
         with:
           name: verified-wasm
           path: pkg/
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-neon-worker
+          path: pkg-neon-worker/
       - name: Software WebGL shard ${{ matrix.shard }}/4
         run: npm run test:browser -- --backend webgl --software --shard ${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4

@@ -14,9 +14,15 @@ public final class MainActivity extends Activity {
     private Spinner profile;
     private String token;
     private int selectedProfile;
+    private boolean closeWhenReady;
     private final Handler handler = new Handler();
     private final Runnable refresh = new Runnable() {
         public void run() {
+            if (closeWhenReady && StreamService.isCapturing() && Objects.equals(token, StreamService.token)) {
+                closeWhenReady = false;
+                finishAndRemoveTask();
+                return;
+            }
             StringBuilder s = new StringBuilder(StreamService.status);
             if (StreamService.token != null) {
                 s.append("\n\nNa počítači ve stejné Wi-Fi otevři:\n");
@@ -39,7 +45,7 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL); root.setPadding(40, 32, 40, 24);
         TextView title = new TextView(this); title.setText("Quest Stream"); title.setTextSize(28); root.addView(title);
         TextView help = new TextView(this);
-        help.setText("Živý obraz do prohlížeče přes místní síť.\nPovol sdílení celé obrazovky a pak otevři VR aplikaci.\nBez zvuku. Nejvýše dvě okna současně. Odkaz umožňuje sledování; sdílej ho jen s důvěryhodnými lidmi.");
+        help.setText("Živý obraz do prohlížeče přes místní síť.\nPo potvrzení sdílení se tento panel zavře. Přenos poběží dál.\nPro odkaz nebo ukončení přenosu znovu otevři Quest Stream nebo jeho oznámení.\nBez zvuku. Nejvýše dvě okna současně. Odkaz umožňuje sledování; sdílej ho jen s důvěryhodnými lidmi.");
         root.addView(help);
         profile = new Spinner(this);
         profile.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item,
@@ -57,17 +63,20 @@ public final class MainActivity extends Activity {
         });
         Button stop = new Button(this); stop.setText("Ukončit přenos"); root.addView(stop);
         stop.setOnClickListener(v -> stopService(new Intent(this, StreamService.class)));
+        Button close = new Button(this); close.setText("Zavřít panel (přenos pokračuje)"); root.addView(close);
+        close.setOnClickListener(v -> finishAndRemoveTask());
         status = new TextView(this); status.setTextSize(18); status.setTextIsSelectable(true); root.addView(status);
         ScrollView scroll = new ScrollView(this); scroll.addView(root); setContentView(scroll);
-        if (state != null) { token = state.getString("token"); selectedProfile = state.getInt("profile"); }
+        if (state != null) { token = state.getString("token"); selectedProfile = state.getInt("profile"); closeWhenReady = state.getBoolean("closeWhenReady"); }
     }
-    protected void onSaveInstanceState(Bundle b) { super.onSaveInstanceState(b); b.putString("token",token); b.putInt("profile", selectedProfile); }
+    protected void onSaveInstanceState(Bundle b) { super.onSaveInstanceState(b); b.putString("token",token); b.putInt("profile", selectedProfile); b.putBoolean("closeWhenReady", closeWhenReady); }
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (request == 17 && result == RESULT_OK && data != null && token != null) {
             Intent service = new Intent(this, StreamService.class);
             service.putExtra("result", result).putExtra("data", data).putExtra("token", token).putExtra("profile", selectedProfile);
             startForegroundService(service);
+            closeWhenReady = true;
         }
     }
     protected void onResume() { super.onResume(); handler.post(refresh); }

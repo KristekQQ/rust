@@ -271,6 +271,19 @@ fn wet_surface(uv: vec2<f32>, source: vec4<f32>) -> vec3<f32> {
         let grid = input.uv * size - vec2(0.5);
         let base = floor(grid);
         let fraction = fract(grid);
+        // A footprint with no reflection confidence contributes exactly zero.
+        // Check unfiltered alpha first, then retain every original depth/material
+        // rejection and normalization rule whenever any reflection is present.
+        let trace_max = vec2<i32>(textureDimensions(ssr_trace)) - vec2<i32>(1);
+        let trace_base = vec2<i32>(base);
+        let confidence_quad = vec4<f32>(
+            textureLoad(ssr_trace, clamp(trace_base, vec2<i32>(0), trace_max), 0).a,
+            textureLoad(ssr_trace, clamp(trace_base + vec2<i32>(1, 0), vec2<i32>(0), trace_max), 0).a,
+            textureLoad(ssr_trace, clamp(trace_base + vec2<i32>(0, 1), vec2<i32>(0), trace_max), 0).a,
+            textureLoad(ssr_trace, clamp(trace_base + vec2<i32>(1, 1), vec2<i32>(0), trace_max), 0).a);
+        if all(confidence_quad == vec4<f32>(0.0)) {
+            return vec4(surface, select(source.a, 1.0, uniforms.params.y > 0.5));
+        }
         // Reconstruct each trace receiver from ORIGINAL depth. Reject edges,
         // material boundaries and dry/grout pixels before interpolating radiance.
         let footprint = max(distance(world_at(input.uv + vec2(1.0 / uniforms.params.z, 0.0), depth), position), distance(world_at(input.uv + vec2(0.0, 1.0 / uniforms.params.w), depth), position));

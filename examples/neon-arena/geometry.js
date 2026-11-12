@@ -484,35 +484,59 @@ export function appleGeometry(segments=32, rings=18) {
 }
 
 
-/** Grip-space sword: -Z runs through the thumb, +X is the back of the right hand.
- * The broad blade lies in YZ, so its flat normal follows the back of the hand.
+/** Grip-space cyber katana. -Z is the blade axis; its single edge is local -Y.
+ * One opaque, vertex-colored mesh: no textures, transparency or extra scene nodes.
+ * @param {'left'|'right'} [hand]
  * @returns {import('../../js/engine.d.ts').TriangleMeshOptions} */
-export function swordGeometry() {
-    /** @type {number[]} */ const positions = [];
-    /** @type {number[]} */ const indices = [];
-    /** @type {number[]} */ const triangleColors = [];
-    /** @param {number[]} size @param {number[]} center @param {number[]} color */
-    const box = (size, center, color) => {
-        const corners = [-1,-1,-1,1,-1,-1,1,1,-1,-1,1,-1,-1,-1,1,1,-1,1,1,1,1,-1,1,1];
-        const faces = [0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5];
-        const base = positions.length / 3;
-        // Roll the authored mesh 90 degrees about its handle axis. Cutter endpoints
-        // remain on -Z; render geometry and collision therefore stay aligned.
-        for (let i=0; i<corners.length; i+=3) {
-            const x = corners[i] * size[0] / 2 + center[0];
-            const y = corners[i+1] * size[1] / 2 + center[1];
-            const z = corners[i+2] * size[2] / 2 + center[2];
-            positions.push(-y, x, z);
-        }
-        indices.push(...faces.map(i => i+base));
-        for (let i=0; i<faces.length; i+=3) triangleColors.push(...color);
+export function swordGeometry(hand='right') {
+    /** @type {number[]} */ const positions=[];
+    /** @type {number[]} */ const indices=[];
+    /** @type {number[]} */ const triangleColors=[];
+    const shell=[.065,.09,.12],steel=[.23,.31,.38],rubber=[.028,.038,.048];
+    const edge=hand==='left'?[.025,.85,1]:[1,.12,.025];
+    const hot=hand==='left'?[.45,1,1]:[1,.64,.22];
+    /** Extrude a convex XZ profile; roll it to the same grip orientation as cutting.
+     * @param {number[][]} outline @param {number} half @param {number[]} face
+     * @param {number[]} [side] */
+    const prism=(outline,half,face,side=face)=>{
+        let profile=outline.slice();
+        const area=profile.reduce((sum,p,i)=>{const q=profile[(i+1)%profile.length];return sum+p[0]*q[1]-q[0]*p[1];},0);
+        if(area<0)profile.reverse();
+        const base=positions.length/3,n=profile.length;
+        for(const y of [-half,half])for(const [x,z] of profile)positions.push(-y,x,z);
+        /** @param {number} a @param {number} b @param {number} c @param {number[]} color */
+        const tri=(a,b,c,color)=>{indices.push(base+a,base+b,base+c);triangleColors.push(...color);};
+        for(let i=1;i<n-1;i++){tri(0,i,i+1,face);tri(n,n+i+1,n+i,face);}
+        for(let i=0;i<n;i++){const j=(i+1)%n;tri(i,n+j,j,side);tri(i,n+i,n+j,side);}
     };
-    box([0.045,0.008,0.85],[0,0,-0.525],[0.72,0.82,0.95]);
-    // Gold seam identifies the single sharp edge (after the grip roll: local -Y).
-    box([0.002,0.0085,0.85],[-0.0215,0,-0.525],[1,.68,.12]);
-    box([0.18,0.025,0.025],[0,0,-0.095],[0.7,0.43,0.09]);
-    box([0.035,0.035,0.15],[0,0,0],[0.14,0.07,0.03]);
-    return {positions, indices, triangleColors};
+    /** @param {number[]} size @param {number[]} center @param {number[]} color */
+    const box=(size,center,color)=>{
+        const [x,,z]=center,[w,h,d]=size;
+        prism([[x-w/2,z-d/2],[x+w/2,z-d/2],[x+w/2,z+d/2],[x-w/2,z+d/2]],h/2,color);
+    };
+    // Clipped kissaki and a subtle sweep: still centred on the original 85 cm cutter.
+    prism([[-.028,-.10],[.026,-.10],[.030,-.65],[.020,-.85],[-.006,-.95],[-.028,-.87]],.0045,steel,shell);
+    // Recessed dark side armour leaves a bright metal bevel visible around it.
+    prism([[-.014,-.18],[.021,-.18],[.024,-.64],[.015,-.80],[-.006,-.87],[-.014,-.78]],.0051,shell);
+    // Continuous thermal/electrical edge, including the pointed tip. It is geometry,
+    // rather than an alpha strip, so the silhouette remains readable in both eyes.
+    prism([[-.028,-.115],[-.021,-.115],[-.021,-.85],[-.006,-.95],[-.028,-.87]],.0048,edge,hot);
+    // Exposed power bus and cooling ribs on the blunt spine.
+    box([.004,.011,.48],[.017,0,-.435],edge);
+    for(let i=0;i<5;i++)box([.021,.014,.009],[.014,0,-.21-i*.027],steel);
+    box([.010,.014,.043],[.014,0,-.72],hot);
+    // Compact asymmetric guard and armoured emitter; no oversized crossguard.
+    prism([[-.070,-.066],[-.055,-.105],[.052,-.105],[.068,-.085],[.050,-.063]],.015,shell,steel);
+    box([.071,.033,.048],[0,0,-.084],shell);
+    box([.037,.035,.009],[0,0,-.111],edge);
+    // Palm-centred faceted grip, separated rubber ribs, luminous status cells.
+    prism([[-.018,-.060],[.018,-.060],[.021,.080],[.014,.108],[-.014,.108],[-.021,.080]],.015,rubber,shell);
+    for(let i=0;i<7;i++)box([.042,.034,.007],[0,0,-.043+i*.020],steel);
+    box([.008,.036,.062],[.010,0,.018],shell);
+    for(let i=0;i<3;i++)box([.004,.038,.009],[.010,0,-.003+i*.018],edge);
+    prism([[-.024,.091],[.024,.091],[.024,.113],[.013,.129],[-.013,.129],[-.024,.113]],.019,shell,steel);
+    box([.026,.040,.006],[0,0,.111],edge);
+    return {positions,indices,triangleColors};
 }
 
 /** Closed rounded rectangle swept with a circular neon tube, in physical metres.

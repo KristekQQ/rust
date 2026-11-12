@@ -39,6 +39,8 @@ struct Collector {
     error: Option<&'static str>,
     skipped: u64,
     cpu: BTreeMap<&'static str, CpuHistory>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pending: Vec<(usize, std::sync::mpsc::Receiver<Option<GpuSample>>)>,
 }
 
 /// Owned query handle: no collector borrow survives into a render pass.
@@ -47,6 +49,12 @@ pub struct PassStamp {
     first: u32,
 }
 impl PassStamp {
+    pub fn begin_section(&self, pass: &mut wgpu::RenderPass<'_>) {
+        pass.write_timestamp(&self.queries, self.first);
+    }
+    pub fn end_section(&self, pass: &mut wgpu::RenderPass<'_>) {
+        pass.write_timestamp(&self.queries, self.first + 1);
+    }
     pub fn writes(&self) -> wgpu::RenderPassTimestampWrites<'_> {
         wgpu::RenderPassTimestampWrites {
             query_set: &self.queries,
@@ -92,6 +100,8 @@ pub fn initialize(device: &wgpu::Device) {
             error: None,
             skipped: 0,
             cpu: BTreeMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            pending: Vec::new(),
         })))
     });
 }
@@ -107,6 +117,28 @@ pub fn begin_frame() {
             return;
         };
         let mut c = collector.borrow_mut();
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut pending = std::mem::take(&mut c.pending);
+            pending.retain(|(index, receiver)| match receiver.try_recv() {
+                Err(std::sync::mpsc::TryRecvError::Empty) => true,
+                result => {
+                    c.slots[*index].busy = false;
+                    match result {
+                        Ok(Some(sample))
+                            if c.latest.as_ref().is_none_or(|s| sample.frame >= s.frame) =>
+                        {
+                            c.latest = Some(sample);
+                            c.error = None;
+                        }
+                        Ok(Some(_)) => {}
+                        _ => c.error = Some("Timestamp readback unavailable"),
+                    }
+                    false
+                }
+            });
+            c.pending = pending;
+        }
         // An abandoned frame has no pending readback and may release its slot.
         if let Some(index) = c.active.take() {
             c.slots[index].busy = false;
@@ -143,6 +175,17 @@ pub fn stamp(label: &str) -> Option<PassStamp> {
             first,
         })
     })
+}
+
+/// Nested GPU diagnostics are reported separately, never added to pass totals.
+pub fn section(device: &wgpu::Device, label: &str) -> Option<PassStamp> {
+    if !device
+        .features()
+        .contains(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES)
+    {
+        return None;
+    }
+    stamp(&format!("detail.{label}"))
 }
 
 pub fn end_frame(device: &wgpu::Device, queue: &wgpu::Queue) {
@@ -185,6 +228,12 @@ pub fn end_frame(device: &wgpu::Device, queue: &wgpu::Queue) {
     queue.submit(Some(encoder.finish()));
     let period_ms = queue.get_timestamp_period() as f64 / 1_000_000.;
     let mapped = read.clone();
+    #[cfg(not(target_arch = "wasm32"))]
+    let sender = {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        collector.borrow_mut().pending.push((index, receiver));
+        sender
+    };
     read.slice(0..bytes)
         .map_async(wgpu::MapMode::Read, move |result| {
             let sample = if result.is_ok() {
@@ -208,26 +257,31 @@ pub fn end_frame(device: &wgpu::Device, queue: &wgpu::Queue) {
                 None
             };
             mapped.unmap();
-            let mut c = collector.borrow_mut();
-            c.slots[index].busy = false;
-            if let Some(sample) = sample {
-                if c.latest
-                    .as_ref()
-                    .is_none_or(|latest| sample.frame >= latest.frame)
-                {
-                    c.latest = Some(sample);
-                    c.error = None;
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let _ = sender.send(sample);
+            }
+            #[cfg(target_arch = "wasm32")]
+            {
+                let mut c = collector.borrow_mut();
+                c.slots[index].busy = false;
+                if let Some(sample) = sample {
+                    if c.latest
+                        .as_ref()
+                        .is_none_or(|latest| sample.frame >= latest.frame)
+                    {
+                        c.latest = Some(sample);
+                        c.error = None;
+                    }
+                } else {
+                    c.error = Some("Timestamp readback unavailable");
                 }
-            } else {
-                c.error = Some("Timestamp readback unavailable");
             }
         });
 }
 
 fn now() -> Option<f64> {
-    web_sys::window()?
-        .performance()
-        .map(|performance| performance.now())
+    super::platform::performance().map(|performance| performance.now())
 }
 
 pub struct CpuScope {
@@ -350,7 +404,8 @@ pub fn stats() -> serde_json::Value {
                 "sampleEveryFrames":SAMPLE_EVERY,"skippedSamples":c.skipped,
                 "sampleFrame":c.latest.as_ref().map(|sample| sample.frame),
                 "ageFrames":c.latest.as_ref().map(|sample| c.frame.saturating_sub(sample.frame)),
-                "passesMs":c.latest.as_ref().map(|sample| &sample.passes),"error":c.error,
+                "passesMs":c.latest.as_ref().map(|sample| sample.passes.iter().filter(|(k,_)| !k.starts_with("detail.")).collect::<BTreeMap<_,_>>()),
+                "sectionsMs":c.latest.as_ref().map(|sample| sample.passes.iter().filter(|(k,_)| k.starts_with("detail.")).collect::<BTreeMap<_,_>>()),"error":c.error,
             }
         })
     })

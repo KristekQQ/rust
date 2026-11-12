@@ -63,6 +63,10 @@ const suites = [
     {name:"gltf-gpu-transforms",path:"tests/gltf-gpu-transforms.html",status:"#result"},
     {name:"gltf-visibility",path:"tests/gltf-visibility.html",status:"#result"},
     {name:"scene-appearance",path:"tests/scene-appearance.html",status:"#result"},
+    {name:"scene-observer-scene",path:"tests/scene-observer-scene.html",status:"#result"},
+    {name:"scene-observer-interpolation",path:"tests/scene-observer-interpolation.html",status:"#result"},
+    {name:"scene-observer-network-demo",path:"tools/scene-observer/network-demo.html?verify=1",status:"#result",pageScreenshot:true},
+    {name:"scene-observer-delivery",path:"tests/scene-observer-delivery.html",status:"#result",pageScreenshot:true},
     {name:"antialias",path:"tests/antialias.html",status:"#result"},
     {name:"rim-refresh",path:"examples/rim/",interaction:"rim-refresh"},
     {name:"rim-device-logs",path:"tests/rim-device-logs.html",status:"#device-result",xrReport:true,softwareTimeoutMs:600000},
@@ -89,8 +93,12 @@ const suites = [
     { name: 'frame-graph', path: 'tests/frame-graph.html', status: '#result', button: '#check', backends: ['webgpu'] },
     { name: 'neon-arena-gpu-profile', path: 'tests/webxr-webgpu.html?profile=1', status: '#result', backends:['webgpu'], xrReport:true },
     { name: 'neon-arena-profile', path: 'tests/neon-arena-profile.html', status: '#result', backends:['webgl'], xrReport:true },
+    { name: 'neon-native-parity', path: 'tests/neon-native-parity.html', status:'#result', backends:['webgl','webgpu'] },
+    { name: 'neon-native-parity-xr', path: 'tests/neon-native-parity.html?xr=1', status:'#result', backends:['webgl'], xrReport:true },
+    { name: 'neon-paytable-xr', path: 'tests/neon-paytable-xr.html', status: '#result', backends:['webgl'], xrReport:true },
     { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:1800000 },
-    { name: 'neon-arena', path: 'examples/neon-arena/', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
+    { name: 'neon-arena', path: 'examples/neon-arena/?verify=1', status: '#result', softwareTimeoutMs:600000 },
+    { name: 'neon-arena-legacy', path: 'examples/neon-arena/legacy.html', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
     {name:'xr-scene-foveation',path:'tests/xr-scene-foveation.html',status:'#result',backends:['webgl'],xrReport:true},
     {name:'xr-scene-foveation-asymmetric',path:'tests/xr-scene-foveation.html?asymmetric=1',status:'#result',backends:['webgl'],xrReport:true},
     {name:'xr-gl-presentation',path:'tests/xr-gl-presentation.html',status:'#result',backends:['webgl'],xrReport:true},
@@ -283,7 +291,7 @@ async function applicationFingerprint() {
     return hash.digest('hex');
 }
 async function startServer() {
-    const serverArgs = ['-u', 'scripts/serve-local.py', '0'];
+    const serverArgs = ['-u', 'scripts/serve-local.py', '0', '--score-file', path.join(output,'neon-parity-test-scores.json')];
     if (productionRoot) serverArgs.push('--production', '--directory', productionRoot, '--test-directory', path.join(root, 'tests'));
     server = spawn('python3', serverArgs, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
     let log = '';
@@ -529,7 +537,7 @@ try {
             const expected = suite.name === 'rim-three-stress' ? 'ThreeWebGL2' : backend === 'webgpu' ? 'BrowserWebGpu' : 'Gl';
             if (result.actualBackend !== expected) throw new Error(`Requested ${backend}, observed ${result.actualBackend || 'unknown'}; fallback is not a pass`);
             if (errors.length) throw new Error(errors.join('\n'));
-            if (suite.name === 'rim-gameplay' || suite.name === 'rim-gameplay-120') result.rimCutEvidence = await page.evaluate(() => ({halfVisibility:window.rimCutEvidence.halfVisibility,transport:window.rimCutEvidence.transport,completionMs:window.rimCutEvidence.completionMs}));
+            if (suite.name === 'rim-gameplay' || suite.name === 'rim-gameplay-120') result.rimCutEvidence = await page.evaluate(() => ({halfVisibility:window.rimCutEvidence.halfVisibility,transport:window.rimCutEvidence.transport,completionMs:window.rimCutEvidence.completionMs,dissolve:window.rimCutEvidence.dissolve}));
             if (suite.name === 'rim-device-logs') result.rimDeviceLogEvidence = await page.evaluate(() => window.rimDeviceLogEvidence);
             if (['rim-stress-xr','rim-spatial-batches-xr'].includes(suite.name)) result.rimStressEvidence = await page.evaluate(() => window.rimStressEvidence);
             if (suite.name === 'rim-three-stress') {
@@ -595,6 +603,9 @@ try {
             }
             if (capture) {
                 result.screenshot = `${suite.name}-${backend}.png`;
+                if (suite.pageScreenshot) {
+                    await page.screenshot({path:path.join(output,result.screenshot),fullPage:true});
+                } else {
                 const png = await page.evaluate(() => new Promise((resolve, reject) => requestAnimationFrame(() => {
                     try {
                         const canvas = document.querySelector('#gpu-canvas, #world');
@@ -605,6 +616,7 @@ try {
                     } catch (error) { reject(error); }
                 })));
                 await writeFile(path.join(output, result.screenshot), Buffer.from(png, 'base64'));
+                }
                 const fontFrame = await page.evaluate(() => {
                     const evidence=document.querySelector('#font-evidence');
                     return evidence instanceof HTMLCanvasElement ? evidence.toDataURL('image/png').split(',')[1] : null;

@@ -258,7 +258,7 @@ impl PostProcessor {
                 format!(
                     "{}\n{}",
                     descriptor.shader_source,
-                    if device.as_webgpu().is_some() {
+                    if super::platform::modern_gpu(device) {
                         include_str!("postprocess_depth_native.wgsl")
                     } else {
                         include_str!("postprocess_depth_packed.wgsl")
@@ -333,7 +333,7 @@ impl PostProcessor {
                     binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: if device.as_webgpu().is_some() {
+                        sample_type: if super::platform::modern_gpu(device) {
                             wgpu::TextureSampleType::Depth
                         } else {
                             wgpu::TextureSampleType::Float { filterable: true }
@@ -1077,7 +1077,7 @@ impl PostProcessor {
         let resources = GraphResources::new(device, &plan.compiled)?;
         let scene = ColorTarget::new(device, "postprocess scene", width, height, self.format);
         let reads_depth = specs.iter().any(|effect| effect.reads_depth);
-        let depth_color = (device.as_webgpu().is_none() && reads_depth)
+        let depth_color = (!super::platform::modern_gpu(device) && reads_depth)
             .then(|| Intermediate::new(device, width, height, wgpu::TextureFormat::Rgba8Unorm));
         let mut bind_groups = Vec::with_capacity(plan.steps.len());
         let mut ssr_target = None;
@@ -1104,7 +1104,7 @@ impl PostProcessor {
                         wgpu::BindGroupEntry {
                             binding: 2,
                             resource: wgpu::BindingResource::TextureView(
-                                if device.as_webgpu().is_some() {
+                                if super::platform::modern_gpu(device) {
                                     &scene.depth
                                 } else {
                                     // Color-only effects never sample depth. Bind an existing
@@ -1188,6 +1188,7 @@ impl PostProcessor {
         })
     }
     /// Call ensure_size before requesting the scene render attachments.
+    #[cfg(target_arch = "wasm32")]
     pub fn foveate_scene(
         &self,
         foveation: &mut super::xr_foveation::GlFoveation,

@@ -30,6 +30,16 @@ if [[ "$mode" != browser ]]; then
     check sdk npm run test:sdk
     check harness npm run test:harness
     check xr-platform npm run test:xr
+    if [[ -f games/neon-core/Cargo.toml ]]; then
+        check neon-core-format cargo fmt --manifest-path games/neon-core/Cargo.toml --check
+        check neon-core cargo test --manifest-path games/neon-core/Cargo.toml --locked --target-dir target --lib
+        check native-rim-format cargo fmt --manifest-path native/rim/Cargo.toml --check
+        check native-rim cargo test --manifest-path native/rim/Cargo.toml --locked --target-dir target --lib
+        check native-neon-format cargo fmt --manifest-path native/neon/Cargo.toml --check
+        check native-neon cargo test --manifest-path native/neon/Cargo.toml --locked --target-dir target --lib
+        check observer npm run test:observer
+        check quest-stream bash tools/quest-stream/test/verify-local.sh
+    fi
 fi
 if [[ "$mode" != native ]]; then
     (
@@ -47,6 +57,10 @@ if [[ "$mode" != native ]]; then
         node scripts/build-fingerprint.mjs --write
     fi
     )
+fi
+if [[ "$mode" != native && -f games/neon-browser-worker/Cargo.toml ]]; then
+    check neon-worker-format cargo fmt --manifest-path games/neon-browser-worker/Cargo.toml --check
+    check neon-worker-build env VERIFY_WASM_PROFILE="$wasm_profile" bash scripts/build-neon-browser-worker.sh
 fi
 check types npm run typecheck
 if [[ "$mode" != native ]]; then

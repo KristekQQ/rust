@@ -226,7 +226,7 @@ export class Scene {
     /** Static inscription of 1..32 ASCII digits using shared 3D tube meshes. */
     createNumericText(value: string, options?: {position?: Vector3; width?: number; height?: number}): SceneObject;
     createTextPanel(options: {title: string; lines: string[]; position?: Vector3; width?: number; height?: number}): SceneObject;
-    playCutFeedback(pieces: SceneObject[], options?: {mirrorText?: boolean; /** Native hit reward or current chain bonus sum, sampled at the hit. */ scoreLabel?:'pending-bonus'|'hit-points'|'stock-total'; /** Gentle hit size multiplier, 0.01..2; fast tracked attacks retain full size. */ size?: number}): {objects: SceneObject[]; duration: number};
+    playCutFeedback(pieces: SceneObject[], options?: {mirrorText?: boolean; /** Native hit reward or current chain bonus sum, sampled at the hit. */ scoreLabel?:'pending-bonus'|'hit-points'|'stock-total'; /** Gentle hit size multiplier, 0.01..2; fast tracked attacks retain full size. */ size?: number; /** Contact-free ballistic debris; native smoothstep fade, then removal. Seconds. */ fadePieces?: {delay?:number;duration?:number;style?:'fade'|'dissolve'}}): {objects: SceneObject[]; duration: number};
     clearCutFeedback(): void;
     cutWithAsync(cutter:SceneObject,options:AsyncCutOptions):Promise<AsyncCutResult>;
     aimCutter(cutter:SceneObject,options:CutterAimOptions):Vector3;
@@ -243,7 +243,7 @@ export type RawEngine = Pick<typeof wasm,
     "clear_lights" | "set_light" | "set_light_orbit" | "clear_light_orbit" |
     "schedule_rotate" | "schedule_remove_object" | "schedule_remove_light" |
     "set_projectile" |
-    "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused"> & {screenToPlane(point:readonly [number,number],height?:number):Vector3;worldToScreen(point:Vector3):readonly[number,number]|null;setOrbitView(position:Vector3,target:Vector3):void;adjustOrbit(dx:number,dy:number,zoom?:number):void;cameraViewState():CameraViewState};
+    "set_camera_mode" | "set_grid_visible" | "set_light_helpers_visible" | "resize" | "renderer_backend" | "set_frustum_culling" | "set_render_effects" | "set_simulation_paused"> & {screenToPlane(point:readonly [number,number],height?:number):Vector3;worldToScreen(point:Vector3):readonly[number,number]|null;/** Built-in desktop view orientation; default left. XR matrices are independent. */ setCameraHandedness(handedness:"left"|"right"):void;setOrbitView(position:Vector3,target:Vector3):void;adjustOrbit(dx:number,dy:number,zoom?:number):void;cameraViewState():CameraViewState};
 export interface RenderStats {
     total: number; visible: number; culled: number;
     /** Legacy object-batch estimate after object culling; excludes helpers and does not account for glTF primitive culling/instancing. Use debugStats().mainDrawCalls for actual main-view commands. */
@@ -262,6 +262,8 @@ export interface EffectStats {
     passes:number; shadowResolution:number; reflectionWidth:number; reflectionHeight:number;
 }
 export interface DebugStats {
+    /** Cached mesh-font halo resources; null when disabled. */
+    fontGlowAtlas: null | {prewarmedSources:number;bakes:number;cachedGlyphs:number;readyGlyphs:number;eligibleGlyphs:number;eligibleInstances:number;drawnInstances:number;textureBytes:number;resolution:number;maxGlyphs:number};
     /** Actual original-selector policy, including backend default and diagnostic override. */
     overlaySelectionReference:boolean;
     panelBufferReuse:boolean;
@@ -282,6 +284,7 @@ export interface DebugStats {
     /** Alpha index subsets; index counts cover the same frame span as drawCalls. */
     translucency: {cachedMeshes:number;indexBufferBytes:number;submittedIndices:number;fullIndices:number;draws:number};
     neonGlow: {enabled:boolean;draws:number;segments:number;cachedMeshes:number;bufferBytes:number};
+    halfGlow: {requestedScale:number;activeScale:number;draws:number;width:number;height:number;effectivePath:string;fallbackReason:string|null;cachedViews:number};
     enabled: boolean; fps: number; frameMs: number; frameP95Ms: number; cpuMs: number;
     /** Main-view extraction only, not GPU execution. Cached frames do not run culling. */
     cullMs: number; cullCached: boolean;
@@ -396,6 +399,9 @@ export interface ComboDisplayState {
 }
 /** Emits frame after the native stereo frame completes, including when document RAF is suspended. */
 export interface WebXRHost extends EventTarget {
+    /** Optional transport hook; borrowed packed sample is valid only during this call. */
+    setSimulationFrameHandler(handler:((sample:Float32Array)=>void)|null):void;
+    pulseHaptics(strengths:ArrayLike<number>):void;
     readonly player: XRPlayer;
     /** Select a scene button with target ray + trigger or a bound blade strike. Emits buttonhover, select.detail.target and buttonpress. */
     bindButton(object: SceneObject|null): void;
@@ -423,10 +429,20 @@ export interface WebXRHost extends EventTarget {
     dispose(): void;
 }
 export type Engine = Readonly<RawEngine & {
+    /** Experimental ordered worker publications, Rust-owned scene validation. */
+    applySimulationPublication(bytes:Uint8Array,localObjects?:SceneObject[],spawns?:{id:number;parentId:number}[]):void;
+    setSceneAuthoringPaused(paused:boolean):void;
+    /** Opt-in render-only remote transform smoothing; duration0 disables. Source topology/removal remains immediate. */
+    setSceneInterpolation(options?:{durationMs?:number;maxDistance?:number}):void;
     setBackgroundColor(color: Vector3): void;
     /** Opt-in hemisphere/sun lighting, ACES exposure, fog and directional shadow volume. Linear RGB. Null restores legacy appearance. */
     setSceneAppearance(options: {sky: Vector3; ground: Vector3; sunDirection: Vector3; exposure: number; fogColor: Vector3; fogNear: number; fogFar: number; shadowExtent: number; shadowTarget: Vector3; shadowNear: number; shadowFar: number; shadowNormalBias?: number; specularAA: boolean} | null): void;
-    /** Additive glow radius in world meters; strength 0..2, radius .001.. .05. */
+    /** Override automatic cached font halos; retains solid glyphs and falls back at oblique angles. */
+    setFontGlowAtlas(enabled?:boolean): void;
+    /** Call after fonts/styles load, before gameplay; unknown styles use ordinary glow. */
+    prewarmFontGlowAtlas(characters?:string): void;
+    /** Soft halos default to .5 where supported; 1 selects the full-resolution reference. */
+    setNeonGlowResolution(scale?:0.5|1): void;
     setNeonGlow(options?: {strength?:number;radius?:number}): void; readonly xr: WebXRHost; readonly scene: Scene; projectileContacts(): number; readonly postprocessing: PostProcessing; /** Idempotently cancels loads and releases RAF, input and GPU resources. Old handles throw afterwards. */ dispose(): void; setCameraView(position: Vector3, target: Vector3): void; /** WASD + Shift and a chase camera. Mouse works with pointer lock requested by the application, otherwise left-drag. Motion and clip selection run in Rust. Switching camera mode releases control. */ controlCharacter(model: ModelObject, options?: CharacterOptions): void; characterState(): CharacterState | null; /** Optional Rust/WGSL output overlay; initially disabled. */ setDebugOverlay(enabled: boolean): void; /** Diagnostic only:0 production,1 cheap fragment (quality reduced),3 stable ordinal merge. */ setRendererExperiment(mode:0|1|3):boolean; gltfIndexLayouts():{primitive:number;format:"Uint16"|"Uint32";topology:string;count:number;max:number|null;payloadBytes:number;bufferBytes:number}[]; setGltfCompactIndicesEnabled(enabled:boolean):boolean; gltfVertexLayouts():{primitive:number;stride:number;bufferBytes:number;omitColor:boolean}[]; /** Reference control; rejects layout changes while GPU assets are live. */ setGltfWhiteColorOmissionEnabled(enabled:boolean):boolean; configureGltfInstancePool(options?:{byteLimit?:number;resourceLimit?:number;streamByteLimit?:number}):boolean; /** Diagnostic main-view controls; auxiliary pass culling is unchanged. */ setMainViewCulling(roots:boolean,primitives:boolean):void; setModelPublicationReuseEnabled(enabled:boolean):void; setPreparedPlanCacheEnabled(enabled: boolean): void; setOverlaySelectionReference(enabled:boolean):void; /** Diagnostic only:0 union,1 coalesced,2 full active span; exact byte accounting is expensive. */ setInstanceUploadPolicy(mode:0|1|2,gapBytes?:number,diagnostic?:boolean):boolean; setPanelBufferReuse(enabled:boolean):void; diagnosticPanelText(id:number,value:string):void; debugStats(): DebugStats; frameProfile(): FrameProfile; set_output_mode(mode: "canvas" | "texture"): boolean; effects_stats(): EffectStats; renderer_stats(): RenderStats }>;
 /** One canvas with id gpu-canvas per page. Await before issuing commands. */
 export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "auto" | "webgl"; profiling?: boolean }): Promise<Engine>;
@@ -434,9 +450,9 @@ export function initEngine(canvas: HTMLCanvasElement, options?: { backend?: "aut
 /** Aurelia scene-authored Rust simulation. JSON collision data is exported offline. */
 export interface RimOptions {
  enemies:{model:ModelObject;kind:string;height:number;offset:Vector3;scale:Vector3}[];
- swords:[SceneObject,SceneObject];bolts:SceneObject[];beams:SceneObject[];charges:SceneObject[];healthBars?:[SceneObject,SceneObject][];/** Optional Rust-owned ground shadow blobs, one per enemy when supplied. */blobShadows?:SceneObject[]|null;hud:SceneObject[];marker:SceneObject;
+ swords:[SceneObject,SceneObject];bolts:SceneObject[];beams:SceneObject[];charges:SceneObject[];healthBars?:[SceneObject,SceneObject][];healthDrops?:[SceneObject,SceneObject,SceneObject][]|null;stagePanel?:SceneObject|null;/** Optional Rust-owned ground shadow blobs, one per enemy when supplied. */blobShadows?:SceneObject[]|null;hud:SceneObject[];marker:SceneObject;
  shapes:{bounds:{minX:number;maxX:number;minY:number;maxY:number;minZ:number;maxZ:number};planes:{x:number;y:number;z:number;d:number}[]}[];
  obstacles:[number,number,number,number][];
 }
 export interface RimInput{start?:boolean;pause?:boolean;reset?:boolean;movement?:[number,number];sprint?:boolean;aim?:boolean;dash?:boolean;slash?:number;look?:[number,number];teleport?:Vector3;death_mode?:'cut'|'dissolve';stress_count?:number}
-export interface RimState{stressModels:number;blade:{contactSamples:number;hits:number;slowSamples:number;discontinuities:number;maxSpeedForFrame:number};active:boolean;paused:boolean;health:number;dead:boolean;wave:number;kills:number;deaths:number;player:{position:{x:number;y:number;z:number};yaw:number;pitch:number;aiming:boolean;target:Vector3|null;jump:{active:boolean;count:number};dash:{active:boolean;count:number};stamina:{value:number;max:number}};frame:{simulation:number;visual:number};enemies:{id:number;slug:string;position:Vector3;height:number;hp:number;maxHp:number;phase:number;shotTimer:number;plasma:number}[];projectiles:{active:number;fired:number;reflected:number;hitEnemies:number;blockedWorld:number;bolts:{position:Vector3;velocity:Vector3;friendly:boolean}[]};cuts:{motion:{id:number;age:number;direction:Vector3;distance:number}[];queued:number;pending:number;pieces:number;errors:number;preparedTriangles:number;stagedVertices:number;staging:number;stagedMeshes:number;commits:number;stageMs:number;stageMaxMs:number};xr:boolean}
+export interface RimState{stressModels:number;blade:{contactSamples:number;hits:number;slowSamples:number;discontinuities:number;maxSpeedForFrame:number};active:boolean;paused:boolean;health:number;dead:boolean;wave:number;completedWaves:number;wavePopulation:[number,number,number];healthDrops:{healAmount:number;spawned:number;collected:number;healed:number;active:{slot:number;ground:Vector3;position:Vector3;remaining:number}[]};kills:number;deaths:number;player:{position:{x:number;y:number;z:number};yaw:number;pitch:number;aiming:boolean;target:Vector3|null;jump:{active:boolean;count:number};dash:{active:boolean;count:number};stamina:{value:number;max:number}};frame:{simulation:number;visual:number};enemies:{id:number;slug:string;position:Vector3;height:number;hp:number;maxHp:number;phase:number;shotTimer:number;plasma:number}[];projectiles:{active:number;fired:number;reflected:number;hitEnemies:number;blockedWorld:number;bolts:{position:Vector3;velocity:Vector3;friendly:boolean}[]};cuts:{motion:{id:number;age:number;direction:Vector3;distance:number}[];queued:number;pending:number;pieces:number;errors:number;preparedTriangles:number;stagedVertices:number;staging:number;stagedMeshes:number;commits:number;stageMs:number;stageMaxMs:number};xr:boolean}

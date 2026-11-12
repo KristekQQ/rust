@@ -9,7 +9,7 @@ const hooks=()=>({state:()=>({}),spawn:c=>({spawned:c.count}),start:()=>{},stop:
 const memory=()=>{const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};};
 test('repository JSON records the accepted exact layout, size and motion',()=>{
     const preset=validatePreset(authored);assert.deepEqual(preset.wave,DEFAULT_WAVE);
-    const recipes=planWave(preset.wave);assert.equal(recipes[0].scale,.09);assert.equal(recipes[0].gravity,.8);assert.equal(recipes[0].lifetime,2.6);
+    const recipes=planWave(preset.wave);assert.equal(recipes[0].scale,.126);assert.equal(recipes[0].gravity,.8);assert.equal(recipes[0].lifetime,2.6);
     const next=planWave({...preset.wave,curve:.1,slope:.08,width:.6,height:1.4,depth:-1.3,lift:.4,gravity:1,fruitScale:.05,lifetime:3});
     assert.equal(next[0].scale,.05);assert.equal(next[0].velocity[1],.4);assert.equal(next[0].gravity,1);assert.equal(next[0].lifetime,3);
     assert.notDeepEqual(next[4].position,recipes[4].position);
@@ -50,12 +50,14 @@ test('legacy saved wave config migrates to the minute program without losing geo
 });
 
 test('old built-in tiny fruit upgrades without losing custom wave settings',()=>{
-    const storage=memory(),old=structuredClone(authored);
-    old.wave.fruitScale=.06;old.wave.count=7;old.wave.curve=.12;
-    storage.setItem(ARENA_STORAGE_KEY,JSON.stringify(old));
-    const tools=createArenaTools(hooks(),{preset:authored,storage});
-    assert.equal(tools.config.fruitScale,.09);assert.equal(tools.config.count,7);assert.equal(tools.config.curve,.12);
-    assert.equal(JSON.parse(storage.getItem(ARENA_STORAGE_KEY)).wave.fruitScale,.09);
-    old.name='My deliberate small targets';storage.setItem(ARENA_STORAGE_KEY,JSON.stringify(old));
-    assert.equal(createArenaTools(hooks(),{preset:authored,storage}).config.fruitScale,.06);
+    for(const oldScale of [.06,.09]){
+        const storage=memory(),old=structuredClone(authored);
+        old.wave.fruitScale=oldScale;old.wave.count=7;old.wave.curve=.12;
+        storage.setItem(ARENA_STORAGE_KEY,JSON.stringify(old));
+        const tools=createArenaTools(hooks(),{preset:authored,storage});
+        assert.equal(tools.config.fruitScale,.126);assert.equal(tools.config.count,7);assert.equal(tools.config.curve,.12);
+        assert.equal(JSON.parse(storage.getItem(ARENA_STORAGE_KEY)).wave.fruitScale,.126);
+        old.name='My deliberate small targets';storage.setItem(ARENA_STORAGE_KEY,JSON.stringify(old));
+        assert.equal(createArenaTools(hooks(),{preset:authored,storage}).config.fruitScale,oldScale);
+    }
 });

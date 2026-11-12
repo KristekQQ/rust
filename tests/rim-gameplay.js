@@ -40,7 +40,10 @@ await run.execute(async test=>{
  window.requestAnimationFrame=()=>{documentRAFCalls++;return 0;};
  const frame=(v={})=>{const start=performance.now();sim.frame(v);if(cutMeasuring){const cpuMs=performance.now()-start;cutTiming.framesMs.push(cpuMs);const s=state();if(!deathAt&&s.kills>0)deathAt=performance.now();if(cutRequestedAt&&!cutPublishedAt&&s.cuts.pieces>0)cutPublishedAt=performance.now();if(measureOnly)cutTiming.frameEvents.push({cpuMs,kills:s.kills,cuts:s.cuts,uploadBytes:engine.renderer_stats().uploadBytes});}if(engine.xr.lastError)throw Error(String(engine.xr.lastError));};
  frame({head:{position:[0,1.7,0]},controllers:{left:{position:[-.3,1.4,-.1]},right:{position:[.3,1.4,-.1]}}});frame();
- test.assert(state().enemies.length===6,'six-orbiter first wave');
+ test.assert(state().enemies.length===1,'one-orbiter introductory wave');
+ test.assert(state().wave===1&&state().completedWaves===0,'fresh run has no completed stage');
+ test.assert(game.healthDrops.length===4&&game.healthDrops.every(drop=>drop.length===3),'bounded health cross pools are authored');
+ test.assert(Number.isInteger(game.stagePanel.id),'stage counter is an engine spatial object');
  test.assert(engine.xr.player.head.object?.exists===true,'shared native diagnostics panel exists in XR');
  test.assert(!document.querySelector('[data-runtime-info]')||document.querySelector('[data-runtime-info]').hidden,'desktop diagnostics hide in XR');
  test.assert(Math.abs(engine.xr.player.head.position[2]-42)<.1,'XR eyes/head share original gate spawn');
@@ -145,6 +148,27 @@ await run.execute(async test=>{
  }
 
  advanceTo(2.05);await capture('Evaporation: 2.05 s');
+ // Spatial dissolution of an opaque mesh is a depth-writing cutout. It must
+ // not resend the full geometry twice through the alpha overlay in each eye.
+ const overlayDraws=()=>{frame({dt:0});return engine.debugStats().translucency.draws;};
+ const opaqueDissolveDraws=overlayDraws();
+ test.assert(opaqueDissolveDraws===0,'opaque dissolving fragments avoid alpha overdraw in both eyes');
+ const solid=[await pixels('left'),await pixels('right')];
+ for(const half of halves)half.object.setOpacity(.35,{opaqueAbove:1});
+ const glassDissolveDraws=overlayDraws();
+ test.assert(glassDissolveDraws>0,'authored glass remains in the alpha overlay during dissolution');
+ assertChanged(solid[0],await pixels('left'),'glass dissolution retains visible authored transparency',12);
+ for(const half of halves)half.object.setOpacity(1);
+ const restoredDissolveDraws=overlayDraws();
+ test.assert(restoredDissolveDraws===0,'restoring opaque material restores the depth-writing dissolution path',{opaqueDissolveDraws,glassDissolveDraws,restoredDissolveDraws});
+ // Real open cut meshes with reversed winding retain interior coverage; no
+ // single-sided optimization may silently delete the cut's exposed surfaces.
+ for(const half of halves)half.object.setScale([-1,1,1]);
+ test.assert(overlayDraws()===0,'mirrored dissolving fragments retain the opaque path');
+ assertForeground(await pixels('left'),'mirrored open cut fragments left');
+ assertForeground(await pixels('right'),'mirrored open cut fragments right');
+ for(const half of halves)half.object.setScale([1,1,1]);frame({dt:0});
+ window.rimCutEvidence.dissolve={opaqueDissolveDraws,glassDissolveDraws};
  assertChanged(snapshots[1].pixels,snapshots[2].pixels,'separation and evaporation rendered stages',30);
  const preview=document.querySelector('#stereo'),w=snapshots[0].pixels.width,h=snapshots[0].pixels.height;
  preview.width=w*snapshots.length;preview.height=h+28;preview.style.width='min(100%, 960px)';preview.style.height='auto';
@@ -153,5 +177,7 @@ await run.execute(async test=>{
  window.rimCutEvidence.halfVisibility=halfVisibility;
  window.rimCutEvidence.visualStages=snapshots.map(({label,age})=>({label,age}));
  advanceTo(3.1);frame();test.assert(state().cuts.motion.length===0&&state().cuts.pieces===0,'evaporated halves are removed after three seconds');
+ for(let i=0;i<40;i++)frame();
+ test.assert(state().wave===2&&state().completedWaves===1&&state().enemies.filter(e=>e.phase===1||e.phase===2).length===2,'cleared solo encounter advances displayed completion and two-enemy wave');
  await engine.xr.exit();test.assert(engine.xr.player.head.object===null,'diagnostics panel releases head binding on XR exit');await engine.xr.enter(xrOptions);frame();test.assert(state().kills>=1,'XR reentry preserves encounter state');await engine.xr.exit();
 });window.requestAnimationFrame=browserRAF;stop?.();info?.dispose();engine?.dispose();projection?.dispose();

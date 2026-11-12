@@ -15,8 +15,8 @@ export function createArenaTools(hooks,options={}) {
         const raw=storage?.getItem(ARENA_STORAGE_KEY);
         if(raw){const saved=validatePreset(JSON.parse(raw));config=saved.wave;presetName=saved.name;restored=true;
             // Upgrade only the old built-in size; retain custom named presets and every other setting.
-            if(saved.name===defaults.name&&saved.wave.fruitScale===.06&&defaults.wave.fruitScale===.09){
-                config={...config,fruitScale:.09};migratedSize=true;
+            if(saved.name===defaults.name&&[.06,.09].includes(saved.wave.fruitScale)&&defaults.wave.fruitScale===.126){
+                config={...config,fruitScale:.126};migratedSize=true;
             }
         }
     }catch(error){storageError=`Uložená předvolba se nenačetla: ${String(error)}`;}

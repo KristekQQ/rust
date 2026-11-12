@@ -16,6 +16,7 @@ pub struct ActiveCamera {
     character: Option<CharacterController>,
     pending_characters: Vec<CharacterController>,
     aspect: f32,
+    right_handed: bool,
 }
 
 impl ActiveCamera {
@@ -27,6 +28,7 @@ impl ActiveCamera {
             character: None,
             pending_characters: Vec::new(),
             aspect,
+            right_handed: false,
         }
     }
 
@@ -34,6 +36,31 @@ impl ActiveCamera {
         self.clear_input();
         self.detach_character();
         self.active = ty;
+    }
+
+    /// Match native OpenXR screen orientation without changing source world poses.
+    pub fn set_right_handed(&mut self, enabled: bool) {
+        self.clear_input();
+        self.right_handed = enabled;
+    }
+
+    fn horizontal_input(&self, value: f32) -> f32 {
+        if self.right_handed {
+            -value
+        } else {
+            value
+        }
+    }
+
+    fn movement_key(&self, code: String) -> String {
+        if self.right_handed {
+            match code.as_str() {
+                "KeyA" => return "KeyD".into(),
+                "KeyD" => return "KeyA".into(),
+                _ => {}
+            }
+        }
+        code
     }
 
     fn detach_character(&mut self) {
@@ -62,7 +89,7 @@ impl ActiveCamera {
         if !matches!(self.active, CameraType::Orbit) || self.character.is_some() {
             return false;
         }
-        self.orbit.adjust(dx, dy, zoom)
+        self.orbit.adjust(self.horizontal_input(dx), dy, zoom)
     }
 
     pub fn orbit_target(&self) -> Option<Vec3> {
@@ -170,14 +197,17 @@ impl CameraController for ActiveCamera {
     }
 
     fn key_down(&mut self, code: String) {
+        let code = self.movement_key(code);
         self.active_mut().key_down(code);
     }
 
     fn key_up(&mut self, code: String) {
+        let code = self.movement_key(code);
         self.active_mut().key_up(code);
     }
 
     fn mouse_move(&mut self, dx: f32, dy: f32) {
+        let dx = self.horizontal_input(dx);
         self.active_mut().mouse_move(dx, dy);
     }
 
@@ -186,7 +216,15 @@ impl CameraController for ActiveCamera {
     }
 
     fn matrix(&self) -> Mat4 {
-        self.active_ref().matrix()
+        let matrix = self.active_ref().matrix();
+        if self.right_handed {
+            // LH and RH look-at/perspective pairs differ by clip-space X.
+            // Keep depth and camera position identical; renderer selects winding
+            // from the resulting view-projection determinant.
+            Mat4::from_scale(Vec3::new(-1., 1., 1.)) * matrix
+        } else {
+            matrix
+        }
     }
 
     fn position(&self) -> Vec3 {
@@ -197,6 +235,40 @@ impl CameraController for ActiveCamera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn right_handed_desktop_matches_xr_sides_depth_and_controls() {
+        let mut camera = ActiveCamera::new(1.0);
+        let eye = Vec3::new(0., 1.6, 2.);
+        let target = Vec3::new(0., 1.6, -2.);
+        camera.set_view(eye, target);
+        let point = Vec3::new(1., 1.6, -2.);
+        let legacy = camera.matrix().project_point3(point);
+        assert!(legacy.x < 0.);
+        let determinant = camera.matrix().determinant();
+        camera.key_down("KeyA".into());
+        camera.set_right_handed(true);
+        camera.update(0.1);
+        assert_eq!(camera.position(), eye, "mode change clears held keys");
+        let corrected = camera.matrix().project_point3(point);
+        assert!(
+            corrected.x > 0.,
+            "world +X is screen-right looking toward -Z"
+        );
+        assert!((corrected.z - legacy.z).abs() < 1e-6);
+        assert!((camera.matrix().determinant() + determinant).abs() < 1e-5);
+        camera.key_down("KeyD".into());
+        camera.update(0.1);
+        assert!(camera.position().x > eye.x);
+        camera.key_up("KeyD".into());
+        let stopped = camera.position();
+        camera.update(0.1);
+        assert_eq!(camera.position(), stopped);
+        camera.set_orbit_view(eye, target);
+        assert!(camera.matrix().project_point3(point).x > 0.);
+        camera.set_right_handed(false);
+        assert!(camera.matrix().project_point3(point).x < 0.);
+    }
 
     #[test]
     fn explicit_free_view_projects_target_and_rejects_invalid_input() {

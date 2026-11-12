@@ -482,7 +482,7 @@ impl FineGroup {
                     // Expensive exact-byte accounting/timing is opt-in, never clean timing.
                     let clock = uploads
                         .diagnostic
-                        .then(|| web_sys::window().and_then(|w| w.performance()))
+                        .then(super::platform::performance)
                         .flatten();
                     let began = clock.as_ref().map(|p| p.now());
                     if uploads.diagnostic {
@@ -3302,7 +3302,7 @@ impl GltfGpu {
                         stages.switch(Some(5));
                     } else if page.last != scratch.payload {
                         if scratch.uploads.diagnostic {
-                            let clock = web_sys::window().and_then(|w| w.performance());
+                            let clock = super::platform::performance();
                             let start = clock.as_ref().map(|p| p.now());
                             stats.instance_changed_bytes += scratch
                                 .payload
@@ -3425,7 +3425,7 @@ impl GltfGpu {
             if fine.is_none() && s.last != s.scratch && !s.scratch.is_empty() {
                 if scratch.uploads.diagnostic {
                     let mut stats = self.counters.get();
-                    let clock = web_sys::window().and_then(|w| w.performance());
+                    let clock = super::platform::performance();
                     let start = clock.as_ref().map(|p| p.now());
                     stats.instance_changed_bytes += s
                         .scratch

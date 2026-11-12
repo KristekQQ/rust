@@ -115,6 +115,7 @@ impl ColorTarget {
                 a: 1.0,
             }),
             depth_load: wgpu::LoadOp::Clear(1.0),
+            depth_store: wgpu::StoreOp::Store,
         }
     }
 }

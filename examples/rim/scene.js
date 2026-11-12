@@ -58,6 +58,8 @@ export async function createGameplay(engine,content){
  const indices=[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5];
  const bar=(/** @type {Vec3} */color)=>scene.createMesh({positions,indices,color}).setPosition([0,-10000,0]).setEmission(1).setRenderOptions({castsShadow:false,receivesShadow:false});
  const healthBars=enemies.map(()=>/** @type {[import('../../js/engine.js').SceneObject,import('../../js/engine.js').SceneObject]} */([bar([.025,.035,.05]),bar([.12,.9,.3])]));
+ const healthDrops=Array.from({length:4},()=>/** @type {[import('../../js/engine.js').SceneObject,import('../../js/engine.js').SceneObject,import('../../js/engine.js').SceneObject]} */([bar([.12,1,.3]),bar([.12,1,.3]),bar([.12,1,.3])]));
+ const stagePanel=scene.createInfoPanel('debug-text',{position:[0,-10000,0],width:.34,height:.025}).setRenderOptions({castsShadow:false,receivesShadow:false});
  // Shared thin closed disk: the mesh pool validates closed solids. Flattened
  // geometry gives the same ground circle; two alpha faces compose to ~.16.
  const diskPositions=[0,0,0],diskIndices=[],segments=32,bottom=segments+1;
@@ -70,7 +72,7 @@ export async function createGameplay(engine,content){
  disk.remove();
  const hud=Array.from({length:5},()=>scene.createCube([0,-10000,0]).setEmission(1).setRenderOptions({castsShadow:false,receivesShadow:false}));
  const marker=scene.createSphere([0,-10000,0]).setScale([.3,.025,.3]).setEmission(1).setRenderOptions({castsShadow:false,receivesShadow:false});
- scene.configureRim({enemies,swords,bolts,beams,charges,healthBars,blobShadows,hud,marker,shapes:collision.shapes,obstacles:collision.obstacles.map((/** @type {{minX:number,maxX:number,minZ:number,maxZ:number}} */r)=>[r.minX,r.maxX,r.minZ,r.maxZ])});
+ scene.configureRim({enemies,swords,bolts,beams,charges,healthBars,healthDrops,stagePanel,blobShadows,hud,marker,shapes:collision.shapes,obstacles:collision.obstacles.map((/** @type {{minX:number,maxX:number,minZ:number,maxZ:number}} */r)=>[r.minX,r.maxX,r.minZ,r.maxZ])});
  for(const [i,hand] of /** @type {const} */(['left','right']).entries())engine.xr.player.equip(hand,swords[i],{requireTrigger:false});
- return {enemies,swords,bolts,beams,charges,healthBars,blobShadows,hud,marker,collision};
+ return {enemies,swords,bolts,beams,charges,healthBars,healthDrops,stagePanel,blobShadows,hud,marker,collision};
 }

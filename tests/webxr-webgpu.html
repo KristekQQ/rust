@@ -199,7 +199,7 @@ const report=await run.execute(async test=>{
     frame();
     const submitted=binding.submissions.slice(submissionStart).filter(record=>record.labels.length);
     const viewBatches=submitted.filter(record=>record.labels.includes('render'));
-    test.assert(submitted.length===3&&viewBatches.length===2&&viewBatches.every(record=>record.buffers===3&&record.labels.join(',')==='render,SSR half-resolution trace,ssr,final.postprocess.overlays'),'SSR stereo fuses final bloom with overlays in one view batch per eye plus final stereo presentation',submitted);
+    test.assert(submitted.length===3&&viewBatches.length===2&&viewBatches.every(record=>record.buffers===3&&record.labels.join(',')==='render,SSR half-resolution trace,ssr,half halo min depth,half halo ordinary edges,final.postprocess.overlays'),'SSR stereo fuses final bloom with overlays in one view batch per eye plus final stereo presentation',submitted);
     const ignoredDepth=[await binding.depthPixels(0),await binding.depthPixels(1)];
     test.assert(ignoredDepth.every(values=>values.every(v=>v===sentinel)),'ignored compositor depth is retained while internal SSR depth still renders');
     test.assert(binding.presentationWrites.at(-1).length===2&&binding.presentationWrites.at(-1).every(write=>!write.depthAttached),'ignored compositor depth is never attached to either final eye pass');
