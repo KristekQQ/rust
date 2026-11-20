@@ -1,9 +1,10 @@
+import {NEON_PERFORMANCE_OFFSET} from './panel-layout.js';
 import {installAudioControls} from '../shared/audio-controls.js';
 import {initEngine} from '../../js/engine.js';
 import {createScene,NEON_GLOW,ARENA_REVISION} from './scene.js';
 import {ParallelBridge} from './parallel-bridge.js';
 import {installRuntimeInfo} from '../shared/runtime-info.js';
-import {installScoreboard,loadScoreboard} from './scoreboard.js';
+import {installNamedScoreboard,loadLeaderboard,validateLeaderboard,LEADERBOARD_STORAGE_KEY} from './scoreboard.js';
 import {reportDiagnostic} from '../shared/diagnostics.js';
 const canvas=document.querySelector('#gpu-canvas'),status=document.querySelector('#status'),error=document.querySelector('#error'),enter=document.querySelector('#enter'),exit=document.querySelector('#exit');
 if(!(canvas instanceof HTMLCanvasElement)||!(enter instanceof HTMLButtonElement)||!(exit instanceof HTMLButtonElement)||!status||!error)throw new Error('Chybí ovládání');
@@ -16,23 +17,22 @@ engine.setDebugOverlay(false);engine.set_grid_visible(false);engine.set_light_he
 engine.setSceneAuthoringPaused(true);
 export const world=await createScene(engine.scene);await world.loadDecorations();
 if(world.arenaFont.selected==='cynatar')engine.prewarmFontGlowAtlas('0123456789+-');
-let scores=[];
-try{scores=await loadScoreboard();}catch{try{scores=JSON.parse(localStorage.getItem('neon-parallel-top5')??'[]');}catch{}}
-if(!Array.isArray(scores))scores=[];scores=scores.filter(value=>Number.isSafeInteger(value)&&value>=0).slice(0,100);
+let leaderboard=[];
+try{leaderboard=await loadLeaderboard();}catch{try{leaderboard=validateLeaderboard(JSON.parse(localStorage.getItem(LEADERBOARD_STORAGE_KEY)??'[]'));}catch{}}
 const mode=parameters.get('simulation')==='inline'?'inline':'worker';
-export const bridge=await ParallelBridge.create(engine,world,{mode,scores,observerUrl:parameters.get('observer')});
+export const bridge=await ParallelBridge.create(engine,world,{mode,leaderboard,observerUrl:parameters.get('observer')});
 engine.setSceneAuthoringPaused(false);
 engine.xr.player.equip('left',world.leftSword,{cutting:false,requireTrigger:false});
 engine.xr.player.equip('right',world.sword,{cutting:false,requireTrigger:false});
 const infoToggle=document.querySelector('#vr-info');
-const runtimeInfo=installRuntimeInfo(engine,{panel:world.infoPanel,toggle:infoToggle instanceof HTMLInputElement?infoToggle:null});runtimeInfo.setVisible(true);
+const runtimeInfo=installRuntimeInfo(engine,{panel:world.infoPanel,offset:NEON_PERFORMANCE_OFFSET,toggle:infoToggle instanceof HTMLInputElement?infoToggle:null});runtimeInfo.setVisible(true);
 if(infoToggle instanceof HTMLInputElement)infoToggle.checked=runtimeInfo.visible;
 const audioContainer=document.querySelector('#arena-menu');
 const audio=installAudioControls({container:audioContainer??document.body,floating:!audioContainer});
 let y=false,saved='';
 bridge.addEventListener('state',()=>audio.mixer?.ingest(bridge.state?.audio,{transportAge:bridge.stats.ageMs/1000}));
-bridge.addEventListener('state',()=>{const value=JSON.stringify(bridge.state?.top5??[]);if(value!==saved){saved=value;try{localStorage.setItem('neon-parallel-top5',value);}catch{}}});
-const removeScoreboard=installScoreboard(bridge,{onScores:values=>bridge.restoreScores(values)});
+bridge.addEventListener('state',()=>{const value=JSON.stringify(bridge.state?.leaderboard??[]);if(value!==saved){saved=value;try{localStorage.setItem(LEADERBOARD_STORAGE_KEY,value);}catch{}}});
+const removeScoreboard=installNamedScoreboard(bridge,{onScores:values=>bridge.restoreLeaderboard(values,bridge.state?.scoreEntrySequence??0)});
 engine.xr.setSimulationFrameHandler(sample=>{
     if(sample[1]&1)audio.mixer?.listener.setMatrix(sample.subarray(8,24));
     bridge.step(sample);

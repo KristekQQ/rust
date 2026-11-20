@@ -40,7 +40,7 @@ function parse(wire, objectIds = null) {
   const r = new Reader(wire);
   if (wire.length > CACHE_LIMIT) fail('Wire/cache budget exceeded');
   if (decoder.decode(wire.subarray(0, 4)) !== 'NWR1') fail('Invalid NWR1 magic');
-  r.skip(4); const version = r.uint(); if (![1,2,3,4].includes(version)) fail('Unsupported NWR1 version');
+  r.skip(4); const version = r.uint(); if (![1,2,3,4,5,6,7,8].includes(version)) fail('Unsupported NWR1 version');
   r.skip(8); const sequence = r.v.getBigUint64(8, true); if (!sequence) fail('Invalid sequence');
   r.skip(version === 1 ? 40 : 48);
   const tables = [new Map(), new Map(), new Map()];
@@ -67,7 +67,36 @@ function parse(wire, objectIds = null) {
   r.ordered(id => {
     objectSet.add(id);
     const start = r.o - 4;
-    const tag = r.byte(); if (tag > 3) fail('Invalid object kind'); r.uint(); r.floats(9);
+    const tag = r.byte(); if (tag > 3) fail('Invalid object kind'); r.uint();
+    if (version >= 5 && r.bool()) {
+      const key=r.uint(), columns=r.uint(), rows=r.uint(), frame=r.uint(); r.bool();
+      if (version >= 6 && r.bool()) {
+        const start=r.uint(), offset=r.o; r.floats(3);
+        const elevation=r.v.getFloat32(offset,true), maxPitch=r.v.getFloat32(offset+4,true), pitch=r.v.getFloat32(offset+8,true);
+        if(start<=frame || start+frame>=columns*rows || !(Math.abs(elevation)>0 && Math.abs(elevation)<90) || maxPitch<0 || maxPitch>Math.abs(elevation) || Math.abs(pitch)<Math.abs(elevation) || Math.abs(pitch)>90 || Math.sign(pitch)!==Math.sign(elevation)) fail('Invalid sprite elevated view');
+      }
+      if (version >= 7 && r.bool()) {
+        const frames=r.uint(), starts=Array.from({length:5},()=>r.uint());
+        if(!frames || starts.some(start=>start+frames>columns*rows) || starts.some((a,i)=>starts.slice(i+1).some(b=>Math.abs(a-b)<frames))) fail('Invalid sprite directional view');
+      }
+      if(version>=8 && r.bool()) {
+        const count=r.count(8), ranges=[];
+        if(!count)fail('Invalid sprite atlas bands');
+        for(let i=0;i<count;i++) {
+          const first=r.uint(), n=r.uint(), repeat=r.uint(), tile=r.uint(), offset=r.o; r.floats(4);
+          const rect=Array.from({length:4},(_,j)=>r.v.getFloat32(offset+j*4,true));
+          const cols=r.uint(), len=r.uint(), bits=r.uint(), padding=r.uint();
+          const clip=padding!==0 && ((padding&0xfe000000)>>>0)===0xba000000 && n===1 && repeat===1 && cols===1 && len===0 && tile===0;
+          if(!n || !repeat || repeat>columns*rows || !cols || cols>256 || first+n>columns*rows || len>8 || (len>0&&len!==repeat) || (padding && padding!==0x00400000 && !clip) || rect[0]<0 || rect[1]<0 || rect[2]<=0 || rect[3]<=0)fail('Invalid sprite atlas bands');
+          const max=len?Math.max(...Array.from({length:len},(_,j)=>(bits>>>(j*4))&15)):repeat-1,last=tile+max;
+          const maxColumn=Math.floor(tile/cols)===Math.floor(last/cols)?last%cols:cols-1;
+          if(last>0xffffffff || rect[0]+(maxColumn+1)*rect[2]>1.000001 || rect[1]+(Math.floor(last/cols)+1)*rect[3]>1.000001 || ranges.some(([a,b])=>first<b&&a<first+n))fail('Invalid sprite atlas bands');
+          ranges.push([first,first+n]);
+        }
+      }
+      if(!key || !columns || !rows || columns>256 || rows>256 || frame>=columns*rows) fail('Invalid sprite descriptor');
+    }
+    r.floats(9);
     r.bool(); r.bool(); r.bool(); r.floats(1); r.bool(); r.floats(8); r.bool(); r.bool();
     if (r.bool()) r.bounds();
     r.floats(44 + 6);
@@ -152,18 +181,25 @@ export class WireCache {
   }
 }
 function checkMeta(meta) {
+  if(meta&&Object.hasOwn(meta,'sourceSampledAt')&&(!Number.isFinite(meta.sourceSampledAt)||meta.sourceSampledAt<0))fail('Invalid source timestamp');
   if (!meta || typeof meta.session !== 'string' || !meta.session.length || meta.session.length > 256 || !Number.isFinite(meta.sampledAt) || meta.sampledAt < 0 || !['demo', 'live'].includes(meta.mode) || !Object.hasOwn(meta, 'state')) fail('Invalid observer metadata');
 }
-export function encodePacket(meta, wire) {
+export function encodePacket(meta, wire, metadataCapacity = null) {
   checkMeta(meta); bytes(wire); const json = utf8.encode(JSON.stringify(meta));
   if (json.length > 65536 || wire.length > CACHE_LIMIT) fail('Packet budget exceeded');
+  if (metadataCapacity !== null) {
+    if (!Number.isInteger(metadataCapacity) || metadataCapacity < 0 || metadataCapacity > 65536) fail('Invalid metadata capacity');
+    const size = Math.max(metadataCapacity, Math.min(65536, Math.ceil(json.length / 512) * 512));
+    const padded = new Uint8Array(size).fill(32); padded.set(json);
+    return join([u32(size), padded, wire]);
+  }
   return join([u32(json.length), json, wire]);
 }
 export function decodePacket(packet) {
   const r = new Reader(packet); if (packet.length > CACHE_LIMIT + 65540) fail('Packet budget exceeded');
   const n = r.count(65536); r.skip(n);
   const meta = JSON.parse(decoder.decode(packet.subarray(4, 4 + n))); checkMeta(meta);
-  const wire = packet.subarray(4 + n); if (wire.length < 68 || decoder.decode(wire.subarray(0,4)) !== 'NWR1' || ![1,2,3,4].includes(new DataView(wire.buffer, wire.byteOffset, wire.length).getUint32(4, true))) fail('Invalid wire packet');
+  const wire = packet.subarray(4 + n); if (wire.length < 68 || decoder.decode(wire.subarray(0,4)) !== 'NWR1' || ![1,2,3,4,5,6,7,8].includes(new DataView(wire.buffer, wire.byteOffset, wire.length).getUint32(4, true))) fail('Invalid wire packet');
   return {meta, wire};
 }
 export function encodeRecording(packets) {

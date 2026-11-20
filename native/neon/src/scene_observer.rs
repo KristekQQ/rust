@@ -1,5 +1,6 @@
 //! Latest full-scene mailbox. Only this low-priority worker serializes or uses TCP.
 use crate::observer::Config;
+use flate2::{write::ZlibEncoder, Compression};
 use serde_json::Value;
 use std::{
     io::{self, Read, Write},
@@ -163,6 +164,30 @@ impl DeltaSender {
         self.previous = raw;
     }
 }
+/// Wrap the finished delta packet, leaving the ACK base as raw scene bytes.
+fn compress_packet(packet: Vec<u8>) -> io::Result<Vec<u8>> {
+    if packet.len() > MAX_WIRE + DELTA_HEADER {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "scene packet exceeds cap",
+        ));
+    }
+    if packet.len() < 4096 {
+        return Ok(packet);
+    }
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(1));
+    encoder.write_all(&packet)?;
+    let compressed = encoder.finish()?;
+    // Include the NZP1 envelope in the savings threshold.
+    if compressed.len() + 8 + 32 > packet.len() {
+        return Ok(packet);
+    }
+    let mut wrapped = Vec::with_capacity(8 + compressed.len());
+    wrapped.extend_from_slice(b"NZP1");
+    wrapped.extend_from_slice(&(packet.len() as u32).to_le_bytes());
+    wrapped.extend_from_slice(&compressed);
+    Ok(wrapped)
+}
 fn send_frame(stream: &mut TcpStream, meta: &[u8], wire: &[u8]) -> io::Result<()> {
     if meta.len() > MAX_META || wire.len() > MAX_WIRE + DELTA_HEADER {
         return Err(io::Error::new(
@@ -245,7 +270,8 @@ fn run(
             let wire = publisher.capture_publication(&sample.publication)?;
             let raw_len = wire.len();
             let encode_start = Instant::now();
-            let encoded = delta.encode(&wire).map_err(|e| e.to_string())?;
+            let encoded = compress_packet(delta.encode(&wire).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
             encode_time += encode_start.elapsed();
             send_frame(connection.as_mut().unwrap(), &meta, &encoded).map_err(|e| e.to_string())?;
             delta.acknowledge(wire);
@@ -271,7 +297,21 @@ fn run(
 mod tests {
     use super::*;
     use std::net::{Ipv4Addr, TcpListener};
+    fn unwrap_packet(packet: &[u8]) -> Vec<u8> {
+        if !packet.starts_with(b"NZP1") {
+            return packet.to_vec();
+        }
+        let length = u32::from_le_bytes(packet[4..8].try_into().unwrap()) as usize;
+        assert!(length <= MAX_WIRE + DELTA_HEADER);
+        let mut decoder = flate2::read::ZlibDecoder::new(&packet[8..]);
+        let mut output = Vec::new();
+        decoder.read_to_end(&mut output).unwrap();
+        assert_eq!(output.len(), length);
+        output
+    }
     fn decode(packet: &[u8], previous: &[u8], base: u32) -> Vec<u8> {
+        let unwrapped = unwrap_packet(packet);
+        let packet = unwrapped.as_slice();
         let number = |at| u32::from_le_bytes(packet[at..at + 4].try_into().unwrap());
         assert_eq!(&packet[..4], b"NDP1");
         assert_eq!(&packet[5..8], &[0; 3]);
@@ -299,6 +339,72 @@ mod tests {
         }
         assert_eq!(cursor, packet.len());
         output
+    }
+    #[test]
+    fn compressed_full_and_delta_preserve_raw_ack_base() {
+        let mut sender = DeltaSender::default();
+        let first = vec![7; 32 * 1024];
+        let full = sender.encode(&first).unwrap();
+        let compressed_full = compress_packet(full.clone()).unwrap();
+        assert!(compressed_full.starts_with(b"NZP1"));
+        assert!(compressed_full.len() + 32 <= full.len());
+        assert_eq!(unwrap_packet(&compressed_full), full);
+        assert_eq!(decode(&compressed_full, &[], 0), first);
+        assert_eq!(sender.sequence, 0);
+        assert!(sender.previous.is_empty());
+        sender.acknowledge(first.clone());
+        assert_eq!(sender.previous, first);
+        let mut next = first.clone();
+        next[4096..16384].fill(9);
+        let delta = sender.encode(&next).unwrap();
+        assert_eq!(delta[4], 1);
+        let compressed_delta = compress_packet(delta.clone()).unwrap();
+        assert!(compressed_delta.starts_with(b"NZP1"));
+        assert_eq!(unwrap_packet(&compressed_delta), delta);
+        assert_eq!(
+            decode(&compressed_delta, &sender.previous, sender.sequence),
+            next
+        );
+        // Encoding/compression alone must not advance either ACK component.
+        assert_eq!(sender.sequence, 1);
+        assert_eq!(sender.previous, first);
+        if let Ok(path) = std::env::var("OBSERVER_COMPRESSION_FIXTURE_DIR") {
+            let path = std::path::PathBuf::from(path);
+            std::fs::create_dir_all(&path).unwrap();
+            for (name, data) in [
+                ("full.ndp", full.as_slice()),
+                ("full.nzp", compressed_full.as_slice()),
+                ("full.raw", first.as_slice()),
+                ("delta.ndp", delta.as_slice()),
+                ("delta.nzp", compressed_delta.as_slice()),
+                ("delta.raw", next.as_slice()),
+            ] {
+                std::fs::write(path.join(name), data).unwrap();
+            }
+        }
+        sender.acknowledge(next.clone());
+        assert_eq!(sender.sequence, 2);
+        assert_eq!(sender.previous, next);
+    }
+    #[test]
+    fn compression_preserves_small_and_incompressible_packets_and_limits() {
+        let sender = DeltaSender::default();
+        let small = sender.encode(&vec![0; 4096 - DELTA_HEADER - 1]).unwrap();
+        assert_eq!(small.len(), 4095);
+        assert_eq!(compress_packet(small.clone()).unwrap(), small);
+        // Deterministic pseudo-random bytes avoid dependency on an RNG crate.
+        let mut seed = 0x1432_9876u32;
+        let raw: Vec<u8> = (0..65536)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                (seed >> 24) as u8
+            })
+            .collect();
+        let packet = sender.encode(&raw).unwrap();
+        assert_eq!(compress_packet(packet.clone()).unwrap(), packet);
+        assert!(compress_packet(vec![0; MAX_WIRE + DELTA_HEADER + 1]).is_err());
     }
     #[test]
     fn byte_delta_roundtrip_full_identical_changed_grow_shrink() {
@@ -374,7 +480,7 @@ mod tests {
         };
         let mut observer = SceneObserver::start(peer, [7; 16]).unwrap();
         let mut scene = SceneManager::default();
-        scene.add_cube(glam::Vec3::ONE);
+        let cube = scene.add_cube(glam::Vec3::ONE);
         observer.publish_scene(&mut scene, &serde_json::json!({"phase":"playing"}));
         let (mut stream, _) = listener.accept().unwrap();
         stream
@@ -397,13 +503,15 @@ mod tests {
         assert!(meta["sampledAt"].as_u64().unwrap() > 0);
         let mut wire = vec![0; wire_len];
         stream.read_exact(&mut wire).unwrap();
+        let wire = unwrap_packet(&wire);
         assert_eq!(&wire[..4], b"NDP1");
         assert_eq!(wire[4], 0);
         let wire = &wire[DELTA_HEADER..];
-        assert_eq!(&wire[..8], b"NWR1\x04\x00\x00\x00");
+        assert_eq!(&wire[..4], b"NWR1");
         assert_eq!(u64::from_le_bytes(wire[8..16].try_into().unwrap()), 1);
         let mut mirror = SceneManager::default();
         mirror.apply_wire_publication(wire, &[]).unwrap();
+        assert_eq!(mirror.objects()[&cube].transform.position, glam::Vec3::ONE);
         stream.write_all(&[1]).unwrap();
         drop(observer);
     }

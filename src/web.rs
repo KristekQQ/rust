@@ -191,7 +191,53 @@ pub fn model_info(id: u32) -> Result<String, JsValue> {
         let nodes:Vec<_>=asset.nodes.iter().enumerate().map(|(i,n)| serde_json::json!({"name":n.name.clone().unwrap_or_else(||format!("Node {i}")),"mesh":n.mesh,"camera":n.camera,"morphTargets":n.mesh.and_then(|m|asset.meshes[m].primitives.first()).map(|p|asset.primitives[*p].morph_targets.len()).unwrap_or(0)})).collect();
         let scenes:Vec<_>=asset.scenes.iter().enumerate().map(|(i,s)|serde_json::json!({"name":s.name.clone().unwrap_or_else(||format!("Scene {i}"))})).collect();
         let playback=model.playback.as_ref().map(|p|serde_json::json!({"clip":p.clip,"time":p.time,"speed":p.speed,"looping":p.looping,"playing":p.playing}));
-        Ok(serde_json::json!({"animations":animations,"nodes":nodes,"scenes":scenes,"scene":model.scene,"playback":playback,"primitives":asset.primitives.len(),"materials":asset.materials.len(),"textures":asset.textures.len(),"skins":asset.skins.len(),"lastError":model.last_error}).to_string())
+        Ok(serde_json::json!({"animations":animations,"nodes":nodes,"scenes":scenes,"scene":model.scene,"playback":playback,"primitives":asset.primitives.len(),"materials":asset.materials.len(),"textures":asset.textures.len(),"skins":asset.skins.len(),"sprite":engine.scene.objects().get(&id).and_then(|o|o.sprite),"lastError":model.last_error}).to_string())
+    })
+}
+#[wasm_bindgen]
+pub fn sprite_state(key: u32) -> String {
+    STATE.with(|s|s.borrow().as_ref().map_or_else(||"null".into(),|state|{
+        let state=state.borrow();
+        state.scene.objects().iter().find_map(|(&id,o)|o.sprite.filter(|v|v.key==key).map(|v|serde_json::json!({"id":id,"key":v.key,"frame":v.frame,"visible":v.visible,"columns":v.columns,"rows":v.rows,"position":o.transform.position.to_array()}))).map_or_else(||"null".into(),|v|v.to_string())
+    }))
+}
+#[wasm_bindgen]
+pub fn configure_sprite(id: u32, options: &str) -> bool {
+    let Ok(config) = serde_json::from_str::<crate::scene::sprite::SpriteConfig>(options) else {
+        return false;
+    };
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.configure_sprite(id, config))
+    })
+}
+#[wasm_bindgen]
+pub fn trigger_sprite(id: u32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.trigger_sprite(id))
+    })
+}
+#[wasm_bindgen]
+pub fn pet_sprite(id: u32, x: f32, y: f32, z: f32, vx: f32, vy: f32, vz: f32) -> bool {
+    STATE.with(|s| {
+        s.borrow().as_ref().is_some_and(|state| {
+            state.borrow_mut().scene.pet_sprite(
+                id,
+                glam::Vec3::new(x, y, z),
+                glam::Vec3::new(vx, vy, vz),
+            )
+        })
+    })
+}
+#[wasm_bindgen]
+pub fn bind_sprite(id: u32, key: u32) -> bool {
+    STATE.with(|s| {
+        s.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow_mut().scene.bind_sprite(id, key))
     })
 }
 #[wasm_bindgen]
@@ -888,6 +934,19 @@ pub fn clear_all() {
     });
 }
 
+#[cfg(debug_assertions)]
+#[wasm_bindgen]
+pub fn debug_scene_bounds() -> Result<String, JsValue> {
+    STATE.with(|state| {
+        let state = state.borrow();
+        let state = state
+            .as_ref()
+            .ok_or_else(|| JsValue::from_str("Engine not initialized"))?;
+        let snapshot = state.borrow().debug_scene_bounds();
+        serde_json::to_string(&snapshot).map_err(|e| JsValue::from_str(&e.to_string()))
+    })
+}
+
 #[wasm_bindgen]
 pub fn scene_object_count() -> u32 {
     STATE.with(|state| {
@@ -1391,10 +1450,42 @@ pub fn set_scene_authoring_paused(paused: bool) -> Result<(), JsValue> {
     Ok(())
 }
 
+#[wasm_bindgen]
+pub fn set_scene_playback(
+    delay_ms: f64,
+    max_extrapolation_ms: f64,
+    max_distance: f32,
+) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_scene_playback(delay_ms, max_extrapolation_ms, max_distance))
+}
+#[wasm_bindgen]
+pub fn enqueue_scene_publication(
+    bytes: &[u8],
+    sampled_at_ms: f64,
+    local_ids: &[u32],
+) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.enqueue_scene_publication(bytes, sampled_at_ms, local_ids))
+}
+#[wasm_bindgen]
+pub fn scene_playback_state() -> Result<String, JsValue> {
+    cutting_command(|scene| Ok(scene.scene_playback_state().to_string()))
+}
+
 /// Opt-in render-only smoothing for a remotely mirrored scene. Zero disables it.
 #[wasm_bindgen]
 pub fn set_scene_interpolation(duration_ms: f32, max_distance: f32) -> Result<(), JsValue> {
     cutting_command(|scene| scene.set_mirror_interpolation(duration_ms, max_distance))
+}
+
+/// Opt-in bounded render-only observer prediction, disabled by default.
+#[wasm_bindgen]
+pub fn set_scene_prediction(horizon_ms: f32) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_mirror_prediction(horizon_ms))
+}
+
+#[wasm_bindgen]
+pub fn set_scene_prediction_sample_time(sampled_at_ms: f64) -> Result<(), JsValue> {
+    cutting_command(|scene| scene.set_mirror_prediction_sample_time(sampled_at_ms))
 }
 
 /// Apply an experimental ordered worker publication without advancing simulation.
@@ -2530,11 +2621,22 @@ pub fn xr_update_head(matrix: &[f32]) -> Result<(), JsValue> {
         Some(xr_world(glam::Mat4::from_cols_array(matrix)))
     };
     let reference = xr_world(glam::Mat4::IDENTITY);
+    let round_active = STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|state| state.borrow().xr_round_active())
+    });
     cutting_command(|scene| {
         XR_PLAYER.with(|player| {
             let mut player = player.borrow_mut();
             player.set_reference(reference);
-            player.update_head(scene, pose)
+            scene.set_billboard_camera(pose.map(|m| m.w_axis.truncate()));
+            player.update_head(scene, pose)?;
+            scene.set_sprite_target_player(
+                player.head().map(|head| head.matrix.w_axis.truncate()),
+                round_active,
+            );
+            Ok(())
         })
     })
 }
@@ -2550,6 +2652,18 @@ pub fn xr_bind_controller(hand: usize, id: u32, cutting: bool) -> Result<(), JsV
             player
                 .borrow_mut()
                 .bind_hand(scene, hand, (id != u32::MAX).then_some(id), cutting)
+        })
+    })
+}
+
+/// Register an authored open-hand alternative for nearby pettable sprites.
+#[wasm_bindgen]
+pub fn xr_bind_pet_hand(hand: usize, id: u32) -> Result<(), JsValue> {
+    cutting_command(|scene| {
+        XR_PLAYER.with(|player| {
+            player
+                .borrow_mut()
+                .bind_pet_hand(scene, hand, (id != u32::MAX).then_some(id))
         })
     })
 }
@@ -2609,6 +2723,14 @@ pub fn xr_panel_hit(id: u32, matrix: &[f32]) -> Vec<f32> {
 /// Raw grip poses against the registered finite blade and actual panel volume.
 #[wasm_bindgen]
 pub fn xr_panel_blade_hit(panel_id: u32, cutter_id: u32, from: &[f32], to: &[f32]) -> Vec<u8> {
+    if XR_PLAYER.with(|player| {
+        let player = player.borrow();
+        [0, 1].into_iter().any(|hand| {
+            player.petting_hands()[hand] && player.controllers[hand].object_id() == Some(cutter_id)
+        })
+    }) {
+        return vec![0, 0];
+    }
     STATE.with(|slot| {
         let state = slot.borrow();
         let Some(state) = state.as_ref() else {
@@ -2662,18 +2784,37 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
             .map_err(|_| JsValue::from_str("Invalid grip matrix"))?;
         Some(xr_world(glam::Mat4::from_cols_array(matrix)))
     };
-    let (dt, round_finished) = STATE.with(|slot| {
-        slot.borrow().as_ref().map_or((0., false), |state| {
+    let (dt, round_finished, round_active) = STATE.with(|slot| {
+        slot.borrow().as_ref().map_or((0., false, false), |state| {
             let state = state.borrow();
-            (state.frame_dt(), state.xr_round_finished())
+            (
+                state.frame_dt(),
+                state.xr_round_finished(),
+                state.xr_round_active(),
+            )
         })
     });
     let (report, blade_contacts) = cutting_command(|scene| {
         let before = scene.projectile_contacts;
         let report = XR_PLAYER.with(|player| {
-            player
-                .borrow_mut()
-                .update_hand(scene, hand, pose, pressed && !round_finished, dt)
+            let mut player = player.borrow_mut();
+            scene.set_sprite_target_player(
+                player.head().map(|head| head.matrix.w_axis.truncate()),
+                round_active,
+            );
+            let report = player.update_hand_with_mesh_cuts(
+                scene,
+                hand,
+                pose,
+                pressed,
+                dt,
+                !round_finished,
+            )?;
+            scene.interact_sprites(
+                player.head().map(|head| head.matrix.w_axis.truncate()),
+                [0, 1].map(|hand| player.hand(hand).map(|grip| grip.matrix.w_axis.truncate())),
+            );
+            Ok::<_, String>(report)
         })?;
         Ok((report, scene.projectile_contacts.saturating_sub(before)))
     })?;
@@ -2682,10 +2823,11 @@ pub fn xr_update_controller(hand: usize, matrix: &[f32], pressed: bool) -> Resul
         if let Some(state) = slot.borrow().as_ref() {
             let mut state = state.borrow_mut();
             state.record_xr_cuts(&report.removed);
+            state.record_xr_sprite_hits(&report.sprite_hits);
             state.xr_cut_rewards().iter().map(|reward| serde_json::json!({"original":reward.original,"points":reward.points,"totalPoints":reward.total_points})).collect::<Vec<_>>()
         } else { Vec::new() }
     });
-    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts,"scoreAwards":score_awards}).to_string())
+    Ok(serde_json::json!({"removed":report.removed,"pieces":report.pieces,"objectCandidates":report.object_candidates,"bvhNodes":report.bvh_nodes,"triangleTests":report.triangle_tests,"bladeContacts":blade_contacts,"spriteHits":report.sprite_hits.iter().map(|hit| serde_json::json!({"original":hit.original,"points":hit.points})).collect::<Vec<_>>(),"scoreAwards":score_awards}).to_string())
 }
 
 #[wasm_bindgen]

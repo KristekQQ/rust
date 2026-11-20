@@ -4,6 +4,7 @@ import {XRTestRun,publishXRReport} from './xr/testkit.js';
 import {assertChanged} from './pixels.js';
 import {installRuntimeInfo} from '../examples/shared/runtime-info.js';
 import {VR_DEBUG_PANEL_OFFSET} from '../examples/shared/vr-debug-panel.js';
+import {NEON_PERFORMANCE_OFFSET} from '../examples/neon-arena/panel-layout.js';
 const scenes=['basic','culling','cutting','cynatar','fox-control','gltf','lights','mirror','monkey','neon-arena','neon-enemies','neon-font-preview','neon-robot','postprocessing','projectiles','rim','shadows','webxr','forest-arena','crystal-cave','monster-room','table-tennis'];
 const name=new URLSearchParams(location.search).get('scene')??'basic';
 if(!scenes.includes(name))throw Error('Unknown example '+name);
@@ -51,7 +52,8 @@ await run.execute(async test=>{
         try{enter.click();await started;}finally{clearTimeout(timeout);globalThis.XRWebGLBinding=originalBinding;}
         test.assert(engine.xr.presentationMode==='canvas-transfer','ordinary example button selects safe WebGL presentation');
     }else await engine.xr.enter();
-    const yaw=-Math.atan2(.9,1),pitch=-Math.atan2(1.25,Math.hypot(.9,1));
+    const [x,y,z]=name==='neon-arena'?NEON_PERFORMANCE_OFFSET:VR_DEBUG_PANEL_OFFSET;
+    const yaw=-Math.atan2(x,-z),pitch=Math.atan2(y-1.6,Math.hypot(x,z));
     const sp=Math.sin(pitch/2),cp=Math.cos(pitch/2),sy=Math.sin(yaw/2),cy=Math.cos(yaw/2);
     // Studio characters occupy the authoring origin: stand in front of the model,
     // rather than placing the simulated eyes inside its opaque torso.
@@ -61,9 +63,9 @@ await run.execute(async test=>{
     const panel=engine.xr.player.head.object;
     test.assert(Boolean(panel),'actual example binds one native information panel');
     test.assert(panel.meshInfo.scale.every(v=>v===1),'actual native panel is not mirrored');
-    const head=engine.xr.player.state.head.matrix,origin=engine.xr.player.state.locomotion.origin,[x,y,z]=VR_DEBUG_PANEL_OFFSET;
+    const head=engine.xr.player.state.head.matrix,origin=engine.xr.player.state.locomotion.origin;
     const expected=[head[12]+origin[0]*x+origin[8]*z,origin[13]+y,head[14]+origin[2]*x+origin[10]*z];
-    test.assert(panel.meshInfo.position.every((v,i)=>Math.abs(v-expected[i])<.004),'actual example uses shared player-floor offset');
+    test.assert(panel.meshInfo.position.every((v,i)=>Math.abs(v-expected[i])<.004),'actual example uses its configured player-floor offset');
     const left=sim.pixels('left'),right=sim.pixels('right');
     ui.setVisible(false);frame();
     test.assert(engine.xr.player.head.object===null&&panel.meshInfo.position[1]<-9000,'actual example hides and releases panel');

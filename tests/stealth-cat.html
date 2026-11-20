@@ -1,0 +1,64 @@
+<!doctype html><meta charset="utf-8"><title>Authoritative billboard sprite</title><canvas id="gpu-canvas"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+try{
+ const canvas=document.querySelector('canvas'),engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.setCameraHandedness('right');engine.setCameraView([0,.4,2],[0,.4,0]);
+ engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_render_effects(false,false);engine.setBackgroundColor([0,0,0]);engine.setNeonGlow({strength:0,radius:.045});
+ engine.postprocessing.disable('ssr');engine.postprocessing.disable('bloom');engine.postprocessing.disable('fxaa');
+ const cat=await engine.scene.loadModel(new URL('../examples/neon-arena/assets/stealth-cat.gltf',import.meta.url));
+ cat.setRenderOptions({castsShadow:false,receivesShadow:false,reflectivity:0}).configureSprite({key:1,columns:4,rows:8,frames:8,fps:6,duration:4,ambientInterval:120,cooldown:8,travel:[0,0,0],combo:false});
+ const count=image=>{let n=0;for(let i=0;i<image.data.length;i+=4)if(Math.max(image.data[i],image.data[i+1],image.data[i+2])>10)n++;return n;};
+ const hidden=await capturePixels(canvas);if(count(hidden)>10)throw Error('Idle sprite is rendered');
+ if(!cat.triggerSprite()||cat.triggerSprite())throw Error('Trigger/cooldown guard failed');
+ const startState=engine.scene.spriteState(1);if(!startState?.visible)throw Error('Missing visible state');
+ const first=await capturePixels(canvas);assertForeground(first,'visible cat',80);
+ const firstFrame=engine.scene.spriteState(1)?.frame,advanceDeadline=performance.now()+2000;
+ let advanced=false;
+ while(performance.now()<advanceDeadline){
+  const state=engine.scene.spriteState(1);
+  if(state?.visible&&state.frame!==firstFrame){advanced=true;break;}
+  await new Promise(r=>setTimeout(r,25));
+ }
+ if(!advanced)throw Error('Atlas frame did not advance within 2s');
+ const second=await capturePixels(canvas);assertChanged(first,second,'atlas animation at fixed transform',20);
+ engine.setCameraView([2,.4,0],[0,.4,0]);const side=await capturePixels(canvas);assertForeground(side,'yaw billboard from side',80);
+ engine.setCameraView([0,.4,2],[0,.4,0]);
+ const blocker=engine.scene.createMesh({positions:[-1,-1,.7,1,-1,.7,1,1.5,.7,-1,1.5,.7,-1,-1,.9,1,-1,.9,1,1.5,.9,-1,1.5,.9],indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,3,7,6,3,6,2,0,4,7,0,7,3,1,2,6,1,6,5],color:[0,0,0]}).setEmission(0).setRenderOptions({castsShadow:false,receivesShadow:false});
+ const occluded=await capturePixels(canvas);if(count(occluded)>10)throw Error('Sprite leaks through opaque sign');blocker.remove();
+ await new Promise(r=>setTimeout(r,4200));const ended=await capturePixels(canvas);if(count(ended)>10)throw Error('Sprite did not return to idle');
+ // Freeze the same atlas frame, then validate true horizontal UV mirroring.
+ cat.configureSprite({key:1,columns:4,rows:8,frames:8,fps:.001,duration:10,ambientInterval:120,cooldown:0,travel:[0,0,0]});
+ cat.triggerSprite();cat.setScale([1,1,1]);const right=await capturePixels(canvas);
+ cat.setScale([-1,1,1]);const left=await capturePixels(canvas);
+ let flippedError=0,unflippedError=0,foreground=0;
+ for(let y=0;y<right.height;y++)for(let x=0;x<right.width;x++){
+  const a=(y*right.width+x)*4,b=(y*right.width+right.width-1-x)*4;
+  for(let c=0;c<3;c++){flippedError+=Math.abs(right.data[a+c]-left.data[b+c]);unflippedError+=Math.abs(right.data[a+c]-left.data[a+c]);foreground+=right.data[a+c];}
+ }
+ if(!foreground||unflippedError<1000||flippedError>unflippedError*.2)throw Error('Signed sprite root does not mirror its atlas frame');
+ // Cuddling is a separate atlas range while the root stays at its endpoint.
+ cat.setScale([1,1,1]);
+ cat.configureSprite({key:1,columns:4,rows:8,frames:8,fps:6,duration:12,endpointPause:11,idleStartFrame:8,idleFrames:8,idleFps:3,pettable:true,ambientInterval:120,cooldown:0,travel:[0,0,0]});
+ if(!cat.triggerSprite())throw Error('Cuddle trigger failed');
+ const deadline=performance.now()+4000;
+ while((engine.scene.spriteState(1)?.frame??0)<8&&performance.now()<deadline)await new Promise(r=>setTimeout(r,25));
+ const cuddleState=engine.scene.spriteState(1),cuddle=await capturePixels(canvas);
+ if(!cuddleState||cuddleState.frame<8||cuddleState.frame>15)throw Error('Cuddle range not selected');
+ assertForeground(cuddle,'cuddle cat',80);
+ await new Promise(r=>setTimeout(r,400));
+ if(engine.scene.spriteState(1)?.frame!==cuddleState.frame)throw Error('Waiting cat must not cuddle before hand contact');
+ if(cat.petSprite([10,10,10],[0,0,2]))throw Error('Distant hand accepted');
+ if(!cat.petSprite([0,.55,0],[0,0,2]))throw Error('Head contact rejected');
+ const contactFrame=engine.scene.spriteState(1).frame,petDeadline=performance.now()+2000;
+ while(engine.scene.spriteState(1)?.frame===contactFrame&&performance.now()<petDeadline)await new Promise(r=>setTimeout(r,25));
+ if(engine.scene.spriteState(1)?.frame===contactFrame)throw Error('Contact must start cuddle animation');
+ const cuddleNext=await capturePixels(canvas);assertChanged(cuddle,cuddleNext,'contact-started cuddle frames',20);
+ const pet=await capturePixels(canvas);assertForeground(pet,'pet contact response',80);
+ const petState=engine.scene.spriteState(1);
+ if(!petState?.visible||petState.frame<8||petState.frame>15)throw Error('Contact lost cuddle presentation');
+ document.querySelector('#result').textContent='PASS: hidden idle, animated atlas, side-facing billboard, depth occlusion, bounded lifetime, signed-root atlas mirroring, separate animated cuddle range, hand contact';
+}catch(error){document.querySelector('#result').textContent='FAIL: '+(error.message??String(error));console.error(error);}
+</script>

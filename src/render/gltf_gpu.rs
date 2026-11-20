@@ -2,6 +2,7 @@
 //! supported skins use joint palettes, while morph/arbitrary skins retain CPU deformation.
 use super::data::as_bytes;
 use crate::gltf_model::*;
+use crate::scene::sprite::SpriteAtlasBandUniform;
 use glam::{Mat4, Vec3, Vec4};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -620,7 +621,9 @@ impl QueueScratch {
             let previous = self.ordered[range.start];
             let other_model = models[previous.model].1;
             let other = &other_model.draws[previous.draw];
-            if range.len() >= 1024 {
+            if draw.last_uniform.sprite[0] > 0. || other.last_uniform.sprite[0] > 0. {
+                Some(7)
+            } else if range.len() >= 1024 {
                 Some(0)
             } else if previous.draw != item.draw {
                 Some(1)
@@ -671,6 +674,11 @@ struct Uniform {
     model: [[f32; 4]; 4],
     normal: [[f32; 4]; 4],
     transform: [f32; 4],
+    sprite: [f32; 4],
+    billboard_camera: [f32; 4],
+    sprite_view: [f32; 4],
+    sprite_direction: [[f32; 4]; 2],
+    sprite_atlas: [SpriteAtlasBandUniform; 8],
 }
 impl Uniform {
     fn affine_basis(&self) -> bool {
@@ -905,6 +913,18 @@ struct Draw {
     bounds: Option<(Vec3, Vec3)>,
     scratch: Vec<Vertex>,
 }
+#[derive(PartialEq)]
+struct ModelPoseStamp {
+    revision: u64,
+    root: Mat4,
+    options: [f32; 4],
+    sprite: [f32; 4],
+    billboard_camera: [f32; 4],
+    sprite_view: [f32; 4],
+    sprite_direction: [[f32; 4]; 2],
+    sprite_atlas: [SpriteAtlasBandUniform; 8],
+}
+
 pub struct GpuModel {
     generation: u64,
     data_revision: u64,
@@ -912,7 +932,7 @@ pub struct GpuModel {
     materials: Rc<Vec<Material>>,
     _shared: Rc<SharedAsset>,
     palettes: HashMap<usize, SkinPalette>,
-    last_pose: Option<(u64, Mat4, [f32; 4])>,
+    last_pose: Option<ModelPoseStamp>,
     active: HashSet<usize>,
     pub opaque_reorderable: bool,
     reorderable_draws: bool,
@@ -1303,7 +1323,13 @@ impl GltfGpu {
                     ]
                 })
                 .unwrap_or([None; 5]);
-            let texture_mask = slots.iter().enumerate().fold(0u8, |mask, (i, slot)| {
+            // Procedural source glare needs authored UV0 even without an image.
+            let uv_seed = if source.is_some_and(|m| m.view_glare) {
+                1
+            } else {
+                0
+            };
+            let texture_mask = slots.iter().enumerate().fold(uv_seed, |mask, (i, slot)| {
                 mask | if slot.is_some() { 1 << i } else { 0 }
             });
             // Only texture/sampler resources identify group 2. Colors, factors,
@@ -1541,12 +1567,23 @@ impl GltfGpu {
                         AlphaMode::Blend => 2.0,
                     },
                     if double_sided { 1.0 } else { 0.0 },
-                    0.0,
+                    if source.is_some_and(|m| m.view_glare) {
+                        3.0
+                    } else if source.is_some_and(|m| m.unlit) {
+                        2.0
+                    } else {
+                        0.0
+                    },
                 ],
                 options: [0.0; 4],
                 model: Mat4::IDENTITY.to_cols_array_2d(),
                 normal: Mat4::IDENTITY.to_cols_array_2d(),
                 transform: [1.0, 0.0, 0.0, 0.0],
+                sprite: [0.; 4],
+                billboard_camera: [0.; 4],
+                sprite_view: [0.; 4],
+                sprite_direction: [[0.; 4]; 2],
+                sprite_atlas: [SpriteAtlasBandUniform::default(); 8],
             };
             materials.push(Material {
                 textures,
@@ -2056,9 +2093,23 @@ impl GltfGpu {
         revision: u64,
         root: Mat4,
         options: [f32; 4],
+        sprite: [f32; 4],
+        billboard_camera: [f32; 4],
+        sprite_view: [f32; 4],
+        sprite_direction: [[f32; 4]; 2],
+        sprite_atlas: [SpriteAtlasBandUniform; 8],
     ) -> Result<usize, String> {
         let _scope = super::profiler::cpu_scope("gltf.update");
-        let stamp = (revision, root, options);
+        let stamp = ModelPoseStamp {
+            revision,
+            root,
+            options,
+            sprite,
+            billboard_camera,
+            sprite_view,
+            sprite_direction,
+            sprite_atlas,
+        };
         if model.last_pose.as_ref() == Some(&stamp) {
             return Ok(0);
         }
@@ -2070,7 +2121,9 @@ impl GltfGpu {
         self.model_data_epoch.set(epoch);
         model.data_revision = epoch;
         model.active.clear();
-        model.active.extend(pose.active_nodes.iter().copied());
+        if sprite[3] >= 0. {
+            model.active.extend(pose.active_nodes.iter().copied());
+        }
         let mut stats = self.counters.get();
         let mut bytes = 0;
         for (&node, palette) in &mut model.palettes {
@@ -2122,6 +2175,14 @@ impl GltfGpu {
             draw.negative = matrix.determinant() < 0.0;
             draw.bounds =
                 bounds_cache.primitive_bounds(asset, pose, draw.node, draw.primitive, root);
+            if sprite[0] > 0. {
+                if let Some((min, max)) = draw.bounds {
+                    let origin = root.w_axis.truncate();
+                    let radius = (min - origin).length().max((max - origin).length());
+                    draw.bounds =
+                        Some((origin - Vec3::splat(radius), origin + Vec3::splat(radius)));
+                }
+            }
             if draw.rigid {
                 // Exact affine vertex mean, rather than the bounds center.
                 draw.center = matrix.transform_point3(draw.local_center);
@@ -2181,9 +2242,16 @@ impl GltfGpu {
                 uniform.normal = normal.to_cols_array_2d();
                 uniform.transform = [if draw.negative { -1.0 } else { 1.0 }, 1.0, 0.0, 0.0];
             }
+            uniform.sprite = sprite;
+            uniform.billboard_camera = billboard_camera;
+            uniform.sprite_view = sprite_view;
+            uniform.sprite_direction = sprite_direction;
+            uniform.sprite_atlas = sprite_atlas;
             uniform.options = options;
             uniform.options[3] = if primitive.flat_normals { 1.0 } else { 0.0 };
-            uniform.extra[3] = if matches!(
+            uniform.extra[3] = if uniform.extra[3] >= 2.0 {
+                uniform.extra[3]
+            } else if matches!(
                 draw.topology,
                 wgpu::PrimitiveTopology::PointList
                     | wgpu::PrimitiveTopology::LineList
@@ -3671,7 +3739,10 @@ fn material_shader_source(key: ShaderKey) -> String {
         source.replace_range(start..end, "");
     }
     for (i, (sample, fallback)) in [
-        ("textureSample(base_map,base_sampler,uv)", "vec4<f32>(1.0)"),
+        (
+            "textureSample(base_map,base_sampler,atlas_uv)",
+            "vec4<f32>(1.0)",
+        ),
         ("textureSample(mr_map,mr_sampler,uv)", "vec4<f32>(1.0)"),
         (
             "textureSample(normal_map,normal_sampler,uv)",
@@ -3716,6 +3787,9 @@ fn material_shader_source(key: ShaderKey) -> String {
         "fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }",
         "",
     );
+    if texture_mask & 1 == 0 {
+        source = source.replace("length(v.uv0*2.0-vec2(1.0))", "0.0");
+    }
     for (i, name) in ["base", "mr", "normal", "ao", "emissive"]
         .iter()
         .enumerate()
@@ -3723,9 +3797,23 @@ fn material_shader_source(key: ShaderKey) -> String {
         if texture_mask & (1 << i) != 0 {
             continue;
         }
-        source = source.replace(&format!("sample_{name}(v.uv{i})"), "vec4<f32>(1.0)");
+        // Base sampling additionally receives the locally selected atlas frame.
+        // Eliminate its entire call before pruning the corresponding UV field.
+        let arguments = if i == 0 {
+            ",v.sprite_frame,v.sprite_mirror,v.sprite_region"
+        } else {
+            ""
+        };
+        source = source.replace(
+            &format!("sample_{name}(v.uv{i}{arguments})"),
+            "vec4<f32>(1.0)",
+        );
         source = source.replace(&format!("@location({}) uv{i}:vec2<f32>, ", i + 3), "");
         source = source.replace(&format!("o.uv{i}=v.uv{i}; "), "");
+        assert!(
+            !source.contains(&format!("v.uv{i}")),
+            "absent material UV {i} still referenced"
+        );
     }
     if translated {
         source = source.replacen(
@@ -4003,4 +4091,55 @@ fn prepare_skin(
         mean_terms: terms,
         identity_mean: identity / divisor,
     })
+}
+
+#[cfg(all(test, feature = "native-render"))]
+mod sprite_material_shader_tests {
+    use super::*;
+
+    #[test]
+    fn gltf_sprite_material_shader_variants_validate_without_gpu() {
+        use wgpu::naga::{
+            front::wgsl,
+            valid::{Capabilities, ValidationFlags, Validator},
+        };
+        for texture_mask in 0..32 {
+            for geometry in 0..4 {
+                for shadow in [false, true] {
+                    for cheap_fragment in [false, true] {
+                        for omit_color in [false, true] {
+                            if geometry == 1 && omit_color {
+                                continue;
+                            }
+                            let key = ShaderKey {
+                                texture_mask,
+                                cheap_fragment,
+                                omit_color,
+                                shadow,
+                                opaque_unclipped: true,
+                                skinned: geometry == 1,
+                                instanced: geometry == 2,
+                                translated: geometry == 3,
+                                single_static_shadow: !shadow,
+                                light_class: crate::render_lights::LightClass::from_colors(
+                                    [[1.; 3]; 4],
+                                    true,
+                                ),
+                            };
+                            let source = material_shader_source(key);
+                            let context = format!("mask={texture_mask} geometry={geometry} shadow={shadow} cheap={cheap_fragment} colorless={omit_color}");
+                            let module = wgsl::parse_str(&source).unwrap_or_else(|error| {
+                                panic!("{context}: {}", error.emit_to_string(&source))
+                            });
+                            Validator::new(ValidationFlags::all(), Capabilities::all())
+                                .validate(&module)
+                                .unwrap_or_else(|error| {
+                                    panic!("{context}: {}", error.emit_to_string(&source))
+                                });
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

@@ -88,3 +88,15 @@ wasm renderer execution. For GPU changes follow [DEVELOPMENT.md](../../../docs/D
 and the affected browser scenarios. Timestamp absence is valid fallback; distinguish
 sampled GPU duration, CPU encoding duration and XR callback cadence. Do not infer
 Quest performance from desktop pixels or historical headset acceptance.
+
+## Sparse glow in final composition
+
+In [the half-resolution glow composite](../../../src/render/half_glow.wgsl), load the four halo taps first. When all four RGB values are exactly zero, their weighted sum is zero for every foreground depth; return before reading full-resolution or reduced depth. For any nonzero tap retain the original depth-aware weights and silhouette behavior. Testing the main scene color or introducing a brightness threshold would change the result. This optimization acts inside the composite shader, independently of object culling and SSR.
+
+Evaluate this reorder with sparse and dense glow. Use both-eye pixel comparisons and total GPU time: reading halo first can do extra work where foreground depth would reject the taps. In the archived Quest 3 stereo cut fixture, total GPU time went from 12.45 to 11.10 ms with identical images. Player and floor fixtures also matched in both eyes. The numbers describe those workloads.
+
+## A stutter when fruit is cut
+
+Follow the handoff through [simulation](../../../native/neon/src/simulation.rs), [render publication](../../../src/scene_publication.rs) and the [native app](../../../native/neon/src/app.rs). On Quest the worker can prepare cut meshes and GPU buffers before publishing. The XR thread still applies publications and draws the result. Measure the first cut and repeated cuts separately; look at the slow-frame percentile alongside worker preparation, queue wait, render-thread installation and GPU passes. Return retired resources only after their consumer releases them.
+
+The native pool (`with_cut_pool`) is selected by a replay option in this checkout; the ordinary game uses `with_cut_device`. Confirm the actual selection before attributing a result to pooling. Trace the browser worker and renderer separately when testing the web implementation. Keep cut direction, cap appearance and burst workload fixed across comparisons.

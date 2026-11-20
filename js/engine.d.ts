@@ -163,13 +163,94 @@ export interface ModelInfo {
     scene: number;
     playback: {clip: number; time: number; speed: number; looping: boolean; playing: boolean} | null;
     primitives: number; materials: number; textures: number; skins: number;
+    sprite: Omit<SpriteState,"id"|"position"> | null;
     lastError: string | null;
+}
+export interface SpriteState {
+    id: number; key: number; columns: number; rows: number; frame: number; visible: boolean; position: Vector3;
+}
+export interface SpriteElevatedView {
+    /** Second band offset from the animation frame; duplicate every animation frame. */
+    startFrame: number;
+    /** Viewer elevation threshold, degrees (-90,0) or (0,90). Negative selects below and overrides directionalView; selection is local to the viewer. */
+    elevation: number;
+    /** Maximum front-art tilt magnitude in degrees, between zero and abs(elevation). */
+    maxFrontPitch: number;
+    /** Selected-art tilt: same sign as elevation, magnitude [abs(elevation),90]. Below views continue towards -90 degrees directly underneath. Defaults to +65; set explicitly for below views. */
+    pitch?: number;
+}
+export interface SpriteDirectionalView {
+    /** Walking semantic frame count, equal to SpriteConfig.frames. */
+    frames: number;
+    frontStartFrame: number;
+    frontObliqueStartFrame: number;
+    sideStartFrame: number;
+    rearObliqueStartFrame: number;
+    rearStartFrame: number;
+}
+export interface SpriteAtlasBand {
+    firstFrame: number; frameCount: number; columns: number;
+    /** Normalized UV origin and one tile's size. */
+    origin: readonly [number, number]; tileSize: readonly [number, number];
+    firstTile?: number;
+    /** Defaults to frameCount, or tileMap.length when present. */
+    repeat?: number;
+    /** Up to eight local tile offsets in [0,15], repeated across the band. */
+    tileMap?: readonly number[];
+}
+export interface SpriteConfig {
+    key: number; columns: number; rows: number; frames: number; fps: number;
+    duration: number; ambientInterval: number; cooldown: number; travel: Vector3; combo?: boolean;
+    /** Quadratic Bézier control point OFFSET from the origin; absent keeps linear travel.
+     * The authoritative sprite retraces the same path on return. */
+    travelControl?: Vector3;
+    /** Optional bounded world-axis drift (meters), zero at both ends. Phase in radians;
+     * cycles 0..64 over one traversal. Omit to preserve the original path/heading. */
+    travelSway?: { amplitude: Vector3; cycles: number; phase: number };
+    /** Optional bonus sword target; reachHeight is relative to tracked head. */
+    swordTarget?: { points: number; radius: number; reachHeight?: number };
+    /** Opt-in falling ground deposits; shared scene pool is capped at 15. */
+    cutEffectKey?: number;
+    groundDrop?: { interval: number; floorY: number };
+    /** One airborne traversal over duration, then hide. No endpoint/start/arrival pauses or petting. */
+    oneWay?: boolean;
+    /** First ambient wait in seconds; defaults to ambientInterval. Later waits use ambientInterval. */
+    ambientDelay?: number;
+    /** Join the scene flock. After its last flight, add up to this many seconds to ambientInterval. */
+    flockJitter?: number;
+    /** Mirror a right-facing atlas with the path tangent in world X (normal player view). */
+    flipWithTravel?: boolean;
+    /** Hold the destination position for these seconds, included in duration. */
+    endpointPause?: number;
+    /** Visible hold at the origin with the first walking frame, included in duration. */
+    startPause?: number;
+    /** Reach the calm endpoint and enable grip contact this many seconds earlier; return timing stays unchanged. */
+    arrivalPoseLead?: number;
+    /** First atlas frame of the endpoint-pause animation; defaults to zero. */
+    idleStartFrame?: number;
+    /** Endpoint-pause frame count; zero keeps the held walking pose. */
+    idleFrames?: number;
+    /** Endpoint-pause playback speed; defaults to fps. Must be finite and positive. */
+    idleFps?: number;
+    /** Allow tracked grip contact near the head to hold the endpoint and cuddle. */
+    pettable?: boolean;
+    elevatedView?: SpriteElevatedView;
+    /** Camera-relative walking artwork; overrides flipWithTravel and keeps root X scale positive.
+     * Oblique/side artwork faces image right; idle artwork keeps existing front/top selection. */
+    directionalView?: SpriteDirectionalView;
+    /** Up to eight nonoverlapping semantic frame bands; unmatched frames use columns/rows. */
+    atlasBands?: readonly SpriteAtlasBand[];
 }
 export class ModelObject extends SceneObject {
     private constructor();
     /** New default pose/root sharing immutable asset/GPU resources; independent animation/physics. */
     createInstance(): ModelObject;
     readonly info: ModelInfo;
+    configureSprite(options: SpriteConfig): this;
+    triggerSprite(): boolean;
+    /** World-space contact and shared viewer head position; returns true on a petting hit. */
+    petSprite(contact: Vector3, viewer: Vector3): boolean;
+    bindSprite(key: number): this;
     playAnimation(clip?: number | string, options?: {loop?: boolean; speed?: number}): this;
     pauseAnimation(paused?: boolean): this;
     seekAnimation(seconds: number): this;
@@ -197,6 +278,7 @@ export interface MeleeOptions {
 export interface MeleeState {active:number; id:number; phase:string; kills:number; position:Vector3; hp:number}
 /** Commands to the Rust SceneManager. Contains no JS scene or animation state. */
 export class Scene {
+    spriteState(key: number): SpriteState | null;
     configureRim(options:RimOptions|null):void;
     rimInput(input:RimInput):void;
     readonly rimState:RimState|null;
@@ -330,7 +412,7 @@ export interface PostProcessing {
     setReflectionMask(options: { width: number; height: number; pixels: Uint8Array; center?: readonly [number, number]; size?: readonly [number, number] }): void;
     stats(): { passes: number; width: number; height: number; targets: number; frames: number; ssrWidth:number; ssrHeight:number; ssrPixels:number; ssrTracePixels:number; ssrViewportPixels:number };
 }
-export interface XRCutReport extends CutResult { handedness: 'left'|'right'; bladeContacts?: number; /** Actual native score increase per original in this cut. */ scoreAwards?: {original:number;points:number;totalPoints:number}[] }
+export interface XRCutReport extends CutResult { spriteHits?: {original:number;points:number}[]; handedness: 'left'|'right'; bladeContacts?: number; /** Actual native score increase per original in this cut. */ scoreAwards?: {original:number;points:number;totalPoints:number}[] }
 export interface FruitChainState {kind:string;count:number;points:number;potential:number}
 export interface XRRoundState { mode?:'legacy'|'chains'; chains?:(FruitChainState|null)[]; rejected?:number; pendingBonus?:number; duration: number; remaining: number; finished: boolean; cuts: number; score: number; streak: number; fruit: string; triples: number }
 export interface XRHandOptions {cutting?: boolean; requireTrigger?: boolean; haptics?: boolean}
@@ -374,6 +456,7 @@ export class XRPlayer {
     removeItem(object: SceneObject): this;
     /** Equip any scene object; a cutting role is explicit and optional. Null empties the hand. */
     equip(hand:'left'|'right',object:SceneObject|null,options?:XRHandOptions): this;
+    bindPetHand(hand:'left'|'right',object:SceneObject|null): this;
     unequip(hand:'left'|'right'): this;
 }
 export interface ComboDisplayOptions {
@@ -428,12 +511,29 @@ export interface WebXRHost extends EventTarget {
     exit(): Promise<void>;
     dispose(): void;
 }
+/** Debug WASM only. Coordinates are normalized CSS viewport coordinates.
+ * Parts and glow eligibility describe geometry, never measured draws or GPU cost. */
+export interface DebugSceneBounds {
+    entries: {id:string;kind:string;layer:string;edges:[number,number,number,number][];label:[number,number];parts:number}[];
+    truncated: boolean;
+}
 export type Engine = Readonly<RawEngine & {
     /** Experimental ordered worker publications, Rust-owned scene validation. */
     applySimulationPublication(bytes:Uint8Array,localObjects?:SceneObject[],spawns?:{id:number;parentId:number}[]):void;
     setSceneAuthoringPaused(paused:boolean):void;
     /** Opt-in render-only remote transform smoothing; duration0 disables. Source topology/removal remains immediate. */
     setSceneInterpolation(options?:{durationMs?:number;maxDistance?:number}):void;
+    /** Source timestamp timeline; zero delay resets. Enabled delay updates preserve the clock. */
+    setScenePlayback(options?:{delayMs?:number;maxExtrapolationMs?:number;maxDistance?:number}):void;
+    /** Ordered deltas; overflow rejects atomically. Retry the same packet or reset the session. */
+    enqueueScenePublication(bytes:Uint8Array,sampledAtMs:number,localObjects?:SceneObject[]):void;
+    scenePlaybackState():{enabled:boolean;timeMs:number|null;sequence:string;extrapolating:boolean;queued:number;bufferBytes:number;underruns:number;rebufferings:number;error:string|null};
+    /** Render-only prediction for dynamic cuttable wire meshes/lineage children. Default disabled; max 300ms. */
+    setScenePrediction(options?:{horizonMs?:number}):void;
+    /** Strictly increasing authoritative session timestamp. Reset with prediction disabled between sessions. */
+    setScenePredictionSampleTime(sampledAtMs:number):void;
+    /** Available in debug WASM builds. */
+    debugSceneBounds?: () => DebugSceneBounds;
     setBackgroundColor(color: Vector3): void;
     /** Opt-in hemisphere/sun lighting, ACES exposure, fog and directional shadow volume. Linear RGB. Null restores legacy appearance. */
     setSceneAppearance(options: {sky: Vector3; ground: Vector3; sunDirection: Vector3; exposure: number; fogColor: Vector3; fogNear: number; fogFar: number; shadowExtent: number; shadowTarget: Vector3; shadowNear: number; shadowFar: number; shadowNormalBias?: number; specularAA: boolean} | null): void;

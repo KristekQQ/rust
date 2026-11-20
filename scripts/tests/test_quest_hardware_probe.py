@@ -59,6 +59,33 @@ class ProbeTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     probe.validate_benchmark(data, variant, expected)
 
+    def test_scene_comparison_keeps_effects_identical_and_allows_floor_without_halos(self):
+        for variant in ('baseline', 'candidate'):
+            data, expected = fixture('candidate')
+            expected.update(experiment='scene', view='floor')
+            data['config'].update(glowResolution=0.5, view='floor')
+            data['config']['renderer']['halfGlow'] = dict(requestedScale=0.5, activeScale=1.0, draws=0, fallbackReason='no-ordinary-glow')
+            probe.validate_benchmark(data, variant, expected)
+            broken = copy.deepcopy(data)
+            broken['config']['renderer']['halfGlow'].update(draws=2, width=864, height=864)
+            with self.assertRaises(ValueError):
+                probe.validate_benchmark(broken, variant, expected)
+            broken['config']['renderer']['halfGlow']['activeScale'] = 0.5
+            probe.validate_benchmark(broken, variant, expected)
+            for key, value in [('fontGlowAtlas', False), ('glowResolution', 1.0), ('view', 'player')]:
+                broken = copy.deepcopy(data)
+                broken['config'][key] = value
+                with self.subTest(variant=variant, key=key), self.assertRaises(ValueError):
+                    probe.validate_benchmark(broken, variant, expected)
+
+    def test_scene_cli_requires_candidate_assets(self):
+        argv = ['--adb-port', '5038', '--serial', 'explicit', '--binary', 'b', '--assets', 'a', '--out', 'o']
+        self.assertEqual(probe.parse_args(argv + ['--experiment', 'scene', '--candidate-assets', 'c', '--view', 'floor']).candidate_assets, 'c')
+        with self.assertRaises(SystemExit):
+            probe.parse_args(argv + ['--experiment', 'scene'])
+        with self.assertRaises(SystemExit):
+            probe.parse_args(argv + ['--candidate-assets', 'c'])
+
     def test_pass_totals_exclude_nested_sections(self):
         data, expected = fixture()
         result = probe.validate_benchmark(data, 'candidate', expected)
@@ -172,6 +199,12 @@ class ProbeTests(unittest.TestCase):
     def test_explicit_sdk_adb_executable(self):
         adb = probe.Adb(5038, 'explicit', Path('/unused'), '/sdk/platform-tools/adb')
         self.assertEqual(adb.prefix, ['/sdk/platform-tools/adb', '-P', '5038', '-s', 'explicit'])
+
+    def test_score_guard_targets_current_leaderboard_and_accepts_legacy_override(self):
+        argv = ['--adb-port', '5037', '--serial', 'device', '--binary', 'b', '--assets', 'a', '--out', 'o']
+        self.assertEqual(probe.parse_args(argv).score_path, 'files/neon-top10.json')
+        legacy = 'files/neon-top5.json'
+        self.assertEqual(probe.parse_args(argv + ['--score-path', legacy]).score_path, legacy)
 
     def test_safe_cli_bounds(self):
         argv = ['--adb-port', '5037', '--serial', 'explicit-device', '--binary', 'binary', '--assets', 'assets', '--out', 'out']

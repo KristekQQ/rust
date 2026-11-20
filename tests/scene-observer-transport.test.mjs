@@ -21,10 +21,31 @@ function mesh(w, shade = 1) {
   w.uint(3).uint(0).uint(1).uint(2);
 }
 function meshData(w, shade) { w.floats(3).floats(3,1).uint(1).uint(3).big(0); mesh(w,shade); w.byte(0); }
-function object(w, id, meshId = id) {
-  w.uint(id).byte(3).uint(meshId).floats(6).floats(3,1).byte(0).byte(1).byte(1).float(0).byte(0).floats(8).byte(0).byte(0).byte(0).floats(50);
+function object(w, id, meshId = id, version = 1, sprite = null) {
+  w.uint(id).byte(3).uint(meshId);
+  if(version>=5) {
+    w.byte(sprite?1:0);
+    if(sprite) {
+      w.uint(77).uint(4).uint(sprite.directional?16:8).uint(sprite.frame??11).byte(1);
+      if(version>=6) {
+        w.byte(sprite.elevated?1:0);
+        if(sprite.elevated)w.uint(sprite.start??16).float(50).float(25).float(65);
+      }
+      if(version>=7) {
+        w.byte(sprite.directional?1:0);
+        if(sprite.directional) for(const value of [8,32,40,0,48,56])w.uint(value);
+      }
+      if(version>=8) {
+        const clipped=sprite.clip!==undefined;
+        w.byte(1).uint(1).uint(0).uint(clipped?1:16).uint(clipped?1:8).uint(0);
+        w.float(0).float(0).float(.25).float(.25);
+        w.uint(clipped?1:4).uint(clipped?0:8).uint(clipped?0:0x89abcdef).uint(sprite.clip??0);
+      }
+    }
+  }
+  w.floats(6).floats(3,1).byte(0).byte(1).byte(1).float(0).byte(0).floats(8).byte(0).byte(0).byte(0).floats(50);
 }
-function frame(sequence, {changed = [], live = [], shade = 1, variant = false, variantChanged = variant, panel = false, instances = {}, tags = false, lights = false, version = 1, lineage = []} = {}) {
+function frame(sequence, {changed = [], live = [], shade = 1, variant = false, variantChanged = variant, panel = false, instances = {}, tags = false, lights = false, version = 1, lineage = [], sprite = null} = {}) {
   const w = new Writer().raw(Buffer.from('NWR1')).uint(version).big(sequence).big(sequence).big(1).big(1).big(1).uint(0xffffffff).uint(100);
   if (version >= 2) w.uint(0xffffffff).uint(0xffffffff);
   w.uint(changed.length); for (const id of changed) { w.uint(id); meshData(w,shade); }
@@ -32,7 +53,7 @@ function frame(sequence, {changed = [], live = [], shade = 1, variant = false, v
   if (variantChanged) { w.uint(80); meshData(w,shade); mesh(w,shade); w.uint(0).uint(1).floats(4,1).uint(0).uint(1); }
   w.uint(panel ? 1:0);
   if (panel) { w.uint(90).byte(0).float(1).float(1).big(1).byte(0); mesh(w); w.byte(0); }
-  w.uint(live.length + (panel ? 1:0)); for (const id of live) object(w,id,instances[id] ?? id); if (panel) object(w,90);
+  w.uint(live.length + (panel ? 1:0)); for (const id of live) object(w,id,instances[id] ?? id,version,sprite); if (panel) object(w,90,90,version);
   w.uint(live.length); for (const id of live) { w.uint(id).byte(1).floats(3).byte(instances[id] === undefined ? 0:1); if (instances[id] !== undefined) w.uint(instances[id]).uint(0); }
   w.uint(variant ? 1:0); if (variant) w.uint(80).byte(1);
   w.uint(panel ? 1:0); if (panel) w.uint(90).big(1);
@@ -187,4 +208,32 @@ test('objectIds sends only selected authoritative objects/assets, preserves ligh
   assert.deepEqual(rebound,frame(3,{changed:[1],live:[1,2],instances:{2:80},variant:true,lights:true}));
   receiver.ingest(rebound); assert.deepEqual([...receiver.assets[1].keys()],[80]);
   assert.throws(()=>new WireCache({objectIds:[-1]}),/objectIds/);
+});
+
+test('v5 through v8 sprite descriptors survive late peers, projection and packet decoding', () => {
+  for(const version of [5,6,7,8]) {
+    const wire=frame(1,{version,changed:[1],live:[1],sprite:{elevated:version>=6,directional:version>=7}});
+    const cache=new WireCache({objectIds:[1]}); cache.ingest(wire);
+    const selected=cache.packetFor(peer());
+    assert.deepEqual(decodePacket(encodePacket(meta(),selected)).wire,selected);
+    const late=new WireCache(); late.ingest(selected);
+    assert.equal(late.sequence,1n);
+  }
+  for(const start of [0,10,21,0xffffffff]) {
+    assert.throws(()=>new WireCache().ingest(frame(1,{version:6,live:[1],sprite:{elevated:true,start}})),/elevated view/);
+  }
+});
+
+// First-band padding carries the direction/offset of a frozen bird fragment.
+test('v8 fragment clip metadata preserves both sides and rejects unknown tags', () => {
+  for(const clip of [0xba800123,0xbb800123,0xba000000,0xbbffffff]) {
+    const wire=frame(1,{version:8,changed:[1],live:[1],sprite:{frame:0,clip}});
+    const cache=new WireCache();cache.ingest(wire);
+    const selected=cache.packetFor(peer());
+    const late=new WireCache();late.ingest(selected);
+    assert.equal(late.sequence,1n);
+  }
+  for(const clip of [1,0xb9800123,0xbc800123,0xffffffff]) {
+    assert.throws(()=>new WireCache().ingest(frame(1,{version:8,live:[1],sprite:{frame:0,clip}})),/atlas bands/);
+  }
 });

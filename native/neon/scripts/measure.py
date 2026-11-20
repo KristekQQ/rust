@@ -97,10 +97,14 @@ def main():
     parser.add_argument("--seconds", type=float, default=65)
     parser.add_argument("--condition", required=True)
     parser.add_argument("--device", default="192.168.0.234:5555")
+    parser.add_argument("--adb-port", type=int, default=5038)
+    parser.add_argument("--cut-buffer-pool", action="store_true", help="enable the experimental worker pool during a cut replay")
     parser.add_argument("--adb", default="/Users/Honza/Library/Android/sdk/platform-tools/adb")
     parser.add_argument("--awake-pidfile", type=Path)
     parser.add_argument("--awake-helper", type=Path)
     parser.add_argument("--player-replay", choices=("view", "cut"))
+    parser.add_argument("--irregular-hands", action="store_true",
+                        help="stress controller translation and rotation during a view replay")
     parser.add_argument("--replay-seconds", type=float, default=65)
     parser.add_argument("--startup-timeout", type=float, default=35)
     parser.add_argument("--resume-only", action="store_true", help="clear diagnostic flags and restart normal input/score persistence")
@@ -109,6 +113,10 @@ def main():
         parser.error("awake-pidfile and awake-helper must be supplied together")
     if args.resume_only and args.player_replay:
         parser.error("resume-only cannot enable player replay")
+    if args.cut_buffer_pool and args.player_replay != "cut":
+        parser.error("cut-buffer-pool requires --player-replay cut")
+    if args.irregular_hands and args.player_replay != "view":
+        parser.error("irregular-hands requires --player-replay view")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", args.run_id):
         parser.error("invalid run-id")
     if not (math.isfinite(args.warmup) and 0 <= args.warmup <= 120
@@ -118,7 +126,7 @@ def main():
             and math.isfinite(args.startup_timeout) and 1 <= args.startup_timeout <= 300):
         parser.error("invalid replay/startup duration")
     args.out.mkdir(parents=True, exist_ok=False)
-    adb = [args.adb, "-P", "5038", "-s", args.device]
+    adb = [args.adb, "-P", str(args.adb_port), "-s", args.device]
 
     def command(*parts, check=True, data=None, timeout=20):
         result = subprocess.run(adb + list(parts), input=data, capture_output=True, timeout=timeout)
@@ -135,10 +143,17 @@ def main():
             "apk_sha256": f"p=$(pm path {PACKAGE}); sha256sum \"${{p#package:}}\"",
             "battery": "dumpsys battery", "thermal": "dumpsys thermalservice",
             "settings": f"run-as {PACKAGE} cat files/neon-settings.json",
-            "top5_sha256": f"run-as {PACKAGE} sha256sum files/neon-top5.json",
         }
-        return {name: shell(query, check=False).stdout.decode(errors="replace")
-                for name, query in queries.items()}
+        result = {name: shell(query, check=False).stdout.decode(errors="replace")
+                  for name, query in queries.items()}
+        # New installs may have no scores yet. A failed adb/run-as command
+        # must never count as an unchanged empty leaderboard.
+        for board in ("top5", "top10"):
+            filename = f"neon-{board}.json"
+            query = (f"cd files || exit 1; if test -e {filename}; then sha256sum {filename}; "
+                     "else echo ABSENT; fi")
+            result[f"{board}_sha256"] = shell(f"run-as {PACKAGE} sh -c '{query}'").stdout.decode().strip()
+        return result
 
     def renew_awake():
         """Replace only the explicitly selected helper after its restoration exits."""
@@ -203,7 +218,7 @@ def main():
         log_offset = log_path.stat().st_size if log_path.exists() else 0
         with log_path.open("ab", buffering=0) as log:
             process = subprocess.Popen([
-                "python3", "-u", expected, "--adb", args.adb, "--adb-port", "5038",
+                "python3", "-u", expected, "--adb", args.adb, "--adb-port", str(args.adb_port),
                 "--serial", args.device, "--keep-app", PACKAGE, "--app-pid", pid,
             ], stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         args.awake_pidfile.write_text(str(process.pid) + "\n")
@@ -264,6 +279,10 @@ def main():
             elif b"No such file" not in old_replay.stdout + old_replay.stderr:
                 raise RuntimeError("cannot determine prior player replay configuration")
             replay_config = {"cutting": args.player_replay == "cut", "duration_s": args.replay_seconds}
+            if args.cut_buffer_pool:
+                replay_config["cut_buffer_pool"] = True
+            if args.irregular_hands:
+                replay_config["irregular_hands"] = True
             shell(f"run-as {PACKAGE} sh -c 'cat > files/neon-replay.json'", data=json.dumps(replay_config).encode())
             configured_replay = True
             info["player_replay"] = replay_config
@@ -291,9 +310,11 @@ def main():
             raise RuntimeError("capture did not complete; no focus/render or interrupted app possible")
         info["after"] = metadata()
         if args.player_replay:
-            info["original_top5_unchanged"] = info["before"]["top5_sha256"] == info["after"]["top5_sha256"]
-            if not info["original_top5_unchanged"]:
-                raise RuntimeError("Original TOP5 changed during synthetic replay")
+            for board in ("top5", "top10"):
+                key = f"{board}_sha256"
+                info[f"original_{board}_unchanged"] = info["before"][key] == info["after"][key]
+                if not info[f"original_{board}_unchanged"]:
+                    raise RuntimeError(f"Original {board.upper()} changed during synthetic replay")
         info["status"] = "captured"
     except Exception as error:
         info["status"] = "failed"

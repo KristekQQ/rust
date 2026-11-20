@@ -1,6 +1,7 @@
 """A small persistent, scores-only HTTP scoreboard for the Neon arena."""
 import json
 import os
+import re
 from contextlib import contextmanager
 import fcntl
 from pathlib import Path
@@ -21,10 +22,10 @@ li{padding:10px 18px;border-bottom:1px solid #344054}li:first-child{color:#e4a7f
 p{color:#b8c9dc}</style><main><h1>Nejvyšší skóre</h1><p id="status">Načítám skóre…</p><ol id="scores"></ol></main>
 <script>
 async function refresh(){try{
- const response=await fetch('/__neon_scores',{cache:'no-store'});
+ const response=await fetch('/__neon_leaderboard_v2',{cache:'no-store'});
  if(!response.ok)throw new Error();
  const scores=await response.json();
- const rows=scores.map(score=>{const row=document.createElement('li');row.textContent=String(score);return row});
+ const rows=scores.map(score=>{const row=document.createElement('li');row.textContent=`${score.initials}  ${score.score}`;return row});
  document.getElementById('scores').replaceChildren(...rows);
  document.getElementById('status').textContent=scores.length?'':'Zatím žádné skóre.';
 }catch{document.getElementById('status').textContent='Skóre se nepodařilo načíst.'}}
@@ -36,9 +37,15 @@ def valid_score(value):
     return type(value) is int and 0 <= value <= MAX_SCORE
 
 
+def valid_entry(value):
+    return (type(value) is dict and valid_score(value.get('score')) and value['score'] > 0
+            and type(value.get('initials')) is str and re.fullmatch(r'[A-Z]{1,3}', value['initials']) is not None)
+
+
 def make_scoreboard_handler(base_handler, score_path):
     """Add scoreboard routes without changing the supplied handler's other paths."""
     score_path = Path(score_path)
+    named_path = score_path.with_name(score_path.stem + '.v2' + score_path.suffix)
     lock = threading.Lock()
 
     @contextmanager
@@ -63,7 +70,20 @@ def make_scoreboard_handler(base_handler, score_path):
             raise ValueError('Existing scoreboard is not a numeric score array')
         return sorted(data, reverse=True)
 
-    def save_scores(scores):
+    def load_named():
+        try:
+            data = json.loads(named_path.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            return {'version': 2, 'entries': [], 'requests': []}
+        if (type(data) is not dict or data.get('version') != 2
+                or type(data.get('entries')) is not list or len(data['entries']) > 10
+                or not all(valid_entry(entry) for entry in data['entries'])
+                or type(data.get('requests')) is not list
+                or not all(type(key) is str for key in data['requests'])):
+            raise ValueError('Invalid named leaderboard')
+        return data
+
+    def save_scores(scores, destination=score_path):
         score_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None
         try:
@@ -74,7 +94,7 @@ def make_scoreboard_handler(base_handler, score_path):
                 stream.write('\n')
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, score_path)
+            os.replace(temporary, destination)
         finally:
             if temporary is not None:
                 try:
@@ -97,11 +117,11 @@ def make_scoreboard_handler(base_handler, score_path):
             if route == '/scoreboard':
                 self.respond(200, SCOREBOARD_HTML, 'text/html; charset=utf-8', head)
                 return True
-            if route != '/__neon_scores':
+            if route not in ('/__neon_scores', '/__neon_leaderboard_v2'):
                 return False
             try:
                 with locked_store():
-                    scores = load_scores()
+                    scores = load_named()['entries'] if route == '/__neon_leaderboard_v2' else load_scores()
                 self.respond(200, json.dumps(scores).encode('utf-8'), head=head)
             except (OSError, ValueError, UnicodeError):
                 self.respond(500, b'[]', head=head)
@@ -116,7 +136,9 @@ def make_scoreboard_handler(base_handler, score_path):
                 super().do_HEAD()
 
         def do_POST(self):
-            if urlsplit(self.path).path != '/__neon_scores':
+            route = urlsplit(self.path).path
+            named = route == '/__neon_leaderboard_v2'
+            if route not in ('/__neon_scores', '/__neon_leaderboard_v2'):
                 super().do_POST()
                 return
             try:
@@ -124,17 +146,32 @@ def make_scoreboard_handler(base_handler, score_path):
                 if not 0 < length <= MAX_BODY or self.headers.get_content_type() != 'application/json':
                     raise ValueError('Invalid request size or content type')
                 payload = json.loads(self.rfile.read(length))
-                if type(payload) is not dict or set(payload) != {'score'} or not valid_score(payload['score']):
+                if named:
+                    if (type(payload) is not dict or set(payload) != {'score', 'initials', 'requestId'}
+                            or not valid_entry(payload) or type(payload['requestId']) is not str
+                            or not re.fullmatch(r'[A-Za-z0-9:._-]{1,128}', payload['requestId'])):
+                        raise ValueError('Invalid named score')
+                elif type(payload) is not dict or set(payload) != {'score'} or not valid_score(payload['score']):
                     raise ValueError('Invalid score')
             except (ValueError, UnicodeError):
                 self.respond(400, b'[]')
                 return
             try:
                 with locked_store():
-                    scores = load_scores()
-                    scores.append(payload['score'])
-                    scores.sort(reverse=True)
-                    save_scores(scores)
+                    if named:
+                        data = load_named()
+                        if payload['requestId'] not in data['requests']:
+                            data['entries'].append({'score': payload['score'], 'initials': payload['initials']})
+                            data['entries'].sort(key=lambda entry: entry['score'], reverse=True)
+                            data['entries'] = data['entries'][:10]
+                            data['requests'] = (data['requests'] + [payload['requestId']])[-1000:]
+                            save_scores(data, named_path)
+                        scores = data['entries']
+                    else:
+                        scores = load_scores()
+                        scores.append(payload['score'])
+                        scores.sort(reverse=True)
+                        save_scores(scores)
                 self.respond(201, json.dumps(scores).encode('utf-8'))
             except (OSError, ValueError, UnicodeError):
                 self.respond(500, b'[]')

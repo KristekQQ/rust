@@ -262,16 +262,55 @@ pub fn geometry(kind: PanelKind, width: f32, height: f32, rows: &[(&str, String)
     }
     let mut mesh = empty_mesh(width, height);
     if kind == PanelKind::DebugText {
-        let value = rows.first().map_or("", |row| row.1.as_str());
+        let (style, value) = rows
+            .first()
+            .map_or(("", ""), |(key, value)| (*key, value.as_str()));
+        let timer = style == "XP BOOST";
+        let color = if timer || style == "XP PAYOUT" {
+            [1., 0.48, 0.06]
+        } else {
+            [0.55; 3]
+        };
+        if timer {
+            let seconds = rows
+                .get(1)
+                .and_then(|(_, s)| s.parse::<f32>().ok())
+                .unwrap_or(0.);
+            let fraction = (seconds / crate::xr_round::CAT_BOOST_SECONDS).clamp(0., 1.);
+            let width = width * 0.92;
+            quad(
+                &mut mesh,
+                -width / 2.,
+                -height * 0.35,
+                width,
+                height * 0.12,
+                0.,
+                [0.17, 0.08, 0.02],
+            );
+            quad(
+                &mut mesh,
+                -width / 2.,
+                -height * 0.35,
+                width * fraction,
+                height * 0.12,
+                0.001,
+                color,
+            );
+        }
         if !value.is_empty() {
-            let unit = fit(value, width * 0.94, height * 0.90);
+            let unit = fit(
+                value,
+                width * 0.94,
+                height * if timer { 0.72 } else { 0.90 },
+            );
+            let top = 3.5 * unit + if timer { height * 0.10 } else { 0. };
             text(
                 &mut mesh,
                 value,
                 -text_width(value, unit) / 2.,
-                3.5 * unit,
+                top,
                 unit,
-                [0.55, 0.55, 0.55],
+                color,
             );
         }
         return mesh;

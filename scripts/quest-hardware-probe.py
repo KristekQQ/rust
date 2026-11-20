@@ -52,6 +52,7 @@ def distribution(values):
 
 def validate_benchmark(data, variant, expected):
     half_glow = expected.get('experiment', 'font-atlas') == 'half-glow'
+    scene_comparison = expected.get('experiment') == 'scene'
     if (data.get('executionOS') != 'android' or data.get('physicalQuest') is not True
             or data.get('deviceLabel') != 'Quest_3' or data.get('openxrRuntime') is not False
             or data.get('fpsMeasurement') is not False):
@@ -66,9 +67,9 @@ def validate_benchmark(data, variant, expected):
                   totalRenderedFrames=expected['frames'] + expected['warmup'],
                   width=expected['size'], height=expected['size'], periodMs=expected['period_ms'],
                   eyesPerFrame=2, ssrEnabled=True, glowOff=False, frozenSimulation=True,
-                  fontGlowAtlas=half_glow or variant == 'candidate', format='Rgba8UnormSrgb', depthStore='Discard')
-    if half_glow:
-        checks.update(glowResolution=0.5 if variant == 'candidate' else 1.0,
+                  fontGlowAtlas=half_glow or scene_comparison or variant == 'candidate', format='Rgba8UnormSrgb', depthStore='Discard')
+    if half_glow or scene_comparison:
+        checks.update(glowResolution=0.5 if scene_comparison or variant == 'candidate' else 1.0,
                       view=expected.get('view', 'player'))
         if expected.get('view') == 'cut':
             arguments = config.get('arguments', [])
@@ -88,7 +89,7 @@ def validate_benchmark(data, variant, expected):
             raise ValueError(f'missing/mismatched actual effect parameter {key}')
     renderer = config.get('renderer', {})
     atlas = renderer.get('fontGlowAtlas')
-    if half_glow:
+    if half_glow or scene_comparison:
         if not isinstance(atlas, dict):
             raise ValueError('half-glow comparison must retain the enabled font atlas')
     elif variant == 'candidate':
@@ -104,6 +105,15 @@ def validate_benchmark(data, variant, expected):
         if variant == 'candidate':
             if half.get('draws', 0) <= 0 or half.get('width') != (expected['size'] + 1) // 2 or half.get('height') != (expected['size'] + 1) // 2:
                 raise ValueError('half-glow target unused or wrong dimensions')
+    if scene_comparison:
+        half = renderer.get('halfGlow', {})
+        if half.get('requestedScale') != 0.5:
+            raise ValueError('scene comparison must retain half-resolution glow')
+        if half.get('draws', 0) > 0:
+            if half.get('activeScale') != 0.5 or half.get('width') != (expected['size'] + 1) // 2 or half.get('height') != (expected['size'] + 1) // 2:
+                raise ValueError('scene comparison has a fallback or wrong half-glow target')
+        elif half.get('fallbackReason') != 'no-ordinary-glow':
+            raise ValueError('zero glow draws must be explained by no ordinary glow')
     totals, frames = [], []
     diagnostics = []
     for sample in data.get('samples', []):
@@ -302,14 +312,17 @@ def parse_args(argv=None):
     parser.add_argument('--warmup', type=int, default=60)
     parser.add_argument('--size', type=int, default=1728)
     parser.add_argument('--period-ms', type=float, default=16.667)
-    parser.add_argument('--experiment', choices=('font-atlas', 'half-glow'), default='font-atlas')
-    parser.add_argument('--view', choices=('player', 'cut'), default='player')
+    parser.add_argument('--experiment', choices=('font-atlas', 'half-glow', 'scene'), default='font-atlas')
+    parser.add_argument('--view', choices=('player', 'floor', 'cut'), default='player')
+    parser.add_argument('--candidate-assets', help='complete candidate asset tree; required only for scene comparison')
     parser.add_argument('--cut-age', type=float, default=0.08)
     parser.add_argument('--package', default='cz.kristek.neon.nativevr')
     parser.add_argument('--activity', default='android.app.NativeActivity')
-    parser.add_argument('--score-path', default='files/neon-top5.json')
+    parser.add_argument('--score-path', default='files/neon-top10.json')
     parser.add_argument('--awake-pid', type=int, help='optional existing device-side helper PID; observed only, never changed')
     args = parser.parse_args(argv)
+    if (args.experiment == 'scene') != bool(args.candidate_assets):
+        parser.error('--candidate-assets is required exactly for --experiment scene')
     if not 1 <= args.adb_port <= 65535 or not 1 <= args.pairs <= 6 or not 30 <= args.frames <= 3600:
         parser.error('port must be 1..65535; pairs 1..6; frames 30..3600')
     if not 0 <= args.warmup <= 600 or args.size % 64 or not 128 <= args.size <= 2048:
@@ -335,12 +348,18 @@ def main(argv=None):
     if any(p.is_symlink() for p in assets.rglob('*')):
         raise ValueError('asset symlinks are not allowed')
     hashes = {p.relative_to(assets).as_posix(): sha(p) for p in files}
+    candidate_assets = Path(args.candidate_assets).resolve() if args.candidate_assets else None
+    candidate_hashes = {}
+    if candidate_assets:
+        if not (candidate_assets / 'scene.json').is_file() or any(p.is_symlink() for p in candidate_assets.rglob('*')):
+            raise ValueError('candidate must be a complete asset tree without symlinks')
+        candidate_hashes = {p.relative_to(candidate_assets).as_posix(): sha(p) for p in sorted(candidate_assets.rglob('*')) if p.is_file()}
     out.mkdir(parents=True, exist_ok=False)
     remote = '/data/local/tmp/neon-hw-probe-' + uuid.uuid4().hex
     expected = dict(frames=args.frames, warmup=args.warmup, size=args.size, period_ms=args.period_ms,
                     experiment=args.experiment, view=args.view, cut_age=args.cut_age)
     manifest = dict(status='PREPARED', arguments=vars(args), expected=expected, binarySha256=sha(binary),
-                    assetsSha256=hashes, sceneSha256=hashes['scene.json'], remoteRoot=remote,
+                    assetsSha256=hashes, candidateAssetsSha256=candidate_hashes, sceneSha256=hashes['scene.json'], remoteRoot=remote,
                     clockLock=False, physicalQuestDiagnostic=True, order=paired_order(args.pairs),
                     scope='frozen offscreen stereo GPU pass timings; no XR compositor/FPS measurement', runs=[])
     write_json(out / 'manifest.json', manifest)  # Before any device mutation.
@@ -365,6 +384,10 @@ def main(argv=None):
         if adb.text('sha256sum ' + shlex.quote(remote + '/neon-preview')).split()[0] != manifest['binarySha256']:
             raise RuntimeError('remote binary SHA mismatch')
         verify_remote_hashes(adb, remote, assets, hashes)
+        if candidate_assets:
+            adb.shell('mkdir ' + shlex.quote(remote + '/candidate') + ' && mkdir ' + shlex.quote(remote + '/candidate/assets'))
+            adb.run('push', str(candidate_assets) + '/.', remote + '/candidate/assets', timeout=300)
+            verify_remote_hashes(adb, remote + '/candidate', candidate_assets, candidate_hashes)
         adb.shell('chmod 700 ' + shlex.quote(remote + '/neon-preview'))
         for pair, order in enumerate(paired_order(args.pairs)):
             for variant in order:
@@ -376,14 +399,19 @@ def main(argv=None):
                 command = [remote + '/neon-preview', '--output', remote_out, '--benchmark-frames', str(args.frames),
                            '--benchmark-warmup', str(args.warmup), '--benchmark-period-ms', str(args.period_ms),
                            '--size', str(args.size)]
+                if args.view == 'floor':
+                    command.append('--look-at-floor')
                 if args.view == 'cut':
                     command.extend(['--look-at-cut', '--cut-age', str(args.cut_age)])
-                if args.experiment == 'half-glow':
+                if args.experiment == 'scene':
+                    command.extend(['--glow-resolution', '0.5'])
+                elif args.experiment == 'half-glow':
                     command.extend(['--glow-resolution', '0.5' if variant == 'candidate' else '1'])
                 elif variant == 'baseline':
                     command.append('--no-font-glow-atlas')
                 active_pidfile = remote + '/' + name + '.pid'
-                shell = probe_wrapper(command, remote + '/assets', active_pidfile)
+                run_assets = remote + ('/candidate/assets' if candidate_assets and variant == 'candidate' else '/assets')
+                shell = probe_wrapper(command, run_assets, active_pidfile)
                 log = adb.shell(shell, timeout=max(180, int((args.frames + args.warmup) * args.period_ms / 1000) + 180), required=False)
                 # A successful remote wait proves the owned child has exited.
                 if log['returncode'] == 0:
@@ -398,7 +426,7 @@ def main(argv=None):
                 for filename in ('benchmark.json', 'report.json', 'left.png', 'right.png'):
                     adb.run('pull', remote_out + '/' + filename, str(local_out / filename), timeout=120)
                 benchmark = json.loads((local_out / 'benchmark.json').read_text())
-                if benchmark.get('config', {}).get('assets') != remote + '/assets':
+                if benchmark.get('config', {}).get('assets') != run_assets:
                     raise RuntimeError('benchmark used unexpected asset root')
                 for eye in ('left', 'right'):
                     with (local_out / (eye + '.png')).open('rb') as stream:

@@ -1,0 +1,28 @@
+{
+  "species": "blue",
+  "sourceUrls": {
+    "blue_anim.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/blue_anim.plist?v=1gobor&b=rc-26.07",
+    "blue_anim.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/blue_anim.png?v=16gq3tm&b=rc-26.07"
+  },
+  "frames": [
+    "blue_BASE_01.png",
+    "blue_BASE_02.png",
+    "blue_BASE_04.png",
+    "blue_BASE_05.png",
+    "blue_BASE_07.png",
+    "blue_BASE_08.png",
+    "blue_BASE_10.png",
+    "blue_BASE_11.png",
+    "blue_BASE_13.png",
+    "blue_BASE_14.png",
+    "blue_BASE_16.png",
+    "blue_BASE_17.png",
+    "blue_BASE_19.png",
+    "blue_BASE_20.png",
+    "blue_BASE_22.png",
+    "blue_BASE_23.png"
+  ],
+  "sourceAnimation": "BASE (gliding presentation, not authored flying cycle)",
+  "processing": "plist trim reconstruction, 16 evenly sampled base poses, 192px cells",
+  "sourceSha256": "cb02967941d09b4da46ffb691f6515e024696dfb0d0a4b15198055b1e088b8c9"
+}

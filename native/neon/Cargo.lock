@@ -545,6 +545,7 @@ name = "kristek-neon-native"
 version = "0.1.0"
 dependencies = [
  "android_logger",
+ "flate2",
  "glam",
  "kristek-rim-native",
  "libc",

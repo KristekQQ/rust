@@ -63,17 +63,25 @@ fn main() {
     let score_path = Some(
         ndk_glue::native_activity()
             .internal_data_path()
-            .join("neon-top5.json"),
+            .join("neon-top10.json"),
     );
     match kristek_rim_native::xr::run_with(
         "Kristek Neon Native",
         &read,
         &mut alive,
         &mut |device, queue, format, read| {
-            Ok(Box::new(
-                crate::app::App::new(device, queue, format, read, score_path.clone())?
-                    .with_reference_mode(settings.reference_mode),
-            ) as Box<dyn kristek_rim_native::xr::HostApp>)
+            let mut app = crate::app::App::new(device, queue, format, read, score_path.clone())?
+                .with_reference_mode(settings.reference_mode);
+            let proxy: crate::app::SwordGlowProxy =
+                serde_json::from_slice(&read("sword-glow.json")?)
+                    .map_err(|e| format!("Invalid sword-glow.json: {e}"))?;
+            app.set_sword_glow(&proxy)?;
+            log::info!(
+                "Sword glow ready: left={} right={}",
+                proxy.left.len(),
+                proxy.right.len()
+            );
+            Ok(Box::new(app) as Box<dyn kristek_rim_native::xr::HostApp>)
         },
     ) {
         Ok(()) => log::info!("OpenXR session finished"),

@@ -52,6 +52,7 @@ each accurately without translating one into another.
 
 ## Existing examples and terminology
 
+- **Local-space halo outlines for a rigid mesh.** Several nearby emissive edges can share a soft outline while the sharp mesh and hit shape keep their detail. Author the outline once in mesh coordinates. In Neon, one loop around each small sword rib reduced the [shipped halo recipe](../../../native/neon/assets/sword-glow.json) from 286 to 112 segments per sword in 0.13.82. Compare both eyes face-on and edge-on, including brightness at the tip and around the grip. In the fixed Quest 3 stereo test the front view went from 11.31 to 11.09 ms GPU time. The segment reduction alone does not establish a live FPS gain.
 - **Glyph boundary-distance atlas:** prepared textures replace many halo edge
   primitives while the real 3D digit cores remain. Oblique views use the original
   path. This is not a general billboard replacement for rotating cut fruit.

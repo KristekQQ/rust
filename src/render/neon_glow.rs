@@ -24,10 +24,11 @@ pub(crate) struct PreparedGlowMesh {
 }
 impl PreparedGlowMesh {
     pub(crate) fn new(mesh: &ImportedMesh) -> Option<Self> {
-        let mut vertices = Vec::new();
-        let mut indices = Vec::<u32>::new();
+        let mut prepared = Self {
+            vertices: Vec::new(),
+            indices: Vec::new(),
+        };
         let mut edges = BTreeMap::<[[u32; 3]; 2], GlowEdge>::new();
-        let max_vertices = u32::MAX as usize;
         for triangle in mesh.indices.as_chunks::<3>().0 {
             let Some(a) = mesh.vertices.get(triangle[0] as usize) else {
                 continue;
@@ -89,24 +90,47 @@ impl PreparedGlowMesh {
             if edge.count != 1 && !edge.crease {
                 continue;
             }
-            let vertex = Vertex {
-                position: ends[0].map(f32::from_bits),
-                color: (edge.color_sum / edge.count as f32).to_array(),
-                normal: ends[1].map(f32::from_bits),
-            };
-            if vertices.len().checked_add(4)? > max_vertices
-                || indices.len().checked_add(6)? > u32::MAX as usize
+            prepared.push_segment(
+                ends[0].map(f32::from_bits),
+                ends[1].map(f32::from_bits),
+                (edge.color_sum / edge.count as f32).to_array(),
+            )?;
+        }
+        (!prepared.vertices.is_empty()).then_some(prepared)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn from_segments(segments: &[[[f32; 3]; 3]]) -> Option<Self> {
+        let mut prepared = Self {
+            vertices: Vec::new(),
+            indices: Vec::new(),
+        };
+        for &[start, end, rgb] in segments {
+            let length_squared = Vec3::from(start).distance_squared(Vec3::from(end));
+            if !length_squared.is_finite()
+                || length_squared <= 1e-20
+                || rgb.iter().any(|&value| !value.is_finite() || value < 0.0)
             {
                 return None;
             }
-            let base = u32::try_from(vertices.len()).ok()?;
-            vertices.extend_from_slice(&[vertex; 4]);
-            indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+            prepared.push_segment(start, end, rgb)?;
         }
-        if vertices.is_empty() {
-            return None;
-        }
-        Some(Self { vertices, indices })
+        Some(prepared)
+    }
+
+    fn push_segment(&mut self, start: [f32; 3], end: [f32; 3], rgb: [f32; 3]) -> Option<()> {
+        u32::try_from(self.vertices.len().checked_add(4)?).ok()?;
+        u32::try_from(self.indices.len().checked_add(6)?).ok()?;
+        let base = self.vertices.len() as u32;
+        let vertex = Vertex {
+            position: start,
+            color: rgb,
+            normal: end,
+        };
+        self.vertices.extend_from_slice(&[vertex; 4]);
+        self.indices
+            .extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        Some(())
     }
 }
 impl GlowMesh {

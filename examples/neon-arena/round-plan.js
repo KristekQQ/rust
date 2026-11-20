@@ -3,7 +3,7 @@ import {DEFAULT_WAVE,FRUIT_KINDS,validateWave,planWave} from './wave-plan.js';
 /** @typedef {import('./wave-plan.js').WaveConfig} WaveConfig */
 /** @typedef {{position:[number,number,number],fruit?:string,scale?:number,velocity?:[number,number,number],lifetime?:number}} RoundTarget */
 /** @typedef {{apexSeconds:number,gravity:number}} RoundLaunch */
-/** @typedef {{at:number,label:string,wave:Partial<WaveConfig>,targets:RoundTarget[],launch?:RoundLaunch}} RoundCue */
+/** @typedef {{at:number,label:string,wave:Partial<WaveConfig>,targets:RoundTarget[],bursts?:number[][],launch?:RoundLaunch}} RoundCue */
 /** @typedef {{version:1,name:string,durationSeconds:60,cues:RoundCue[]}} RoundPlan */
 
 /** @param {unknown} input @param {string[]} keys */
@@ -15,7 +15,7 @@ function record(input,keys) {
 }
 /** @param {unknown} input @returns {RoundCue} */
 function validateCue(input) {
-    const cue=record(input,['at','label','wave','targets','launch']);
+    const cue=record(input,['at','label','wave','targets','launch','bursts']);
     /** @type {RoundLaunch|undefined} */
     let launch;
     if(cue.launch!==undefined){
@@ -52,7 +52,18 @@ function validateCue(input) {
     if(patch.count!==undefined&&patch.count!==targets.length)throw new Error('Pocet vlny neodpovida cilum.');
     validateWave({...patch,count:targets.length});
     if(launch)for(const target of targets)ballisticLaunch(target.position,target.velocity??[0,0,.015],launch);
-    return {at:cue.at,label:cue.label,...(launch?{launch}:{}),wave:/** @type {Partial<WaveConfig>} */({...patch,count:targets.length}),targets};
+    const bursts=cue.bursts;
+    if(bursts!==undefined){
+        if(!Array.isArray(bursts)||!bursts.length)throw new Error('Empty release pattern');
+        let previous=-1,total=0;
+        for(const step of bursts){
+            if(!Array.isArray(step)||step.length!==2||!Number.isFinite(step[0])||step[0]<=previous||
+                (previous<0&&step[0]!==0)||!Number.isInteger(step[1])||step[1]<1)throw new Error('Invalid release pattern');
+            previous=step[0];total+=step[1];
+        }
+        if(total!==targets.length)throw new Error('Release counts must match targets');
+    }
+    return {at:cue.at,label:cue.label,...(Array.isArray(bursts)?{bursts:bursts.map(step=>[...step])}:{}),...(launch?{launch}:{}),wave:/** @type {Partial<WaveConfig>} */({...patch,count:targets.length}),targets};
 }
 /** Validate and copy a JSON round without retaining mutable caller data.
  * @param {unknown} input @returns {RoundPlan} */
@@ -89,4 +100,18 @@ export function planCue(cue,baseWave=DEFAULT_WAVE,waveIndex=0) {
             lifetime:target.lifetime??recipe.lifetime,
             ...(checked.launch?ballisticLaunch(target.position,target.velocity??recipe.velocity,checked.launch):{})};
     });
+}
+
+/** Expand authored musical phrases into individual launches for both runtimes.
+ * @param {RoundPlan} plan @returns {RoundPlan} */
+export function releasePlan(plan){
+    const cues=plan.cues.flatMap(({bursts,...cue})=>{
+        let first=0;
+        return (bursts??[[0,cue.targets.length]]).map(([delay,count])=>{
+            const targets=cue.targets.slice(first,first+count);
+            first+=count;
+            return {...cue,at:cue.at+delay,wave:{...cue.wave,count},targets};
+        });
+    });
+    return validateRoundPlan({...plan,cues});
 }

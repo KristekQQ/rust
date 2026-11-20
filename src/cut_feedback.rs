@@ -44,7 +44,7 @@ struct Trail {
     ids: [u32; 3],
     enabled: bool,
     previous: Option<[Vec3; 2]>,
-    poses: [Option<Transform>; 3],
+    active: [bool; 3],
     ages: [f32; 3],
 }
 #[derive(Default)]
@@ -701,7 +701,7 @@ impl SceneManager {
         }
         for trail in feedback.trails.iter_mut().flatten() {
             trail.previous = None;
-            trail.poses = [None; 3];
+            trail.active = [false; 3];
             trail.ages = [1.; 3];
             for id in trail.ids {
                 self.park_feedback(id);
@@ -820,12 +820,14 @@ impl SceneManager {
         }
         for trail in feedback.trails.iter_mut().flatten() {
             for i in 0..3 {
+                if !trail.active[i] {
+                    continue;
+                }
                 trail.ages[i] += dt;
                 if trail.ages[i] >= 0.06 {
-                    if trail.poses[i].take().is_some() {
-                        self.park_feedback(trail.ids[i]);
-                    }
-                } else if trail.poses[i].is_some() {
+                    trail.active[i] = false;
+                    self.park_feedback(trail.ids[i]);
+                } else {
                     self.set_emission(trail.ids[i], 2. * (1. - trail.ages[i] / 0.06));
                 }
             }
@@ -868,7 +870,7 @@ impl SceneManager {
             ids,
             enabled,
             previous: None,
-            poses: [None; 3],
+            active: [false; 3],
             ages: [1.; 3],
         });
         Ok(())
@@ -884,7 +886,7 @@ impl SceneManager {
         };
         let trail = self.feedback.trails[slot].as_mut().unwrap();
         trail.previous = None;
-        trail.poses = [None; 3];
+        trail.active = [false; 3];
         trail.ages = [1.; 3];
         for id in trail.ids {
             self.park_feedback(id);
@@ -924,7 +926,7 @@ impl SceneManager {
                         transform.rotation,
                         transform.scale,
                     );
-                    trail.poses[i] = Some(transform);
+                    trail.active[i] = true;
                     trail.ages[i] = alpha * 0.035;
                     self.set_emission(trail.ids[i], 2. * (1. - alpha));
                 }

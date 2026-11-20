@@ -314,6 +314,10 @@ impl Controls {
             &info_toggle,
             instance.string_to_path("/user/hand/left/input/y/click")?,
         ));
+        bindings.push(xr::Binding::new(
+            &info_toggle,
+            instance.string_to_path("/user/hand/right/input/b/click")?,
+        ));
         for hand in ["left", "right"] {
             bindings.push(xr::Binding::new(
                 &haptic,

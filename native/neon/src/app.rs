@@ -1,4 +1,5 @@
 //! XR owns rendering and late hand/head poses; gameplay is simulation-thread owned.
+pub const PERFORMANCE_PANEL_OFFSET: Vec3 = Vec3::new(-0.82, 1.66, -1.65);
 pub const NEON_GLOW_STRENGTH: f32 = 0.4;
 pub const NEON_GLOW_RADIUS: f32 = 0.045;
 pub const NEON_SSR_STRENGTH: f32 = 0.92;
@@ -11,7 +12,7 @@ use crate::{
     settings::ReferenceMode,
     simulation::{Simulation, Snapshot, WorkerMetrics},
 };
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Vec2, Vec3};
 use kristek_rim_native::{
     info::Info,
     measurement::{AppMetrics, Config, ReplayMetrics, Setup},
@@ -36,6 +37,10 @@ use webgpu_wasm::{
 struct ReplayConfig {
     cutting: bool,
     duration_s: f32,
+    #[serde(default)]
+    irregular_hands: bool,
+    #[serde(default)]
+    cut_buffer_pool: bool,
 }
 struct PlayerReplay {
     config: ReplayConfig,
@@ -60,8 +65,10 @@ impl PlayerReplay {
             return Err("Replay duration must be10..120 seconds".into());
         }
         log::info!("Diagnostic player replay: cutting={} duration={}s; ordinary game/worker; temporary score store",config.cutting,config.duration_s);
+        let mut driver = Replay::new(config.cutting);
+        driver.set_irregular_hands(config.irregular_hands);
         Ok(Some(Self {
-            driver: Replay::new(config.cutting),
+            driver,
             config,
             settle_s: 0.,
             last_tick: None,
@@ -136,6 +143,13 @@ impl PlayerReplay {
         (scripted, reference, false)
     }
 }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SwordGlowProxy {
+    pub left: Vec<[[f32; 3]; 3]>,
+    pub right: Vec<[[f32; 3]; 3]>,
+}
+
 pub struct App {
     pub renderer: SceneRenderer,
     pub player: XrPlayer,
@@ -145,8 +159,9 @@ pub struct App {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub applied_sequence: u64,
-    local_ids: [u32; 3],
+    local_ids: Vec<u32>,
     post: PostProcessor,
+    visor_splat: webgpu_wasm::render::visor_splat::VisorSplat,
     last_frame: Option<Instant>,
     published: Option<Instant>,
     simulation_ms: f64,
@@ -231,7 +246,7 @@ impl App {
         let mut scene = SceneManager::default();
         let simulation_content = Content::load(&mut scene, read)?;
         let game = Game::new(&mut scene, &simulation_content, score_path)?;
-        let local_ids = [
+        let mut local_ids = vec![
             game.ref_id("infoPanel")?,
             game.ref_id("leftSword")?,
             game.ref_id("sword")?,
@@ -255,24 +270,86 @@ impl App {
         let mut player = XrPlayer::default();
         player.bind_hand(&mut renderer.scene, 0, Some(local_ids[1]), false)?;
         player.bind_hand(&mut renderer.scene, 1, Some(local_ids[2]), false)?;
-        let info = Info::from_panel(&mut renderer.scene, &mut player, local_ids[0])?;
+        for (hand, name) in ["leftPetHand", "rightPetHand"].into_iter().enumerate() {
+            if let Ok(id) = game.ref_id(name) {
+                player.bind_pet_hand(&mut renderer.scene, hand, Some(id))?;
+                local_ids.push(id);
+            }
+        }
+        player.set_petting_override([false; 2]);
+        let info = Info::from_panel(
+            &mut renderer.scene,
+            &mut player,
+            local_ids[0],
+            PERFORMANCE_PANEL_OFFSET,
+        )?;
         let simulation_state = game.state();
+        let publisher = if replay.as_ref().is_some_and(|r| r.config.cut_buffer_pool) {
+            webgpu_wasm::scene::publication::RenderPublisher::with_cut_pool(
+                device.clone(),
+                queue.clone(),
+            )
+        } else {
+            webgpu_wasm::scene::publication::RenderPublisher::with_cut_device(device.clone())
+        };
         let simulation = Simulation::new_with_observer(
             scene,
             game,
             measurement_setup.is_some(),
             scene_observer,
+            publisher,
         )?;
         let mut post = PostProcessor::new(&device, format);
         post.set_effect("fxaa", false, 1.);
         // Match the original browser arena: half-resolution floor SSR at .92.
-        post.configure_ssr(NEON_SSR_SCALE);
+        // Shared authored pool: baked floor lighting plus the same world-space
+        // reflection mask used by the observer. No light/shadow pass is added.
+        let spot: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../examples/neon-arena/assets/neon-spotlight-profile.json"
+        ))
+        .map_err(|e| e.to_string())?;
+        let vector = |value: &serde_json::Value| -> Result<Vec3, String> {
+            let values = value.as_array().ok_or("Invalid spotlight vector")?;
+            if values.len() != 3 {
+                return Err("Invalid spotlight vector length".into());
+            }
+            Ok(Vec3::new(
+                values[0].as_f64().ok_or("Invalid x")? as f32,
+                values[1].as_f64().ok_or("Invalid y")? as f32,
+                values[2].as_f64().ok_or("Invalid z")? as f32,
+            ))
+        };
+        let ssr = &spot["ssr"];
+        post.configure_ssr(ssr["resolutionScale"].as_f64().ok_or("Invalid SSR scale")? as f32);
         post.configure_ssr_region(
-            Vec3::new(-1.5, -0.03, -3.),
-            Vec3::new(1.5, 0.03, 0.75),
+            vector(&ssr["receiverBounds"]["min"])?,
+            vector(&ssr["receiverBounds"]["max"])?,
             true,
         );
-        post.set_effect("ssr", true, NEON_SSR_STRENGTH);
+        post.set_effect(
+            "ssr",
+            true,
+            ssr["strength"].as_f64().ok_or("Invalid SSR strength")? as f32,
+        );
+        let mask = &spot["mask"];
+        let pair = |v: &serde_json::Value| -> Result<Vec2, String> {
+            Ok(Vec2::new(
+                v[0].as_f64().ok_or("Invalid mask x")? as f32,
+                v[1].as_f64().ok_or("Invalid mask y")? as f32,
+            ))
+        };
+        if !post.set_reflection_mask(
+            &device,
+            &queue,
+            mask["width"].as_u64().ok_or("Invalid mask width")? as u32,
+            mask["height"].as_u64().ok_or("Invalid mask height")? as u32,
+            include_bytes!("../../../examples/neon-arena/assets/neon-spotlight-mask.bin"),
+            pair(&mask["center"])?,
+            pair(&mask["size"])?,
+        ) {
+            return Err("Invalid spotlight reflection mask".into());
+        }
+        let visor_splat = webgpu_wasm::render::visor_splat::VisorSplat::new(&device, format);
         let mut app = Self {
             renderer,
             player,
@@ -283,6 +360,7 @@ impl App {
             queue,
             local_ids,
             post,
+            visor_splat,
             last_frame: None,
             applied_sequence: 0,
             published: None,
@@ -327,16 +405,40 @@ impl App {
         self.published = Some(snapshot.sampled);
         self.audio
             .snapshot(snapshot.audio, snapshot.sampled.elapsed().as_secs_f64());
+        self.player.set_petting_override([0, 1].map(|hand| {
+            snapshot.state["pettingHands"][hand]
+                .as_bool()
+                .unwrap_or(false)
+        }));
+        for hand in 0..2 {
+            self.player.set_hand_suppressed(
+                hand,
+                snapshot.state["drinkingHands"][hand]
+                    .as_bool()
+                    .unwrap_or(false),
+            );
+        }
         self.simulation_state = snapshot.state;
+        let prior_splat = self.renderer.scene.visor_splat_remaining();
         let retired = self
             .renderer
             .scene
             .apply_render_publication(snapshot.publication, &self.local_ids);
+        if prior_splat <= 0. && self.renderer.scene.visor_splat_remaining() > 0. {
+            log::info!("Bird visor impact");
+        }
         self.simulation.retire(retired);
     }
     /// Offscreen acceptance only, never called from the real OpenXR frame path.
     pub fn replay_ssr(&mut self, enabled: bool) {
         self.post.set_effect("ssr", enabled, NEON_SSR_STRENGTH);
+    }
+    /// Upload the authored halos once, after the immutable sword meshes are installed.
+    pub fn set_sword_glow(&mut self, proxy: &SwordGlowProxy) -> Result<(), String> {
+        self.renderer
+            .set_mesh_glow_segments(self.local_ids[1], &proxy.left)?;
+        self.renderer
+            .set_mesh_glow_segments(self.local_ids[2], &proxy.right)
     }
     pub fn reflection_work(&self) -> [f64; 2] {
         self.post.ssr_work_stats()
@@ -370,6 +472,7 @@ impl HostApp for App {
             publication_age_ms: self
                 .snapshot_published
                 .map_or(0., |t| t.elapsed().as_secs_f64() * 1000.),
+            cut_pool: w.cut_pool,
             worker_samples: w.samples,
             worker_queue_ms: w.queue_ms,
             worker_game_ms: w.game_ms,
@@ -439,6 +542,9 @@ impl HostApp for App {
         } else {
             input
         };
+        self.renderer
+            .scene
+            .set_billboard_camera(input.head.map(|m| m.w_axis.truncate()));
         if let Some(head) = input.head {
             self.audio.listener(head.to_cols_array());
         }
@@ -455,7 +561,13 @@ impl HostApp for App {
         self.renderer.main_draw_calls = 0;
         self.renderer.begin_external_scene_frame(input.dt);
         self.simulation.submit(input)?;
+        let mut boost_activated = false;
         if let Some(snapshot) = self.simulation.poll()? {
+            boost_activated = snapshot.state["catWildRemaining"].as_f64().unwrap_or(0.) > 0.
+                && self.simulation_state["catWildRemaining"]
+                    .as_f64()
+                    .unwrap_or(0.)
+                    <= 0.;
             self.apply(snapshot);
         }
         // No collision/cutting on these render-only equipment controllers.
@@ -465,6 +577,13 @@ impl HostApp for App {
             self.player
                 .update_head(&mut self.renderer.scene, input.head)?;
             for hand in 0..2 {
+                // Tracking reset can occur without a new worker publication.
+                self.player.set_hand_suppressed(
+                    hand,
+                    self.simulation_state["drinkingHands"][hand]
+                        .as_bool()
+                        .unwrap_or(false),
+                );
                 self.player.update_hand(
                     &mut self.renderer.scene,
                     hand,
@@ -476,6 +595,14 @@ impl HostApp for App {
         }
         self.renderer.finish_scene_updates();
         self.info.update_ms = start.elapsed().as_secs_f64() * 1000.;
+        if boost_activated {
+            log::info!(
+                "XP boost activated: sequence={} worker_ms={:.2} xr_update_ms={:.2}",
+                self.applied_sequence,
+                self.simulation_ms,
+                self.info.update_ms
+            );
+        }
         self.log_elapsed += input.dt.max(0.);
         if self.log_elapsed >= 1. {
             self.log_elapsed = 0.;
@@ -501,6 +628,11 @@ impl HostApp for App {
             slot,
             [0., 0., 0.],
         )?;
+        let splat_remaining = self.renderer.scene.visor_splat_remaining();
+        if splat_remaining > 0.0 {
+            self.visor_splat
+                .render(&self.device, &self.queue, target, splat_remaining);
+        }
         let view_bit = 1u8 << slot.min(7);
         if self.glow_logged_views & view_bit == 0 {
             log::info!(
@@ -534,6 +666,8 @@ mod replay_host_tests {
             config: ReplayConfig {
                 cutting: true,
                 duration_s: 65.,
+                irregular_hands: false,
+                cut_buffer_pool: false,
             },
             driver: Replay::new(true),
             settle_s: 0.,

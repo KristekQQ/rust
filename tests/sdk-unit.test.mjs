@@ -146,6 +146,50 @@ test('simulation publications preserve legacy calls and forward explicit spawn I
     engine.dispose();
 });
 
+test('observer playback preserves timestamps, owned local IDs and optional debug exports', async t => {
+    const canvas = environment(t);
+    const calls = [];
+    const state = {enabled: true, timeMs: 1234.5, sequence: '9007199254740993'};
+    const bounds = {entries: [], truncated: false};
+    globalThis.__sdkImport = async () => wasmMock({
+        set_scene_playback: (...args) => calls.push(['playback', ...args]),
+        enqueue_scene_publication: (...args) => calls.push(['enqueue', ...args]),
+        scene_playback_state: () => JSON.stringify(state),
+        set_scene_prediction: (...args) => calls.push(['prediction', ...args]),
+        set_scene_prediction_sample_time: (...args) => calls.push(['sample', ...args]),
+        debug_scene_bounds: () => JSON.stringify(bounds),
+        add_cube: () => 7,
+        dispose() {},
+    });
+    const {initEngine, SceneObject} = await sdk();
+    const engine = await initEngine(canvas);
+    const local = engine.scene.createCube();
+    const bytes = new Uint8Array([1, 2, 3]);
+    engine.setScenePlayback();
+    engine.setScenePlayback({delayMs: 0, maxExtrapolationMs: 40, maxDistance: 1});
+    engine.enqueueScenePublication(bytes, 1234.5, [local]);
+    engine.setScenePrediction({horizonMs: 75});
+    engine.setScenePredictionSampleTime(1234.5);
+    assert.deepEqual(engine.scenePlaybackState(), state);
+    assert.deepEqual(engine.debugSceneBounds(), bounds);
+    assert.throws(() => engine.enqueueScenePublication([1, 2, 3], 1234.5), /publication\/owner/);
+    assert.throws(() => engine.enqueueScenePublication(bytes, 1234.5, [new SceneObject({}, 7)]), /publication\/owner/);
+    assert.deepEqual(calls, [
+        ['playback', 120, 80, 2],
+        ['playback', 0, 40, 1],
+        ['enqueue', bytes, 1234.5, new Uint32Array([7])],
+        ['prediction', 75],
+        ['sample', 1234.5],
+    ]);
+    engine.dispose();
+    assert.throws(() => engine.scenePlaybackState(), /ukončen/);
+    assert.throws(() => engine.debugSceneBounds(), /ukončen/);
+    globalThis.__sdkImport = async () => wasmMock({dispose() {}});
+    const releaseEngine = await initEngine(canvas);
+    assert.equal(releaseEngine.debugSceneBounds, undefined);
+    releaseEngine.dispose();
+});
+
 test('orbit and world/screen commands forward to Rust, including lifecycle guards',async t=>{
     const canvas=environment(t),calls=[];
     globalThis.__sdkImport=async()=>wasmMock({set_camera_handedness:v=>{calls.push(["handedness",v]);return true;},set_orbit_view:(...p)=>{calls.push(p);return true;},adjust_orbit:(...p)=>{calls.push(p);return true;},camera_view_state:()=>JSON.stringify({position:[1,2,3],orbitTarget:[0,0,0]}),world_to_screen:()=>new Float32Array([.25,.75]),dispose(){}});

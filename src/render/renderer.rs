@@ -300,6 +300,25 @@ struct AlphaIndices {
     count: u32,
 }
 
+#[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+pub(crate) mod cut_buffer_pool;
+
+#[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+pub(crate) struct PreparedCutBuffers {
+    device: wgpu::Device,
+    mesh: Mesh,
+}
+#[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+impl PreparedCutBuffers {
+    pub(crate) fn new(device: &wgpu::Device, model: &crate::gltf_loader::ImportedMesh) -> Self {
+        Self {
+            device: device.clone(),
+            mesh: Mesh::imported(device, model),
+        }
+    }
+}
+
+#[derive(Clone)]
 struct Mesh {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -307,6 +326,8 @@ struct Mesh {
     index_format: wgpu::IndexFormat,
     panel_dynamic: bool,
     panel_indices: Vec<u32>,
+    #[cfg(not(target_arch = "wasm32"))]
+    _cut_lease: Option<std::sync::Arc<()>>,
 }
 
 impl Mesh {
@@ -330,6 +351,8 @@ impl Mesh {
             index_format: wgpu::IndexFormat::Uint16,
             panel_dynamic: false,
             panel_indices: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            _cut_lease: None,
         }
     }
     fn panel_buffer(device: &wgpu::Device, bytes: u64, vertex: bool) -> wgpu::Buffer {
@@ -356,17 +379,12 @@ impl Mesh {
         stats: &mut PanelMeshStats,
     ) {
         let _scope = super::profiler::cpu_scope("panel.upload");
-        let vertices: Vec<Vertex> = model
-            .vertices
-            .iter()
-            .map(|v| Vertex {
-                position: v.position,
-                color: v.color,
-                normal: v.normal,
-            })
-            .collect();
         for (buffer, bytes, vertex) in [
-            (&mut self.vertex_buffer, data::as_bytes(&vertices), true),
+            (
+                &mut self.vertex_buffer,
+                data::as_bytes(&model.vertices),
+                true,
+            ),
             (
                 &mut self.index_buffer,
                 data::as_bytes(&model.indices),
@@ -428,6 +446,8 @@ impl Mesh {
             index_format: wgpu::IndexFormat::Uint32,
             panel_dynamic: true,
             panel_indices: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            _cut_lease: None,
         };
         stats.buffers_created += 2;
         stats.created_bytes += v + i;
@@ -443,18 +463,9 @@ impl Mesh {
         vertex_label: &str,
         index_label: &str,
     ) -> Self {
-        let vertices: Vec<Vertex> = model
-            .vertices
-            .iter()
-            .map(|v| Vertex {
-                position: v.position,
-                color: v.color,
-                normal: v.normal,
-            })
-            .collect();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(vertex_label),
-            contents: data::as_bytes(&vertices),
+            contents: data::as_bytes(&model.vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -469,6 +480,8 @@ impl Mesh {
             index_format: wgpu::IndexFormat::Uint32,
             panel_dynamic: false,
             panel_indices: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            _cut_lease: None,
         }
     }
 }
@@ -621,6 +634,8 @@ pub struct SceneRenderer {
     main_root_culling: bool,
     main_primitive_culling: bool,
     pub upload_bytes: usize,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub worker_cut_meshes_adopted: u64,
     pub prepare_ms: f64,
     /// Actual draw/draw_indexed commands in the current/last submitted frame.
     pub draw_calls: usize,
@@ -780,6 +795,8 @@ impl SceneRenderer {
             main_root_culling: true,
             main_primitive_culling: true,
             upload_bytes: 0,
+            #[cfg(not(target_arch = "wasm32"))]
+            worker_cut_meshes_adopted: 0,
             prepare_ms: 0.0,
             draw_calls: 0,
             main_draw_calls: 0,
@@ -998,6 +1015,16 @@ impl SceneRenderer {
                 removed.insert(super::gltf_gpu::GltfGpu::model_generation(&model));
             }
         }
+        for id in &changes.updated {
+            if self.scene.sprite_ids.contains(id)
+                && !self.gltf_models.contains_key(id)
+                && self.scene.model(*id).is_some()
+            {
+                if let Err(error) = self.register_gltf_model(*id) {
+                    super::platform::report_error(&error);
+                }
+            }
+        }
         if !self.model_publication_reuse {
             self.model_publication_full_scans += 1;
             self.gltf_models.retain(|id, model| {
@@ -1047,6 +1074,18 @@ impl SceneRenderer {
                         0.0,
                         0.0,
                     ],
+                    object.sprite.map_or([0.; 4], |v| v.uniform()),
+                    self.scene
+                        .billboard_camera
+                        .map_or([0.; 4], |v| [v.x, v.y, v.z, 1.]),
+                    object.sprite.map_or([0.; 4], |v| v.view_uniform()),
+                    object
+                        .sprite
+                        .map_or([[0.; 4]; 2], |v| v.direction_uniform()),
+                    object.sprite.map_or(
+                        [crate::scene::sprite::SpriteAtlasBandUniform::default(); 8],
+                        |v| v.atlas_uniform(),
+                    ),
                 ) {
                     Ok(bytes) => self.upload_bytes += bytes,
                     Err(error) => {
@@ -1156,7 +1195,7 @@ impl SceneRenderer {
             if unchanged && self.imported_meshes.contains_key(&id) {
                 continue;
             }
-            let _upload_scope = super::profiler::cpu_scope("mesh.upload");
+            let _install_scope = super::profiler::cpu_scope("mesh.install");
             let generated;
             let render_mesh = if let Some(prepared) = object.mesh.prepared_render() {
                 prepared
@@ -1168,9 +1207,25 @@ impl SceneRenderer {
                 &generated
             };
             self.neon_meshes.remove(&id);
-            self.upload_bytes += render_mesh.vertices.len() * 36 + render_mesh.indices.len() * 4;
-            self.imported_meshes
-                .insert(id, Mesh::imported(&self.device, render_mesh));
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            let uploaded = object
+                .mesh
+                .cut_buffers()
+                .filter(|prepared| prepared.device == self.device)
+                .map(|prepared| {
+                    self.worker_cut_meshes_adopted += 1;
+                    prepared.mesh.clone()
+                });
+            let upload = |upload_bytes: &mut usize| {
+                let _scope = super::profiler::cpu_scope("mesh.upload");
+                *upload_bytes += render_mesh.vertices.len() * 36 + render_mesh.indices.len() * 4;
+                Mesh::imported(&self.device, render_mesh)
+            };
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            let mesh = uploaded.unwrap_or_else(|| upload(&mut self.upload_bytes));
+            #[cfg(target_arch = "wasm32")]
+            let mesh = upload(&mut self.upload_bytes);
+            self.imported_meshes.insert(id, mesh);
             self.cpu_mesh_sources.insert(id, object.mesh.clone());
             self.alpha_indices.remove(&id);
         }
@@ -1204,6 +1259,18 @@ impl SceneRenderer {
                 0.0,
                 0.0,
             ],
+            object.sprite.map_or([0.; 4], |v| v.uniform()),
+            self.scene
+                .billboard_camera
+                .map_or([0.; 4], |v| [v.x, v.y, v.z, 1.]),
+            object.sprite.map_or([0.; 4], |v| v.view_uniform()),
+            object
+                .sprite
+                .map_or([[0.; 4]; 2], |v| v.direction_uniform()),
+            object.sprite.map_or(
+                [crate::scene::sprite::SpriteAtlasBandUniform::default(); 8],
+                |v| v.atlas_uniform(),
+            ),
         )?;
         self.gltf_models.insert(id, gpu);
         Ok(())
@@ -1225,6 +1292,11 @@ impl SceneRenderer {
             instance.revision,
             Mat4::IDENTITY,
             [0.0, 1.0, 0.0, 0.0],
+            [0.; 4],
+            [0.; 4],
+            [0.; 4],
+            [[0.; 4]; 2],
+            [crate::scene::sprite::SpriteAtlasBandUniform::default(); 8],
         )?;
         let id = self.scene.add_model(asset)?;
         self.gltf_models.insert(id, gpu);
@@ -1516,6 +1588,33 @@ impl SceneRenderer {
             .get_or_insert_with(|| super::neon_glow::NeonGlow::new(&self.device))
             .configure(strength, radius)
     }
+    /// Override one unshared triangle mesh's halo until its geometry changes.
+    /// Uses the ordinary object transform, emission, depth and capsule draw path.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn set_mesh_glow_segments(
+        &mut self,
+        id: u32,
+        segments: &[[[f32; 3]; 3]],
+    ) -> Result<(), String> {
+        use super::neon_glow::{GlowMesh, PreparedGlowMesh};
+        if !self.scene.triangle_meshes().contains_key(&id)
+            || self.scene.variant_instances.contains_key(&id)
+        {
+            return Err(format!("Object {id} has no unshared triangle mesh"));
+        }
+        let glow = if segments.is_empty() {
+            None
+        } else {
+            let prepared = PreparedGlowMesh::from_segments(segments)
+                .ok_or_else(|| format!("Invalid glow segments for object {id}"))?;
+            Some(
+                GlowMesh::from_prepared(&self.device, &prepared)
+                    .ok_or_else(|| format!("Glow segments for object {id} exceed GPU limits"))?,
+            )
+        };
+        self.neon_meshes.insert(id, glow);
+        Ok(())
+    }
     /// Ordinary-edge halo resolution (default 0.5). Only 1.0 and 0.5 are supported;
     /// unsupported targets/backends retain the original full-resolution path.
     pub fn configure_neon_glow_resolution(&mut self, scale: f32) -> bool {
@@ -1586,6 +1685,24 @@ impl SceneRenderer {
             self.font_glow_params[1],
             &cache.queue.imported,
         );
+    }
+    /// Eligibility from the current prepared geometry, not an observed pass count.
+    #[cfg(debug_assertions)]
+    pub(crate) fn debug_glow_eligible(&self, id: u32) -> bool {
+        let Some(object) = self.scene.objects().get(&id) else {
+            return false;
+        };
+        let crate::scene::MeshKind::Imported(handle) = object.mesh else {
+            return false;
+        };
+        self.neon_glow.as_ref().is_some_and(|glow| glow.enabled())
+            && object.render_data.instance.emission[0] > 0.0
+            && !self.scene.is_cut_feedback_ring(handle)
+            && (self.neon_meshes.get(&handle).is_some_and(Option::is_some)
+                || (self.font_glow.is_some()
+                    && (self.scene.is_text_object(handle)
+                        || self.scene.font3d_assets().any(|asset| *asset == handle)
+                        || self.scene.numeric_font_digit(handle).is_some())))
     }
     fn has_neon_geometry(&self, id: u32) -> bool {
         self.scene.triangle_meshes().contains_key(&id)

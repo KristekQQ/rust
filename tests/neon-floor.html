@@ -1,0 +1,34 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><title>Texturovaná podlaha Neon</title>
+<style>body{background:#101521;color:#fff}canvas{width:800px;height:600px}</style>
+<canvas id="gpu-canvas" width="800" height="600"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {createScene,NEON_GLOW} from '../examples/neon-arena/scene.js';
+import {ParallelBridge} from '../examples/neon-arena/parallel-bridge.js';
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+const result=document.querySelector('#result');
+try {
+ const mode=new URLSearchParams(location.search).get('floor');
+ const canvas=document.querySelector('canvas');
+ const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')==='webgl'?'webgl':'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.setSceneAuthoringPaused(true);
+ const world=await createScene(engine.scene);await world.loadDecorations();
+ engine.setNeonGlow(NEON_GLOW);engine.prewarmFontGlowAtlas('0123456789+-');
+ const bridge=await ParallelBridge.create(engine,world,{mode:'worker'});
+ await bridge.settle();engine.setSceneAuthoringPaused(false);
+ const wait=async()=>{for(let i=0;i<5;i++)await new Promise(requestAnimationFrame);};
+ if(world.floorMode!==mode||world.floorMetadata.triangles!==2||world.floorTiles.info.primitives!==1||world.floorGrout!==world.floorTiles)throw Error('Wrong experimental floor or duplicate floor geometry');
+ for(const [position,target] of [[[0,1.7,.8],[0,0,-1.5]],[[.3,.3,.1],[0,0,-1.5]]]) {
+  engine.setOrbitView(position,target);await wait();
+  const before=await capturePixels(canvas);assertForeground(before,'textured floor scene',500);
+  world.floorTiles.setPosition([0,-100,0]);await wait();
+  assertChanged(before,await capturePixels(canvas),'floor visibly renders from standing and grazing views',1500);
+  world.floorTiles.setPosition([0,0,0]);await wait();
+ }
+ engine.setOrbitView([0,1.7,.8],[0,0,-1.5]);await wait();
+ bridge.dispose();
+ window.floorTest={mode,metadata:world.floorMetadata};
+ result.textContent=`PASS: ${mode}, 2 triangles, standing + grazing rendering, simulation identity, ${engine.renderer_backend()}`;
+} catch(error) {result.textContent='FAIL: '+(error.stack||error);}
+</script></html>

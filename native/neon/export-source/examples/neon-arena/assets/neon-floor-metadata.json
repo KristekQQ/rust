@@ -1,0 +1,55 @@
+{
+  "generator": "node scripts/generate-neon-floor.mjs",
+  "tileSpacing": 0.75,
+  "bounds": {
+    "min": [
+      -3,
+      0,
+      -5.25
+    ],
+    "max": [
+      3,
+      0,
+      2.25
+    ]
+  },
+  "grid": [
+    8,
+    10
+  ],
+  "vertices": 4,
+  "triangles": 2,
+  "primitives": 1,
+  "textureSize": [
+    512,
+    512
+  ],
+  "textureRepeatMeters": 1.5,
+  "extensions": [],
+  "reflectivity": 0.94,
+  "normalScale": 0.55,
+  "baseline": {
+    "tileVertices": 640,
+    "tileTriangles": 960,
+    "groutVertices": 8,
+    "groutTriangles": 12
+  },
+  "files": {
+    "neon-floor-color.png": {
+      "bytes": 18420,
+      "sha256": "b797b229204652449e78a9c2d33227255c8169fd24e546ada1de0dbd11a215c8"
+    },
+    "neon-floor-normal.png": {
+      "bytes": 2718,
+      "sha256": "288f19f5050aa9bf6c524c845f9dee5bc2fb424a2e0278a842bd1b97f04947b7"
+    },
+    "neon-floor-texture.gltf": {
+      "bytes": 2760,
+      "sha256": "ff7da42e195482b601ab9f1da7d960ed13eba0ab187e15f2cd50f787216fcd55"
+    },
+    "neon-floor-normal.gltf": {
+      "bytes": 3019,
+      "sha256": "6dbc3ad449385bc56c806e238731275b6cbc8ab57388c3e1d50920e01dfbb6a0"
+    }
+  }
+}

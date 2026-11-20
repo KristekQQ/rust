@@ -1,0 +1,255 @@
+{
+  "sourceUrls": {
+    "feather_anim1.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/feather_anim1.plist",
+    "feather_anim1.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/feather_anim1.png",
+    "feather_anim2.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/feather_anim2.plist",
+    "feather_anim2.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/feather_anim2.png"
+  },
+  "sourceSha256": {
+    "feather_anim1.plist": "9df9499264e6d9c959a2d1b2c285fb0b3751baab33cbfc7c9e5bb13b74aa51d4",
+    "feather_anim1.png": "a50c695e35a82f61f0e5e7f743526488651956f24d4841f3ea7458ad139550f5",
+    "feather_anim2.plist": "60a2ac5f73d61f982d14824be06912bc444ff3dff2dfb861234db77e49d32b14",
+    "feather_anim2.png": "09a0de9cba94350c9b9af34a32ddc4390bce7b479d361a9a91fa44b905848f39"
+  },
+  "frames": [
+    {
+      "name": "symbols_feather_01.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 278
+    },
+    {
+      "name": "symbols_feather_02.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 280
+    },
+    {
+      "name": "symbols_feather_03.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 282
+    },
+    {
+      "name": "symbols_feather_04.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 284
+    },
+    {
+      "name": "symbols_feather_05.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 286
+    },
+    {
+      "name": "symbols_feather_06.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 288
+    },
+    {
+      "name": "symbols_feather_07.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 290
+    },
+    {
+      "name": "symbols_feather_08.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 292
+    },
+    {
+      "name": "symbols_feather_09.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 294
+    },
+    {
+      "name": "symbols_feather_10.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 296
+    },
+    {
+      "name": "symbols_feather_11.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 298
+    },
+    {
+      "name": "symbols_feather_12.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 300
+    },
+    {
+      "name": "symbols_feather_13.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 302
+    },
+    {
+      "name": "symbols_feather_14.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 304
+    },
+    {
+      "name": "symbols_feather_15.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 306
+    },
+    {
+      "name": "symbols_feather_16.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 308
+    },
+    {
+      "name": "symbols_feather_17.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 310
+    },
+    {
+      "name": "symbols_feather_18.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 312
+    },
+    {
+      "name": "symbols_feather_19.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 314
+    },
+    {
+      "name": "symbols_feather_20.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 316
+    },
+    {
+      "name": "symbols_feather_21.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 318
+    },
+    {
+      "name": "symbols_feather_22.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 320
+    },
+    {
+      "name": "symbols_feather_23.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 322
+    },
+    {
+      "name": "symbols_feather_24.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 324
+    },
+    {
+      "name": "symbols_feather_25.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 326
+    },
+    {
+      "name": "symbols_feather_26.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 328
+    },
+    {
+      "name": "symbols_feather_27.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 330
+    },
+    {
+      "name": "symbols_feather_28.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 332
+    },
+    {
+      "name": "symbols_feather_29.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 334
+    },
+    {
+      "name": "symbols_feather_30.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 336
+    },
+    {
+      "name": "symbols_feather_31.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 338
+    },
+    {
+      "name": "symbols_feather_32.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 340
+    },
+    {
+      "name": "symbols_feather_33.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 342
+    },
+    {
+      "name": "symbols_feather_34.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 344
+    },
+    {
+      "name": "symbols_feather_35.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 346
+    },
+    {
+      "name": "symbols_feather_36.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 348
+    },
+    {
+      "name": "symbols_feather_37.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 350
+    },
+    {
+      "name": "symbols_feather_38.png",
+      "plist": "_bitmaps/feather_anim1.plist",
+      "originalFrameIndex": 352
+    },
+    {
+      "name": "symbols_feather_39.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 354
+    },
+    {
+      "name": "symbols_feather_40.png",
+      "plist": "_bitmaps/feather_anim2.plist",
+      "originalFrameIndex": 356
+    }
+  ],
+  "atlas": {
+    "columns": 8,
+    "rows": 5,
+    "frames": 40,
+    "fps": 30,
+    "cellSize": [
+      160,
+      192
+    ],
+    "pixelSize": [
+      1280,
+      960
+    ],
+    "sha256": "b71be544da60e39ece3d5484023bbd6b2aba2c1f69d59151dccc74813b83cf16"
+  },
+  "processing": "Reconstruct original trimmed/rotated 428x512 canvases, uniformly fit into transparent 160x192 cells. Original neutral RGB and alpha retained; original blue tint (0,160,255) intentionally omitted for shared species use.",
+  "originalPlacement": {
+    "anchor": [
+      0,
+      1
+    ],
+    "position": [
+      -198,
+      124
+    ],
+    "canvasSize": [
+      428,
+      512
+    ],
+    "centerFromBirdCenter": [
+      16,
+      -132
+    ],
+    "birdSourceSize": [
+      320,
+      320
+    ]
+  },
+  "timing": "60Hz authored timeline: keys 278..356 every 2 ticks; visible 278..356, hidden at 357; repeated frame40 at 358 excluded. Standard 40 frames at 30fps lasts 1.333s versus authored visible span 1.317s."
+}

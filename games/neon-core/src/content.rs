@@ -141,6 +141,10 @@ fn replay(
             created = Some(scene.add_model(import(string(p(0))?, read)?)?);
             true
         }
+        "configureSprite" => scene.configure_sprite(
+            id,
+            serde_json::from_value(p(0).clone()).map_err(|e| e.to_string())?,
+        ),
         "setPosition" => scene.set_object_position(id, vec3(p(0))?),
         "setRotation" => scene.set_object_rotation(id, vec3(p(0))?),
         "setScale" => scene.set_object_scale(id, vec3(p(0))?),
@@ -379,7 +383,22 @@ mod tests {
         })
         .unwrap();
         assert_eq!(content.manifest["revision"], "cynatar-arena-51");
-        assert_eq!(scene.models().len(), 1);
+        let declared: std::collections::BTreeSet<u32> = content.manifest["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|op| op["op"] == "loadModel")
+            .map(|op| u32::try_from(op["id"].as_u64().unwrap()).unwrap())
+            .collect();
+        assert!(!declared.is_empty());
+        assert_eq!(
+            scene
+                .models()
+                .keys()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>(),
+            declared
+        );
         assert_eq!(
             content.manifest["runtime"]["catalog"]
                 .as_array()

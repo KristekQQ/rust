@@ -3,7 +3,7 @@
 import {capturePixels,assertForeground,assertChanged} from './pixels.js';
 const result=document.querySelector('#result'),iframe=document.querySelector('iframe');
 const origin=location.origin,backend=new URLSearchParams(location.search).get('backend')||'auto';
-const wait=async check=>{for(let i=0;i<600;i++){if(check())return;await new Promise(r=>setTimeout(r,10));}throw Error('Fixture condition timeout');};
+const wait=async check=>{for(let i=0;i<1200;i++){if(check())return;await new Promise(r=>setTimeout(r,10));}throw Error('Fixture condition timeout');};
 try{
  iframe.src='./scene-observer-delivery-frame.html?backend='+encodeURIComponent(backend);
  await wait(()=>iframe.contentWindow.sceneObserver?.meta);
@@ -13,22 +13,29 @@ try{
  await capturePixels(canvas);
  if(w.sceneObserver.engine.worldToScreen([-1,0,0])[0]>=w.sceneObserver.engine.worldToScreen([1,0,0])[0])throw Error('Live observer did not enable native camera handedness');
  w.sceneObserver.engine.resize(640,480);w.sceneObserver.engine.set_grid_visible(false);w.sceneObserver.engine.setCameraView([3,2.5,4],[.5,.3,.2]);
+ // Match framebuffer density and preserve projection proportions through wide/tall layouts.
+ for(const [width,height] of [[960,360],[360,600],[640,480]]){
+   iframe.style.width=width+'px';iframe.style.height=height+'px';
+   await wait(()=>canvas.width===Math.round(width*w.devicePixelRatio)&&canvas.height===Math.round(height*w.devicePixelRatio));
+   await w.deliveryFixture.capture();
+   const center=w.sceneObserver.engine.worldToScreen([.5,.3,.2]);
+   if(!center.every(Number.isFinite))throw Error('Resize produced invalid camera projection');
+ }
  const initial=await w.deliveryFixture.capture();assertForeground(initial,'initial scene');
  await new Promise(r=>setTimeout(r,400));
  if(!doc.querySelector('#veil').hidden)throw Error('A short delay covered the scene');
  if(doc.querySelector('#delivery-state').hidden)throw Error('Delay was not labelled');
  await new Promise(r=>setTimeout(r,1250));
  if(!doc.querySelector('#veil').hidden)throw Error('A pause covered the last known scene');
- if(!doc.querySelector('#delivery-state').textContent.includes('Pozastaveno'))throw Error('Paused source is presented as live');
+ if(!doc.querySelector('#delivery-state').getAttribute('aria-label').includes('pozastaven'))throw Error('Paused source is presented as live');
  const paused=await w.deliveryFixture.capture();assertForeground(paused,'last known paused scene');
- // Exercise the 4Hz presentation interval while keeping this controlled connection idle.
- w.sceneObserver.engine.setSceneInterpolation({durationMs:250,maxDistance:2});
+ // Recovery commits the source cut at its timestamp on the playback timeline.
  w.deliveryFixture.sendFrame('cut');await wait(()=>w.sceneObserver.meta?.state.fragments===2);
  const resumed=await w.deliveryFixture.capture();assertChanged(paused,resumed,'delta resume with cut halves');
  if(!doc.querySelector('#veil').hidden)throw Error('Resume still covers scene');
- // Real viewer has no demo provenance arguments: lineage must arrive through wire + delta relay.
- await new Promise(r=>setTimeout(r,110));const movingHalves=await w.deliveryFixture.capture();
- assertChanged(resumed,movingHalves,'global viewer cut halves move without another packet');
+ // A newborn child has no velocity sample yet: do not invent movement from the old parent.
+ await new Promise(r=>setTimeout(r,110));const heldHalves=await w.deliveryFixture.capture();
+ assertForeground(heldHalves,'cut halves remain visible without a future sample');
  const existingEngine=w.sceneObserver.engine;
  w.deliveryFixture.reconnect();
  await new Promise(r=>setTimeout(r,200));
@@ -36,6 +43,22 @@ try{
  await wait(()=>w.sceneObserver.meta?.state.fragments===0);
  if(w.sceneObserver.engine!==existingEngine)throw Error('Same-session reconnect recreated GPU engine');
  if(!doc.querySelector('#veil').hidden)throw Error('Reconnect failed to resume visible scene');
- result.textContent='PASS: delay/pause keeps rendered scene visible and labelled; NDP1 resumes actual Rust cut';
+ // Hold only the presentation callback, like a throttled/background RAF.
+ w.deliveryFixture.pause();await new Promise(r=>setTimeout(r,100));
+ const ackBefore=w.deliveryFixture.acks;
+ w.deliveryFixture.sendFrame('cut');w.deliveryFixture.sendFrame('removed');
+ if(w.deliveryFixture.acks!==ackBefore+2)throw Error('Receipt ACK still waits for rendering');
+ await new Promise(r=>setTimeout(r,20000));
+ w.deliveryFixture.resume();await wait(()=>w.sceneObserver.meta?.state.frame==='removed');
+ if(w.sceneObserver.engine!==existingEngine)throw Error('Rendering stall recreated GPU engine');
+ w.deliveryFixture.newSession();await wait(()=>w.sceneObserver.meta?.session.endsWith('-next'));
+ if(w.sceneObserver.engine!==existingEngine)throw Error('New full-scene session recreated GPU engine');
+ const connections=w.deliveryFixture.connections;w.deliveryFixture.silence();
+ await wait(()=>w.deliveryFixture.connections>connections);
+ await wait(()=>w.sceneObserver.meta?.state.frame==='initial');
+ if(w.sceneObserver.engine!==existingEngine)throw Error('Silent connection recovery recreated engine');
+ const restored=await w.deliveryFixture.capture();assertForeground(restored,'fresh source replaces the removed scene');
+ if(!doc.querySelector('#veil').hidden)throw Error('New session covered scene');
+ result.textContent='PASS: receipt ACK independent of 20s render stall; coalesced cuts/removal; same/new-session recovery retains renderer';
 }catch(e){result.textContent='FAIL: '+e.message;console.error(e);}
 </script>

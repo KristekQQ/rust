@@ -1,0 +1,46 @@
+{
+  "source": "Apollo Games original SlotBirds symbolVultureFly, rc-26.07",
+  "authorization": "User states Apollo CEO authorization in this conversation, 2026-11-16",
+  "sourceUrls": {
+    "vulture_anim1.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/vulture_anim1.plist?v=3g33yf&b=rc-26.07",
+    "vulture_anim1.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/vulture_anim1.png?v=1d2tesv&b=rc-26.07",
+    "vulture_anim2.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/vulture_anim2.plist?v=1baot0q&b=rc-26.07",
+    "vulture_anim2.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/vulture_anim2.png?v=jtoq5e&b=rc-26.07",
+    "symbolVultureFly.json": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/symbols/symbolVultureFly.json?v=2tcfxv&b=rc-26.07",
+    "symbolVulture.json": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/symbols/symbolVulture.json?v=1svp39v&b=rc-26.07"
+  },
+  "frames": [
+    "vulture_FLY_01.png",
+    "vulture_FLY_02.png",
+    "vulture_FLY_03.png",
+    "vulture_FLY_04.png",
+    "vulture_FLY_05.png",
+    "vulture_FLY_06.png",
+    "vulture_FLY_07.png",
+    "vulture_FLY_08.png",
+    "vulture_FLY_09.png",
+    "vulture_FLY_10.png",
+    "vulture_FLY_11.png",
+    "vulture_FLY_12.png",
+    "vulture_FLY_13.png",
+    "vulture_FLY_14.png",
+    "vulture_FLY_15.png",
+    "vulture_FLY_16.png"
+  ],
+  "fps": 15,
+  "layout": [
+    4,
+    4
+  ],
+  "cell": [
+    320,
+    320
+  ],
+  "processing": "Lossless plist extraction; deterministic exterior-connected near-neutral dark drop-shadow alpha removal in the 16 front FLY frames; original source sheets and colored artwork preserved.",
+  "sha256": {
+    "vulture_anim1.png": "fc00fa18f3992fd918cd971c0558be4c48aca067302762a18f30a2c578bf891a",
+    "vulture_anim1.plist": "efdc4adc35f1896de5b76318f9a1b47889c4a83e8b1ff8663272d089c0abbab1",
+    "symbolVultureFly.json": "9d9d2288df0418130273ae7aa51a618fbaa47775dce6347a5365cb63d103cc09",
+    "slot-bird-flight.png": "0fa56fe78a0591af690ee64e2b650884e56ed845e5ca669181ac4683dc13ac0f"
+  }
+}

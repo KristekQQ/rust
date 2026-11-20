@@ -42,7 +42,7 @@ nikoli GPU čas nebo 1% low.
 
 Aktuální ukázka používá čisté černé pozadí. Obsahuje devět druhů ovoce včetně dvojice třešní, banánu, hroznů,
 pomeranče a limetky; dvě katany,
-60sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Samostatný panel VÝKON u hráčových nohou zobrazuje diagnostiku FPS, FRAME MS, CPU MS, CULL MS, VISIBLE, CULLED, OBJECTS a DRAWS.
+60sekundové kolo a skutečné Rust řezy. Přímo před hráčem je velký odpočet z neonových trubic a pod ním skóre. Samostatný panel VÝKON vlevo pod skóre zobrazuje diagnostiku FPS, FRAME MS, CPU MS, CULL MS, VISIBLE, CULLED, OBJECTS a DRAWS.
 
 Aplikace neimportuje `environment.js` ani obrázky cubemapy. Tmavá dlaždicová
 podlaha zachovává orientaci prostoru i shodu s nativním exportem.
@@ -249,7 +249,7 @@ nejvýše čtyřikrát za sekundu a přestavuje mesh jen při změně obsahu. Fo
 obsahuje A–Z a číslice, texty příkladu používají zápis bez diakritiky.
 
 Náhrobek a jeho kredit CODEX byly odstraněny z webové i nativní arény.
-Panel VÝKON je nezávislý, s offsetem `[.9,.35,-1]` od hráčova referenčního rámce.
+Panel VÝKON je nezávislý, s offsetem `[-.82,1.66,-1.65]` od hráčova referenčního rámce.
 Historický generátor modelů se při spuštění arény nepoužívá.
 
 ## Rychlé ladění zásahu

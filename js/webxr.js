@@ -42,6 +42,12 @@ export class XRPlayer {
         this.#engine.xr_remove_item(object.id);return this;
     }
     equip(hand,object,options={}){this.#check(object);this.#host.bindController(hand,object,options);return this;}
+    bindPetHand(hand,object){
+        this.#check(object);
+        const index=hand==='left'?0:hand==='right'?1:-1;
+        if(index<0)throw new Error('Neplatná ruka.');
+        this.#engine.xr_bind_pet_hand(index,object?.id??0xffffffff);return this;
+    }
     unequip(hand){return this.equip(hand,null);}
 }
 
@@ -183,11 +189,12 @@ export class WebXRHost extends EventTarget {
             const report = JSON.parse(this.#engine.xr_update_controller(index, pose ? pose.transform.matrix : new Float32Array(), !!pose && (pressed || !this.#requireTrigger[index])));
             const contact = !!pose && report.bladeContacts > 0;
             if (pose && this.#haptics[index]) {
-                if (report.removed.length) this.#pulse(source, 0.45, 35);
+                if (report.spriteHits?.length) this.#pulse(source, 0.6, 35);
+                else if (report.removed.length) this.#pulse(source, 0.45, 35);
                 else if (contact && !this.#contactActive[index]) this.#pulse(source, 0.2, 20);
             }
             this.#contactActive[index] = contact;
-            if (report.removed.length) this.dispatchEvent(new CustomEvent('cut', {detail: {...report, pieces: report.pieces.map(this.#object), handedness: hand}}));
+            if (report.removed.length || report.spriteHits?.length) this.dispatchEvent(new CustomEvent('cut', {detail: {...report, pieces: report.pieces.map(this.#object), handedness: hand}}));
             let point = null;
             if (this.#button && pose && source?.targetRaySpace) {
                 const ray = frame.getPose(source.targetRaySpace, space);

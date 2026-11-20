@@ -1,17 +1,24 @@
 // Opt-in viewer-only LAN gateway. The publisher and private native API stay loopback-only.
 import http from 'node:http';
-import {randomBytes, timingSafeEqual} from 'node:crypto';
+import {timingSafeEqual} from 'node:crypto';
 import {isIP} from 'node:net';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {WebSocket, WebSocketServer} from 'ws';
+import {shortAccess, sessionSecret, permanentPairingCode} from './lan-access.mjs';
 
 const cookieName = 'observer_viewer';
 const dashboardPath = '/tools/scene-observer/';
 const dashboardRoute = dashboardPath + '?source=native&backend=webgl&viewer=1';
 const files = new Set([
-  '/favicon.ico',
-  ...['index.html','view.html','observer.css','dashboard.js','viewer.js','protocol.mjs','scene.js','byte-delta.mjs','interpolation-policy.mjs'].map(name => `/tools/scene-observer/${name}`),
+  ...['vulture', 'blue', 'duck', 'green', 'cock', 'pistachio'].map(name=>'/tools/scene-observer/assets/slot-birds/slot-bird-feathers-'+name+'.gltf'),
+  ...['flight','blue','duck','green','cock','pistachio','feathers'].flatMap(s=>['gltf','png'].map(ext=>'slot-bird-'+s+'.'+ext)).map(name=>`/tools/scene-observer/assets/slot-birds/${name}`),
+  '/favicon.ico', '/examples/neon-arena/bird-flight.js',
+  '/examples/neon-arena/cabinet.js', '/tools/scene-observer/assets/apollo-stellar/apollo-stellar.glb',
+  ...['stealth-cat.gltf','stealth-cat.png','stealth-cat-carry.png'].map(name=>`/tools/scene-observer/assets/stealth-cat/${name}`),
+  ...['neon-spotlight-shaft.png','neon-spotlight.gltf','neon-spotlight-color.png','neon-spotlight-mask.bin','neon-spotlight-profile.json'].map(name=>`/tools/scene-observer/assets/neon-spotlight/${name}`),
+  ...['neon-floor-texture.gltf','neon-floor-texture-embedded-0.bin','neon-floor-color.png'].map(name=>`/tools/scene-observer/assets/neon-0.13.2/${name}`),
+  ...['index.html','view.html','observer.css','dashboard.js','debug-bounds.mjs','viewer.js','protocol.mjs','scene.js','byte-delta.mjs','interpolation-policy.mjs','scene-inbox.mjs'].map(name => `/tools/scene-observer/${name}`),
   ...['engine.js','webxr.js','xr-presentation-profile.js','audio.js'].map(name => `/js/${name}`),
   '/examples/shared/audio-controls.js', '/examples/neon-arena/geometry.js',
   '/pkg/webgpu_wasm.js', '/pkg/webgpu_wasm_bg.wasm', '/assets/audio/neon/manifest.json',
@@ -31,7 +38,8 @@ function equalToken(value, token) {
   return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) && timingSafeEqual(Buffer.from(value), Buffer.from(token));
 }
 
-export async function createLanViewer({host, port = 8894, upstream = 'http://127.0.0.1:8891', token = randomBytes(32).toString('hex')} = {}) {
+export async function createLanViewer({host, port = 8894, upstream = 'http://127.0.0.1:8891', token: providedToken, authFile, pairCode, pairCodeFile, streamConfig, streamConfigFile, streamPort, now} = {}) {
+  const token = providedToken ?? await sessionSecret(authFile);
   // Explicit IPv4 bind also prevents accidentally publishing on all interfaces.
   if (isIP(host) !== 4 || host === '0.0.0.0') throw Error('An explicit local IPv4 --host is required');
   if (!/^[a-f0-9]{64}$/.test(token)) throw Error('Viewer token must be 32 random bytes encoded as hex');
@@ -39,7 +47,10 @@ export async function createLanViewer({host, port = 8894, upstream = 'http://127
   if (source.protocol !== 'http:' || source.hostname !== '127.0.0.1' || source.username || source.password || source.pathname !== '/' || source.search || source.hash) throw Error('Upstream must be loopback HTTP');
   let authority;
   const pending = new Set(), sockets = new Set();
-  const wss = new WebSocketServer({noServer:true, maxPayload:4096, perMessageDeflate:false});
+  const wss = new WebSocketServer({noServer:true, maxPayload:4096, perMessageDeflate:{
+    threshold:4096,serverNoContextTakeover:true,clientNoContextTakeover:true,
+    zlibDeflateOptions:{level:1},concurrencyLimit:2,
+  }});
   function allowedOrigin(req) { return req.headers.host === authority && (!req.headers.origin || req.headers.origin === `http://${authority}`); }
   function authenticated(req) {
     return (req.headers.cookie ?? '').split(';').some(part => {
@@ -53,20 +64,29 @@ export async function createLanViewer({host, port = 8894, upstream = 'http://127
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('X-Frame-Options','SAMEORIGIN');
   }
+  const setCookie = res => res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`);
+  const savedCode = pairCodeFile ? await permanentPairingCode(pairCodeFile) : undefined;
+  const access = shortAccess({pairCode:savedCode ?? pairCode,permanent:!!pairCodeFile,setCookie,authenticated,streamConfig,streamConfigFile,streamPort,now});
   const server = http.createServer(async (req, res) => {
     headers(res);
     if (!allowedOrigin(req)) { res.writeHead(403).end('Forbidden origin'); return; }
-    if (!['GET','HEAD'].includes(req.method)) { res.writeHead(405).end(); return; }
     let url;
     try { url = new URL(req.url, `http://${authority}`); } catch { res.writeHead(400).end(); return; }
+    if (url.pathname === '/pair' && req.method === 'POST') {
+      if (req.headers.origin !== `http://${authority}`) {res.writeHead(403).end('Forbidden origin'); req.resume(); return;}
+      await access.pair(req,res,url); return;
+    }
+    if (!['GET','HEAD'].includes(req.method)) { res.writeHead(405).end(); return; }
     if (url.searchParams.has('token')) {
       if (req.method !== 'GET' || !['/','/tools/scene-observer/','/tools/scene-observer/index.html'].includes(url.pathname) || !equalToken(url.searchParams.get('token'), token)) { res.writeHead(401).end('Unauthorized'); return; }
       const clean = new URL(dashboardRoute, `http://${authority}`);
-      res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict`);
+      setCookie(res);
       res.writeHead(303,{Location:clean.pathname + clean.search}).end(); return;
     }
+    try { if (await access.route(req,res,url)) return; }
+    catch { if (!res.headersSent) res.writeHead(503).end('Viewer není dostupný.'); else res.destroy(); return; }
     if (!authenticated(req)) { res.writeHead(401).end('Unauthorized'); return; }
-    if (['/',dashboardPath,dashboardPath+'index.html'].includes(url.pathname) && url.pathname + url.search !== dashboardRoute) {
+    if ([dashboardPath,dashboardPath+'index.html'].includes(url.pathname) && url.pathname + url.search !== dashboardRoute) {
       res.writeHead(303,{Location:dashboardRoute}).end(); return;
     }
     const pathname = url.pathname === '/tools/scene-observer/' ? '/tools/scene-observer/index.html' : url.pathname;
@@ -94,6 +114,8 @@ export async function createLanViewer({host, port = 8894, upstream = 'http://127
     proxy.on('error', () => { if (!res.headersSent) res.writeHead(502).end(); else res.destroy(); });
     res.on('close', () => proxy.destroy());
   });
+  server.requestTimeout = 10000;
+  server.headersTimeout = 10000;
   server.on('upgrade', (req, socket, head) => {
     let url;
     try { url = new URL(req.url, `http://${authority}`); } catch { socket.destroy(); return; }
@@ -130,7 +152,7 @@ export async function createLanViewer({host, port = 8894, upstream = 'http://127
   server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
   await new Promise((resolve,reject) => { server.once('error',reject); server.listen(port,host,resolve); });
   authority = `${host}:${server.address().port}`;
-  return {server, token, url:`http://${authority}/tools/scene-observer/?token=${token}`, async close() {
+  return {server, token, pairCode:access.pairCode, expiresAt:access.expiresAt, landingUrl:`http://${authority}/`, observerUrl:`http://${authority}/observer`, streamUrl:`http://${authority}/stream`, url:`http://${authority}/tools/scene-observer/?token=${token}`, async close() {
     for (const peer of pending) peer.terminate();
     for (const viewer of wss.clients) viewer.terminate();
     for (const socket of sockets) socket.destroy();
@@ -142,10 +164,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const args = process.argv.slice(2), options = {};
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i];
-    if (!['--host','--port','--upstream'].includes(name) || !args[i+1]) throw Error('Usage: node tools/scene-observer/lan-viewer.mjs --host 192.168.0.17 [--port 8894] [--upstream http://127.0.0.1:8891]');
-    options[name.slice(2)] = name === '--port' ? Number(args[i+1]) : args[i+1];
+    if (!['--host','--port','--upstream','--auth-file','--stream-config','--pair-code-file'].includes(name) || !args[i+1]) throw Error('Usage: node tools/scene-observer/lan-viewer.mjs --host 192.168.0.17 [--port 8894] [--upstream http://127.0.0.1:8891] [--auth-file private-auth.txt] [--stream-config private-stream.json] [--pair-code-file private-code.txt]');
+    options[{'--auth-file':'authFile','--stream-config':'streamConfigFile','--pair-code-file':'pairCodeFile'}[name] ?? name.slice(2)] = name === '--port' ? Number(args[i+1]) : args[i+1];
   }
   const gateway = await createLanViewer(options);
-  console.log(`Private viewer URL (share only with trusted viewers): ${gateway.url}`);
+  console.log(`Scéna: ${gateway.observerUrl}\nObraz: ${gateway.streamUrl}\nPárovací kód: ${gateway.pairCode} (${gateway.expiresAt === null ? "trvalý kód" : "platí 15 minut; nový kód po restartu brány"})`);
   for (const signal of ['SIGINT','SIGTERM']) process.once(signal, () => { void gateway.close(); });
 }

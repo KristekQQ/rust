@@ -1,0 +1,28 @@
+{
+  "species": "pistachio",
+  "sourceUrls": {
+    "pistachio_anim.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/pistachio_anim.plist?v=15hcep5&b=rc-26.07",
+    "pistachio_anim.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/pistachio_anim.png?v=17zy8rz&b=rc-26.07"
+  },
+  "frames": [
+    "pistachio_BASE_01.png",
+    "pistachio_BASE_02.png",
+    "pistachio_BASE_04.png",
+    "pistachio_BASE_06.png",
+    "pistachio_BASE_07.png",
+    "pistachio_BASE_09.png",
+    "pistachio_BASE_11.png",
+    "pistachio_BASE_12.png",
+    "pistachio_BASE_14.png",
+    "pistachio_BASE_16.png",
+    "pistachio_BASE_17.png",
+    "pistachio_BASE_19.png",
+    "pistachio_BASE_21.png",
+    "pistachio_BASE_22.png",
+    "pistachio_BASE_24.png",
+    "pistachio_BASE_26.png"
+  ],
+  "sourceAnimation": "BASE (gliding presentation, not authored flying cycle)",
+  "processing": "plist trim reconstruction, 16 evenly sampled base poses, 192px cells",
+  "sourceSha256": "1ae8f21343c2495f2d51ff3f104004504be10d33c08df21d9f4cbae455ccf34d"
+}

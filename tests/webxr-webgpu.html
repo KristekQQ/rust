@@ -281,7 +281,7 @@ const report=await run.execute(async test=>{
         const fruitTargets=names.map((name,i)=>launchApple(engine.scene,world.fruits.find(f=>f.name===name),1)
             .setPosition([(i%3-1)*.48,i<3?1.6:1.08,-1.3]));
         engine.setNeonGlow(NEON_GLOW);engine.postprocessing.disable('bloom');
-        const profileFrame=()=>sim.frame({dt:0,head:{position:[0,1.65,0],orientation:[-Math.sin(.15),0,0,Math.cos(.15)]}});
+        const profileFrame=(pitch=.30)=>sim.frame({dt:0,head:{position:[0,1.65,0],orientation:[-Math.sin(pitch/2),0,0,Math.cos(pitch/2)]}});
         const measurements=[];
         for(const [name,scale,bounded] of [['SSR off',0,false],['previous half SSR',.5,false],['bounded half SSR',.5,true],['previous half SSR repeat',.5,false],['bounded half SSR repeat',.5,true],['previous half SSR final',.5,false],['bounded half SSR final',.5,true]]){
             if(scale===0)engine.postprocessing.disable('ssr');
@@ -298,11 +298,19 @@ const report=await run.execute(async test=>{
         const stats=engine.postprocessing.stats();
         test.assert(stats.ssrWidth===width/2&&stats.ssrHeight===height/2&&stats.ssrPixels===width*height/4,'half-resolution SSR traces one quarter of eye pixels and keeps full-size output',stats);
         test.assert(stats.ssrTracePixels>0&&stats.ssrTracePixels<stats.ssrViewportPixels,'receiver projection restricts the actual trace draw rectangle',stats);
+        // The timed pose sees the fruit, but its reflections on the flat floor
+        // land below the viewport. Look down so both fit in each eye and the
+        // reflections land in floorDifference's lower quarter.
+        const reflectionPitch=.65;
+        engine.postprocessing.enable('bloom',{strength:.000001});
+        profileFrame(reflectionPitch);
         const optimizedEyes=[await second.pixels(0),await second.pixels(1)];
-        engine.postprocessing.disable('ssr');profileFrame();
+        engine.postprocessing.disable('ssr');profileFrame(reflectionPitch);
         const dryEyes=[await second.pixels(0),await second.pixels(1)];
         const reflectedCounts=optimizedEyes.map((eye,i)=>floorDifference(eye,dryEyes[i]));
+        test.report.evidence.reflections={pitchRadians:reflectionPitch,changedFloorPixelsPerEye:reflectedCounts};
         test.assert(reflectedCounts.every(count=>count>5),'bounded production arena still reflects into BOTH native GPU eyes',reflectedCounts);
+        engine.postprocessing.disable('bloom');
         engine.postprocessing.enable('ssr',FLOOR_SSR);profileFrame();
         sim.frame({dt:0,head:{position:[0,1.65,0],orientation:[Math.sin(.5),0,0,Math.cos(.5)]}});
         test.assert(engine.postprocessing.stats().ssrTracePixels===0,'looking away from the receiver skips the SSR trace draw',engine.postprocessing.stats());

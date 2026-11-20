@@ -11,8 +11,8 @@ const installed=new WeakMap();
 /** Idempotent explicit example installation, outside the core SDK.
  * Existing scene panels can be adopted without allocating a second native node.
  * @param {import('../../js/engine.d.ts').Engine} engine
- * @param {{panel?:import('../../js/engine.d.ts').SceneObject,toggle?:HTMLInputElement|null}} [options] */
-export function installRuntimeInfo(engine,{panel:scenePanel,toggle=null}={}){
+ * @param {{panel?:import('../../js/engine.d.ts').SceneObject,offset?:[number,number,number],toggle?:HTMLInputElement|null}} [options] */
+export function installRuntimeInfo(engine,{panel:scenePanel,toggle=null,offset=VR_DEBUG_PANEL_OFFSET}={}){
     const existing=installed.get(engine);if(existing)return existing;
     let panel=scenePanel??null;
     const xr=engine.xr;
@@ -30,7 +30,7 @@ export function installRuntimeInfo(engine,{panel:scenePanel,toggle=null}={}){
         if(attached&&attached.id!==panel?.id)return;
         panel??=engine.scene.createInfoPanel('diagnostics',{position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT});
         panel.setScale([1,1,1]).setRenderOptions({castsShadow:false,receivesShadow:false});
-        xr.player.bindHead(panel,{anchor:'feet',offset:VR_DEBUG_PANEL_OFFSET});
+        xr.player.bindHead(panel,{anchor:'feet',offset});
     }
     /** @returns {RuntimeSnapshot} */
     function readSnapshot(){

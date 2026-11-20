@@ -65,6 +65,8 @@ pub struct ReplayMetrics {
 }
 #[derive(Clone, Default, Serialize)]
 pub struct AppMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cut_pool: Option<webgpu_wasm::scene::publication::CutPoolStats>,
     pub replay: Option<ReplayMetrics>,
     pub input_sequence: u64,
     pub applied_sequence: u64,

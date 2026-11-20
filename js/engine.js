@@ -199,6 +199,13 @@ export class ModelObject extends SceneObject {
         const index = typeof clip === 'string' ? this.info.animations.findIndex(a => a.name === clip) : clip;
         accepted(this.#wasm.play_model_animation(this.id, index, loop, speed)); return this;
     }
+    /** @param {import('./engine.d.ts').SpriteConfig} options */
+    configureSprite(options) { accepted(this.#wasm.configure_sprite(this.id, JSON.stringify(options))); return this; }
+    triggerSprite() { return this.#wasm.trigger_sprite(this.id); }
+    /** @param {import('./engine.d.ts').Vector3} contact @param {import('./engine.d.ts').Vector3} viewer */
+    petSprite(contact, viewer) { return this.#wasm.pet_sprite(this.id, ...contact, ...viewer); }
+    /** Bind this preloaded atlas asset to an authoritative semantic key. @param {number} key */
+    bindSprite(key) { accepted(this.#wasm.bind_sprite(this.id,key)); return this; }
     pauseAnimation(paused = true) { accepted(this.#wasm.pause_model_animation(this.id, paused)); return this; }
     /** @param {number} seconds */
     seekAnimation(seconds) { accepted(this.#wasm.seek_model_animation(this.id, seconds)); return this; }
@@ -219,6 +226,8 @@ export class Scene {
     #loads = new Map();
     /** @param {Wasm} wasm */
     constructor(wasm) { this.#wasm = wasm; Object.freeze(this); }
+    /** @param {number} key @returns {import('./engine.d.ts').SpriteState|null} */
+    spriteState(key) { return JSON.parse(this.#wasm.sprite_state(key)); }
     /** @param {import('./engine.d.ts').RimOptions|null} options */
     configureRim(options){
         if(options===null){this.#wasm.configure_rim('null');return;}
@@ -566,6 +575,7 @@ async function initializeEngine(canvas, backend, initialization) {
             return value(...args);
         };
     } });
+    const debugSceneBounds = /** @type {(() => string) | undefined} */ (Reflect.get(wasm, 'debug_scene_bounds'));
     const scene = new Scene(wasm);
     const xr = new WebXRHost(wasm, canvas, object => handleBindings.get(object) === wasm, id => new SceneObject(wasm, id));
 
@@ -578,6 +588,19 @@ async function initializeEngine(canvas, backend, initialization) {
         /** Render-only smoothing for a remote mirror; duration0 disables it.
          * @param {{durationMs?:number,maxDistance?:number}} [options] */
         setSceneInterpolation({durationMs=60,maxDistance=2}={}) { wasm.set_scene_interpolation(durationMs,maxDistance); },
+        setScenePlayback({delayMs=120, maxExtrapolationMs=80, maxDistance=2}={}) {
+            wasm.set_scene_playback(delayMs, maxExtrapolationMs, maxDistance);
+        },
+        /** @param {Uint8Array} bytes @param {number} sampledAtMs @param {SceneObject[]} localObjects */
+        enqueueScenePublication(bytes, sampledAtMs, localObjects=[]) {
+            if (!(bytes instanceof Uint8Array) || localObjects.some(object => handleBindings.get(object) !== wasm)) {
+                throw new TypeError('Invalid simulation publication/owner');
+            }
+            wasm.enqueue_scene_publication(bytes, sampledAtMs, Uint32Array.from(localObjects, object => object.id));
+        },
+        scenePlaybackState() { return JSON.parse(wasm.scene_playback_state()); },
+        setScenePrediction({horizonMs=0}={}) { wasm.set_scene_prediction(horizonMs); },
+        setScenePredictionSampleTime(sampledAtMs) { wasm.set_scene_prediction_sample_time(sampledAtMs); },
         /** Apply a versioned worker publication; state validation lives in Rust.
          * @param {Uint8Array} bytes @param {SceneObject[]} localObjects
          * @param {{id:number,parentId:number}[]} spawns Explicit source provenance. */
@@ -770,6 +793,9 @@ async function initializeEngine(canvas, backend, initialization) {
         setModelPublicationReuseEnabled(enabled) { wasm.set_model_publication_reuse_enabled(enabled); },
         /** Exact opaque prepared-plan reuse; disable for independent comparison. @param {boolean} enabled */
         setPreparedPlanCacheEnabled(enabled) { wasm.set_prepared_plan_cache_enabled(enabled); },
+        ...(typeof debugSceneBounds === 'function' ? {
+            debugSceneBounds() { return JSON.parse(debugSceneBounds()); },
+        } : {}),
         debugStats() { return JSON.parse(wasm.debug_stats()); },
         frameProfile() { return JSON.parse(wasm.frame_profile_stats()); },
         projectileContacts() { return wasm.projectile_contacts(); },

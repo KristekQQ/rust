@@ -46,6 +46,11 @@ pub struct XrPlayer {
     reference: Mat4,
     hand_speeds: [GripSpeed; 2],
     inventory: BTreeSet<u32>,
+    pet_hands: [Option<(u32, Vec3)>; 2],
+    petting: [bool; 2],
+    petting_override: Option<[bool; 2]>,
+    hand_suppressed: [bool; 2],
+    suppression_changed: [bool; 2],
 }
 
 impl XrPlayer {
@@ -80,6 +85,11 @@ impl XrPlayer {
                 controller.bind(scene, None, false)?;
             }
         }
+        for hand in 0..2 {
+            if self.pet_hands[hand].is_some_and(|(pet_id, _)| pet_id == id) {
+                self.bind_pet_hand(scene, hand, None)?;
+            }
+        }
         self.inventory.remove(&id);
         Ok(())
     }
@@ -96,18 +106,100 @@ impl XrPlayer {
         }
         if let Some(id) = id {
             self.validate_item(scene, id)?;
-            if self.controllers[1 - hand].object_id() == Some(id) || self.head_object() == Some(id)
+            if self.controllers[1 - hand].object_id() == Some(id)
+                || self.head_object() == Some(id)
+                || self
+                    .pet_hands
+                    .iter()
+                    .flatten()
+                    .any(|(pet_id, _)| *pet_id == id)
             {
                 return Err("Tracked object is already equipped in another slot".into());
             }
         }
         // Controller binding validates cutter configuration before changing its old binding.
         self.controllers[hand].bind(scene, id, cutting)?;
+        self.petting[hand] = false;
+        if let Some((pet_id, _)) = self.pet_hands[hand] {
+            scene.set_object_position(pet_id, HIDDEN);
+        }
         self.prune_inventory(scene);
         if let Some(id) = id {
             self.inventory.insert(id);
         }
         Ok(())
+    }
+
+    /// Optional authored open-hand visual; ordinary equipment stays bound and owned.
+    pub fn bind_pet_hand(
+        &mut self,
+        scene: &mut SceneManager,
+        hand: usize,
+        id: Option<u32>,
+    ) -> Result<(), String> {
+        if hand > 1 {
+            return Err("Tracked hand index must be 0 or 1".into());
+        }
+        let item = if let Some(id) = id {
+            self.validate_item(scene, id)?;
+            if self
+                .controllers
+                .iter()
+                .any(|controller| controller.object_id() == Some(id))
+                || self.pet_hands[1 - hand].is_some_and(|(other, _)| other == id)
+                || self.head_object() == Some(id)
+            {
+                return Err("Pet hand is already equipped".into());
+            }
+            Some((id, scene.objects()[&id].transform.scale))
+        } else {
+            None
+        };
+        if let Some((id, _)) = self.pet_hands[hand] {
+            scene.set_object_position(id, HIDDEN);
+        }
+        self.controllers[hand].reset(scene);
+        self.pet_hands[hand] = item;
+        self.petting[hand] = false;
+        if let Some((id, _)) = item {
+            self.inventory.insert(id);
+            scene.set_object_position(id, HIDDEN);
+        }
+        Ok(())
+    }
+    pub fn wants_pet_hand(&self, scene: &SceneManager, hand: usize, pose: Option<Mat4>) -> bool {
+        hand < 2
+            && self.pet_hands[hand].is_some_and(|(id, _)| scene.object_exists(id))
+            && pose.is_some_and(|grip| {
+                valid_pose(grip)
+                    && self.head.is_some_and(|head| {
+                        self.petting_override.map_or_else(
+                            || {
+                                scene.pet_hand_intent(
+                                    head.matrix,
+                                    grip.w_axis.truncate(),
+                                    self.petting[hand],
+                                )
+                            },
+                            |intent| intent[hand],
+                        )
+                    })
+            })
+    }
+    /// Preserve raw grip tracking while another held interaction owns its visual.
+    /// The next hand update clears controller motion history on either transition.
+    pub fn set_hand_suppressed(&mut self, hand: usize, suppressed: bool) {
+        if hand < 2 && self.hand_suppressed[hand] != suppressed {
+            self.hand_suppressed[hand] = suppressed;
+            self.suppression_changed[hand] = true;
+        }
+    }
+    pub fn petting_hands(&self) -> [bool; 2] {
+        self.petting
+    }
+    /// Render mirrors consume authoritative intent, then apply the freshest grip pose.
+    pub fn set_petting_override(&mut self, intent: [bool; 2]) {
+        self.petting_override = Some(intent);
     }
 
     fn validate_item(&self, scene: &SceneManager, id: u32) -> Result<(), String> {
@@ -228,10 +320,42 @@ impl XrPlayer {
         pressed: bool,
         dt: f32,
     ) -> Result<CutReport, String> {
+        self.update_hand_with_mesh_cuts(scene, hand, pose, pressed, dt, true)
+    }
+
+    pub fn update_hand_with_mesh_cuts(
+        &mut self,
+        scene: &mut SceneManager,
+        hand: usize,
+        pose: Option<Mat4>,
+        pressed: bool,
+        dt: f32,
+        mesh_cuts: bool,
+    ) -> Result<CutReport, String> {
         if hand >= self.hands.len() {
             return Err("Tracked hand index must be 0 or 1".into());
         }
         self.prune_inventory(scene);
+        let was_petting = self.petting[hand];
+        if std::mem::take(&mut self.suppression_changed[hand]) {
+            self.controllers[hand].reset(scene);
+        }
+        let petting = !self.hand_suppressed[hand] && self.wants_pet_hand(scene, hand, pose);
+        self.petting[hand] = petting;
+        if was_petting != petting {
+            self.controllers[hand].reset(scene);
+        }
+        if let Some((id, scale)) = self.pet_hands[hand] {
+            if petting {
+                let (_, rotation, position) = pose.unwrap().to_scale_rotation_translation();
+                scene.set_object_position(id, position);
+                let (y, x, z) = rotation.to_euler(EulerRot::YXZ);
+                scene.set_object_rotation(id, Vec3::new(x, y, z));
+                scene.set_object_scale(id, scale);
+            } else {
+                scene.set_object_position(id, HIDDEN);
+            }
+        }
         if pose.is_some_and(|pose| !valid_pose(pose)) {
             self.hands[hand] = None;
             self.hand_speeds[hand] = GripSpeed::default();
@@ -266,12 +390,29 @@ impl XrPlayer {
             self.hand_speeds[hand] = GripSpeed::default();
             0.
         };
-        self.controllers[hand].update_timed_with_speed(scene, pose, pressed, dt, Some(speed))
+        self.controllers[hand].update_timed_with_speed(
+            scene,
+            if petting || self.hand_suppressed[hand] {
+                None
+            } else {
+                pose
+            },
+            pressed,
+            dt,
+            Some(speed),
+            mesh_cuts,
+        )
     }
 
     /// Clear poses and motion history while preserving optional object bindings.
     pub fn reset_tracking(&mut self, scene: &mut SceneManager) {
         self.head = None;
+        self.petting = [false; 2];
+        self.hand_suppressed = [false; 2];
+        self.suppression_changed = [false; 2];
+        for (id, _) in self.pet_hands.iter().flatten() {
+            scene.set_object_position(*id, HIDDEN);
+        }
         self.hands = [None; 2];
         self.hand_speeds = Default::default();
         if let Some((id, _, _, _)) = self.head_binding {
@@ -286,6 +427,94 @@ impl XrPlayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn xr_player_pet_hand_tracks_combined_wrist_rotations() {
+        let mut scene = SceneManager::default();
+        let mut player = XrPlayer::default();
+        player
+            .update_head(&mut scene, Some(Mat4::IDENTITY))
+            .unwrap();
+        player.set_petting_override([true; 2]);
+        for (hand, side) in [(0, -1.), (1, 1.)] {
+            let palm = scene.add_cube(Vec3::ZERO);
+            player.bind_pet_hand(&mut scene, hand, Some(palm)).unwrap();
+            for pitch in [0., 0.75, 1.56, 1.60] {
+                let rotation = Quat::from_euler(EulerRot::YXZ, side * 1.2, pitch, side * 1.45);
+                let grip =
+                    Mat4::from_rotation_translation(rotation, Vec3::new(side * 0.2, 0.6, -0.4));
+                player
+                    .update_hand(&mut scene, hand, Some(grip), false, 0.01)
+                    .unwrap();
+                assert!(
+                    scene.objects()[&palm]
+                        .transform
+                        .model()
+                        .abs_diff_eq(grip, 1e-4),
+                    "hand {hand}, pitch {pitch}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn xr_player_pet_hand_switch_and_tracking_loss_restore_equipment() {
+        let mut scene = SceneManager::default();
+        let sword = scene.add_cube(Vec3::ZERO);
+        let open = scene.add_cube(Vec3::ZERO);
+        let mut player = XrPlayer::default();
+        player.bind_hand(&mut scene, 0, Some(sword), false).unwrap();
+        player.bind_pet_hand(&mut scene, 0, Some(open)).unwrap();
+        player
+            .update_head(&mut scene, Some(Mat4::IDENTITY))
+            .unwrap();
+        let grip = Mat4::from_translation(Vec3::new(0.2, 1., -0.5));
+        player.set_petting_override([true, false]);
+        player
+            .update_hand(&mut scene, 0, Some(grip), true, 0.01)
+            .unwrap();
+        assert_eq!(player.petting_hands(), [true, false]);
+        assert_eq!(scene.objects()[&sword].transform.position, HIDDEN);
+        assert_eq!(
+            scene.objects()[&open].transform.position,
+            grip.w_axis.truncate()
+        );
+        player.update_hand(&mut scene, 0, None, true, 0.01).unwrap();
+        assert_eq!(player.petting_hands(), [false; 2]);
+        assert_eq!(scene.objects()[&open].transform.position, HIDDEN);
+        player.set_petting_override([false; 2]);
+        player
+            .update_hand(&mut scene, 0, Some(grip), true, 0.01)
+            .unwrap();
+        assert_eq!(
+            scene.objects()[&sword].transform.position,
+            grip.w_axis.truncate()
+        );
+        player.set_petting_override([true, false]);
+        player.set_hand_suppressed(0, true);
+        player
+            .update_hand(&mut scene, 0, Some(grip), true, 0.01)
+            .unwrap();
+        assert_eq!(
+            player.hand(0).unwrap().matrix,
+            grip,
+            "suppression retains actual grip tracking"
+        );
+        assert_eq!(scene.objects()[&open].transform.position, HIDDEN);
+        assert_eq!(scene.objects()[&sword].transform.position, HIDDEN);
+        player.set_hand_suppressed(0, false);
+        player.set_petting_override([false; 2]);
+        player
+            .update_hand(&mut scene, 0, Some(grip), true, 0.01)
+            .unwrap();
+        assert_eq!(
+            scene.objects()[&sword].transform.position,
+            grip.w_axis.truncate()
+        );
+        player.reset_tracking(&mut scene);
+        assert_eq!(scene.objects()[&open].transform.position, HIDDEN);
+        assert_eq!(scene.objects()[&sword].transform.position, HIDDEN);
+    }
 
     #[test]
     fn xr_player_tracks_unbound_head_and_hands_without_spawning() {

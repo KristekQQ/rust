@@ -1,8 +1,11 @@
 //! Simulation-to-render publication. Snapshots are complete, so a latest-only
 //! mailbox may discard intermediate frames. glTF assets/poses must remain static
-//! and be loaded on both scenes with identical root IDs before publication.
+//! and be loaded on both scenes with identical root IDs before publication. Sprite
+//! atlas assets may instead bind locally by semantic key.
 use super::*;
 use crate::gltf_loader::ImportedMesh;
+#[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+pub use crate::render::renderer::cut_buffer_pool::CutPoolStats;
 use std::{collections::BTreeSet, sync::Arc};
 
 #[derive(Default)]
@@ -30,12 +33,18 @@ pub(super) struct PreparedVariant {
 /// Retains immutable prepared assets across captures; no frame-delta dependency.
 #[derive(Default)]
 pub struct RenderPublisher {
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    cut_device: Option<wgpu::Device>,
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    cut_pool: Option<crate::render::renderer::cut_buffer_pool::CutBufferPool>,
     variants: BTreeMap<u32, Arc<PreparedVariant>>,
 }
 /// Owned snapshot, Send on native; WASM keeps it on its owning thread.
 /// Geometry payloads are shared, never copied per frame.
 pub struct RenderPublication {
+    visor_splat_remaining: f32,
     pub(super) objects: BTreeMap<u32, SceneObject>,
+    pub(super) sprite_ids: BTreeSet<u32>,
     pub(super) cut_lineage: BTreeMap<u32, (u32, Mat4)>,
     pub(super) triangles: BTreeMap<u32, TriangleObject>,
     pub(super) variants: BTreeMap<u32, MeshVariants>,
@@ -63,6 +72,27 @@ pub struct RenderRetirement {
 }
 
 impl RenderPublisher {
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    pub fn with_cut_device(device: wgpu::Device) -> Self {
+        Self {
+            cut_device: Some(device),
+            ..Self::default()
+        }
+    }
+
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    pub fn with_cut_pool(device: wgpu::Device, queue: wgpu::Queue) -> Self {
+        Self {
+            cut_pool: Some(crate::render::renderer::cut_buffer_pool::CutBufferPool::new(queue)),
+            ..Self::with_cut_device(device)
+        }
+    }
+
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    pub fn cut_pool_stats(&self) -> Option<CutPoolStats> {
+        self.cut_pool.as_ref().map(|pool| pool.stats)
+    }
+
     /// Font layout and all CPU mesh conversion run on the simulation owner.
     pub fn capture(&mut self, scene: &mut SceneManager) -> RenderPublication {
         assert!(
@@ -103,10 +133,20 @@ impl RenderPublisher {
         for (&id, object) in &scene.triangle_meshes {
             if !scene.variant_instances.contains_key(&id) {
                 object.mesh.prepare_render();
+                #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+                if let Some(device) = &self.cut_device {
+                    if scene.cut_lineage.contains_key(&id) {
+                        object
+                            .mesh
+                            .prepare_cut_buffers(device, self.cut_pool.as_mut());
+                    }
+                }
             }
         }
         RenderPublication {
+            visor_splat_remaining: scene.visor_splat_remaining(),
             objects: scene.objects.clone(),
+            sprite_ids: scene.sprite_ids.clone(),
             cut_lineage: scene.cut_lineage.clone(),
             triangles: scene.triangle_meshes.clone(),
             variants: scene.mesh_variants.clone(),
@@ -185,6 +225,14 @@ impl SceneManager {
                 .is_none_or(|old| old.dirty || old.revision != panel.revision);
         }
         exchange(&mut self.objects, &mut p.objects, local_ids);
+        for id in self.sprite_ids.difference(&p.sprite_ids) {
+            if !self.objects.contains_key(id) && self.models.remove(id).is_some() {
+                self.model_gpu_changes.removed.push(*id);
+            }
+        }
+        self.visor_splat_remaining = p.visor_splat_remaining;
+        self.sprite_ids = p.sprite_ids.clone();
+        self.sync_sprite_models();
         exchange(&mut self.triangle_meshes, &mut p.triangles, local_ids);
         exchange(&mut self.mesh_variants, &mut p.variants, local_ids);
         exchange(&mut self.variant_instances, &mut p.instances, local_ids);

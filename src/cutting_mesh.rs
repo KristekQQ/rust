@@ -59,6 +59,8 @@ struct MeshNode {
     source: MeshSource,
     support: Option<SupportCurve>,
     contact: Option<Rc<crate::contact_shape::ContactShape>>,
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    cut_gpu: OnceCell<Box<crate::render::renderer::PreparedCutBuffers>>,
     prepared_render: OnceCell<crate::gltf_loader::ImportedMesh>,
     #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
     prepared_glow: OnceCell<Option<crate::render::neon_glow::PreparedGlowMesh>>,
@@ -136,6 +138,8 @@ impl MeshData {
             source: MeshSource::Cpu(prepared.mesh),
             support: None,
             contact: None,
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            cut_gpu: OnceCell::new(),
             prepared_render: OnceCell::from(prepared.render),
             #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             prepared_glow: OnceCell::new(),
@@ -151,6 +155,8 @@ impl MeshData {
             source: MeshSource::RenderOnly,
             support: None,
             contact: None,
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            cut_gpu: OnceCell::new(),
             prepared_render: OnceCell::from(render),
             #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             prepared_glow: OnceCell::new(),
@@ -191,6 +197,8 @@ impl MeshData {
             stats,
             source: MeshSource::Cpu(mesh),
             support: None,
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            cut_gpu: OnceCell::new(),
             prepared_render: OnceCell::new(),
             #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             prepared_glow: OnceCell::new(),
@@ -203,6 +211,8 @@ impl MeshData {
             contact: self.0.contact.clone(),
             stats: self.0.stats,
             support: None,
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            cut_gpu: OnceCell::new(),
             prepared_render: OnceCell::new(),
             #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             prepared_glow: OnceCell::new(),
@@ -224,10 +234,33 @@ impl MeshData {
             stats,
             source: MeshSource::Resident { recipe, side },
             support: Some(support),
+            #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+            cut_gpu: OnceCell::new(),
             prepared_render: OnceCell::new(),
             #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             prepared_glow: OnceCell::new(),
         }))
+    }
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    pub(crate) fn prepare_cut_buffers(
+        &self,
+        device: &wgpu::Device,
+        pool: Option<&mut crate::render::renderer::cut_buffer_pool::CutBufferPool>,
+    ) {
+        if let Some(mesh) = self.prepared_render() {
+            // The mesh source is immutable and shared by successive publications.
+            // Dropping the last source and renderer handle releases its buffers.
+            self.0.cut_gpu.get_or_init(|| {
+                Box::new(match pool {
+                    Some(pool) => pool.upload(device, mesh),
+                    None => crate::render::renderer::PreparedCutBuffers::new(device, mesh),
+                })
+            });
+        }
+    }
+    #[cfg(all(feature = "native-render", not(target_arch = "wasm32")))]
+    pub(crate) fn cut_buffers(&self) -> Option<&crate::render::renderer::PreparedCutBuffers> {
+        self.0.cut_gpu.get().map(Box::as_ref)
     }
     pub(crate) fn same_source(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)

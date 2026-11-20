@@ -335,6 +335,7 @@ impl State {
         if let Some(display) = &mut self.combo_display {
             display.advance(&mut self.renderer.scene, dt);
         }
+        self.renderer.scene.set_billboard_camera(Some(camera_pos));
         self.renderer.advance_scene_with_elapsed(elapsed, dt);
         self.refresh_info_panels(elapsed);
         self.view = RenderView {
@@ -354,6 +355,15 @@ impl State {
     }
     pub fn screen_to_plane(&self, u: f32, v: f32, height: f32) -> Option<Vec3> {
         crate::render_math::screen_to_horizontal_plane(self.view.view_projection, u, v, height)
+    }
+    #[cfg(debug_assertions)]
+    pub(crate) fn debug_scene_bounds(&self) -> serde_json::Value {
+        crate::debug_scene_bounds::snapshot(
+            &self.renderer.scene,
+            self.view.view_projection,
+            |id| self.renderer.debug_glow_eligible(id),
+            self.postprocess.debug_ssr_rect(self.view),
+        )
     }
     pub fn world_to_screen(&self, point: Vec3) -> Option<[f32; 2]> {
         let p = self.view.view_projection * point.extend(1.0);
@@ -535,6 +545,9 @@ impl State {
         value["xrRoundRemaining"] = self.xr_round.map(|r| r.remaining).into();
         value.to_string()
     }
+    pub fn xr_round_active(&self) -> bool {
+        self.xr_round.is_some_and(|round| !round.finished())
+    }
     pub fn xr_round_finished(&self) -> bool {
         self.xr_round.is_some_and(|round| round.finished())
     }
@@ -706,6 +719,28 @@ impl State {
             }
             self.invalidate_xr_hud();
         }
+    }
+    pub fn record_xr_sprite_hits(&mut self, hits: &[crate::scene::sprite::SpriteCutHit]) {
+        if hits.is_empty() {
+            return;
+        }
+        self.xr_scene_pending = true;
+        if !self.xr_round_active() {
+            return;
+        }
+        for hit in hits {
+            let points = self
+                .combo_score
+                .award_round_bonus(self.xr_round, hit.points);
+            if self.xr_cut_rewards.len() < 32 {
+                self.xr_cut_rewards.push(XRCutReward {
+                    original: hit.original,
+                    points,
+                    total_points: u64::from(hit.points),
+                });
+            }
+        }
+        self.invalidate_xr_hud();
     }
     pub fn bank_xr_chain(&mut self, index: usize) -> bool {
         if !self.combo_score.chain_mode || self.xr_round.is_none() || self.xr_round_finished() {

@@ -34,6 +34,28 @@ try{
  for(const id of ids.halves)if(!engine.scene.getObject(id).exists)throw Error('Cut half missing');
  let gone=false;try{engine.scene.getObject(ids.source);}catch{gone=true;}if(!gone)throw Error('Cut parent retained');
  engine.setSceneInterpolation({durationMs:0});
- result.textContent='PASS: Rust render-only interpolation moves between source packets, settles, and preserves actual cut/removal and moves new halves before the second packet';
+ // Opt-in bounded prediction: only two authoritative snapshots, then no packets.
+ engine.setScenePrediction({horizonMs:300});
+ engine.setScenePredictionSampleTime(1000);await apply('initial',7);
+ engine.setSceneInterpolation({durationMs:50,maxDistance:3});
+ engine.setScenePredictionSampleTime(1200);await apply('motion',8);
+ await new Promise(r=>setTimeout(r,85));const predictedA=await capturePixels(canvas);
+ await new Promise(r=>setTimeout(r,75));const predictedB=await capturePixels(canvas);
+ assertChanged(predictedA,predictedB,'fruit keeps moving during a missing-packet interval');
+ await new Promise(r=>setTimeout(r,350));const boundedA=await capturePixels(canvas);
+ await new Promise(r=>setTimeout(r,80));const boundedB=await capturePixels(canvas);
+ let drift=0;for(let i=0;i<boundedA.data.length;i++)if(boundedA.data[i]!==boundedB.data[i])drift++;
+ if(drift>10)throw Error('Prediction continued beyond bounded horizon');
+ // A stationary authoritative update corrects the displayed prediction smoothly.
+ engine.setSceneInterpolation({durationMs:250,maxDistance:3});
+ engine.setScenePredictionSampleTime(1650);await apply('motion',9);
+ const correcting=await capturePixels(canvas);
+ await new Promise(r=>setTimeout(r,300));const corrected=await capturePixels(canvas);
+ assertChanged(correcting,corrected,'return from prediction is blended rather than teleported');
+ engine.setScenePrediction({horizonMs:0});
+ const exact=await capturePixels(canvas);let correctionError=0;
+ for(let i=0;i<corrected.data.length;i++)if(corrected.data[i]!==exact.data[i])correctionError++;
+ if(correctionError>10)throw Error('Stationary update did not settle at authoritative target');
+ result.textContent='PASS: default interpolation, real cut lineage/removal, bounded missing-packet prediction and smooth authoritative recovery';
 }catch(e){result.textContent='FAIL: '+e.message;console.error(e);}
 </script>

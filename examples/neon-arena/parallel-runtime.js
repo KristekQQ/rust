@@ -1,5 +1,5 @@
 // Asset loading and WASM calls only. The native and browser games share neon-core.
-export async function createSimulation(assetBase,scores=[],assetOverrides=new Map()){
+export async function createSimulation(assetBase,scores=[],assetOverrides=new Map(),leaderboard=null){
     const module=await import('../../pkg-neon-worker/neon_browser_worker.js');await module.default();
     const files=new Map();
     const read=async name=>{
@@ -17,5 +17,5 @@ export async function createSimulation(assetBase,scores=[],assetOverrides=new Ma
             for(const item of [...(document.buffers??[]),...(document.images??[])])if(item.uri&&!item.uri.startsWith('data:'))await read(directory+item.uri);
         }
     }
-    const game=new module.NeonSimulation([...files.keys()],[...files.values()]);game.restore_scores(JSON.stringify(scores));return game;
+    const game=new module.NeonSimulation([...files.keys()],[...files.values()]);if(leaderboard!==null)game.restore_leaderboard(JSON.stringify(leaderboard));else game.restore_scores(JSON.stringify(scores));return game;
 }

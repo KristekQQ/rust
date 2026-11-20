@@ -1,16 +1,20 @@
-<!doctype html><canvas id="gpu-canvas" width="640" height="480"></canvas><div id="veil">Loading</div><div id="caption"></div>
+<!doctype html><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{display:block;width:100%;height:100%}</style><canvas id="gpu-canvas" width="640" height="480"></canvas><div id="veil">Loading</div><div id="caption"></div>
 <script type="module">
 import {capturePixels} from './pixels.js';
 import {encodePacket} from '../tools/scene-observer/protocol.mjs';
 import {encodeByteDelta} from '../tools/scene-observer/byte-delta.mjs';
-const frames={};for(const name of ['initial','cut'])frames[name]=new Uint8Array(await(await fetch('./fixtures/native-scene/'+name+'.nwr')).arrayBuffer());
-let active,transport=null;
+const frames={};for(const name of ['initial','cut','removed'])frames[name]=new Uint8Array(await(await fetch('./fixtures/native-scene/'+name+'.nwr')).arrayBuffer());
+let active,transport=null,session='controlled-scene',acks=0,paused=false,held=null,connections=0,clockReplies=true,lastSampleAt=0;
+const raf=window.requestAnimationFrame.bind(window);
+window.requestAnimationFrame=callback=>raf(time=>{if(paused&&callback.name==='renderUpdate'){held=callback;return;}callback(time);});
 class ControlledSocket{
- static OPEN=1;constructor(){active=this;transport=null;this.readyState=1;setTimeout(()=>{this.onopen?.();setTimeout(()=>this.onmessage?.({data:JSON.stringify({type:'session',session:'controlled-scene',native:true,scene:true})}),0)},0)}
- send(data){const m=JSON.parse(data);if(m.type==='clock')this.onmessage?.({data:JSON.stringify({type:'clock',sentAt:m.sentAt,serverAt:Date.now()})});if(m.type==='ready')sendFrame('initial')}
+ static OPEN=1;constructor(){connections++;clockReplies=true;active=this;transport=null;this.readyState=1;setTimeout(()=>{this.onopen?.();setTimeout(()=>this.onmessage?.({data:JSON.stringify({type:'session',session,native:true,scene:true})}),0)},0)}
+ send(data){const m=JSON.parse(data);if(m.type==='clock'&&clockReplies)this.onmessage?.({data:JSON.stringify({type:'clock',sentAt:m.sentAt,serverAt:Date.now()})});if(m.type==='ready')sendFrame('initial');if(m.type==='ack')acks++}
  close(){this.readyState=3}
 }
-function sendFrame(name){const raw=encodePacket({session:'controlled-scene',sampledAt:Date.now(),mode:'live',clockUncertaintyMs:0,state:{fragments:name==='cut'?2:0}},frames[name]);const encoded=encodeByteDelta(transport,raw);transport={sequence:encoded.sequence,bytes:raw};active.onmessage?.({data:encoded.payload.buffer})}
-window.WebSocket=ControlledSocket;window.deliveryFixture={sendFrame,capture:()=>capturePixels(document.querySelector('canvas')),reconnect(){active.readyState=3;active.onclose?.()}};
+function sendFrame(name){lastSampleAt=Math.max(Date.now(),lastSampleAt+1);const raw=encodePacket({session,sampledAt:lastSampleAt,mode:'live',clockUncertaintyMs:0,state:{frame:name,fragments:name==='cut'?2:0}},frames[name]);const encoded=encodeByteDelta(transport,raw);transport={sequence:encoded.sequence,bytes:raw};active.onmessage?.({data:encoded.payload.buffer})}
+window.WebSocket=ControlledSocket;window.deliveryFixture={sendFrame,capture:()=>capturePixels(document.querySelector('canvas')),get connections(){return connections;},silence(){clockReplies=false;},get acks(){return acks;},pause(){paused=true;},resume(){paused=false;if(held){const cb=held;held=null;window.requestAnimationFrame(cb);}},
+ newSession(){session+='-next';transport=null;active.onmessage?.({data:JSON.stringify({type:'session',session,native:true,scene:true})});},
+ reconnect(){active.readyState=3;active.onclose?.()}};
 await import('../tools/scene-observer/viewer.js');
 </script>

@@ -70,6 +70,14 @@ must not become a successful benchmark. The explicit `--experiment half-glow`
 comparison keeps the glyph atlas enabled in both variants and selects ordinary
 halo resolution 1 versus 0.5; it rejects an inactive/fallback half-resolution
 path. `--view cut` uses the real cut fixture for paired stereo quality checks.
+For authored scene/asset comparisons use `--experiment scene --candidate-assets
+<complete-tree>` alongside baseline `--assets`. Both variants keep the font atlas,
+half-resolution ordinary glow and SSR settings fixed; the runner hashes both
+asset trees and validates their actual roots. Use `--view player` for the usual
+player camera and `--view floor` for a downward view. A downward-only improvement
+does not establish the normal-player benefit. Zero ordinary-glow draws are valid
+only with the explicit `no-ordinary-glow` fallback; otherwise the effective
+half-resolution target must be active.
 Include the new depth-reduction and halo passes in whole-pass GPU totals.
 The existence of this experiment is not evidence that it should be enabled by
 default. Change variants deliberately in code and validation for other effects.

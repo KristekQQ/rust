@@ -2,6 +2,7 @@
 <style>body{background:#101521;color:#fff}#gpu-canvas{width:640px;height:480px}button{display:none}</style>
 <canvas id="gpu-canvas"></canvas><button id="enter"></button><button id="exit"></button><p id="status"></p><p id="error"></p><p id="build"></p><a id="backend"></a><pre id="result">RUNNING</pre><ul id="checks"></ul><canvas id="stereo"></canvas>
 <script type="module">
+import {NEON_PERFORMANCE_OFFSET} from '../examples/neon-arena/panel-layout.js';
 import {matrixFromPose} from './xr/poses.js';
 import {installXRSimulator} from './xr/simulator.js';
 import {assertForeground,capturePixels} from './pixels.js';
@@ -48,7 +49,7 @@ try{
   let different=0;for(let i=0;i<left.data.length;i++)if(left.data[i]!==right.data[i])different++;
   assert(different>1000,'native game has distinct real stereo eye images');
   const c=document.querySelector('#stereo');c.width=left.width+right.width;c.height=left.height;const ctx=c.getContext('2d');ctx.putImageData(left,0,0);ctx.putImageData(right,left.width,0);
-  assert(Math.abs(world.infoPanel.meshInfo.position[0]-.9)<.02&&Math.abs(world.infoPanel.meshInfo.position[1]-.35)<.02,'same independent feet-anchored info panel');
+  assert(world.infoPanel.meshInfo.position.every((v,i)=>Math.abs(v-NEON_PERFORMANCE_OFFSET[i])<.02),'same independent feet-anchored info panel');
   const beforeReset=bridge.state.cuts;
   sim.resetReferenceSpace();sim.frame(still);await bridge.settle();
   assert(bridge.state.cuts===beforeReset,'recenter resets worker blade history without phantom cut');
@@ -58,12 +59,41 @@ try{
  }
  assert(bridge.state.audio&&Array.isArray(bridge.state.audio.events),'shared Rust sound journal present');
  // Full authored minute, genuine Rust timings/waves, without timers or JS gameplay.
- bridge.newSession();bridge.step(sample());await bridge.settle();
+ if(wantsXR){bridge.newSession();bridge.step(sample());await bridge.settle();}
  for(let batch=0;batch<61;batch++){
   for(let i=0;i<120;i++)bridge.step(sample());
   await bridge.settle();
  }
- assert(bridge.state.round.finished&&bridge.state.cueIndex===24&&bridge.state.shots===140,'same complete minute:24 cues,140 targets,finished state');
+ assert(bridge.state.round.finished&&bridge.state.cueIndex===manifest.runtime.minutePlan.cues.length&&bridge.state.shots===149,'same complete minute:authored cues,149 targets,finished state');
+ if(!wantsXR){
+  assert(bridge.state.scoreEntryPending,'qualified player sees the initials keyboard');
+  const canvas=document.querySelector("#gpu-canvas");
+  const beforeAim=await capturePixels(canvas);
+  const aim=sample();
+  aim[1]|=16;
+  aim.set(matrixFromPose({position:[-.45,1.55,0]}),72);
+  bridge.step(aim);await bridge.settle();
+  const afterAim=await capturePixels(canvas);
+  const rayVisible=[-.25,-.45,-.65,-.85].filter(z=>{
+   const uv=engine.worldToScreen([-.45,1.55,z]);
+   if(!uv)return false;
+   const x=Math.round(uv[0]*afterAim.width),y=Math.round(uv[1]*afterAim.height);
+   for(let j=-3;j<=3;j++)for(let i=-3;i<=3;i++){
+    const k=((y+j)*afterAim.width+x+i)*4;
+    const [r,g,b]=afterAim.data.subarray(k,k+3);
+    if(g>r+20&&g>b+20&&g>beforeAim.data[k+1]+20)return true;
+   }
+   return false;
+  });
+  assert(rayVisible.length>=2,'green aiming ray is visible along the path before trigger press');
+  const key=async index=>{
+   const v=sample();v[1]|=16;v[2]=2;
+   v.set(matrixFromPose({position:[(index%7)*.15-.45,1.55-Math.floor(index/7)*.112,0]}),72);
+   bridge.step(v);await bridge.settle();bridge.step(sample());await bridge.settle();
+  };
+  await key(7);await key(10);await key(27);
+  assert(bridge.state.lastScoreEntry?.initials==='HK'&&!bridge.state.scoreEntryPending,'controller ray and trigger confirm two initials');
+ }
  const restart=sample();restart[3]=1;bridge.step(restart);await bridge.settle();
  assert(!bridge.state.round.finished&&bridge.state.score===0&&bridge.state.shots===6,'A starts a fresh native round');
  assert(bridge.state.audio.events.some(e=>e.clip==='round_start'),'restart emits authoritative round sound');

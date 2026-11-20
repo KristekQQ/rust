@@ -21,6 +21,9 @@ impl RoundClock {
     }
 }
 
+pub const CAT_BOOST_MULTIPLIER: u64 = 2;
+pub const CAT_BOOST_SECONDS: f32 = 20.0;
+
 /// Guaranteed reward for each registered original cut in chain mode.
 pub const CHAIN_HIT_POINTS: u64 = 10;
 
@@ -30,6 +33,8 @@ pub struct FruitChain {
     pub kind: String,
     pub count: u32,
     pub points: u32,
+    /// Actual earned bonus; None retains nominal values for fixtures.
+    pub earned_bonus: Option<u64>,
 }
 impl FruitChain {
     /// Total earned by the stored fruit: guaranteed hits and chain bonus.
@@ -39,6 +44,9 @@ impl FruitChain {
             .saturating_add(self.value())
     }
     pub fn value(&self) -> u64 {
+        self.earned_bonus.unwrap_or_else(|| self.nominal_value())
+    }
+    fn nominal_value(&self) -> u64 {
         if self.count < 3 {
             return 0;
         }
@@ -63,6 +71,7 @@ pub struct ComboScore {
     pub streak: u32,
     pub kind: String,
     pub targets: std::collections::BTreeMap<u32, (String, u32, bool)>,
+    cat_wild_remaining: f32,
     streak_points: u32,
     display_kind: String,
     display_count: u32,
@@ -73,6 +82,39 @@ pub struct ComboScore {
     chain_age: [u8; 2],
 }
 impl ComboScore {
+    /// After drinking, boost awards for twenty seconds of round time.
+    pub fn activate_cat_wild(&mut self) {
+        if self.cat_wild_remaining <= 0.0 {
+            self.cat_wild_remaining = CAT_BOOST_SECONDS;
+        }
+    }
+    pub fn advance_cat_wild(&mut self, dt: f32) {
+        if dt.is_finite() && dt > 0.0 {
+            self.cat_wild_remaining = (self.cat_wild_remaining - dt).max(0.0);
+        }
+    }
+    fn xp_multiplier(&self) -> u64 {
+        if self.cat_wild_remaining > 0. {
+            CAT_BOOST_MULTIPLIER
+        } else {
+            1
+        }
+    }
+    pub fn cat_wild_remaining(&self) -> f32 {
+        self.cat_wild_remaining
+    }
+
+    /// Independent bonuses never enter or alter fruit chains. The live sprite
+    /// controller consumes each target once before passing its reward here.
+    pub fn award_round_bonus(&mut self, round: Option<RoundClock>, points: u32) -> u64 {
+        if !round.is_some_and(|round| !round.finished()) {
+            return 0;
+        }
+        let before = self.score;
+        let multiplier = self.xp_multiplier();
+        self.score = self.score.saturating_add(u64::from(points) * multiplier);
+        self.score - before
+    }
     pub fn register(&mut self, id: u32, kind: &str, points: u32, wild: bool) -> bool {
         if kind.is_empty()
             || kind.len() > 16
@@ -108,9 +150,16 @@ impl ComboScore {
     /// oldest chain; its previously earned reward remains in the score.
     pub fn hit_chain(&mut self, id: u32) -> Option<bool> {
         let (kind, points, wild) = self.targets.remove(&id)?;
-        // Only registered originals get the guaranteed reward, exactly once.
-        self.score = self.score.saturating_add(CHAIN_HIT_POINTS);
         self.last_lost_bonus = 0;
+        if self.cat_wild_remaining > 0.0 {
+            // credit_chain always adds its guaranteed ten. Store the remainder
+            // on each stock, including the boosted part of that guaranteed hit.
+            let per_stock = (CHAIN_HIT_POINTS + u64::from(points)) * self.xp_multiplier();
+            let bonus = Some(per_stock - CHAIN_HIT_POINTS);
+            self.credit_chain(0, kind.clone(), points, true, bonus);
+            self.credit_chain(1, kind, points, true, bonus);
+            return Some(true);
+        }
         let slot = if wild {
             self.chains
                 .iter()
@@ -133,6 +182,18 @@ impl ComboScore {
                 .or_else(|| (0..self.chains.len()).min_by_key(|&index| self.chain_age[index]))
         };
         let index = slot?;
+        self.credit_chain(index, kind, points, wild, None);
+        Some(true)
+    }
+    fn credit_chain(
+        &mut self,
+        index: usize,
+        kind: String,
+        points: u32,
+        wild: bool,
+        fixed_bonus: Option<u64>,
+    ) {
+        self.score = self.score.saturating_add(CHAIN_HIT_POINTS);
         if !wild
             && !self.chain_wild[index]
             && self.chains[index]
@@ -144,7 +205,10 @@ impl ComboScore {
             self.last_lost_bonus = 0;
             self.chains[index] = None;
         }
-        let old_value = self.chains[index].as_ref().map_or(0, FruitChain::value);
+        let earned_bonus = self.chain_bonus_points(index);
+        let old_value = self.chains[index]
+            .as_ref()
+            .map_or(0, FruitChain::nominal_value);
         let old_count = self.chains[index].as_ref().map_or(0, |chain| chain.count);
         if let Some(chain) = self.chains[index].as_mut() {
             if !wild && self.chain_wild[index] {
@@ -158,6 +222,7 @@ impl ComboScore {
             self.chain_age[other] = u8::from(self.chains[other].is_some());
             self.chain_age[index] = 2;
             self.chains[index] = Some(FruitChain {
+                earned_bonus: None,
                 kind: if wild { "ZOLIK".into() } else { kind },
                 count: 1,
                 points,
@@ -167,33 +232,52 @@ impl ComboScore {
         let chain = self.chains[index]
             .as_ref()
             .expect("chain was inserted or grown");
-        let new_value = chain.value();
-        self.score = self
-            .score
-            .saturating_add(new_value.saturating_sub(old_value));
-        let new_triples = chain.count / 3;
+        let new_value = chain.nominal_value();
+        let new_count = chain.count;
+        // Cat credits are fixed by the hit target, independent of each row's
+        // kind/count. Later normal growth cannot reprice those earned credits.
+        let bonus = fixed_bonus.unwrap_or_else(|| new_value.saturating_sub(old_value));
+        self.chains[index].as_mut().unwrap().earned_bonus =
+            Some(earned_bonus.saturating_add(bonus));
+        self.score = self.score.saturating_add(bonus);
+        let new_triples = new_count / 3;
         self.triples = self
             .triples
             .saturating_add(new_triples.saturating_sub(old_count / 3));
         self.last_chain_index = Some(index);
-        Some(true)
+    }
+    pub fn chain_bonus_points(&self, index: usize) -> u64 {
+        self.chains
+            .get(index)
+            .and_then(Option::as_ref)
+            .map_or(0, |chain| chain.value())
+    }
+    pub fn chain_total_points(&self, index: usize) -> u64 {
+        self.chains
+            .get(index)
+            .and_then(Option::as_ref)
+            .map_or(0, |chain| {
+                u64::from(chain.count)
+                    .saturating_mul(CHAIN_HIT_POINTS)
+                    .saturating_add(self.chain_bonus_points(index))
+            })
     }
     pub fn last_chain_total_points(&self) -> u64 {
         self.last_chain_index
-            .and_then(|index| self.chains[index].as_ref())
-            .map_or(0, FruitChain::total_points)
+            .map_or(0, |index| self.chain_total_points(index))
     }
     pub fn bank_chain(&mut self, index: usize) -> Option<u64> {
-        let chain = self.chains.get_mut(index)?.take()?;
+        self.chains.get(index)?.as_ref()?;
+        let bonus = self.chain_bonus_points(index);
+        self.chains[index] = None;
         self.chain_wild[index] = false;
         self.chain_age[index] = 0;
-        Some(chain.value())
+        Some(bonus)
     }
     pub fn pending_bonus(&self) -> u64 {
-        self.chains
-            .iter()
-            .flatten()
-            .fold(0_u64, |sum, chain| sum.saturating_add(chain.value()))
+        (0..self.chains.len()).fold(0_u64, |sum, index| {
+            sum.saturating_add(self.chain_bonus_points(index))
+        })
     }
     pub fn bank_all(&mut self) -> u64 {
         (0..self.chains.len()).fold(0_u64, |total, index| {
@@ -231,9 +315,11 @@ impl ComboScore {
         self.streak += 1;
         self.display_count = self.streak;
         let completed = self.streak == 3;
-        let award = self.streak_points;
+        let award = self
+            .streak_points
+            .saturating_mul(self.xp_multiplier() as u32);
         if completed {
-            self.score = self.score.saturating_add(u64::from(self.streak_points));
+            self.score = self.score.saturating_add(u64::from(award));
             self.triples = self.triples.saturating_add(1);
             self.display_count = 3;
             if !self.kind.is_empty() {
@@ -264,6 +350,121 @@ pub struct ComboEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cat_wild_credits_equal_new_values_without_repricing_old_chains() {
+        let mut score = ComboScore::default();
+        for id in 0..5 {
+            chain_hit(&mut score, id, "A", 10, false);
+        }
+        chain_hit(&mut score, 10, "B", 100, false);
+        // An ordinary WILD earned before drinking stays at its original value.
+        chain_hit(&mut score, 11, "GIFT", 25, true);
+        let before = [score.chain_total_points(0), score.chain_total_points(1)];
+        let score_before = score.score;
+        score.activate_cat_wild();
+        chain_hit(&mut score, 12, "C", 35, false);
+        assert_eq!(score.score, score_before + 180);
+        for (index, earlier_points) in before.into_iter().enumerate() {
+            assert_eq!(score.chain_total_points(index), earlier_points + 90);
+        }
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "A");
+        assert_eq!(score.chains[1].as_ref().unwrap().kind, "B");
+        assert_eq!(score.hit_chain(12), None);
+        let before_bonus = score.chains[0].as_ref().unwrap().value();
+        score.advance_cat_wild(20.0);
+        chain_hit(&mut score, 13, "A", 10, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().value(), before_bonus + 50);
+        let before_bank = score.score;
+        let pending = score.pending_bonus();
+        assert_eq!(score.bank_all(), pending);
+        assert_eq!(score.bank_all(), 0);
+        assert_eq!(score.score, before_bank);
+    }
+    #[test]
+    fn cat_wild_empty_slots_banking_expiry_and_birds_are_independent() {
+        let mut score = ComboScore::default();
+        score.activate_cat_wild();
+        chain_hit(&mut score, 1, "A", 30, false);
+        assert_eq!(score.score, 160);
+        for chain in score.chains.iter().flatten() {
+            assert_eq!(
+                (
+                    &*chain.kind,
+                    chain.count,
+                    chain.value(),
+                    chain.total_points()
+                ),
+                ("ZOLIK", 1, 70, 80)
+            );
+        }
+        assert_eq!(score.bank_chain(0), Some(70));
+        chain_hit(&mut score, 2, "B", 50, true);
+        assert_eq!(score.chain_total_points(0), 120);
+        assert_eq!(score.chain_total_points(1), 200);
+        let before = score.score;
+        assert_eq!(score.award_round_bonus(RoundClock::new(60.0), 77), 154);
+        assert_eq!(score.score, before + 154);
+        score.advance_cat_wild(19.0);
+        score.activate_cat_wild();
+        assert_eq!(score.cat_wild_remaining(), 1.0);
+        for dt in [f32::NAN, f32::INFINITY, -1.0, 0.0] {
+            score.advance_cat_wild(dt);
+        }
+        assert_eq!(score.cat_wild_remaining(), 1.0);
+        score.advance_cat_wild(2.0);
+        assert_eq!(score.cat_wild_remaining(), 0.0);
+        assert_eq!(
+            score.award_round_bonus(RoundClock::new(60.0), 77),
+            77,
+            "ordinary bird scoring returns after boost expires"
+        );
+        chain_hit(&mut score, 3, "C", 70, false);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "C");
+        assert_eq!(score.chain_total_points(0), 130);
+        assert_eq!(score.chain_total_points(1), 200);
+        score.activate_cat_wild();
+        score.reset();
+        assert_eq!(score.cat_wild_remaining(), 0.0);
+        assert_eq!(score.score, 0);
+        assert_eq!(score.pending_bonus(), 0);
+    }
+    #[test]
+    fn cat_wild_rewards_saturate_without_overflow() {
+        let mut score = ComboScore::default();
+        score.activate_cat_wild();
+        chain_hit(&mut score, 1, "A", 10, false);
+        score.score = u64::MAX - 1;
+        score.chains[0].as_mut().unwrap().earned_bonus = Some(u64::MAX - 1);
+        chain_hit(&mut score, 2, "A", 10, false);
+        assert_eq!(score.score, u64::MAX);
+        assert_eq!(score.chains[0].as_ref().unwrap().value(), u64::MAX);
+        assert_eq!(score.pending_bonus(), u64::MAX);
+        assert_eq!(score.bank_all(), u64::MAX);
+    }
+    #[test]
+    fn independent_bonus_requires_live_round_and_preserves_fruit_chains() {
+        let mut score = ComboScore::default();
+        score.set_chain_mode(true);
+        chain_hit(&mut score, 7, "APPLE", 20, false);
+        let before = score.score;
+        let live = RoundClock::new(60.).unwrap();
+        assert_eq!(score.award_round_bonus(None, 1000), 0);
+        let mut finished = live;
+        finished.advance(60.);
+        assert_eq!(score.award_round_bonus(Some(finished), 1000), 0);
+        assert_eq!(score.score, before);
+        assert_eq!(score.award_round_bonus(Some(live), 1000), 1000);
+        assert_eq!(score.score, before + 1000);
+        assert_eq!(score.chains[0].as_ref().unwrap().count, 1);
+        assert_eq!(score.chains[0].as_ref().unwrap().kind, "APPLE");
+        assert_eq!(score.triples, 0);
+        assert!(score.targets.is_empty());
+        score.score = u64::MAX - 5;
+        assert_eq!(score.award_round_bonus(Some(live), 1000), 5);
+        assert_eq!(score.score, u64::MAX);
+        score.reset();
+        assert_eq!(score.score, 0);
+    }
     fn chain_hit(score: &mut ComboScore, id: u32, kind: &str, points: u32, wild: bool) -> bool {
         assert!(score.register(id, kind, points, wild));
         score.hit_chain(id).unwrap()
@@ -415,6 +616,7 @@ mod tests {
         assert!(score.chains.iter().all(Option::is_none));
         assert_eq!((score.score, score.triples, score.rejected), (0, 0, 0));
         let maximal = FruitChain {
+            earned_bonus: None,
             kind: "A".into(),
             count: u32::MAX,
             points: u32::MAX,

@@ -29,6 +29,7 @@ pub mod textures;
 
 mod hud;
 pub mod postprocess;
+pub mod visor_splat;
 
 pub mod environment;
 

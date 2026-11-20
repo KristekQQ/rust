@@ -95,6 +95,16 @@ Never imply a deduction: this value is already included in the main score. Retai
 further replacement. Keep all scoring and effect timing native; do not clone
 geometry or add a JS score/animation loop.
 
+## Characters that change a player's next decision
+
+Give a visitor a recognizable cue, one action the player can choose, an immediate response and a readable ending. Decide whether the opportunity is worth interrupting the main activity. Leave room for ignoring the visitor and finishing the round. For implementation details use [NPC characters](../npc-characters/SKILL.md).
+
+- **Friendly reward in Neon.** The cat can visit between rounds. During an eligible round, a sustained stroke earns a delivery. The player still picks up the can and drinks it. That moment starts the 20-second 2× boost; qualifying new fruit hits credit both stocks. Leave previously earned points intact. Show the multiplier and time remaining where the player can see them and make a boosted hit visibly pay off. [Drink interaction](../../../src/xp_drink.rs) and [scoring rules](../../../src/xr_round.rs)
+- **Mischief with counterplay.** Some birds drop a splat. A floor deposit is scenery; a falling drop that actually hits the player briefly marks the visor. The existing effect lasts seven seconds and the player can dodge. Preserve a readable part of the view, the approach cue and a clear return to normal. Tune chance, coverage and duration separately. Check a near miss, a direct hit and a second bird while the effect is active. [Deposits and visor tests](../../../src/sprite_deposits.rs)
+- **Example for a future visitor.** A firefly could pause beside a fruit to mark a scoring opportunity. The player may follow it or keep their current chain. Start with one cue and one eligible hit; if players miss why the reward fired, improve the cue before increasing its value. This is a design sketch.
+
+Play through earning, declining, missing and expiry, plus a round restart during the encounter. Check whether a player can explain what caused the effect and what choice it gave them. Keep a reward on the action that earns or consumes it, and make its onset, duration, stacking and reset policy explicit.
+
 ## Author, verify and learn
 
 Use the [engine workflow](../rust-webgpu-project/SKILL.md) and

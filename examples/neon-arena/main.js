@@ -1,10 +1,10 @@
-import {VR_DEBUG_PANEL_OFFSET} from '../shared/vr-debug-panel.js';
+import {NEON_PERFORMANCE_OFFSET} from './panel-layout.js';
 import {reportDiagnostic,probeWebGpuXR} from '../shared/diagnostics.js';
 import { initEngine } from '../../js/engine.js';
 import { ARENA_REVISION, createScene, createFruitMesh, launchApple, previewSlice, FRUIT_SCALE, RESTART_POSITION, FRUIT_OPACITY, FRUIT_OPACITY_VARIATION, CUT_EFFECT_SIZE, CUT_PIECE_FADE, NEON_GLOW } from './scene.js';
 import {PerformanceTest,PERFORMANCE_PHASES} from './performance-test.js';
 import {planWave} from './wave-plan.js';
-import {validateRoundPlan,planCue} from './round-plan.js';
+import {releasePlan,validateRoundPlan,planCue} from './round-plan.js';
 import {createArenaTools,installArenaPanel,installArenaBridge} from './arena-tools.js';
 import {fetchPreset} from './arena-presets.js';
 import {installScoreboard,loadScoreboard} from './scoreboard.js';
@@ -124,7 +124,9 @@ if(verify instanceof HTMLButtonElement)verify.onclick=async()=>{
 export const player = engine.xr.player;
 player.equip('right', world.sword, {cutting: true, requireTrigger: false, haptics:true});
 player.equip('left', world.leftSword, {cutting: true, requireTrigger: false, haptics:true});
-engine.xr.bindButton(world.restartButton);
+player.bindPetHand('left', world.leftPetHand);
+player.bindPetHand('right', world.rightPetHand);
+// Restart is a controller button action, never a world-space hit target.
 engine.xr.addEventListener('buttonhover', event => {
     const {handedness,point}=/** @type {CustomEvent<{handedness:'left'|'right',point:import('../../js/engine.d.ts').Vector3|null}>} */(event).detail;
     world.pointers[handedness==='left'?0:1].setPosition(point ?? [100,100,100]);
@@ -166,7 +168,7 @@ let phaseLabel='';
 let cueHistory=[];
 const roundResponse=await fetch(new URL('./minute-scene.json',import.meta.url),{cache:'no-store'});
 if(!roundResponse.ok)throw new Error(`Nelze načíst minutovou scénu: HTTP ${roundResponse.status}`);
-export const minutePlan=validateRoundPlan(await roundResponse.json());
+export const minutePlan=releasePlan(validateRoundPlan(await roundResponse.json()));
 /** @param {string} label @param {boolean} [preview] */
 const showPhase=(label,preview=false)=>{
     phaseLabel=label;
@@ -182,7 +184,7 @@ const spawnRecipes=(recipes,showLaunch=false)=>{
         if(!source)throw new Error('Neznámé ovoce.');
         const object=launchApple(engine.scene,world.nextFruitVariant(source),0,solidFruit,recipe);
         flying.push(object);shot++;
-        if(showLaunch)for(const side of [-1,1]){
+        if(showLaunch && world.launchGlintAssets.length)for(const side of [-1,1]){
             const glint=world.launchGlintAssets[i%3].createInstance()
                 .setPosition([recipe.position[0]+side*.045,recipe.position[1]-.04,recipe.position[2]])
                 .setScale([.006,.09,.006]).setRotation([0,0,side*.35])
@@ -279,7 +281,7 @@ export const benchmarkState=()=>performanceTest?.snapshot()??null;
 function benchmarkLabel(/** @type {string} */ title,/** @type {string[]} */ lines) {
     if(benchmarkPanel?.exists)benchmarkPanel.remove();
     benchmarkPanel=engine.scene.createTextPanel({title,lines,position:[0,-10000,0],width:.66,height:.40}).setEmission(.7);
-    engine.xr.player.bindHead(benchmarkPanel,{offset:VR_DEBUG_PANEL_OFFSET,anchor:'feet'});
+    engine.xr.player.bindHead(benchmarkPanel,{offset:NEON_PERFORMANCE_OFFSET,anchor:'feet'});
 }
 function startBenchmark(){
     const original={ssr:enableSSR,glow:enableGlow};
@@ -327,7 +329,7 @@ function startBenchmark(){
             for(const object of benchmarkObjects)if(object.exists)object.remove();
             benchmarkObjects=[];
             if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;
-            if(engine.xr.isPresenting)engine.xr.player.bindHead(world.infoPanel,{offset:VR_DEBUG_PANEL_OFFSET,anchor:'feet'});
+            if(engine.xr.isPresenting)engine.xr.player.bindHead(world.infoPanel,{offset:NEON_PERFORMANCE_OFFSET,anchor:'feet'});
             const report={...snapshot,revision,production:releaseBuild,renderer:engine.renderer_backend(),profiling:parameters.get('profile')==='1',created:new Date().toISOString(),
                 note:'FPS a medián/minimum oken po 180 snímcích; nejde o 1% low ani GPU čas. Pohled a pohyb hlavy nejsou uzamčené.'};
             benchmarkReport=JSON.stringify(report,null,2);
@@ -359,19 +361,8 @@ if(benchmarkDownload instanceof HTMLButtonElement)benchmarkDownload.onclick=()=>
     const url=URL.createObjectURL(new Blob([benchmarkReport],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download=`xr-test-${engine.renderer_backend()}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
-const parkStartButton = () => {
-    world.restartButton.setPosition(RESTART_POSITION).setRotation([0,-Math.atan2(RESTART_POSITION[0],-RESTART_POSITION[2]),0]);
-};
-const showStartButton = () => {
-    const head=engine.xr.player.head;
-    const position=head.position??[0,1.55,0],matrix=head.matrix;
-    const fx=matrix?-matrix[8]:0,fz=matrix?-matrix[10]:-1;
-    const length=Math.hypot(fx,fz);
-    const x=length>.01?fx/length:0,z=length>.01?fz/length:-1;
-    world.restartButton.setPosition([position[0]+x*.95,Math.max(.85,position[1]-.35),position[2]+z*.95])
-        .setRotation([0,Math.atan2(-x,-z),0]);
-    engine.xr.bindButton(world.restartButton);
-};
+const showStartButton = () => world.restartButton.setPosition([100,-10000,100]);
+const parkStartButton = showStartButton;
 const startRound = () => {
     if(performanceTest?.running)return;
     parkStartButton();
@@ -391,8 +382,7 @@ document.getElementById('shoot')?.addEventListener('click', shootApple);
 engine.xr.addEventListener('select', event => {
     if(performanceTest?.running)return;
     const {handedness,target}=/** @type {CustomEvent<{handedness:string,target:import('../../js/engine.js').SceneObject|null}>} */(event).detail;
-    if (target?.id===world.restartButton.id) startRound();
-    else if (!engine.xr.roundState?.finished && engine.xr.roundState?.mode==='chains' && (handedness==='left'||handedness==='right')) {
+    if (!engine.xr.roundState?.finished && engine.xr.roundState?.mode==='chains' && (handedness==='left'||handedness==='right')) {
         arenaTools.call('arena_bank',{hand:handedness});
     } else if (handedness==='left' && !engine.xr.roundState?.finished && arenaTools.config.program==='practice') spawnWave();
 });
@@ -424,12 +414,12 @@ enter.onclick = () => {
 };
 exit.onclick = () => { void engine.xr.exit().catch(error => { status.textContent = String(error); }); };
 engine.xr.addEventListener('firstframe', event => reportDiagnostic('xr-first-frame',undefined,{.../** @type {CustomEvent} */(event).detail,postprocessing:engine.postprocessing.stats(),profile:engine.frameProfile(),graph:engine.postprocessing.graph()}));
-engine.xr.addEventListener('start', () => { enter.hidden=true;reportDiagnostic('xr-start'); if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=true; if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=true; setPanelFacing(true); engine.xr.player.bindHead(world.infoPanel,{offset:VR_DEBUG_PANEL_OFFSET,anchor:'feet'}); exit.hidden = false; if(benchmarkToggle instanceof HTMLInputElement&&benchmarkToggle.checked)startBenchmark();else startRound(); });
+engine.xr.addEventListener('start', () => { enter.hidden=true;reportDiagnostic('xr-start'); if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=true; if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=true; setPanelFacing(true); engine.xr.player.bindHead(world.infoPanel,{offset:NEON_PERFORMANCE_OFFSET,anchor:'feet'}); exit.hidden = false; if(benchmarkToggle instanceof HTMLInputElement&&benchmarkToggle.checked)startBenchmark();else startRound(); });
 engine.xr.addEventListener('roundend', () => {
     stopLaunches();showPhase('');showStartButton();
     const count=document.getElementById('cuts');if(count)count.textContent=String(engine.xr.roundState?.score??0);
     world.apples.forEach((fruit,i)=>fruit.setPosition(world.previewPositions[i]));
-    status.textContent = `Konec kola — skóre ${engine.xr.roundState?.score ?? 0}, trojic ${engine.xr.roundState?.triples ?? 0}. Před tebou je START — klepni mečem nebo namiř a stiskni trigger.`;
+    status.textContent = `Konec kola — skóre ${engine.xr.roundState?.score ?? 0}, trojic ${engine.xr.roundState?.triples ?? 0}. Další kolo spusť tlačítkem RESTART.`;
 });
 engine.xr.addEventListener('end', () => { performanceTest?.cancel('VR ukončeno');if(benchmarkPanel?.exists)benchmarkPanel.remove();benchmarkPanel=null;if(benchmarkToggle instanceof HTMLInputElement)benchmarkToggle.disabled=false;if(fruitStyle instanceof HTMLInputElement)fruitStyle.disabled=false; parkStartButton();engine.xr.player.bindHead(null);world.infoPanel.setPosition(diagnosticHome.position).setRotation(diagnosticHome.rotation);setPanelFacing(false); stopLaunches();showPhase(''); engine.scene.clearCutFeedback(); world.pointers.forEach(p=>p.setPosition([100,100,100])); exit.hidden = true; enter.hidden=false;void ready(); home(); fit(); status.textContent = 'VR ukončeno. Můžete vstoupit znovu.'; });
 engine.xr.addEventListener('error', () => { performanceTest?.cancel('Chyba XR');stopLaunches();showPhase('');status.textContent = `VR se zastavilo: ${engine.xr.lastError}`; reportDiagnostic('xr-frame',engine.xr.lastError); });

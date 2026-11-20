@@ -45,12 +45,23 @@ struct Track {
     local_center: Vec3,
     local_extent: Vec3,
     elapsed: f32,
+    duration: f32,
+    velocity: Vec3,
+    horizon: f32,
+}
+struct Sample {
+    position: Vec3,
+    time: f64,
+    velocity: Vec3,
 }
 #[derive(Default)]
 pub(super) struct MirrorInterpolation {
     duration: f32,
     max_distance: f32,
     active: BTreeMap<u32, Track>,
+    horizon: f32,
+    sample_time: Option<f64>,
+    samples: BTreeMap<u32, Sample>,
 }
 fn matrix(data: &ObjectRenderData) -> Mat4 {
     Mat4::from_cols_array_2d(&data.instance.model)
@@ -73,11 +84,65 @@ impl MirrorInterpolation {
     pub(super) fn enabled(&self) -> bool {
         self.duration > 0.
     }
+    pub(super) fn prediction_enabled(&self) -> bool {
+        self.horizon > 0. && self.sample_time.is_some()
+    }
     pub(super) fn clear(&mut self) {
         self.active.clear();
+        self.samples.clear();
+        self.sample_time = None;
+        self.horizon = 0.;
     }
     pub(super) fn retain(&mut self, mut keep: impl FnMut(u32) -> bool) {
         self.active.retain(|&id, _| keep(id));
+        self.samples.retain(|&id, _| keep(id));
+    }
+    /// Only wire-authoritative transforms enter this history, before smoothing mutates them.
+    pub(super) fn sample(
+        &mut self,
+        id: u32,
+        target: &SceneObject,
+        eligible: bool,
+        reset: bool,
+    ) -> bool {
+        if self.horizon == 0. || !eligible || target.render_options.is_static {
+            self.samples.remove(&id);
+            return false;
+        }
+        let Some(time) = self.sample_time else {
+            return false;
+        };
+        let Some(pose) = Pose::decompose(matrix(&target.render_data)) else {
+            self.samples.remove(&id);
+            return false;
+        };
+        let position = pose.translation;
+        let mut velocity = Vec3::ZERO;
+        let mut discontinuity = false;
+        if !reset {
+            if let Some(previous) = self.samples.get(&id) {
+                let dt = ((time - previous.time) / 1000.) as f32;
+                let delta = position - previous.position;
+                discontinuity = delta.length() > self.max_distance.min(2.);
+                // Reject stale, duplicate, long-gap and teleport samples. Never clamp a
+                // teleport into a plausible velocity, and never read the displayed pose.
+                if (0.001..=0.5).contains(&dt) && delta.length() <= self.max_distance.min(2.) {
+                    let candidate = delta / dt;
+                    if candidate.length() <= 15. {
+                        velocity = candidate;
+                    }
+                }
+            }
+        }
+        self.samples.insert(
+            id,
+            Sample {
+                position,
+                time,
+                velocity,
+            },
+        );
+        discontinuity
     }
     pub(super) fn receive(
         &mut self,
@@ -96,7 +161,9 @@ impl MirrorInterpolation {
             return;
         };
         if let Some(track) = self.active.get_mut(&id) {
-            if track.target.instance.model == target.render_data.instance.model {
+            if self.horizon == 0.
+                && track.target.instance.model == target.render_data.instance.model
+            {
                 track.target = target.render_data.clone();
                 copy_pose(&mut target.render_data, &old.render_data);
                 return;
@@ -124,7 +191,8 @@ impl MirrorInterpolation {
     }
     fn start(&mut self, id: u32, from_data: &ObjectRenderData, target: &mut SceneObject) {
         self.active.remove(&id);
-        if from_data.instance.model == target.render_data.instance.model {
+        let velocity = self.samples.get(&id).map_or(Vec3::ZERO, |s| s.velocity);
+        if from_data.instance.model == target.render_data.instance.model && velocity == Vec3::ZERO {
             return;
         }
         let (Some(from), Some(to)) = (
@@ -155,6 +223,13 @@ impl MirrorInterpolation {
                 local_center,
                 local_extent,
                 elapsed: 0.,
+                duration: self.duration,
+                velocity,
+                horizon: if velocity == Vec3::ZERO {
+                    0.
+                } else {
+                    self.horizon.min(2. / velocity.length())
+                },
             },
         );
         let fade = target.render_data.instance.normal_matrix[3][3];
@@ -166,6 +241,42 @@ impl MirrorInterpolation {
     }
 }
 impl SceneManager {
+    /// Bounded, render-only translation prediction. Zero disables and resets history.
+    pub fn set_mirror_prediction(&mut self, horizon_ms: f32) -> Result<(), String> {
+        if !horizon_ms.is_finite() || !(0. ..=300.).contains(&horizon_ms) {
+            return Err("Mirror prediction requires horizon 0..300 ms".into());
+        }
+        if horizon_ms == 0. || self.mirror_interpolation.horizon != horizon_ms / 1000. {
+            self.mirror_interpolation.samples.clear();
+            self.mirror_interpolation.sample_time = None;
+            let active = std::mem::take(&mut self.mirror_interpolation.active);
+            for (id, track) in active {
+                if let Some(object) = self.objects.get_mut(&id) {
+                    copy_pose(&mut object.render_data, &track.target);
+                    self.changed(id);
+                }
+            }
+        }
+        self.mirror_interpolation.horizon = horizon_ms / 1000.;
+        Ok(())
+    }
+    /// Set the next publication's authoritative session-relative timestamp, in ms.
+    pub fn set_mirror_prediction_sample_time(&mut self, time: f64) -> Result<(), String> {
+        if !time.is_finite()
+            || time < 0.
+            || self
+                .mirror_interpolation
+                .sample_time
+                .is_some_and(|old| time <= old)
+        {
+            return Err(
+                "Mirror prediction sample time must be finite, nonnegative and strictly increasing"
+                    .into(),
+            );
+        }
+        self.mirror_interpolation.sample_time = Some(time);
+        Ok(())
+    }
     /// Configure wire-mirror presentation smoothing. Zero disables it (the default).
     pub fn set_mirror_interpolation(
         &mut self,
@@ -179,7 +290,13 @@ impl SceneManager {
         {
             return Err("Mirror interpolation requires duration 0 or 8..250 ms and positive finite distance".into());
         }
-        // Configuration changes settle existing tracks at the precise authoritative pose.
+        // Cadence adaptation affects new tracks only; do not snap a displayed pose.
+        if duration_ms > 0. && self.mirror_interpolation.duration > 0. {
+            self.mirror_interpolation.duration = duration_ms / 1000.;
+            self.mirror_interpolation.max_distance = max_distance;
+            return Ok(());
+        }
+        // Disabling settles existing tracks at the precise authoritative pose.
         let active = std::mem::take(&mut self.mirror_interpolation.active);
         for (id, track) in active {
             if let Some(object) = self.objects.get_mut(&id) {
@@ -198,7 +315,7 @@ impl SceneManager {
         if !dt.is_finite() || dt <= 0. {
             return;
         }
-        let duration = self.mirror_interpolation.duration;
+
         // Only active IDs are visited. No scene clones or per-frame scratch allocations.
         let mut render_changed = false;
         let mut static_changed = false;
@@ -209,20 +326,24 @@ impl SceneManager {
             let Some(object) = objects.get_mut(id) else {
                 return false;
             };
-            track.elapsed = (track.elapsed + dt).min(duration);
+            let duration = track.duration;
+            track.elapsed = (track.elapsed + dt).min(duration.max(track.horizon));
             let t = if track.elapsed >= duration * (1. - 4. * f32::EPSILON) {
                 1.
             } else {
                 track.elapsed / duration
             };
             let previous = object.render_data.instance.model;
-            if t >= 1. {
+            if t >= 1. && track.horizon == 0. {
                 copy_pose(&mut object.render_data, &track.target);
             } else {
                 let model = Pose {
                     scale: track.from.scale.lerp(track.to.scale, t),
                     rotation: track.from.rotation.slerp(track.to.rotation, t),
-                    translation: track.from.translation.lerp(track.to.translation, t),
+                    translation: track.from.translation.lerp(
+                        track.to.translation + track.velocity * track.elapsed.min(track.horizon),
+                        t.min(1.),
+                    ),
                 }
                 .matrix();
                 let fade = object.render_data.instance.normal_matrix[3][3];
@@ -239,7 +360,7 @@ impl SceneManager {
                 static_shadow |= options.casts_shadow && options.is_static;
                 dynamic_shadow |= options.casts_shadow && !options.is_static;
             }
-            t < 1.
+            t < 1. || track.horizon > 0.
         });
         self.render_revision = self.render_revision.wrapping_add(render_changed as u64);
         self.static_revision = self.static_revision.wrapping_add(static_changed as u64);
@@ -265,6 +386,122 @@ mod tests {
     }
     fn near(a: Vec3, b: Vec3) {
         assert!((a - b).length() < 1e-4, "{a:?} != {b:?}");
+    }
+    fn prediction_fixture() -> SceneManager {
+        let mut mirror = SceneManager::default();
+        mirror.set_mirror_interpolation(50., 4.).unwrap();
+        mirror.set_mirror_prediction(300.).unwrap();
+        mirror.set_mirror_prediction_sample_time(1000.).unwrap();
+        mirror
+            .apply_wire_publication(
+                include_bytes!("../tests/fixtures/native-scene/initial.nwr"),
+                &[],
+            )
+            .unwrap();
+        assert!(mirror.triangle_meshes[&1].cuttable);
+        assert!(!mirror.objects[&1].render_options.is_static);
+        mirror.set_mirror_prediction_sample_time(1200.).unwrap();
+        mirror
+            .apply_wire_publication(
+                include_bytes!("../tests/fixtures/native-scene/motion.nwr"),
+                &[],
+            )
+            .unwrap();
+        mirror
+    }
+    fn position(mirror: &SceneManager, id: u32) -> Vec3 {
+        matrix(&mirror.objects[&id].render_data).w_axis.truncate()
+    }
+    #[test]
+    fn mirror_prediction_continues_bounds_holds_and_disables() {
+        let mut mirror = prediction_fixture();
+        mirror.update_mirror_interpolation(0.1);
+        near(position(&mirror, 1), Vec3::X * 1.8);
+        mirror.update_mirror_interpolation(0.1);
+        near(position(&mirror, 1), Vec3::X * 2.4);
+        mirror.update_mirror_interpolation(0.1);
+        near(position(&mirror, 1), Vec3::X * 3.);
+        mirror.update_mirror_interpolation(2.);
+        near(position(&mirror, 1), Vec3::X * 3.);
+        near(position(&mirror, 2), Vec3::ZERO); // sword/cutter never predicts
+        mirror.set_mirror_prediction(0.).unwrap();
+        near(position(&mirror, 1), Vec3::X * 1.2);
+        assert!(mirror.mirror_interpolation.samples.is_empty());
+        mirror.set_mirror_prediction_sample_time(0.).unwrap();
+    }
+    #[test]
+    fn mirror_prediction_stationary_recovery_cadence_and_authoritative_history() {
+        let mut mirror = prediction_fixture();
+        mirror.update_mirror_interpolation(0.2);
+        let displayed = position(&mirror, 1);
+        mirror.set_mirror_interpolation(80., 4.).unwrap();
+        near(position(&mirror, 1), displayed);
+        // A repeated authoritative position explicitly stops extrapolation, and
+        // corrects continuously from the previously displayed predicted pose.
+        let mut target = mirror.objects[&1].clone();
+        target.render_data = mirror.mirror_interpolation.active[&1].target.clone();
+        mirror.set_mirror_prediction_sample_time(1400.).unwrap();
+        assert!(!mirror.mirror_interpolation.sample(1, &target, true, false));
+        assert_eq!(mirror.mirror_interpolation.samples[&1].velocity, Vec3::ZERO);
+        let old = mirror.objects[&1].clone();
+        mirror
+            .mirror_interpolation
+            .receive(1, Some(&old), &mut target, false);
+        mirror.objects.insert(1, target);
+        near(position(&mirror, 1), displayed);
+        mirror.update_mirror_interpolation(0.08);
+        near(position(&mirror, 1), Vec3::X * 1.2);
+        mirror.update_mirror_interpolation(1.);
+        near(position(&mirror, 1), Vec3::X * 1.2);
+    }
+    #[test]
+    fn mirror_prediction_recovery_uses_authority_and_caps_distance() {
+        let mut mirror = prediction_fixture();
+        mirror.update_mirror_interpolation(0.2);
+        let displayed = position(&mirror, 1);
+        let mut target = mirror.objects[&1].clone();
+        target.render_data = mirror.mirror_interpolation.active[&1].target.clone();
+        target.render_data.instance.model =
+            Mat4::from_translation(Vec3::X * 1.8).to_cols_array_2d();
+        mirror.set_mirror_prediction_sample_time(1300.).unwrap();
+        assert!(!mirror.mirror_interpolation.sample(1, &target, true, false));
+        near(
+            mirror.mirror_interpolation.samples[&1].velocity,
+            Vec3::X * 6.,
+        );
+        let old = mirror.objects[&1].clone();
+        mirror
+            .mirror_interpolation
+            .receive(1, Some(&old), &mut target, false);
+        mirror.objects.insert(1, target);
+        near(position(&mirror, 1), displayed);
+        mirror.update_mirror_interpolation(0.3);
+        near(position(&mirror, 1), Vec3::X * 3.6);
+        mirror.clear_scene();
+        assert_eq!(mirror.mirror_interpolation.horizon, 0.);
+        assert!(mirror.mirror_interpolation.samples.is_empty());
+    }
+    #[test]
+    fn mirror_prediction_teleport_topology_static_and_deletion_reset() {
+        let mut mirror = prediction_fixture();
+        let mut target = mirror.objects[&1].clone();
+        target.render_data.instance.model =
+            Mat4::from_translation(Vec3::X * 20.).to_cols_array_2d();
+        mirror.set_mirror_prediction_sample_time(1400.).unwrap();
+        assert!(mirror.mirror_interpolation.sample(1, &target, true, false));
+        assert_eq!(mirror.mirror_interpolation.samples[&1].velocity, Vec3::ZERO);
+        // New topology and child birth never inherit a parent's estimated velocity.
+        mirror.set_mirror_prediction_sample_time(1500.).unwrap();
+        mirror.mirror_interpolation.sample(1, &target, true, true);
+        assert_eq!(mirror.mirror_interpolation.samples[&1].velocity, Vec3::ZERO);
+        target.render_options.is_static = true;
+        mirror.mirror_interpolation.sample(1, &target, true, false);
+        assert!(!mirror.mirror_interpolation.samples.contains_key(&1));
+        mirror.mirror_interpolation.retain(|_| false);
+        assert!(mirror.mirror_interpolation.active.is_empty());
+        assert!(mirror.mirror_interpolation.samples.is_empty());
+        assert!(mirror.set_mirror_prediction_sample_time(1500.).is_err());
+        assert!(mirror.set_mirror_prediction(301.).is_err());
     }
     #[test]
     fn mirror_interpolation_spawn_uses_displayed_parent_and_child_bounds_before_next_packet() {

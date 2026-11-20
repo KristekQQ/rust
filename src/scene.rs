@@ -1,4 +1,8 @@
 //! CPU scene state and simulation. No browser, JavaScript or GPU dependencies.
+#[path = "sprite.rs"]
+pub mod sprite;
+#[path = "sprite_deposits.rs"]
+mod sprite_deposits;
 use glam::{Mat4, Vec3};
 use std::collections::BTreeMap;
 
@@ -22,6 +26,8 @@ type AssetArray<T> = std::rc::Rc<[T]>;
 type AssetArray<T> = std::sync::Arc<[T]>;
 
 pub const MAX_LIGHTS: usize = 4;
+const MAX_SCENE_CUT_TRIANGLES: usize = 200_000;
+pub const SCENE_TRIANGLE_BUDGET_EXCEEDED: &str = "Scene cutting triangle budget exceeded";
 pub const INVALID_ID: u32 = u32::MAX;
 
 #[derive(Clone)]
@@ -66,6 +72,7 @@ impl MeshVariants {
 }
 #[derive(Default)]
 pub struct CutReport {
+    pub sprite_hits: Vec<sprite::SpriteCutHit>,
     pub removed: Vec<u32>,
     pub pieces: Vec<u32>,
     pub object_candidates: usize,
@@ -265,6 +272,7 @@ struct PieceFade {
 #[derive(Clone)]
 pub struct SceneObject {
     pub transform: Transform,
+    pub sprite: Option<sprite::SpriteVisual>,
     pub mesh: MeshKind,
     pub render_options: RenderOptions,
     pub emission: f32,
@@ -338,6 +346,7 @@ pub struct SceneManager {
     pub(crate) render_publication: publication::MirrorState,
     wire_state: wire::WireState,
     mirror_interpolation: interpolation::MirrorInterpolation,
+    scene_playback: wire::playback::ScenePlayback,
     pub table_tennis: Option<crate::table_tennis::Game>,
     feedback: cut_feedback::Feedback,
     numeric_font: numeric_font::NumericFont,
@@ -357,6 +366,14 @@ pub struct SceneManager {
     // Current preview: cutter, first dashed-line handle, plane/origin/finite axis.
     cutting_guide: Option<(u32, u32, [[f32; 4]; 3])>,
     models: BTreeMap<u32, crate::gltf_model::ModelInstance>,
+    flock_standing_eye_y: f32,
+    sprite_deposits: sprite_deposits::Deposits,
+    visor_splat_remaining: f32,
+    pub(crate) sprites: BTreeMap<u32, sprite::SpriteController>,
+    pub(crate) sprite_ids: std::collections::BTreeSet<u32>,
+    pub(crate) sprite_assets: BTreeMap<u32, std::sync::Arc<crate::gltf_model::ModelAsset>>,
+    pet_gift_origin: Option<Vec3>,
+    pub(crate) billboard_camera: Option<Vec3>,
     model_gpu_changes: ModelGpuChanges,
     lights: BTreeMap<u32, Light>,
     light_orbits: BTreeMap<u32, LightOrbit>,
@@ -982,6 +999,7 @@ impl SceneManager {
             SceneObject {
                 mesh,
                 transform,
+                sprite: None,
                 render_options: RenderOptions::default(),
                 emission: 0.0,
                 visual_fade: 1.0,
@@ -1163,6 +1181,25 @@ impl SceneManager {
         Ok(id)
     }
     pub fn add_mesh_variant(&mut self, handle: u32, variant: u32) -> Result<u32, String> {
+        self.insert_mesh_variant(handle, variant, None)
+    }
+    pub fn add_cuttable_mesh_variant(
+        &mut self,
+        handle: u32,
+        variant: u32,
+        cap: Vec3,
+    ) -> Result<u32, String> {
+        if !cap.is_finite() || cap.min_element() < 0. || cap.max_element() > 1. {
+            return Err("Invalid cap color".into());
+        }
+        self.insert_mesh_variant(handle, variant, Some(cap))
+    }
+    fn insert_mesh_variant(
+        &mut self,
+        handle: u32,
+        variant: u32,
+        cap: Option<Vec3>,
+    ) -> Result<u32, String> {
         let mesh = self
             .mesh_variants
             .get(&handle)
@@ -1170,7 +1207,15 @@ impl SceneManager {
             .and_then(|asset| asset.variants.get(variant as usize))
             .ok_or("Invalid mesh variant handle/index")?
             .clone();
-        let id = self.add_mesh_data(mesh)?;
+        if cap.is_some() {
+            self.reserve_cut_triangles(mesh.triangle_count())?;
+        }
+        let id = self.insert_mesh_data(mesh)?;
+        if let Some(cap) = cap {
+            let target = self.triangle_meshes.get_mut(&id).unwrap();
+            target.cuttable = true;
+            target.cap_color = cap;
+        }
         self.variant_instances.insert(id, (handle, variant));
         let object = self.objects.get_mut(&id).unwrap();
         object.mesh = MeshKind::Imported(handle);
@@ -1214,14 +1259,27 @@ impl SceneManager {
         self.add_mesh_data(crate::cutting_mesh::MeshData::from_prepared_visual(mesh))
     }
     fn add_mesh_data(&mut self, mesh: crate::cutting_mesh::MeshData) -> Result<u32, String> {
-        let total: usize = self
-            .triangle_meshes
-            .values()
-            .map(|o| o.mesh.triangle_count())
+        self.reserve_cut_triangles(mesh.triangle_count())?;
+        self.insert_mesh_data(mesh)
+    }
+    // Decorative instances borrow their registered asset. Unique meshes and live
+    // cut targets each reserve space; cut replacement can release its original.
+    fn budgeted_meshes(&self) -> impl Iterator<Item = (&u32, &TriangleObject)> {
+        self.triangle_meshes
+            .iter()
+            .filter(|(id, object)| object.cuttable || !self.variant_instances.contains_key(id))
+    }
+    fn reserve_cut_triangles(&self, additional: usize) -> Result<(), String> {
+        let used: usize = self
+            .budgeted_meshes()
+            .map(|(_, object)| object.mesh.triangle_count())
             .sum();
-        if total + mesh.triangle_count() > 200_000 {
-            return Err("Scene cutting triangle budget exceeded".into());
+        if used + additional > MAX_SCENE_CUT_TRIANGLES {
+            return Err(SCENE_TRIANGLE_BUDGET_EXCEEDED.into());
         }
+        Ok(())
+    }
+    fn insert_mesh_data(&mut self, mesh: crate::cutting_mesh::MeshData) -> Result<u32, String> {
         let (min, max) = mesh.bounds();
         let id = self.add_imported(min, max);
         if id == INVALID_ID {
@@ -1243,6 +1301,15 @@ impl SceneManager {
         }
         if enabled && self.cutters.contains_key(&id) {
             return Err("Cutter cannot also be cuttable".into());
+        }
+        if enabled && self.variant_instances.contains_key(&id) {
+            if let Some(mesh) = self
+                .triangle_meshes
+                .get(&id)
+                .filter(|object| !object.cuttable)
+            {
+                self.reserve_cut_triangles(mesh.mesh.triangle_count())?;
+            }
         }
         let object = self
             .triangle_meshes
@@ -1707,7 +1774,11 @@ impl SceneManager {
         cutter: u32,
         ribbons: &BTreeMap<u32, Vec<[Vec3; 2]>>,
     ) -> Result<CutReport, String> {
-        let report = self.cut_with_regions(cutter, Vec3::X, 0.0015, None, Some(ribbons))?;
+        let report = match self.cut_with_regions(cutter, Vec3::X, 0.0015, None, Some(ribbons)) {
+            // Replacement is checked before committing. Keep the fruit intact on a full scene.
+            Err(error) if error == SCENE_TRIANGLE_BUDGET_EXCEEDED => CutReport::default(),
+            result => result?,
+        };
         self.cutting_swings.remove(&cutter);
         for &id in &report.pieces {
             let velocity = self.projectiles.get(&id).map_or(Vec3::ZERO, |body| body.0);
@@ -1954,8 +2025,7 @@ impl SceneManager {
     ) -> Result<CutReport, String> {
         let removed: Vec<_> = pending.iter().map(|(c, _)| c.id).collect();
         let retained: usize = self
-            .triangle_meshes
-            .iter()
+            .budgeted_meshes()
             .filter(|(id, _)| !removed.contains(id))
             .map(|(_, o)| o.mesh.triangle_count())
             .sum();
@@ -1964,8 +2034,8 @@ impl SceneManager {
             .flat_map(|(_, pieces)| pieces)
             .map(|m| m.triangle_count())
             .sum();
-        if retained + total > 200_000 {
-            return Err("Scene cutting triangle budget exceeded".into());
+        if retained + total > MAX_SCENE_CUT_TRIANGLES {
+            return Err(SCENE_TRIANGLE_BUDGET_EXCEEDED.into());
         }
         if self
             .next_id
@@ -2342,13 +2412,14 @@ impl SceneManager {
             return Err("Object IDs exhausted".into());
         }
         let retained: usize = self
-            .triangle_meshes
-            .iter()
+            .budgeted_meshes()
             .filter(|(id, _)| !report.removed.contains(id))
             .map(|(_, o)| o.mesh.triangle_count())
             .sum();
-        if retained + pending.iter().map(|p| p.1.triangles.len()).sum::<usize>() > 200_000 {
-            return Err("Scene cutting triangle budget exceeded".into());
+        if retained + pending.iter().map(|p| p.1.triangles.len()).sum::<usize>()
+            > MAX_SCENE_CUT_TRIANGLES
+        {
+            return Err(SCENE_TRIANGLE_BUDGET_EXCEEDED.into());
         }
         let mut fragment_motion = BTreeMap::new();
         if ribbons.is_some() {
@@ -2636,6 +2707,7 @@ impl SceneManager {
     }
     pub fn clear_scene(&mut self) {
         self.mirror_interpolation.clear();
+        self.scene_playback = Default::default();
         self.table_tennis = None;
         self.feedback = cut_feedback::Feedback::default();
         self.projectiles.clear();
@@ -2671,6 +2743,13 @@ impl SceneManager {
                 .extend(self.models.keys().copied());
         }
         self.models.clear();
+        self.pet_gift_origin = None;
+        self.sprites.clear();
+        self.flock_standing_eye_y = 0.;
+        self.sprite_deposits = Default::default();
+        self.visor_splat_remaining = 0.;
+        self.sprite_ids.clear();
+        self.sprite_assets.clear();
         self.mirror_object = None;
         self.spins.clear();
         self.static_revision = self.static_revision.wrapping_add(1);
@@ -2708,6 +2787,9 @@ impl SceneManager {
         let Some(removed) = self.objects.remove(&id) else {
             return false;
         };
+        self.sprites.remove(&id);
+        self.sprite_deposits.remove(id);
+        self.sprite_ids.remove(&id);
         self.shadow_revisions.changed(removed.render_options);
         self.collision_dirty |= self.colliders.remove(&id).is_some();
         if self.models.remove(&id).is_some()
@@ -2964,6 +3046,10 @@ impl SceneManager {
         true
     }
     pub fn update(&mut self, dt: f32) {
+        if self.scene_playback.enabled() {
+            self.update_scene_playback(dt);
+            return;
+        }
         if self.render_publication.is_mirror {
             self.update_mirror_interpolation(dt);
             return;
@@ -3017,6 +3103,8 @@ impl SceneManager {
                 }
             }
         }
+        self.update_sprites(dt);
+        self.update_sprite_deposits(dt);
         self.update_piece_fades(dt);
         self.update_cut_feedback(dt);
         self.time += dt;

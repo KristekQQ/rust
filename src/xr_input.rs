@@ -103,7 +103,7 @@ impl TrackedController {
         pressed: bool,
         dt: f32,
     ) -> Result<CutReport, String> {
-        self.update_timed_with_speed(scene, pose, pressed, dt, None)
+        self.update_timed_with_speed(scene, pose, pressed, dt, None, true)
     }
 
     /// Player-owned tracking supplies its measured grip speed; standalone callers
@@ -115,6 +115,7 @@ impl TrackedController {
         pressed: bool,
         dt: f32,
         speed: Option<f32>,
+        mesh_cuts: bool,
     ) -> Result<CutReport, String> {
         let Some(id) = self.id else {
             return Ok(CutReport::default());
@@ -211,7 +212,7 @@ impl TrackedController {
         let assisted = scene.cut_assist(id) > 0.;
         let contact_response = scene.blade_contact_response(id);
         if assisted && translation < 1e-6 && angle < 1e-6 {
-            if contact_response {
+            if mesh_cuts && contact_response {
                 scene.blade_contacts(
                     id,
                     previous.pose,
@@ -225,7 +226,7 @@ impl TrackedController {
             self.record(scene, sample);
             return Ok(CutReport::default());
         }
-        if !assisted {
+        if mesh_cuts && !assisted {
             scene.follow_blade_jams(id, previous.pose, sample.pose, dt);
         }
         let jam_rotation = sample.orientation * previous.orientation.conjugate();
@@ -277,6 +278,13 @@ impl TrackedController {
                 orientation,
                 endpoints: blade.map(|p| pose.transform_point3(p * self.scale)),
             };
+            report
+                .sprite_hits
+                .extend(scene.cut_sprite_sweep(last.endpoints, current.endpoints));
+            if !mesh_cuts {
+                last = current;
+                continue;
+            }
             let midpoint_step = midpoint(current) - midpoint(last);
             let endpoint_step = current.endpoints[1] - last.endpoints[1];
             let step = if midpoint_step.length_squared() >= 1e-8 {
@@ -336,6 +344,12 @@ impl TrackedController {
         }
         // Usually one mesh query per frame, with at most two extra prefix
         // queries when a continuity boundary would discard a completed hit.
+        if !mesh_cuts {
+            self.ribbons.clear();
+            self.anchor = None;
+            self.frames = 0;
+            return Ok(report);
+        }
         let result = scene.cut_tracked_with(id, &self.ribbons);
         if result.as_ref().is_ok_and(|r| !r.removed.is_empty()) || result.is_err() {
             self.anchor = Some(sample);
@@ -533,6 +547,7 @@ impl TrackedController {
 }
 
 fn append_report(report: &mut CutReport, next: CutReport) {
+    report.sprite_hits.extend(next.sprite_hits);
     report.removed.extend(next.removed);
     report.pieces.extend(next.pieces);
     report.object_candidates += next.object_candidates;
@@ -567,6 +582,37 @@ pub(crate) fn valid_pose(pose: Mat4) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cut_report_prefix_aggregation_keeps_sprite_hits_separate_from_fruit() {
+        use crate::scene::sprite::SpriteCutHit;
+        let mut report = CutReport::default();
+        report.sprite_hits.push(SpriteCutHit {
+            original: 11,
+            points: 1000,
+        });
+        let mut next = CutReport::default();
+        next.sprite_hits.push(SpriteCutHit {
+            original: 12,
+            points: 1000,
+        });
+        next.removed.push(21);
+        next.pieces.extend([22, 23]);
+        append_report(&mut report, next);
+        assert_eq!(
+            report
+                .sprite_hits
+                .iter()
+                .map(|hit| hit.original)
+                .collect::<Vec<_>>(),
+            vec![11, 12]
+        );
+        assert_eq!(
+            report.sprite_hits.iter().map(|hit| hit.points).sum::<u32>(),
+            2000
+        );
+        assert_eq!(report.removed, vec![21]);
+        assert_eq!(report.pieces, vec![22, 23]);
+    }
     fn setup() -> (SceneManager, TrackedController, u32, u32) {
         let mut scene = SceneManager::default();
         let positions = vec![

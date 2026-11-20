@@ -1,0 +1,58 @@
+<!doctype html><meta charset="utf-8"><title>Directional sprite view bands</title>
+<canvas id="gpu-canvas"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels} from './pixels.js';
+import {installXRSimulator} from './xr/simulator.js';
+const canvas=document.querySelector('canvas'),result=document.querySelector('#result');
+let engine,sim,url,presenting=false;
+try {
+ const backend=new URLSearchParams(location.search).get('backend')||'auto';
+ if(backend==='webgl')sim=installXRSimulator({clockTimers:false});
+ engine=await initEngine(canvas,{backend});document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.setCameraHandedness('right');engine.setBackgroundColor([0,0,0]);
+ engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_render_effects(false,false);engine.setNeonGlow({strength:0});
+ for(const effect of ['ssr','bloom','fxaa'])engine.postprocessing.disable(effect);
+ const tex=document.createElement('canvas');tex.width=64;tex.height=320;const ctx=tex.getContext('2d');
+ const colors=['#ff0808','#08ff08','#0808ff','#ffff08','#ff08ff'];
+ colors.forEach((color,i)=>{ctx.fillStyle=color;ctx.fillRect(0,i*64,64,64);ctx.fillStyle='#ffffff';ctx.fillRect(8,i*64+8,8,48);});
+ const binary=new Uint8Array(140);new Float32Array(binary.buffer,0,12).set([-.5,0,0,.5,0,0,.5,1,0,-.5,1,0]);
+ new Float32Array(binary.buffer,48,12).set([0,0,1,0,0,1,0,0,1,0,0,1]);new Float32Array(binary.buffer,96,8).set([0,1,1,1,1,0,0,0]);new Uint16Array(binary.buffer,128,6).set([0,1,2,0,2,3]);
+ const asset={asset:{version:'2.0'},extensionsUsed:['KHR_materials_unlit'],buffers:[{byteLength:140,uri:'data:application/octet-stream;base64,'+btoa(String.fromCharCode(...binary))}],bufferViews:[{buffer:0,byteOffset:0,byteLength:48},{buffer:0,byteOffset:48,byteLength:48},{buffer:0,byteOffset:96,byteLength:32},{buffer:0,byteOffset:128,byteLength:12}],accessors:[{bufferView:0,componentType:5126,count:4,type:'VEC3',min:[-.5,0,0],max:[.5,1,0]},{bufferView:1,componentType:5126,count:4,type:'VEC3'},{bufferView:2,componentType:5126,count:4,type:'VEC2'},{bufferView:3,componentType:5123,count:6,type:'SCALAR'}],images:[{uri:tex.toDataURL()}],textures:[{source:0}],materials:[{extensions:{KHR_materials_unlit:{}},doubleSided:true,pbrMetallicRoughness:{baseColorTexture:{index:0},metallicFactor:0,roughnessFactor:1}}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1,TEXCOORD_0:2},indices:3,material:0}]}],nodes:[{mesh:0}],scenes:[{nodes:[0]}],scene:0};
+ url=URL.createObjectURL(new Blob([JSON.stringify(asset)],{type:'model/gltf+json'}));
+ const cat=await engine.scene.loadModel(new URL(url));
+ function setup(travel){cat.configureSprite({key:75,columns:1,rows:5,frames:1,fps:.001,duration:120,startPause:100,endpointPause:2,ambientInterval:1000,cooldown:0,travel,directionalView:{frames:1,frontStartFrame:0,frontObliqueStartFrame:1,sideStartFrame:2,rearObliqueStartFrame:3,rearStartFrame:4}});if(!cat.triggerSprite())throw Error('Could not activate sprite');}
+ setup([0,0,1]);const evidence=[];
+ function position(yaw,pitch=0){const y=yaw*Math.PI/180,p=pitch*Math.PI/180;return [2*Math.sin(y)*Math.cos(p),2*Math.sin(p),2*Math.cos(y)*Math.cos(p)];}
+ function check(image,label,band,mirrored=false){
+  const counts=[0,0,0,0,0];let white=0,whiteX=0,colorX=0;
+  for(let y=0;y<image.height;y++)for(let x=0;x<image.width;x++){
+   const i=(y*image.width+x)*4,r=image.data[i],g=image.data[i+1],b=image.data[i+2];
+   if(r>170&&g>170&&b>170){white++;whiteX+=x;continue;}
+   const bright=[r>60,g>60,b>60],mask=bright.map(Number).join('');
+   const k=['100','010','001','110','101'].indexOf(mask);
+   if(k>=0){counts[k]++;if(k===band)colorX+=x;}
+  }
+  evidence.push({label,counts,white});
+  if(counts[band]<500||counts.some((n,i)=>i!==band&&n>40))throw Error('Wrong directional band: '+JSON.stringify(evidence.at(-1)));
+  if(white<20||(mirrored?whiteX/white<=colorX/counts[band]:whiteX/white>=colorX/counts[band]))throw Error('Wrong UV mirroring: '+label);
+  if(engine.scene.spriteState(75).frame!==0)throw Error('Camera changed authoritative frame');
+ }
+ for(const [label,yaw,band,mirror,pitch] of [['front',0,0,false,0],['front oblique',-45,1,false,0],['side left viewer',-90,2,false,0],['side right viewer',90,2,true,0],['rear oblique',-135,3,false,0],['rear',180,4,false,0],['upper departure',180,4,false,85]]){
+  engine.setCameraView(position(yaw,pitch),[0,0,0]);check(await capturePixels(canvas),label,band,mirror);
+ }
+ setup([0,0,-1]);engine.setCameraView(position(0),[0,0,0]);check(await capturePixels(canvas),'reverse heading',4);
+ setup([0,0,1]);
+ if(sim){
+  await engine.xr.enter();presenting=true;
+  for(const [yaw,band] of [[22.4,0],[22.6,1]]){
+   const y=yaw*Math.PI/180;
+   sim.frame({dt:0,head:{position:position(yaw),orientation:[0,Math.sin(y/2),0,Math.cos(y/2)]}});
+   if(engine.xr.lastError)throw Error(engine.xr.lastError);
+   check(sim.pixels('left'),'stereo left '+yaw,band,band===1);check(sim.pixels('right'),'stereo right '+yaw,band,band===1);
+  }
+ }
+ result.textContent='PASS: '+JSON.stringify(evidence);
+}catch(error){result.textContent='FAIL: '+(error.stack||error);console.error(error);}
+finally{if(presenting)await engine.xr.exit();engine?.dispose();sim?.dispose();if(url)URL.revokeObjectURL(url);}
+</script>

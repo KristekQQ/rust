@@ -2,7 +2,7 @@
 //!
 //! The host supplies only live original fruit from its latest scene publication.
 //! Strokes lock onto a fruit while preparing, then follow through even after a hit.
-use glam::{Mat4, Quat, Vec3};
+use glam::{FloatExt, Mat4, Quat, Vec3};
 use webgpu_wasm::frame_input::FrameInput;
 
 const SPEED: f32 = 3.0;
@@ -19,8 +19,10 @@ struct Stroke {
 
 pub struct Replay {
     cutting: bool,
+    irregular_hands: bool,
     time: f64,
     positions: [Vec3; 2],
+    rotations: [Quat; 2],
     stroke: Option<Stroke>,
     next_hand: usize,
     stroke_count: usize,
@@ -31,8 +33,10 @@ impl Replay {
     pub fn new(cutting: bool) -> Self {
         Self {
             cutting,
+            irregular_hands: false,
             time: 0.,
             positions: REST,
+            rotations: [Quat::IDENTITY; 2],
             stroke: None,
             next_hand: 1,
             stroke_count: 0,
@@ -42,6 +46,10 @@ impl Replay {
 
     pub fn elapsed(&self) -> f32 {
         self.time as f32
+    }
+
+    pub fn set_irregular_hands(&mut self, enabled: bool) {
+        self.irregular_hands = enabled;
     }
 
     pub fn head(&self) -> Mat4 {
@@ -62,6 +70,9 @@ impl Replay {
             0.
         };
         self.time += f64::from(step);
+        if self.irregular_hands {
+            return self.irregular_frame(step);
+        }
         self.cooldown = (self.cooldown - step).max(0.);
         if self.cutting && self.stroke.is_none() && self.cooldown == 0. {
             let hand = self.next_hand;
@@ -146,6 +157,83 @@ impl Replay {
             ..Default::default()
         }
     }
+
+    fn irregular_frame(&mut self, step: f32) -> FrameInput {
+        const SEGMENTS: usize = 48;
+        let poses = std::array::from_fn(|hand| {
+            // Different offsets and per-segment durations desynchronize the hands.
+            let mut t = self.elapsed() + hand as f32 * 0.37;
+            let mut from = irregular_key(hand, 0);
+            let mut to = from;
+            let mut fraction = 1.;
+            for segment in 0..SEGMENTS {
+                to = irregular_key(hand, segment + 1);
+                let duration = 0.38 + irregular_hash(hand, segment, 17) * 0.36;
+                if t < duration {
+                    // Finish movement early, then hold the pose until the next
+                    // uneven keyframe to create deliberate brief stops.
+                    fraction = (t / (duration * 0.76)).clamp(0., 1.);
+                    break;
+                }
+                t -= duration;
+                from = to;
+                fraction = 1.;
+            }
+            let goal = from.0.lerp(to.0, fraction);
+            self.positions[hand] += (goal - self.positions[hand]).clamp_length_max(SPEED * step);
+            let target = Quat::from_euler(
+                glam::EulerRot::XYZ,
+                from.1.x.lerp(to.1.x, fraction),
+                from.1.y.lerp(to.1.y, fraction),
+                from.1.z.lerp(to.1.z, fraction),
+            );
+            // Keep rotation changes bounded even if frame cadence is irregular.
+            let delta = self.rotations[hand].angle_between(target);
+            let fraction = if delta > 1e-5 {
+                (2.5 * step / delta).min(1.)
+            } else {
+                1.
+            };
+            self.rotations[hand] = self.rotations[hand].slerp(target, fraction);
+            Mat4::from_rotation_translation(self.rotations[hand], self.positions[hand])
+        });
+        FrameInput {
+            dt: step,
+            head: Some(self.head()),
+            hands: poses.map(Some),
+            primary: false,
+            ..Default::default()
+        }
+    }
+}
+
+fn irregular_hash(hand: usize, segment: usize, salt: u32) -> f32 {
+    let mut value = (segment as u32)
+        .wrapping_mul(0x9e37_79b9)
+        .wrapping_add((hand as u32 + 1).wrapping_mul(0x85eb_ca6b))
+        .wrapping_add(salt);
+    value ^= value >> 16;
+    value = value.wrapping_mul(0x7feb_352d);
+    value ^= value >> 15;
+    value = value.wrapping_mul(0x846c_a68b);
+    value ^= value >> 16;
+    value as f32 / u32::MAX as f32
+}
+
+fn irregular_key(hand: usize, index: usize) -> (Vec3, Vec3) {
+    if index == 0 {
+        return (REST[hand], Vec3::ZERO);
+    }
+    let side = if hand == 0 { -1. } else { 1. };
+    let axis = |salt| irregular_hash(hand, index, salt) * 2. - 1.;
+    (
+        Vec3::new(
+            side * (0.12 + (axis(3) + 1.) * 0.24),
+            1.10 + (axis(5) + 1.) * 0.27,
+            -0.54 + (axis(7) + 1.) * 0.12,
+        ),
+        Vec3::new(axis(11) * 1.05, axis(13) * 1.0, axis(19) * 0.9),
+    )
 }
 
 fn reachable(p: Vec3) -> bool {
@@ -232,6 +320,69 @@ mod tests {
     }
 
     #[test]
+    fn irregular_hands_have_bounded_translation_rotation_and_final_stop() {
+        let mut replay = Replay::new(false);
+        replay.set_irregular_hands(true);
+        let mut previous = REST;
+        let mut prior_rot = [Quat::IDENTITY; 2];
+        let mut directions = [Vec3::ZERO; 2];
+        let mut reversals = [0; 2];
+        let mut rotations = [0; 2];
+        let mut held = [false; 2];
+        for frame in 0..4800 {
+            let input = replay.frame(1. / 120., &[]);
+            for hand in 0..2 {
+                let pose = input.hands[hand].unwrap();
+                assert!(pose.is_finite());
+                let position = pose.w_axis.truncate();
+                assert!(position.distance(previous[hand]) <= SPEED / 120. + 1e-6);
+                assert!(position.x.abs() <= 0.66 && (0.65..=2.2).contains(&position.y));
+                assert!((-0.56..=-0.24).contains(&position.z));
+                let movement = position - previous[hand];
+                if frame > 4000 {
+                    assert!(movement.length() < 1e-5, "hand {hand} did not settle");
+                }
+                if movement.length() < 1e-5 {
+                    held[hand] = true;
+                }
+                if movement.length() > 1e-4 {
+                    let direction = movement.normalize();
+                    if directions[hand].length() > 0. && directions[hand].dot(direction) < -0.1 {
+                        reversals[hand] += 1;
+                    }
+                    directions[hand] = direction;
+                }
+                let rotation = Quat::from_mat4(&pose);
+                assert!(rotation.is_finite());
+                if prior_rot[hand].angle_between(rotation) > 0.01 {
+                    rotations[hand] += 1;
+                }
+                assert!(prior_rot[hand].angle_between(rotation) <= 2.5 / 120. + 1e-4);
+                prior_rot[hand] = rotation;
+                previous[hand] = position;
+            }
+            assert!((0.65..=2.2).contains(&input.head.unwrap().w_axis.y));
+            if frame == 240 {
+                assert!(previous[0].x < 0. && previous[1].x > 0.);
+            }
+        }
+        assert!(held.into_iter().all(|v| v));
+        assert!(reversals.into_iter().all(|v| v > 0));
+        assert!(rotations.into_iter().all(|v| v > 50));
+    }
+
+    fn minute_plan_counts(content: &Content) -> (usize, u64) {
+        let cues = content.manifest["runtime"]["minutePlan"]["cues"]
+            .as_array()
+            .unwrap();
+        let shots = cues
+            .iter()
+            .map(|cue| cue["recipes"].as_array().unwrap().len() as u64)
+            .sum();
+        (cues.len(), shots)
+    }
+
+    #[test]
     fn worker_minute_with_stale_publication_targets_and_variable_cadence() {
         use crate::simulation::Simulation;
         use std::collections::VecDeque;
@@ -245,6 +396,7 @@ mod tests {
                     std::fs::read(root.join(name)).map_err(|e| e.to_string())
                 })
                 .unwrap();
+                let (planned_cues, planned_shots) = minute_plan_counts(&content);
                 let game = Game::new(&mut scene, &content, None).unwrap();
                 let mut simulation = Simulation::new(scene, game).unwrap();
                 let initial = simulation.wait_initial().unwrap();
@@ -300,9 +452,9 @@ mod tests {
                     frame_index += 1;
                 }
                 println!("worker minute: variable={variable}, stale={stale_frames}, frames={frame_index}, haptics={haptics_seen}, state={state}");
-                assert_eq!(state["cueIndex"], 24);
+                assert_eq!(state["cueIndex"].as_u64(), Some(planned_cues as u64));
                 assert_eq!(state["round"]["finished"], true);
-                assert!((100..=140).contains(&state["shots"].as_u64().unwrap()));
+                assert!((100..=planned_shots).contains(&state["shots"].as_u64().unwrap()));
                 assert!(state["cuts"].as_u64().unwrap() > 10);
                 assert!(haptics_seen);
                 assert_eq!(simulation.dropped, 0);
@@ -320,6 +472,7 @@ mod tests {
         })
         .unwrap();
         let mut game = Game::new(&mut scene, &content, None).unwrap();
+        let (planned_cues, planned_shots) = minute_plan_counts(&content);
         let original_ids: BTreeSet<_> = scene.objects().keys().copied().collect();
         let mut replay = Replay::new(true);
         let mut pieces_seen = false;
@@ -354,10 +507,14 @@ mod tests {
             "ordinary minute: shots={}, cuts={}, cues={}, pieces={pieces_seen}, impact_ring={feedback_seen}, haptics={haptics_seen}",
             game.shots, game.cuts, game.cue_index
         );
-        assert_eq!(game.cue_index, 24);
-        // All 140 recipes remain authored; ordinary gameplay may skip a whole
+        assert_eq!(game.cue_index, planned_cues);
+        // Ordinary gameplay may skip an authored
         // cue when surviving fruit plus its recipes exceed the ten-fruit cap.
-        assert!((100..=140).contains(&game.shots), "{}", game.state());
+        assert!(
+            (100..=planned_shots).contains(&game.shots),
+            "{}",
+            game.state()
+        );
         assert!(game.round.unwrap().finished());
         assert!(
             game.cuts > 10,

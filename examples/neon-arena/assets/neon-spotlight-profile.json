@@ -1,0 +1,93 @@
+{
+  "mask": {
+    "width": 128,
+    "height": 128,
+    "center": [
+      0,
+      -1.5
+    ],
+    "size": [
+      6,
+      7.5
+    ]
+  },
+  "floorLobes": {
+    "forwardOffset": 0.65,
+    "sideOffset": 0.68,
+    "width": 0.5,
+    "length": 1.35,
+    "strength": 0.9
+  },
+  "stageSpill": {
+    "center": [
+      0,
+      -0.2
+    ],
+    "innerRadius": 1.65,
+    "outerRadius": 2.4
+  },
+  "distribution": {
+    "kind": "authored-angular-profile",
+    "measured": false,
+    "degrees": [
+      0,
+      7,
+      12,
+      17,
+      22,
+      27,
+      32
+    ],
+    "relativeIntensity": [
+      1,
+      0.98,
+      0.82,
+      0.48,
+      0.18,
+      0.035,
+      0
+    ]
+  },
+  "lights": [
+    {
+      "position": [
+        -4.2,
+        6.2,
+        -4.8
+      ],
+      "aimTarget": [
+        0,
+        1.1,
+        0
+      ]
+    },
+    {
+      "position": [
+        4.2,
+        6.2,
+        -4.8
+      ],
+      "aimTarget": [
+        0,
+        1.1,
+        0
+      ]
+    }
+  ],
+  "ssr": {
+    "strength": 0.92,
+    "resolutionScale": 0.5,
+    "receiverBounds": {
+      "min": [
+        -2.3,
+        -0.03,
+        -2.55
+      ],
+      "max": [
+        2.3,
+        0.03,
+        2.05
+      ]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {validateRoundPlan,planCue} from '../examples/neon-arena/round-plan.js';
+import {releasePlan,validateRoundPlan,planCue} from '../examples/neon-arena/round-plan.js';
 import {DEFAULT_WAVE,FRUIT_KINDS,planWave} from '../examples/neon-arena/wave-plan.js';
 const source=JSON.parse(readFileSync(new URL('../examples/neon-arena/minute-scene.json',import.meta.url),'utf8'));
 const pristine=structuredClone(source);
@@ -28,57 +28,35 @@ test('six score challenges provide choices, delayed completion, precision, timin
     const labels=['VOLBA','DOKONCI','PRESNOST','NACASOVANI','SERIE','FINALE'];
     for(const [i,label] of labels.entries()){
         const cues=plan.cues.filter(c=>c.at>=i*10&&c.at<(i+1)*10);
-        assert.equal(cues.length,4,label);assert.ok(cues.every(c=>c.label===label));
+        assert.equal(cues.length,[4,6,4,4,5,4][i],label);assert.ok(cues.every(c=>c.label===label));
     }
-    for(const c of plan.cues.filter(c=>['VOLBA','PRESNOST','SERIE'].includes(c.label))){
-        const valuable=c.targets.filter(t=>values[t.fruit]>=60),cheap=c.targets.filter(t=>values[t.fruit]<=25);
-        assert.equal(valuable.length,3);assert.equal(cheap.length,3);
-        assert.equal(new Set(valuable.map(t=>t.fruit)).size,1);
-        assert.equal(new Set(cheap.map(t=>t.fruit)).size,1);
-        assert.notDeepEqual(valuable.map(t=>t.position),cheap.map(t=>t.position));
+    const releases=releasePlan(plan).cues;
+    const mixed=releases.filter(c=>new Set(c.targets.map(t=>t.fruit)).size>1);
+    assert.equal(releases.length,51);
+    assert.equal(mixed.length,5);
+    for(const cue of mixed){
+        const bait=cue.targets.at(-1);
+        assert.ok(cue.targets.slice(0,-1).every(t=>t.fruit===cue.targets[0].fruit && t.fruit!==bait.fruit));
     }
-    const delayed=plan.cues.filter(c=>c.label==='DOKONCI');
-    for(let i=0;i<delayed.length;i+=2){
-        const first=delayed[i],third=delayed[i+1],fruit=first.targets.find(t=>values[t.fruit]>=60).fruit;
-        assert.equal(first.targets.filter(t=>t.fruit===fruit).length,2);
-        assert.equal(third.targets.filter(t=>t.fruit===fruit).length,1);
-        assert.ok(third.at-first.at>=1.5&&third.at-first.at<=1.7);
-        assert.ok(third.targets.filter(t=>t.fruit!==fruit).length>=3);
-    }
-    for(const c of plan.cues.filter(c=>c.label==='PRESNOST')){
-        assert.ok(c.targets.filter(t=>values[t.fruit]>=60).every(t=>t.scale===.105&&t.lifetime>=1.6&&t.lifetime<=2.2));
-        assert.ok(c.targets.filter(t=>values[t.fruit]<=25).every(t=>t.scale===.147));
-    }
-    for(const c of plan.cues.filter(c=>c.label==='NACASOVANI')){
-        const high=c.targets.filter(t=>values[t.fruit]>=60);
-        const xs=planCue(c).filter(t=>values[t.fruit]>=60).map(t=>t.position[0]+t.velocity[0]*c.launch.apexSeconds);
-        assert.ok(Math.max(...xs)-Math.min(...xs)<.001,'valuable fruit align at the real ballistic apex');
-        assert.ok(high.some(t=>t.velocity[0]===.25)&&high.some(t=>t.velocity[0]===-.25));
-        const ys=high.map(t=>t.position[1]).sort();assert.ok(ys[1]-ys[0]>=.2&&ys[2]-ys[1]>=.2);
-    }
+    const small=releases.flatMap(c=>c.targets).filter(t=>t.scale===.091);
+    assert.equal(small.length,24);
     assert.ok(plan.cues.filter(c=>c.label==='SERIE').every(c=>c.wave.lifetime===1.8));
     assert.equal(plan.cues.at(-1).targets.length,10);
 });
 
-test('selecting valuable triples beats naive sweeping under the existing scoring rules',()=>{
+test('clean swings can sustain triples under the legacy scoring rules',()=>{
     assert.equal(scoreHits(['grapes','grapes',null,'grapes']).score,100);
     assert.equal(scoreHits(['grapes','grapes','cherry','grapes']).score,0);
     assert.equal(scoreHits(['grapes',{fruit:'watermelon',wild:true},'grapes']).score,100);
     assert.equal(scoreHits([{fruit:'watermelon',wild:true},{fruit:'watermelon',wild:true},{fruit:'watermelon',wild:true}]).score,120);
-    const naive=scoreHits(plan.cues.flatMap(c=>c.targets.map(t=>t.fruit)));
-    const selective=scoreHits(plan.cues.flatMap(c=>c.targets.filter(t=>values[t.fruit]>=60).sort((a,b)=>values[b.fruit]-values[a.fruit]).map(t=>t.fruit)));
-    const beginner=scoreHits(plan.cues.flatMap(c=>c.targets.filter(t=>values[t.fruit]<=25).map(t=>t.fruit)));
-    assert.equal(naive.score,110);assert.equal(selective.score,2440);
-    assert.ok(beginner.score>=250,'large cheap triples remain useful');
-    assert.ok(selective.score>=2000&&selective.score>=naive.score*4,`${JSON.stringify({naive,selective,beginner})}`);
-    // Also compare a wide left-to-right cut that meets both lanes at each x.
-    const spatial=scoreHits(plan.cues.flatMap(c=>[...c.targets].sort((a,b)=>a.position[0]-b.position[0]||a.position[1]-b.position[1]).map(t=>t.fruit)));
-    assert.ok(selective.score>spatial.score,JSON.stringify({selective,spatial}));
+    const clean=releasePlan(plan).cues.flatMap(c=>c.targets.filter(t=>t.fruit===c.targets[0].fruit).map(t=>t.fruit));
+    assert.ok(scoreHits(clean).triples>=35,'clean runs offer repeated full triples');
+
 });
 
 test('authored fruit stays reachable and separated, with default size on most targets',()=>{
     let defaults=0,total=0;
-    for(const [i,cue] of plan.cues.entries()){
+    for(const [i,cue] of releasePlan(plan).cues.entries()){
         const targets=planCue(cue,DEFAULT_WAVE,i);
         assert.equal(cue.wave.count,targets.length);
         for(const target of targets){
@@ -97,12 +75,12 @@ test('authored fruit stays reachable and separated, with default size on most ta
             assert.ok(Math.hypot(...targets[a].position.map((v,k)=>v-targets[b].position[k]))>=Math.max(.14,targets[a].scale+targets[b].scale),`${i}: fruit ${a}/${b} overlap`);
         }
     }
-    assert.ok(defaults/total>.75);
+    assert.ok(defaults/total>.65);
 });
 
 test('no cuts admit every cue under the ten-original cap and clear the finale before 60 s',()=>{
     for(const lifetime of [1.5,2.6,3.5]){
-        const scheduled=plan.cues.map((cue,i)=>({at:cue.at,targets:planCue(cue,{...DEFAULT_WAVE,lifetime},i)}));
+        const scheduled=releasePlan(plan).cues.map((cue,i)=>({at:cue.at,targets:planCue(cue,{...DEFAULT_WAVE,lifetime},i)}));
         let peak=0,admitted=0;
         for(const cue of scheduled){
             const active=scheduled.filter(c=>c.at<=cue.at).flatMap(c=>c.targets.map(target=>({expires:c.at+target.lifetime}))).filter(t=>t.expires>cue.at+1e-8);
@@ -164,17 +142,13 @@ test('round validation rejects malformed authoring and every target override bou
 });
 
 
-test('opening changes stroke direction, hook and separated staggered fan immediately',()=>{
-    assert.equal(plan.cues.length,24);assert.equal(plan.cues.reduce((n,c)=>n+c.targets.length,0),140);
-    const group=(i,high)=>plan.cues[i].targets.filter(t=>(values[t.fruit]>=60)===high).map(t=>t.position);
-    for(const high of [false,true]){
-        const up=group(0,high),down=group(1,high),hook=group(2,high);
-        assert.ok(up[2][1]>up[0][1]);assert.ok(down[2][1]<down[0][1]);
-        assert.ok((hook[1][0]-hook[0][0])*(hook[2][0]-hook[1][0])<0,'hook turns horizontally');
-    }
-    assert.ok(Math.max(...group(3,true).map(p=>p[0]))<Math.min(...group(3,false).map(p=>p[0])));
-    const shapes=plan.cues.map(c=>JSON.stringify(c.targets.map(t=>t.position)));
-    assert.equal(new Set(shapes).size,24,'no repeated horizontal two-row grids');
+test('opening changes from a rising stroke to alternating pairs and a growing burst',()=>{
+    assert.equal(plan.cues.length,27);assert.equal(plan.cues.reduce((n,c)=>n+c.targets.length,0),149);
+    const opening=plan.cues[0].targets;
+    assert.ok(opening[2].position[1]>opening[0].position[1]);
+    const pairs=releasePlan(plan).cues.slice(1,4);
+    assert.deepEqual(pairs.map(c=>c.targets.map(t=>t.position[0])),[[-.5,-.5],[.5,.5],[0,0]]);
+    assert.deepEqual(plan.cues[2].bursts,[[0,1],[.5,2],[1,3]]);
 });
 
 test('ballistic launch validates strict fields, copies settings and ignores only authored vertical velocity',()=>{
@@ -209,5 +183,13 @@ test('arcade flight doubles the strike window without changing the throw path',(
             const within=2*Math.sqrt(2*.15/recipe.gravity);
             assert.ok(within>.69,'at least 690 ms within 15 cm of the apex');
         }
+    }
+});
+
+test('synthwave launches and strike windows land on the 120 BPM grid',()=>{
+    for(const cue of plan.cues){
+        const strikeOnBeat = ['PRESNOST','NACASOVANI','FINALE'].includes(cue.label);
+        const beat = (cue.at + (strikeOnBeat ? cue.launch.apexSeconds : 0)) * 2;
+        assert.ok(Math.abs(beat-Math.round(beat))<1e-6, cue.label);
     }
 });

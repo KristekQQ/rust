@@ -10,6 +10,11 @@ mod cutting_bench;
 pub mod cutting_mesh;
 pub mod cutting_tool;
 pub mod debug_overlay;
+#[cfg(all(
+    debug_assertions,
+    any(test, target_arch = "wasm32", feature = "native-render")
+))]
+mod debug_scene_bounds;
 pub mod frame_graph;
 pub mod frame_input;
 pub mod frame_metrics;
@@ -43,6 +48,7 @@ mod rim_cut_work;
 pub mod rim_game;
 pub mod rim_movement;
 pub mod scene;
+
 mod spatial;
 pub mod table_tennis;
 pub mod table_tennis_contact;
@@ -51,6 +57,7 @@ mod translucency;
 pub mod visibility;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
+pub mod xp_drink;
 pub mod xr_buttons;
 pub mod xr_input;
 pub mod xr_locomotion;

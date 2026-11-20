@@ -22,6 +22,8 @@ For direct Quest WebGPU XR, runtime support, projection textures and headset dia
 
 For standalone headset mirroring to a local browser over Wi-Fi, reconnecting viewers and keeping Quest awake during off-face streaming, use [quest-stream](.agents/skills/quest-stream/SKILL.md). Its independent Android companion lives in `tools/quest-stream/`; it does not require an engine build.
 
+For NPC behavior, sprite views, interaction and round lifetime use [npc-characters](.agents/skills/npc-characters/SKILL.md). For replicated spectator bandwidth, interpolation, cuts and camera parity use [scene-observer](.agents/skills/scene-observer/SKILL.md).
+
 For shared game audio, web/native playback, observer sound and their regression checks, use [game-audio](.agents/skills/game-audio/SKILL.md). Quest Stream captures playback separately; its permission and transport workflow remains in quest-stream.
 
 For creating or tuning graphical effects, use [effect-optimization](.agents/skills/effect-optimization/SKILL.md): preserve appearance, prefer cheaper approximations and measure total cost.

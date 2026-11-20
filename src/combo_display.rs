@@ -1,4 +1,5 @@
 //! Opt-in Rust-owned combo rows. Assets remain shared; only live rows own instances.
+use crate::xr_round::CAT_BOOST_MULTIPLIER;
 use crate::{scene::SceneManager as Scene, xr_round::ComboEvent};
 use glam::Vec3;
 use serde_json::{json, Value};
@@ -54,6 +55,9 @@ struct Symbol {
     variant: u32,
 }
 pub struct ComboDisplay {
+    xp_status_panel: Option<u32>,
+    xp_stock_labels: [Option<u32>; 2],
+    xp_status: Option<u32>,
     notice_seconds: f32,
     stack_score_panel: Option<u32>,
     stock_score_panels: Option<[u32; 2]>,
@@ -82,6 +86,7 @@ struct Row {
     count: u32,
     success: bool,
     points: u32,
+    earned_bonus: u64,
     age: f32,
     icons: Vec<u32>,
     frames: Vec<u32>,
@@ -93,6 +98,7 @@ impl Row {
             count,
             success,
             points,
+            earned_bonus: 0,
             age: 0.,
             icons: vec![],
             frames: vec![],
@@ -232,6 +238,9 @@ impl ComboDisplay {
             }
         };
         Some(Self {
+            xp_status_panel: None,
+            xp_stock_labels: [None; 2],
+            xp_status: None,
             stack_score_panel,
             stock_score_panels,
             retired: None,
@@ -256,7 +265,88 @@ impl ComboDisplay {
             history: vec![],
         })
     }
+    // Prepare the opt-in drink labels during setup, rather than
+    // inserting/removing render resources on the first sip and at every expiry.
+    fn prepare_xp_panels(&mut self, scene: &mut Scene) {
+        if self.xp_status_panel.is_none() {
+            if let Ok(id) = scene.add_info_panel("debug-text", 1.04, 0.12) {
+                scene.set_object_position(id, self.origin + Vec3::new(0., 0.26, 0.04));
+                scene.set_emission(id, 1.8);
+                scene.update_info_panel(id, &[("", "PRIBLIZ K USTUM".into())]);
+                scene.set_opacity(id, 0., 8., 0., -1.);
+                self.xp_status_panel = Some(id);
+            }
+        }
+        for (index, slot) in self.xp_stock_labels.iter_mut().enumerate() {
+            if slot.is_none() {
+                if let Ok(id) = scene.add_info_panel("debug-text", 0.56, 0.105) {
+                    scene.set_object_position(
+                        id,
+                        self.origin + Vec3::new(if index == 0 { -0.67 } else { 0.67 }, 0.14, 0.06),
+                    );
+                    scene.set_emission(id, 2.);
+                    scene.update_info_panel(
+                        id,
+                        &[("XP PAYOUT", format!("X{CAT_BOOST_MULTIPLIER}"))],
+                    );
+                    scene.set_opacity(id, 0., 8., 0., -1.);
+                    *slot = Some(id);
+                }
+            }
+        }
+    }
+    /// A held drink shows the sip cue. Positive seconds are the scoring timer.
+    pub fn sync_xp_status(&mut self, scene: &mut Scene, held: bool, remaining: f32) {
+        let seconds = remaining.ceil() as u32;
+        let status = (held || seconds > 0).then_some(seconds);
+        if status == self.xp_status {
+            return;
+        }
+        if status.is_some() {
+            self.prepare_xp_panels(scene);
+        }
+        let was_active = self.xp_status.unwrap_or(0) > 0;
+        if (seconds > 0) != was_active {
+            for id in self.xp_stock_labels.iter().flatten().copied() {
+                // Clear the previous drink's payout before showing the pool again.
+                scene.update_info_panel(id, &[("XP PAYOUT", format!("X{CAT_BOOST_MULTIPLIER}"))]);
+                scene.set_opacity(id, if seconds > 0 { 1. } else { 0. }, 8., 0., -1.);
+            }
+        }
+        if let Some(id) = self.xp_status_panel {
+            scene.set_opacity(id, if status.is_some() { 1. } else { 0. }, 8., 0., -1.);
+            if status.is_some() {
+                if seconds == 0 {
+                    scene.update_info_panel(id, &[("", "PRIBLIZ K USTUM".into())]);
+                } else {
+                    scene.update_info_panel(
+                        id,
+                        &[
+                            (
+                                "XP BOOST",
+                                format!("XP X{CAT_BOOST_MULTIPLIER}   {seconds} S"),
+                            ),
+                            ("SECONDS", seconds.to_string()),
+                        ],
+                    );
+                }
+            }
+        }
+        self.xp_status = status;
+    }
     pub fn clear(&mut self, scene: &mut Scene) {
+        self.sync_xp_status(scene, false, 0.);
+        for id in self
+            .xp_status_panel
+            .take()
+            .into_iter()
+            .chain(self.xp_stock_labels.iter_mut().filter_map(Option::take))
+        {
+            scene.remove_object(id);
+        }
+        self.clear_rows(scene);
+    }
+    fn clear_rows(&mut self, scene: &mut Scene) {
         self.clear_retired(scene);
         self.notice_seconds = 0.;
         self.pending_bonus = 0;
@@ -306,6 +396,28 @@ impl ComboDisplay {
             let row =
                 self.chain_rows[index].get_or_insert_with(|| Row::new(String::new(), 0, false, 0));
             let new_hit = count > 0 && (row.kind != kind || count > row.count);
+            if let Some(id) =
+                self.xp_stock_labels[index].filter(|_| self.xp_status.unwrap_or(0) > 0)
+            {
+                if new_hit {
+                    let previous =
+                        u64::from(row.count) * crate::xr_round::CHAIN_HIT_POINTS + row.earned_bonus;
+                    let gain = chain
+                        .as_ref()
+                        .unwrap()
+                        .total_points()
+                        .saturating_sub(previous);
+                    scene.update_info_panel(
+                        id,
+                        &[("XP PAYOUT", format!("X{CAT_BOOST_MULTIPLIER}  +{gain}"))],
+                    );
+                } else if count == 0 {
+                    scene.update_info_panel(
+                        id,
+                        &[("XP PAYOUT", format!("X{CAT_BOOST_MULTIPLIER}"))],
+                    );
+                }
+            }
             hit |= new_hit;
             if count == 0 {
                 self.chain_pulse[index] = 0.;
@@ -320,6 +432,7 @@ impl ComboDisplay {
             }
             row.count = count;
             row.points = chain.as_ref().map_or(0, |c| c.points);
+            row.earned_bonus = chain.as_ref().map_or(0, |c| c.value());
             let frame_count = (count as usize).min(MAX_CHAIN_ICONS);
             while row.frames.len() > frame_count {
                 if let Some(id) = row.frames.pop() {
@@ -445,6 +558,11 @@ impl ComboDisplay {
         scene.set_emission(id, 4. + 4. * pulse);
     }
     fn sync_stock_score(&self, scene: &mut Scene, index: usize) {
+        if let Some(label) = self.xp_stock_labels[index] {
+            let pulse = self.chain_pulse[index] / CHAIN_PULSE_SECONDS;
+            scene.set_object_scale(label, Vec3::splat(1. + 0.20 * pulse));
+            scene.set_emission(label, 2. + pulse);
+        }
         let Some(ids) = self.stock_score_panels else {
             return;
         };
@@ -501,12 +619,7 @@ impl ComboDisplay {
                 }
             }
         }
-        let earned_bonus = crate::xr_round::FruitChain {
-            kind: row.kind,
-            count: row.count,
-            points: row.points,
-        }
-        .value();
+        let earned_bonus = row.earned_bonus;
         let earned_points = u64::from(row.count)
             .saturating_mul(crate::xr_round::CHAIN_HIT_POINTS)
             .saturating_add(earned_bonus);
@@ -634,7 +747,9 @@ impl ComboDisplay {
     }
     pub fn reset(&mut self, scene: &mut Scene) {
         if self.chain_mode {
-            self.clear(scene);
+            self.sync_xp_status(scene, false, 0.);
+            self.clear_rows(scene);
+            self.prepare_xp_panels(scene);
             self.sync_chains(scene, &[None, None]);
             return;
         }
@@ -797,8 +912,8 @@ impl ComboDisplay {
             let chains: Vec<Value> = self.chain_rows.iter().enumerate().map(|(i, row)| {
                 let r = row.as_ref();
                 json!({"kind":r.map_or("", |r|r.kind.as_str()),"count":r.map_or(0,|r|r.count),"points":r.map_or(0,|r|r.points),
-                    "earnedPoints":r.map_or(0,|r|crate::xr_round::FruitChain{kind:r.kind.clone(),count:r.count,points:r.points}.total_points()),
-                    "potential":r.map_or(0,|r|crate::xr_round::FruitChain{kind:r.kind.clone(),count:r.count,points:r.points}.value()),
+                    "earnedPoints":r.map_or(0,|r|u64::from(r.count).saturating_mul(crate::xr_round::CHAIN_HIT_POINTS).saturating_add(r.earned_bonus)),
+                    "potential":r.map_or(0,|r|r.earned_bonus),
                     "icons":r.map(|r|&r.icons),"frames":r.map(|r|&r.frames),"label":self.awards[i]})
             }).collect();
             return json!({"mode":"chains","pendingBonus":self.pending_bonus,"stackScorePanel":self.stack_score_panel,"stockScorePanels":self.stock_score_panels,"retiring":self.retired.as_ref().map(|r|json!({"age":r.age,"earnedBonus":r.earned_bonus,"earnedPoints":r.earned_points,"scoreLabel":r.score_label,"objects":r.parts.iter().map(|p|p.id).collect::<Vec<_>>()})),"current":null,"history":[],"chains":chains})
@@ -829,6 +944,99 @@ mod tests {
         let config = json!({"symbols":[{"kind":"A","asset":asset,"variant":0},{"kind":"B","asset":asset,"variant":0},{"kind":"W","asset":asset,"variant":0}],"frameAsset":asset,"timerPanel":timer,"scorePanel":score,"awardPanels":awards});
         let display = ComboDisplay::configure(&scene, &config.to_string()).unwrap();
         (scene, display)
+    }
+    #[test]
+    fn xp_status_tracks_sip_countdown_and_expiry() {
+        let (mut scene, mut display) = fixture();
+        display.sync_xp_status(&mut scene, true, 0.);
+        let id = display.xp_status_panel.unwrap();
+        for (remaining, expected) in [(20., 20), (19.75, 20), (7.1, 8), (0.1, 1)] {
+            display.sync_xp_status(&mut scene, false, remaining);
+            assert_eq!(display.xp_status, Some(expected));
+            assert_eq!(display.xp_status_panel, Some(id));
+            assert!(!scene.info_panels[&id].mesh.indices.is_empty());
+        }
+        display.chain_mode = true;
+        let stock = Some(crate::xr_round::FruitChain {
+            kind: "A".into(),
+            count: 1,
+            points: 120,
+            earned_bonus: Some(250),
+        });
+        display.sync_chains(&mut scene, &[stock.clone(), stock]);
+        let ids = display.xp_stock_labels.map(Option::unwrap);
+        for label in ids {
+            assert!(!scene
+                .info_panels
+                .get_mut(&label)
+                .unwrap()
+                .update(vec![("XP PAYOUT", "X2  +260".into())]));
+        }
+        display.sync_xp_status(&mut scene, false, 0.);
+        assert_eq!(scene.objects()[&id].opacity, 0.);
+        assert!(ids.iter().all(|id| scene.objects()[id].opacity == 0.));
+        display.clear(&mut scene);
+        assert!(!scene.object_exists(id));
+        assert!(ids.iter().all(|id| !scene.object_exists(*id)));
+    }
+    #[test]
+    fn xp_panel_pool_survives_activation_expiry_and_round_reset() {
+        let (mut scene, mut display) = fixture();
+        display.chain_mode = true;
+        display.reset(&mut scene);
+        let status = display.xp_status_panel.unwrap();
+        let labels = display.xp_stock_labels.map(Option::unwrap);
+        let object_count = scene.objects().len();
+        let panel_count = scene.info_panels.len();
+        let stock = Some(crate::xr_round::FruitChain {
+            kind: "A".into(),
+            count: 1,
+            points: 120,
+            earned_bonus: Some(250),
+        });
+        for _ in 0..2 {
+            display.sync_xp_status(&mut scene, true, 0.);
+            display.sync_xp_status(&mut scene, false, 20.);
+            let revision = scene.info_panels[&status].revision;
+            display.sync_xp_status(&mut scene, false, 19.75);
+            assert_eq!(scene.info_panels[&status].revision, revision);
+            assert!(labels.iter().all(|id| scene.objects()[id].opacity == 1.));
+            assert_eq!(scene.objects().len(), object_count);
+            display.sync_xp_status(&mut scene, false, 0.);
+            display.sync_chains(&mut scene, &[stock.clone(), None]);
+            assert!(labels.iter().all(|id| scene.objects()[id].opacity == 0.));
+            display.reset(&mut scene);
+            assert_eq!(display.xp_status_panel, Some(status));
+            assert_eq!(display.xp_stock_labels, labels.map(Some));
+            assert_eq!(scene.objects().len(), object_count);
+            assert_eq!(scene.info_panels.len(), panel_count);
+        }
+        display.clear(&mut scene);
+        assert!(!scene.object_exists(status));
+        assert!(labels.iter().all(|id| !scene.object_exists(*id)));
+    }
+    #[test]
+    fn chain_display_and_retirement_keep_actual_cat_earned_bonus() {
+        let (mut scene, mut display) = fixture();
+        display.chain_mode = true;
+        let make = |kind: &str, count, bonus| {
+            Some(crate::xr_round::FruitChain {
+                kind: kind.into(),
+                count,
+                points: 10,
+                earned_bonus: Some(bonus),
+            })
+        };
+        display.sync_chains(&mut scene, &[make("A", 5, 123), make("B", 1, 30)]);
+        let state: Value = serde_json::from_str(&display.state()).unwrap();
+        assert_eq!(state["pendingBonus"], 153);
+        assert_eq!(state["chains"][0]["potential"], 123);
+        assert_eq!(state["chains"][0]["earnedPoints"], 173);
+        assert_eq!(state["chains"][1]["earnedPoints"], 40);
+        display.sync_chains(&mut scene, &[make("B", 1, 0), make("B", 1, 30)]);
+        let retired = display.retired.as_ref().unwrap();
+        assert_eq!(retired.earned_bonus, 123);
+        assert_eq!(retired.earned_points, 173);
     }
     #[test]
     fn combo_display_mismatch_wild_success_fade_and_reset() {
@@ -935,6 +1143,7 @@ mod tests {
         let mut display = ComboDisplay::configure(&scene, &config.to_string()).unwrap();
         let make = |kind: &str, count| {
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: kind.into(),
                 count,
                 points: 10,
@@ -1019,11 +1228,13 @@ mod tests {
         let mut display = ComboDisplay::configure(&scene, &config.to_string()).unwrap();
         let mut chains = [
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: "A".into(),
                 count: 4,
                 points: 10,
             }),
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: "B".into(),
                 count: 5,
                 points: 20,
@@ -1068,6 +1279,7 @@ mod tests {
             &mut scene,
             &[
                 Some(crate::xr_round::FruitChain {
+                    earned_bonus: None,
                     kind: "A".into(),
                     count: 5,
                     points: 10,
@@ -1094,11 +1306,13 @@ mod tests {
         assert_eq!(scene.variant_instances.len(), 0);
         let mut chains = [
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: "A".into(),
                 count: 5,
                 points: 10,
             }),
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: "B".into(),
                 count: 2,
                 points: 20,
@@ -1160,11 +1374,13 @@ mod tests {
         display.chain_mode = true;
         let chains = [
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: "A".into(),
                 count: 4,
                 points: 10,
             }),
             Some(crate::xr_round::FruitChain {
+                earned_bonus: None,
                 kind: "B".into(),
                 count: 5,
                 points: 20,

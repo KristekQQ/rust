@@ -6,7 +6,7 @@ self.onmessage=async event=>{
     const message=event.data;
     try{
         if(message.type==='init'){
-            game=await createSimulation(message.assets,message.scores);
+            game=await createSimulation(message.assets,message.scores,new Map(),message.leaderboard??null);
             const started=now(),bytes=game.initial();
             if(message.observerUrl){
                 // Optional observer stays on this CPU worker; transport failure never stops gameplay.
@@ -21,6 +21,7 @@ self.onmessage=async event=>{
             observer?.publish(bytes,state,message.sampledAt);
             self.postMessage({type:'frame',bytes:bytes.buffer,frames:message.frames,workerMs:now()-started,state,haptics,sent:message.sent},[bytes.buffer,message.frames]);
         }else if(message.type==='immersive'){game.set_immersive(message.value);
+        }else if(message.type==='leaderboard'){game.restore_leaderboard_if_current(JSON.stringify(message.entries),message.expectedSequence);
         }else if(message.type==='scores'){game.restore_scores(JSON.stringify(message.scores));
         }else if(message.type==='dispose'){observer?.close();game?.free();game=null;self.close();}
     }catch(error){self.postMessage({type:'error',error:String(error)});}

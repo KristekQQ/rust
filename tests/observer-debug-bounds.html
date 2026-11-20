@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><canvas id="gpu-canvas" style="width:800px;height:600px"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels} from './pixels.js';
+import {installDebugBounds} from '../tools/scene-observer/debug-bounds.mjs';
+try{
+ const canvas=document.querySelector('canvas');const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();engine.resize(800,600);engine.setCameraHandedness('right');engine.setCameraView([0,2,6],[0,1,0]);engine.set_grid_visible(false);
+ if(new URLSearchParams(location.search).get('profile')==='release'){
+  if(engine.debugSceneBounds!==undefined||installDebugBounds(engine)!==null)throw Error('Production build exposed debug bounds');
+  document.querySelector('#result').textContent='PASS: release engine and observer omit bounds inspection';
+ }else{
+ if(typeof engine.debugSceneBounds!=='function')throw Error('Debug capability missing in dev build');
+ if(installDebugBounds({})!==null)throw Error('UI accepts production engine without capability');
+ await engine.scene.loadModel(new URL('../tools/scene-observer/assets/neon-spotlight/neon-spotlight.gltf',import.meta.url));
+ engine.postprocessing.configureSSR({resolutionScale:.5,receiverBounds:{min:[-2,-.03,-2],max:[2,.03,2]}});engine.postprocessing.enable('ssr',{strength:.92});
+ await capturePixels(canvas);
+ const before=engine.debugSceneBounds();
+ if(!before.entries.some(e=>e.kind==='primitive')||!before.entries.some(e=>e.kind==='effect'))throw Error('Model parts or SSR region missing');
+ for(const e of before.entries)for(const line of e.edges)if(line.length!==4||line.some(v=>!Number.isFinite(v)||v<0||v>1))throw Error('Unclipped edge');
+ const root=before.entries.find(e=>e.kind==='model');if(!root||root.parts!==2)throw Error('Expected floor and shaft model parts');
+ const ui=installDebugBounds(engine);ui.setEnabled(true);ui.update(performance.now());
+ if(document.querySelectorAll('#debug-bounds path').length!==before.entries.length)throw Error('Missing SVG borders');
+ ui.setEnabled(false);if(document.querySelectorAll('#debug-bounds path').length)throw Error('Disabled overlay retains geometry');
+ const after=engine.debugSceneBounds();if(JSON.stringify(before)!==JSON.stringify(after))throw Error('Debug changed scene');
+ ui.setEnabled(true);ui.update(performance.now());document.querySelector('#result').textContent='PASS: projected parts/SSR, clipped edges, toggle and production capability guard';
+ }
+}catch(e){document.querySelector('#result').textContent='FAIL: '+e.message;console.error(e);}
+</script>

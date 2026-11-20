@@ -13,8 +13,14 @@ try {
    // Resume is invoked directly within the real click gesture.
    controls=installAudioControls();const unlocked=controls.enable();live=controls.mixer;
    await unlocked;
-   if(live.context.state!=='running'||live.clips.size!==16)throw Error('Audio unlock/assets failed');
-   live.play('ui_confirm',{gain:.2});
+   if(live.context.state!=='running')throw Error(`Audio context is ${live.context.state} after click`);
+   const response=await fetch('../assets/audio/neon/manifest.json');
+   if(!response.ok)throw Error(`Audio manifest: ${response.status}`);
+   const {sounds}=await response.json();
+   const missing=sounds.filter(({id})=>!(live.clips.get(id)?.buffer.length>0));
+   if(missing.length)throw Error(`WAVs not decoded: ${missing.map(({id})=>id).join(', ')}`);
+   if(live.clips.size!==sounds.length)throw Error(`Decoded ${live.clips.size} clips for ${sounds.length} manifest entries`);
+   if(!live.play('ui_confirm',{gain:.2}))throw Error('Live audio playback failed');
    async function render(position,forward=[0,0,-1]){
     const context=new OfflineAudioContext(2,48000,48000),mixer=new AudioMixer({context});
     for(const [id,clip]of live.clips)mixer.clips.set(id,clip);
@@ -31,7 +37,7 @@ try {
    const turned=await render([2,0,-1],[0,0,1]),near=await render([0,0,-1]),far=await render([0,0,-5]);
    if(!(turned[0]>turned[1]*2))throw Error('Listener rotation does not rotate spatial sound');
    if(!(near[0]+near[1]>(far[0]+far[1])*8))throw Error('Distant source not attenuated');
-   result.textContent='PASS: 16 WAVs decoded; real click unlocked output; nonzero stereo PCM; left/right spatialization; listener rotation; distance attenuation; headroom';
+   result.textContent=`PASS: ${sounds.length} WAVs decoded; real click unlocked output; nonzero stereo PCM; left/right spatialization; listener rotation; distance attenuation; headroom`;
    controls.dispose();await live.dispose();engine.dispose();
   }catch(error){controls?.dispose();await live?.dispose();result.textContent='FAIL: '+error.stack;console.error(error);}
  };

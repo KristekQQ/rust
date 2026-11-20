@@ -1,0 +1,43 @@
+<!doctype html><meta charset="utf-8"><title>Buffered observer timeline</title><canvas id="gpu-canvas"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels,assertForeground,assertChanged} from './pixels.js';
+const result=document.querySelector('#result'),canvas=document.querySelector('canvas');
+// Capture the next rendered frame without four extra warm-up RAFs inside a 400ms segment.
+const captureMotion=()=>new Promise(resolve=>requestAnimationFrame(()=>{const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;const ctx=copy.getContext('2d',{willReadFrequently:true});ctx.drawImage(canvas,0,0);resolve(ctx.getImageData(0,0,copy.width,copy.height));}));
+const wait=async check=>{for(let i=0;i<800;i++){if(check())return;await new Promise(r=>setTimeout(r,10));}throw Error('Playback condition timeout');};
+try{
+ const frames={};for(const name of ['initial','motion','cut','removed'])frames[name]=new Uint8Array(await(await fetch('./fixtures/native-scene/'+name+'.nwr')).arrayBuffer());
+ const ids=await(await fetch('./fixtures/native-scene/ids.json')).json();
+ const engine=await initEngine(canvas,{backend:new URLSearchParams(location.search).get('backend')||'auto'});
+ document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.setDebugOverlay(false);engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_render_effects(false,false);
+ engine.setBackgroundColor([.01,.02,.03]);engine.setCameraView([3,2.5,4],[.5,.3,.2]);
+ engine.setScenePlayback({delayMs:150,maxExtrapolationMs:80,maxDistance:3});
+ const enqueue=(name,time,sequence)=>{const bytes=frames[name].slice();new DataView(bytes.buffer).setBigUint64(8,BigInt(sequence),true);engine.enqueueScenePublication(bytes,time);};
+ const exists=id=>{try{return engine.scene.getObject(id).exists;}catch{return false;}};
+ // Future topology is received now, but must only become visible on the timeline.
+
+ enqueue('initial',1000,1);enqueue('motion',1400,2);enqueue('cut',1800,3);enqueue('removed',2200,4);
+ if(engine.scenePlaybackState().sequence!=='0'||exists(ids.source))throw Error('First snapshot was shown before buffer boundary');
+ await wait(()=>engine.scenePlaybackState().sequence==='1');
+ if(!exists(ids.source)||ids.halves.some(exists))throw Error('Future cut became visible too early');
+ const captureStarted=performance.now();
+ const before=await captureMotion();assertForeground(before,'buffered initial');
+ await new Promise(r=>setTimeout(r,90));const moving=await captureMotion();
+ assertChanged(before,moving,'buffer advances without new packets');
+ if(engine.scenePlaybackState().sequence!=='1')throw Error('Movement check crossed source boundary '+JSON.stringify({captureElapsed:performance.now()-captureStarted,state:engine.scenePlaybackState()}));
+ await wait(()=>engine.scenePlaybackState().sequence==='3');
+ if(exists(ids.source)||!ids.halves.every(exists))throw Error('Cut did not commit atomically at boundary');
+ const cut=await capturePixels(canvas);assertForeground(cut,'cut at playback boundary');
+ await wait(()=>engine.scenePlaybackState().sequence==='4');
+ if(ids.halves.some(exists))throw Error('Removed fragments survived their boundary');
+ if(engine.scenePlaybackState().queued!==0||engine.scenePlaybackState().bufferBytes!==0)throw Error('Consumed snapshots retain queue memory');
+ await new Promise(r=>setTimeout(r,180));const held=engine.scenePlaybackState().timeMs;
+ await new Promise(r=>setTimeout(r,90));if(engine.scenePlaybackState().timeMs!==held)throw Error('Clock ran beyond extrapolation bound');
+ engine.setScenePlayback({delayMs:0});engine.setScenePlayback({delayMs:120,maxExtrapolationMs:80});
+ enqueue('initial',10000,5);await wait(()=>engine.scenePlaybackState().sequence==='5');
+ if(!exists(ids.source)||engine.scenePlaybackState().error)throw Error('Reset did not load new session snapshot');
+ result.textContent='PASS: buffered motion without packets, delayed atomic cut/removal, bounded clock, memory drain and reset';
+}catch(error){result.textContent='FAIL: '+error.message;console.error(error);}
+</script>

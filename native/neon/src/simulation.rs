@@ -30,6 +30,7 @@ struct Input {
 }
 #[derive(Clone, Copy, Default)]
 pub struct WorkerMetrics {
+    pub cut_pool: Option<webgpu_wasm::scene::publication::CutPoolStats>,
     pub samples: u32,
     pub queue_ms: f64,
     pub game_ms: f64,
@@ -69,18 +70,46 @@ impl Simulation {
     pub fn new(scene: SceneManager, game: Game) -> Result<Self, String> {
         Self::new_with_measurement(scene, game, false)
     }
+    pub fn new_with_cut_device(
+        scene: SceneManager,
+        game: Game,
+        device: wgpu::Device,
+    ) -> Result<Self, String> {
+        Self::new_with_observer(
+            scene,
+            game,
+            false,
+            None,
+            RenderPublisher::with_cut_device(device),
+        )
+    }
+    pub fn new_with_cut_pool(
+        scene: SceneManager,
+        game: Game,
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+    ) -> Result<Self, String> {
+        Self::new_with_observer(
+            scene,
+            game,
+            false,
+            None,
+            RenderPublisher::with_cut_pool(device, queue),
+        )
+    }
     pub fn new_with_measurement(
         scene: SceneManager,
         game: Game,
         measure: bool,
     ) -> Result<Self, String> {
-        Self::new_with_observer(scene, game, measure, None)
+        Self::new_with_observer(scene, game, measure, None, RenderPublisher::default())
     }
     pub(crate) fn new_with_observer(
         mut scene: SceneManager,
         mut game: Game,
         measure: bool,
         mut observer: Option<SceneObserver>,
+        mut publisher: RenderPublisher,
     ) -> Result<Self, String> {
         let (sender, inputs) = mpsc::sync_channel::<Input>(INPUT_CAPACITY);
         let output = Arc::new(Mutex::new(Output::default()));
@@ -94,7 +123,7 @@ impl Simulation {
                     "Neon simulation worker started: {:?}",
                     std::thread::current().id()
                 );
-                let mut publisher = RenderPublisher::default();
+
                 // Startup prewarming is finished before entering the XR frame loop.
                 let start = Instant::now();
                 let state = game.state();
@@ -174,6 +203,7 @@ impl Simulation {
                         observer.publish_scene(&mut scene, &state);
                     }
                     let publication = publisher.capture(&mut scene);
+                    measurement.cut_pool = publisher.cut_pool_stats();
                     measurement.publication_ms =
                         publication_start.map_or(0., |t| t.elapsed().as_secs_f64() * 1000.);
                     let snapshot = Snapshot {
@@ -396,6 +426,63 @@ mod tests {
             moved,
             "render mirror cannot simulate"
         );
+    }
+    #[test]
+    fn worker_pet_hand_approach_publishes_swap_and_tracking_loss() {
+        let (mut scene, mut game) = fixture();
+        let cat = game
+            .ref_id("stealthCat")
+            .expect("native petting content must include cat");
+        let open = game.ref_id("leftPetHand").unwrap();
+        let sword = game.ref_id("leftSword").unwrap();
+        game.start(&mut scene).unwrap();
+        assert!(scene.trigger_sprite(cat));
+        scene.update(7.);
+        let object = &scene.objects()[&cat];
+        let yaw = object.transform.rotation.y;
+        let right = Vec3::new(yaw.cos(), 0., -yaw.sin());
+        let pitch = object
+            .sprite
+            .unwrap()
+            .elevated_view
+            .unwrap()
+            .pitch
+            .to_radians();
+        let facing = right.cross(Vec3::Y) * pitch.cos() + Vec3::Y * pitch.sin();
+        let back = object.transform.position
+            + facing.cross(right) * (0.22 * object.transform.scale.y.abs());
+        let viewer = object.transform.position + Vec3::new(0., 0.95, 0.6);
+        let grip = back + (viewer - back).normalize() * 0.45;
+        let head = Mat4::from_rotation_translation(
+            glam::Quat::from_rotation_arc(Vec3::NEG_Z, (back - viewer).normalize()),
+            viewer,
+        );
+        // Showing a reaching hand must not require an already-established pet.
+        assert!(!scene.pet_sprite(cat, grip, viewer));
+        assert!(scene.pet_hand_intent(head, grip, false));
+        let (mut mirror, _) = fixture();
+        let mut sim = Simulation::new(scene, game).unwrap();
+        let mut frame = input();
+        frame.head = Some(head);
+        frame.hands[0] = Some(Mat4::from_translation(grip));
+        sim.submit(frame).unwrap();
+        let snapshot = sim.wait_replay().unwrap();
+        assert_eq!(
+            snapshot.state["pettingHands"],
+            serde_json::json!([true, false])
+        );
+        mirror.apply_render_publication(snapshot.publication, &[]);
+        assert!(mirror.objects()[&open].transform.position.distance(grip) < 0.001);
+        assert!(mirror.objects()[&sword].transform.position.y < -9999.);
+        frame.hands[0] = None;
+        sim.submit(frame).unwrap();
+        let lost = sim.wait_replay().unwrap();
+        assert_eq!(
+            lost.state["pettingHands"],
+            serde_json::json!([false, false])
+        );
+        mirror.apply_render_publication(lost.publication, &[]);
+        assert!(mirror.objects()[&open].transform.position.y < -9999.);
     }
     #[test]
     fn worker_real_sword_cut_scores_and_emits_haptic_off_xr() {

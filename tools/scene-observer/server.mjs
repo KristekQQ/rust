@@ -31,18 +31,18 @@ export async function createObserverServer({ root, host = '127.0.0.1', port = 87
     if(nativeScene.normalizedSnapshot)return {...frame,scene:true};
     const time=nativeBridge?.normalizeTimestamp(frame.sampledAt);if(!time)return null;
     const pose=nativeBridge.latest?.state;
-    return {...frame,...time,session:'scene-'+frame.session,state:{...frame.state,head:pose?.head??null,swords:pose?.swords??0},scene:true};
+    return {...frame,...time,sourceSampledAt:frame.sampledAt,session:'scene-'+frame.session,state:{...frame.state,head:pose?.head??null,swords:pose?.swords??0},scene:true};
   }
   function pumpPose(ws,peer){
     const scene=sceneMeta();
     if(scene){
       if(peer.session!==scene.session){
-        peer.session=scene.session;peer.ready=false;peer.inFlight=false;peer.sentSource=null;peer.sequence=0;peer.known=[new Map(),new Map(),new Map()];peer.lastPacket=null;
+        peer.session=scene.session;peer.ready=false;peer.inFlight=false;peer.sentSource=null;peer.sequence=0;peer.known=[new Map(),new Map(),new Map()];peer.lastPacket=null;peer.metadataCapacity=0;
         sendJSON(ws,{type:'session',session:scene.session,native:true,scene:true});
       }
       if(!peer.ready||peer.inFlight||peer.sentSource===nativeScene.cache.sequence||ws.readyState!==WebSocket.OPEN)return;
       const wire=nativeScene.cache.packetFor(peer);peer.inFlight=true;peer.sentSource=nativeScene.cache.sequence;
-      const raw=encodePacket(scene,wire);egress.packets++;egress.rawBytes+=raw.length;
+      const raw=encodePacket(scene,wire,peer.metadataCapacity??0);peer.metadataCapacity=new DataView(raw.buffer,raw.byteOffset).getUint32(0,true);egress.packets++;egress.rawBytes+=raw.length;
       if(peer.delta){const encoded=encodeByteDelta(peer.lastPacket,raw);peer.lastPacket={sequence:encoded.sequence,bytes:raw};egress.sentBytes+=encoded.payload.length;if(encoded.patch)egress.patchFrames++;ws.send(encoded.payload);}
       else{egress.sentBytes+=raw.length;ws.send(raw);}return;
     }

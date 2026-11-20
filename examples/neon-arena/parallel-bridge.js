@@ -5,12 +5,12 @@ export class ParallelBridge extends EventTarget {
     #engine;#locals;#worker;#inline;#queue=new Float32Array(CAPACITY*STRIDE);#spare=new Float32Array(CAPACITY*STRIDE);
     #count=0;#busy=false;#reply=null;#error=null;#flags=0;#disposed=false;#waiters=[];#sampledAt=0;
     state=null;stats={workerMs:0,applyMs:0,ageMs:0,bytes:0,dropped:0,batches:0,frames:0};
-    static async create(engine,world,{mode='worker',scores=[],observerUrl=null}={}){
+    static async create(engine,world,{mode='worker',scores=[],leaderboard=null,observerUrl=null}={}){
         const bridge=new ParallelBridge(engine,[world.infoPanel,world.leftSword,world.sword]);
-        const assets=new URL('./parallel-assets/',import.meta.url).href;
+        const assets=new URL(world.floorMode==='baseline'?'./parallel-assets/':'./parallel-assets/textured-floor/',import.meta.url).href;
         let initial;
         if(mode==='inline'){
-            bridge.#inline=await createSimulation(assets,scores);
+            bridge.#inline=await createSimulation(assets,scores,new Map(),leaderboard);
             initial={type:'ready',bytes:bridge.#inline.initial().buffer,refs:JSON.parse(bridge.#inline.refs()),state:JSON.parse(bridge.#inline.state()),workerMs:0};
         }else{
             bridge.#worker=new Worker(new URL('./parallel-worker.js',import.meta.url),{type:'module',name:'neon-simulation'});
@@ -18,7 +18,7 @@ export class ParallelBridge extends EventTarget {
                 const timeout=setTimeout(()=>reject(new Error('Simulation startup timeout')),30000);
                 bridge.#worker.onerror=event=>{clearTimeout(timeout);reject(new Error(event.message));};
                 bridge.#worker.onmessage=event=>{clearTimeout(timeout);event.data.type==='error'?reject(new Error(event.data.error)):resolve(event.data);};
-                bridge.#worker.postMessage({type:'init',assets,scores,observerUrl});
+                bridge.#worker.postMessage({type:'init',assets,scores,leaderboard,observerUrl});
             });
             bridge.#worker.onmessage=event=>{
                 if(event.data.type==='error'){bridge.#error=new Error(event.data.error);bridge.#rejectWaiters();return;}
@@ -51,6 +51,7 @@ export class ParallelBridge extends EventTarget {
     applyPending(){if(this.#error)throw this.#error;if(this.#reply){const reply=this.#reply;this.#reply=null;this.#apply(reply);}}
     get roundState(){return this.state?.round?{...this.state.round,score:this.state.score}:null;}
     restoreScores(scores){if(this.#inline)this.#inline.restore_scores(JSON.stringify(scores));else this.#worker.postMessage({type:'scores',scores});}
+    restoreLeaderboard(entries,expectedSequence){if(this.#inline)this.#inline.restore_leaderboard_if_current(JSON.stringify(entries),expectedSequence);else this.#worker.postMessage({type:'leaderboard',entries,expectedSequence});}
     setImmersive(value){if(this.#inline)this.#inline.set_immersive(value);else this.#worker.postMessage({type:'immersive',value});}
     newSession(){this.#flags|=2;}
     resetTracking(){this.#flags|=4;}

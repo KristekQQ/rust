@@ -2,7 +2,7 @@
 //! NWR1/v2 is little endian: sequence/revisions, immutable asset deltas, then full
 //! live object/asset references, lights and font tags. Apply every frame in order;
 //! start a fresh mirror/publisher together after restarting the transport. glTF
-//! assets and poses remain static and must be loaded identically on both sides.
+//! assets and poses remain static; v5 sprite atlas assets bind locally by semantic key.
 use super::*;
 use crate::{
     cutting_mesh::{MeshData, MeshStats},
@@ -13,7 +13,10 @@ use publication::{PreparedVariant, RenderPublication, RenderPublisher};
 use std::{collections::BTreeSet, sync::Arc};
 
 const MAGIC: &[u8; 4] = b"NWR1";
-const VERSION: u32 = 4;
+#[path = "scene_playback.rs"]
+pub(super) mod playback;
+
+const VERSION: u32 = 8;
 const MAX_BYTES: usize = 128 * 1024 * 1024;
 const MAX_ITEMS: usize = 200_000;
 const MAX_ARRAY: usize = 4_000_000;
@@ -24,7 +27,42 @@ pub struct WirePublisher {
     sequence: u64,
     triangles: BTreeMap<u32, MeshData>,
     variants: BTreeMap<u32, Arc<PreparedVariant>>,
-    panels: BTreeMap<u32, (u64, bool)>,
+    panels: BTreeMap<u32, PanelWireKey>,
+}
+// Bound panels render through authoritative glyph children. Their fallback text
+// revision does not affect the wire asset, but binding/metadata changes still do.
+#[derive(PartialEq, Eq)]
+struct PanelWireKey {
+    revision: u64,
+    bound: bool,
+    kind: u8,
+    dimensions: [u32; 2],
+    bounds: [u32; 6],
+}
+impl PanelWireKey {
+    fn new(panel: &InfoPanel) -> Self {
+        Self {
+            revision: panel_wire_revision(panel),
+            bound: panel.font3d_bound,
+            kind: kind_tag(panel.kind),
+            dimensions: [panel.width.to_bits(), panel.height.to_bits()],
+            bounds: [
+                panel.mesh.bounds_min[0].to_bits(),
+                panel.mesh.bounds_min[1].to_bits(),
+                panel.mesh.bounds_min[2].to_bits(),
+                panel.mesh.bounds_max[0].to_bits(),
+                panel.mesh.bounds_max[1].to_bits(),
+                panel.mesh.bounds_max[2].to_bits(),
+            ],
+        }
+    }
+}
+fn panel_wire_revision(panel: &InfoPanel) -> u64 {
+    if panel.font3d_bound {
+        0
+    } else {
+        panel.revision
+    }
 }
 struct VariantAsset {
     asset: MeshVariants,
@@ -121,9 +159,7 @@ impl WirePublisher {
         let changed_panels: Vec<_> = p
             .panels
             .iter()
-            .filter(|(id, panel)| {
-                self.panels.get(*id) != Some(&(panel.revision, panel.font3d_bound))
-            })
+            .filter(|(id, panel)| self.panels.get(*id) != Some(&PanelWireKey::new(panel)))
             .collect();
         w.count(changed_panels.len(), MAX_ITEMS);
         for (&id, panel) in changed_panels {
@@ -131,8 +167,17 @@ impl WirePublisher {
             w.u8(kind_tag(panel.kind));
             w.f32(panel.width);
             w.f32(panel.height);
-            w.u64(panel.revision);
+            w.u64(panel_wire_revision(panel));
             w.bool(panel.font3d_bound);
+            if panel.font3d_bound {
+                // Keep the v4 mesh envelope and bounds without unused fallback triangles.
+                w.vec3(Vec3::from(panel.mesh.bounds_min));
+                w.vec3(Vec3::from(panel.mesh.bounds_max));
+                w.count(0, MAX_ARRAY);
+                w.count(0, MAX_ARRAY);
+                w.bool(false); // No fallback glow; glyph children carry their own glow.
+                continue;
+            }
             put_mesh(&mut w, &panel.mesh);
             #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
             {
@@ -172,7 +217,7 @@ impl WirePublisher {
         w.count(p.panels.len(), MAX_ITEMS);
         for (&id, panel) in &p.panels {
             w.id(id);
-            w.u64(panel.revision);
+            w.u64(panel_wire_revision(panel));
         }
         w.count(p.lights.len(), MAX_LIGHTS);
         for (&id, l) in &p.lights {
@@ -218,7 +263,7 @@ impl WirePublisher {
         self.variants = p.prepared.clone();
         self.panels.retain(|id, _| p.panels.contains_key(id));
         for (&id, panel) in &p.panels {
-            let value = (panel.revision, panel.font3d_bound);
+            let value = PanelWireKey::new(panel);
             if self.panels.get(&id) != Some(&value) {
                 self.panels.insert(id, value);
             }
@@ -367,6 +412,43 @@ fn put_object(w: &mut Writer, o: &SceneObject) {
     };
     w.u8(tag);
     w.u32(id);
+    w.bool(o.sprite.is_some());
+    if let Some(s) = o.sprite {
+        w.u32(s.key);
+        w.u32(s.columns);
+        w.u32(s.rows);
+        w.u32(s.frame);
+        w.bool(s.visible);
+        w.bool(s.elevated_view.is_some());
+        if let Some(v) = s.elevated_view {
+            w.u32(v.start_frame);
+            w.f32(v.elevation);
+            w.f32(v.max_front_pitch);
+            w.f32(v.pitch);
+        }
+        w.bool(s.directional_view.is_some());
+        if let Some(v) = s.directional_view {
+            w.u32(v.frames);
+            for start in v.starts() {
+                w.u32(start);
+            }
+        }
+        w.bool(s.atlas_layout.is_some());
+        if let Some(layout) = s.atlas_layout {
+            w.u32(layout.count);
+            for band in &layout.bands[..layout.count as usize] {
+                for v in band.frames {
+                    w.u32(v);
+                }
+                for v in band.rect {
+                    w.f32(v);
+                }
+                for v in band.tiles {
+                    w.u32(v);
+                }
+            }
+        }
+    }
     w.vec3(o.transform.position);
     w.vec3(o.transform.rotation);
     w.vec3(o.transform.scale);
@@ -642,7 +724,7 @@ fn read_mesh_data(r: &mut Reader<'_>) -> Result<MeshData, String> {
     let _ = glow;
     Ok(mesh)
 }
-fn read_object(r: &mut Reader<'_>) -> Result<SceneObject, String> {
+fn read_object(r: &mut Reader<'_>, version: u32) -> Result<SceneObject, String> {
     let tag = r.u8()?;
     let mesh_id = r.u32()?;
     let mesh = match tag {
@@ -651,6 +733,80 @@ fn read_object(r: &mut Reader<'_>) -> Result<SceneObject, String> {
         2 => MeshKind::Sphere,
         3 if mesh_id != INVALID_ID => MeshKind::Imported(mesh_id),
         _ => return Err("Invalid wire mesh kind".into()),
+    };
+    let sprite = if version >= 5 && r.bool()? {
+        let mut s = sprite::SpriteVisual {
+            key: r.u32()?,
+            columns: r.u32()?,
+            rows: r.u32()?,
+            frame: r.u32()?,
+            visible: r.bool()?,
+            elevated_view: None,
+            directional_view: None,
+            atlas_layout: None,
+        };
+        if version >= 6 && r.bool()? {
+            s.elevated_view = Some(sprite::SpriteElevatedView {
+                start_frame: r.u32()?,
+                elevation: r.f32()?,
+                max_front_pitch: r.f32()?,
+                pitch: r.f32()?,
+            });
+        }
+        if version >= 7 && r.bool()? {
+            s.directional_view = Some(sprite::SpriteDirectionalView {
+                frames: r.u32()?,
+                front_start_frame: r.u32()?,
+                front_oblique_start_frame: r.u32()?,
+                side_start_frame: r.u32()?,
+                rear_oblique_start_frame: r.u32()?,
+                rear_start_frame: r.u32()?,
+            });
+        }
+        if version >= 8 && r.bool()? {
+            let count = r.count(8, 48)?;
+            let mut layout = sprite::SpriteAtlasLayout {
+                count: count as u32,
+                bands: [sprite::SpriteAtlasBandUniform::default(); 8],
+            };
+            for band in &mut layout.bands[..count] {
+                for v in &mut band.frames {
+                    *v = r.u32()?;
+                }
+                for v in &mut band.rect {
+                    *v = r.f32()?;
+                }
+                for v in &mut band.tiles {
+                    *v = r.u32()?;
+                }
+            }
+            s.atlas_layout = Some(layout);
+        }
+        if s.key == 0
+            || s.columns == 0
+            || s.rows == 0
+            || s.columns > 256
+            || s.rows > 256
+            || s.frame >= s.columns * s.rows
+        {
+            return Err("Invalid sprite descriptor".into());
+        }
+        if s.elevated_view
+            .is_some_and(|v| !v.valid(s.columns * s.rows, s.frame))
+        {
+            return Err("Invalid sprite elevated view".into());
+        }
+        if s.directional_view
+            .is_some_and(|v| !v.valid(s.columns * s.rows))
+        {
+            return Err("Invalid sprite directional view".into());
+        }
+        if s.atlas_layout.is_some_and(|v| !v.valid(s.columns * s.rows)) {
+            return Err("Invalid sprite atlas bands".into());
+        }
+        Some(s)
+    } else {
+        None
     };
     let transform = Transform::new(r.vec3()?, r.vec3()?, r.vec3()?);
     if !transform.is_valid() {
@@ -704,6 +860,7 @@ fn read_object(r: &mut Reader<'_>) -> Result<SceneObject, String> {
         return Err("Invalid wire render extent".into());
     }
     Ok(SceneObject {
+        sprite,
         transform,
         mesh,
         render_options,
@@ -898,7 +1055,7 @@ fn decode(bytes: &[u8]) -> Result<Frame, String> {
             },
         )?;
     }
-    let objects = read_ordered(&mut r, MAX_ITEMS, read_object)?;
+    let objects = read_ordered(&mut r, MAX_ITEMS, |r| read_object(r, version))?;
     let triangles = read_ordered(&mut r, MAX_ITEMS, |r| {
         let cuttable = r.bool()?;
         let cap_color = r.vec3()?;
@@ -1009,7 +1166,15 @@ impl SceneManager {
         local_ids: &[u32],
         spawn_pairs: &[u32],
     ) -> Result<(), String> {
-        let f = decode(bytes)?;
+        let frame = decode(bytes)?;
+        self.apply_decoded_wire_publication(frame, local_ids, spawn_pairs)
+    }
+    fn apply_decoded_wire_publication(
+        &mut self,
+        f: Frame,
+        local_ids: &[u32],
+        spawn_pairs: &[u32],
+    ) -> Result<(), String> {
         if self.wire_state.sequence.checked_add(1) != Some(f.sequence) {
             return Err("Out-of-order wire publication".into());
         }
@@ -1143,9 +1308,19 @@ impl SceneManager {
         self.wire_state.panels.extend(f.new_panels);
         self.objects
             .retain(|id, _| local_ids.contains(id) || has(&f.objects, *id));
+        let prediction_children = self.mirror_interpolation.prediction_enabled().then(|| {
+            f.cut_lineage
+                .iter()
+                .map(|(child, _)| *child)
+                .collect::<BTreeSet<_>>()
+        });
+        self.sprite_ids.retain(|id| local_ids.contains(id));
         for (id, mut o) in f.objects {
             if local_ids.contains(&id) {
                 continue;
+            }
+            if o.sprite.is_some() {
+                self.sprite_ids.insert(id);
             }
             let geometry_changed = changed_triangles.contains(&id)
                 || changed_panels.contains(&id)
@@ -1154,6 +1329,17 @@ impl SceneManager {
                         || t.instance
                             .is_some_and(|(handle, _)| changed_variants.contains(&handle))
                 });
+            let prediction_reset = prediction_children.as_ref().is_some_and(|children| {
+                let eligible = (get(&f.triangles, id).is_some_and(|t| t.cuttable)
+                    || children.contains(&id))
+                    && !f.numeric_children.contains(&id)
+                    && !f.font_children.contains(&id)
+                    && !f.font_texts.contains(&id)
+                    && !f.font_owners.contains(&id)
+                    && !f.font_assets.contains(&id);
+                self.mirror_interpolation
+                    .sample(id, &o, eligible, geometry_changed)
+            });
             if let Some((parent, relative)) = spawn_seeds.get(&id) {
                 self.mirror_interpolation
                     .receive_spawn(id, parent, &mut o, *relative);
@@ -1162,7 +1348,7 @@ impl SceneManager {
                     id,
                     self.objects.get(&id),
                     &mut o,
-                    geometry_changed,
+                    geometry_changed || prediction_reset,
                 );
             }
             match self.objects.get_mut(&id) {
@@ -1172,6 +1358,7 @@ impl SceneManager {
                 }
             }
         }
+        self.sync_sprite_models();
         self.triangle_meshes
             .retain(|id, _| local_ids.contains(id) || has(&f.triangles, *id));
         self.variant_instances.retain(|id, _| {
@@ -1540,6 +1727,8 @@ mod tests {
         let bytes = WirePublisher::default().capture(&mut source).unwrap();
         for version in [1u32, 2, 3] {
             let mut legacy = bytes[..bytes.len() - 4].to_vec(); // Empty v4 lineage.
+                                                                // One cube, no asset tables: omit the v5 sprite-present byte.
+            legacy.remove(64 + 12 + 4 + 4 + 1 + 4);
             if version < 3 {
                 legacy.truncate(legacy.len() - 4);
             } // Empty font owners.
@@ -1882,6 +2071,130 @@ mod tests {
         assert!(mirror.apply_wire_publication(&first, &[]).is_err());
         mirror.apply_wire_publication(&second, &[]).unwrap();
         assert_eq!(mirror.wire_publication_sequence(), 2);
+    }
+    #[test]
+    fn binary_bound_panel_omits_fallback_but_preserves_glyphs_and_transitions() {
+        let mut worker = SceneManager::default();
+        let panel = worker.add_info_panel("countdown", 2., 0.6).unwrap();
+        worker.update_info_panel(panel, &[("", "1234567890".into())]);
+        let font = worker.builtin_font3d("pixel").unwrap();
+        worker.bind_info_panel_font3d(panel, font, "{}").unwrap();
+        let mut snapshots = RenderPublisher::default();
+        let mut snapshot = snapshots.capture(&mut worker);
+        assert!(!snapshot.font_children.is_empty());
+        assert!(!snapshot.panels[&panel].mesh.indices.is_empty());
+        // Compare identical glyph/object payloads with the former fallback encoding.
+        snapshot.panels.get_mut(&panel).unwrap().font3d_bound = false;
+        let fallback = WirePublisher::default()
+            .capture_publication(&snapshot)
+            .unwrap();
+        snapshot.panels.get_mut(&panel).unwrap().font3d_bound = true;
+        let mut publisher = WirePublisher::default();
+        let first = publisher.capture_publication(&snapshot).unwrap();
+        let decoded = decode(&first).unwrap();
+        let asset = &decoded.new_panels[&panel];
+        assert_eq!(asset.panel.kind, PanelKind::Countdown);
+        assert_eq!((asset.panel.width, asset.panel.height), (2., 0.6));
+        assert!(asset.panel.font3d_bound);
+        assert!(asset.panel.mesh.vertices.is_empty());
+        assert!(asset.panel.mesh.indices.is_empty());
+        assert_eq!(
+            asset.panel.mesh.bounds_min,
+            worker.info_panels[&panel].mesh.bounds_min
+        );
+        assert_eq!(
+            asset.panel.mesh.bounds_max,
+            worker.info_panels[&panel].mesh.bounds_max
+        );
+        #[cfg(any(target_arch = "wasm32", feature = "native-render"))]
+        assert!(asset.glow.is_none());
+        let fallback_geometry_bytes = worker.info_panels[&panel].mesh.vertices.len() * 36
+            + worker.info_panels[&panel].mesh.indices.len() * 4;
+        assert!(fallback.len() - first.len() >= fallback_geometry_bytes);
+        assert!(
+            first.len() * 4 < fallback.len(),
+            "bound={} fallback={}",
+            first.len(),
+            fallback.len()
+        );
+        eprintln!(
+            "bound panel wire: {} bytes vs {} fallback bytes",
+            first.len(),
+            fallback.len()
+        );
+        let mut mirror = SceneManager::default();
+        mirror.apply_wire_publication(&first, &[]).unwrap();
+        assert_bound_glyphs(&snapshot, &mirror);
+
+        // Revisions change while bound, but only authoritative glyphs need updates.
+        worker.update_info_panel(panel, &[("", "90".into())]);
+        let updated = snapshots.capture(&mut worker);
+        let update = publisher.capture_publication(&updated).unwrap();
+        assert!(decode(&update).unwrap().new_panels.is_empty());
+        mirror.apply_wire_publication(&update, &[]).unwrap();
+        assert_bound_glyphs(&updated, &mirror);
+        assert!(mirror.info_panels[&panel].mesh.indices.is_empty());
+        // A fresh publisher supplies all assets needed by a late joiner.
+        let mut late_joiner = SceneManager::default();
+        let late = WirePublisher::default()
+            .capture_publication(&updated)
+            .unwrap();
+        late_joiner.apply_wire_publication(&late, &[]).unwrap();
+        assert_bound_glyphs(&updated, &late_joiner);
+        assert!(late_joiner.info_panels[&panel].font3d_bound);
+
+        // Unbinding may keep the text revision unchanged; binding state must invalidate.
+        worker
+            .bind_info_panel_font3d(panel, INVALID_ID, "{}")
+            .unwrap();
+        let unbound = publisher.capture(&mut worker).unwrap();
+        assert_eq!(decode(&unbound).unwrap().new_panels.len(), 1);
+        mirror.apply_wire_publication(&unbound, &[]).unwrap();
+        assert!(!mirror.info_panels[&panel].font3d_bound);
+        assert!(mirror.render_publication.font_children.is_empty());
+        assert_mesh(
+            &worker.info_panels[&panel].mesh,
+            &mirror.info_panels[&panel].mesh,
+        );
+        worker.update_info_panel(panel, &[("", "7".into())]);
+        let changed = publisher.capture(&mut worker).unwrap();
+        assert_eq!(decode(&changed).unwrap().new_panels.len(), 1);
+        mirror.apply_wire_publication(&changed, &[]).unwrap();
+        assert_mesh(
+            &worker.info_panels[&panel].mesh,
+            &mirror.info_panels[&panel].mesh,
+        );
+        worker.bind_info_panel_font3d(panel, font, "{}").unwrap();
+        let rebound_snapshot = snapshots.capture(&mut worker);
+        let rebound = publisher.capture_publication(&rebound_snapshot).unwrap();
+        assert_eq!(decode(&rebound).unwrap().new_panels.len(), 1);
+        mirror.apply_wire_publication(&rebound, &[]).unwrap();
+        assert!(mirror.info_panels[&panel].font3d_bound);
+        assert!(mirror.info_panels[&panel].mesh.indices.is_empty());
+        assert_bound_glyphs(&rebound_snapshot, &mirror);
+    }
+    fn assert_bound_glyphs(snapshot: &RenderPublication, mirror: &SceneManager) {
+        assert!(!snapshot.font_children.is_empty());
+        assert_eq!(
+            mirror.render_publication.font_children,
+            snapshot.font_children
+        );
+        for id in &snapshot.font_children {
+            assert_eq!(mirror.objects[id].opacity, snapshot.objects[id].opacity);
+            assert!(mirror.objects[id].opacity > 0.);
+            assert!(mirror.objects[id].transform.scale.abs().min_element() > 0.);
+            assert_eq!(mirror.variant_instances[id], snapshot.instances[id]);
+            assert_eq!(
+                mirror.objects[id].transform.position,
+                snapshot.objects[id].transform.position
+            );
+            assert_mesh(
+                mirror
+                    .prepared_variant_mesh(snapshot.instances[id].0)
+                    .unwrap(),
+                &snapshot.prepared[&snapshot.instances[id].0].mesh,
+            );
+        }
     }
     #[test]
     fn binary_standalone_geometry_is_supplied_and_panel_revisions_are_incremental() {

@@ -2,6 +2,7 @@
 //! The engine owns physics and scene state; hosts provide input and asset bytes.
 pub mod content;
 pub mod game;
+mod initials;
 pub mod scores;
 
 pub use content::Content;

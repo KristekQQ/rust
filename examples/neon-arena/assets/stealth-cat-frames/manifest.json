@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "normal": [
+    "normal-00.png",
+    "normal-01.png",
+    "normal-02.png",
+    "normal-03.png",
+    "normal-04.png",
+    "normal-05.png",
+    "normal-06.png",
+    "normal-07.png",
+    "normal-08.png",
+    "normal-09.png",
+    "normal-10.png",
+    "normal-11.png",
+    "normal-12.png",
+    "normal-13.png",
+    "normal-14.png",
+    "normal-15.png",
+    "normal-16.png",
+    "normal-17.png",
+    "normal-18.png",
+    "normal-19.png",
+    "normal-20.png",
+    "normal-21.png",
+    "normal-22.png",
+    "normal-23.png",
+    "normal-24.png",
+    "normal-25.png",
+    "normal-26.png",
+    "normal-27.png",
+    "normal-28.png",
+    "normal-29.png",
+    "normal-30.png",
+    "normal-31.png"
+  ],
+  "close": [
+    "close-00.png",
+    "close-01.png",
+    "close-02.png",
+    "close-03.png",
+    "close-04.png",
+    "close-05.png"
+  ],
+  "carry": [
+    {
+      "source": "normal-00.png",
+      "size": 256
+    },
+    {
+      "source": "normal-04.png",
+      "size": 256
+    },
+    {
+      "source": "normal-16.png",
+      "size": 256
+    },
+    {
+      "source": "normal-17.png",
+      "size": 256
+    },
+    {
+      "source": "normal-20.png",
+      "size": 256
+    },
+    {
+      "source": "normal-21.png",
+      "size": 256
+    },
+    {
+      "source": "normal-08.png",
+      "size": 256
+    },
+    {
+      "source": "close-00.png",
+      "size": 256
+    }
+  ]
+}

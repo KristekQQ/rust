@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const source=path.join(root,'export-source');
-const output=path.join(root,'assets');
-globalThis.location={search:'',href:pathToFileURL(path.join(source,'examples/neon-arena/index.html')).href};
+const output=process.env.NEON_EXPORT_OUT?path.resolve(process.env.NEON_EXPORT_OUT):path.join(root,'assets');
+globalThis.location={search:process.env.NEON_EXPORT_QUERY??'',href:pathToFileURL(path.join(source,'examples/neon-arena/index.html')).href};
 const author=await import(pathToFileURL(path.join(source,'examples/neon-arena/scene.js')));
-const {planCue,validateRoundPlan}=await import(pathToFileURL(path.join(source,'examples/neon-arena/round-plan.js')));
+const {releasePlan,planCue,validateRoundPlan}=await import(pathToFileURL(path.join(source,'examples/neon-arena/round-plan.js')));
 const {planWave,validateWave}=await import(pathToFileURL(path.join(source,'examples/neon-arena/wave-plan.js')));
 const ops=[]; let next=1;
 const referenced=new Set();
@@ -24,7 +24,7 @@ class Handle {
  get exists(){return true;}
  get meshInfo(){return {scale:this.scale};}
 }
-for(const method of ['setPosition','setRotation','setScale','setEmission','setColorCutout','setOpacity','setRenderOptions','spin','setCutter','setBladePhysics','setCutAssist','setBladeContactResponse','setBladeTrail','setFont3D','bindComboIndicator','remove']){
+for(const method of ['configureSprite','setPosition','setRotation','setScale','setEmission','setColorCutout','setOpacity','setRenderOptions','spin','setCutter','setBladePhysics','setCutAssist','setBladeContactResponse','setBladeTrail','setFont3D','bindComboIndicator','remove']){
  Handle.prototype[method]=function(...args){if(method==='setScale')this.scale=args[0];ops.push({op:method,id:this.id,args});return this;};
 }
 const create=(kind,op,args)=>{const handle=new Handle(kind);ops.push({op,id:handle.id,args});return handle;};
@@ -53,10 +53,14 @@ const catalog=Object.entries(world.fruitPatterns).map(([name,patterns],index)=>{
  variants:patterns.map((fruit,variant)=>({variant,coverage:fruit.coverage,capColor:fruit.capColor}))};
 });
 const parse=async file=>JSON.parse(await readFile(path.join(source,'examples/neon-arena',file),'utf8'));
+// The packed PNG and its generated frame rectangles must ship together.
+const catSprite=ops.find(op=>op.op==='configureSprite' && op.id===world.stealthCat.id);
+assert.deepEqual(catSprite?.args[0].atlasBands, await parse('assets/stealth-cat-carry-bands.json'),
+ 'Cat sprite layout differs from the packed atlas');
 const preset=validateWave((await parse('wave-preset.json')).wave);
-const minutePlan=validateRoundPlan(await parse('minute-scene.json'));
+const minutePlan=releasePlan(validateRoundPlan(await parse('minute-scene.json')));
 const sourceHashes={};
-for(const file of ['scene.js','geometry.js','wave-plan.js','round-plan.js','minute-scene.json','wave-preset.json']){
+for(const file of ['scene.js','pet-hand.js','xp-drink.js','xp-print.js','bird-flight.js','cat-atlas.js','cabinet.js','debug-pillar.js','floor.js','geometry.js','wave-plan.js','round-plan.js','minute-scene.json','wave-preset.json']){
  const name=`examples/neon-arena/${file}`;sourceHashes[name]=createHash('sha256').update(await readFile(path.join(source,name))).digest('hex');
 }
 for(const name of ['examples/shared/vr-debug-panel.js','assets/fonts/cynatar/glyphs.json'])sourceHashes[name]=createHash('sha256').update(await readFile(path.join(source,name))).digest('hex');

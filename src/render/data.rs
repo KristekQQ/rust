@@ -1,11 +1,5 @@
+pub use crate::gltf_loader::ImportedVertex as Vertex;
 use wgpu::VertexBufferLayout;
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Vertex {
-    pub position: [f32; 3],
-    pub color: [f32; 3],
-    pub normal: [f32; 3],
-}
 
 impl Vertex {
     pub fn layout<'a>() -> VertexBufferLayout<'a> {

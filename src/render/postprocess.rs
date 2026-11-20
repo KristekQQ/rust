@@ -906,6 +906,24 @@ impl PostProcessor {
         self.last_pass_count = 0;
         self.ssr_work = [0.0; 2];
     }
+    #[cfg(debug_assertions)]
+    pub(crate) fn debug_ssr_rect(&self, view: RenderView) -> Option<[f32; 4]> {
+        if !self.ssr_enabled() {
+            return None;
+        }
+        let size = self.ssr_stats();
+        let (width, height) = (size[0] as u32, size[1] as u32);
+        if width == 0 || height == 0 {
+            return None;
+        }
+        let [x, y, w, h] = self.ssr_rect(view, width, height);
+        (w > 0 && h > 0).then_some([
+            x as f32 / width as f32,
+            y as f32 / height as f32,
+            (x + w) as f32 / width as f32,
+            (y + h) as f32 / height as f32,
+        ])
+    }
     fn ssr_rect(&self, view: RenderView, width: u32, height: u32) -> [u32; 4] {
         let full = [0, 0, width, height];
         let Some((min, max)) = self.ssr_region else {

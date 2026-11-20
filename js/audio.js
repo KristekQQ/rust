@@ -2,7 +2,7 @@
 const finite3=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
 const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
 export class AudioClip {
-    constructor(id,buffer,{gain=1,spatial=true}={}) {this.id=id;this.buffer=buffer;this.gain=gain;this.spatial=spatial;}
+    constructor(id,buffer,{gain=1,spatial=true,bus=null}={}) {this.id=id;this.buffer=buffer;this.gain=gain;this.spatial=spatial;this.bus=bus;}
 }
 export class AudioListener {
     constructor(context){this.context=context;}
@@ -17,7 +17,7 @@ export class AudioListener {
     setMatrix(matrix){if(matrix?.length===16&&Array.from(matrix).every(Number.isFinite))this.setPose([matrix[12],matrix[13],matrix[14]],[-matrix[8],-matrix[9],-matrix[10]],[matrix[4],matrix[5],matrix[6]]);}
 }
 export class AudioSource {
-    constructor(mixer,clip,{position=null,gain=1,pitch=1,priority=1,delay=0,loop=false,bus='effects'}={}){
+    constructor(mixer,clip,{position=null,gain=1,pitch=1,priority=1,delay=0,loop=false,bus=clip.bus??'effects'}={}){
         this.mixer=mixer;this.clip=clip;this.priority=priority;this.stopped=false;
         const context=mixer.context;this.node=context.createBufferSource();this.node.buffer=clip.buffer;
         this.node.playbackRate.value=clamp(pitch,.5,2);this.node.loop=loop;
@@ -52,7 +52,7 @@ export class AudioMixer {
             if(typeof item.id!=='string'||!/^[-\w]+\.wav$/.test(item.file))throw Error('Invalid sound asset');
             const reply=await fetch(new URL(item.file,manifestUrl));if(!reply.ok)throw Error(`Audio asset: ${reply.status}`);
             const buffer=await this.context.decodeAudioData(await reply.arrayBuffer());
-            if(!this.disposed)this.clips.set(item.id,new AudioClip(item.id,buffer,{spatial:item.spatial,gain:1}));
+            if(!this.disposed)this.clips.set(item.id,new AudioClip(item.id,buffer,{spatial:item.spatial,bus:item.bus,gain:1}));
         }));
     }
     resume(){return this.context.resume();}
@@ -86,7 +86,7 @@ export class AudioMixer {
             this.latest=event.id;
             const age=snapshot.clock-event.at+Math.max(0,Number.isFinite(transportAge)?transportAge:Infinity);
             if(age<-.001||age>maxAge){this.stats.expired++;continue;}
-            this.play(event.clip,{...event,delay:Math.max(0,delay-age),bus:event.position?'effects':'ui'});
+            this.play(event.clip,{...event,delay:Math.max(0,delay-age),bus:this.clips.get(event.clip)?.bus??(event.position?'effects':'ui')});
         }
         this.latest=snapshot.latest;
     }

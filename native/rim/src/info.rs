@@ -8,6 +8,7 @@ pub const OFFSET: Vec3 = Vec3::new(0.9, 0.35, -1.0);
 pub const WIDTH: f32 = 0.66;
 pub const HEIGHT: f32 = 0.40;
 pub struct Info {
+    offset: Vec3,
     pub panel: u32,
     pub enabled: bool,
     pub timing: FrameMetrics,
@@ -21,15 +22,17 @@ pub struct Info {
 impl Info {
     pub fn new(scene: &mut SceneManager, player: &mut XrPlayer) -> Result<Self, String> {
         let panel = scene.add_info_panel("diagnostics", WIDTH, HEIGHT)?;
-        Self::from_panel(scene, player, panel)
+        Self::from_panel(scene, player, panel, OFFSET)
     }
     pub fn from_panel(
         scene: &mut SceneManager,
         player: &mut XrPlayer,
         panel: u32,
+        offset: Vec3,
     ) -> Result<Self, String> {
-        player.bind_head_offset(scene, Some(panel), OFFSET, true)?;
+        player.bind_head_offset(scene, Some(panel), offset, true)?;
         Ok(Self {
+            offset,
             panel,
             enabled: true,
             timing: FrameMetrics::default(),
@@ -47,7 +50,7 @@ impl Info {
         player: &mut XrPlayer,
     ) -> Result<(), String> {
         let enabled = !self.enabled;
-        player.bind_head_offset(scene, enabled.then_some(self.panel), OFFSET, true)?;
+        player.bind_head_offset(scene, enabled.then_some(self.panel), self.offset, true)?;
         self.enabled = enabled;
         self.refresh_elapsed = 0.25;
         Ok(())

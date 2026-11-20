@@ -1,6 +1,21 @@
+import {createXpDrink} from './xp-drink.js';
+import {createPetHand} from './pet-hand.js';
+import {createBirdFlights} from './bird-flight.js';
+import {CAT_ATLAS_BANDS} from './cat-atlas.js';
+import {createArenaCabinet} from './cabinet.js';
+import {createArenaFloor} from './floor.js';
 import {VR_DEBUG_PANEL_WIDTH,VR_DEBUG_PANEL_HEIGHT} from '../shared/vr-debug-panel.js';
 export const ARENA_REVISION='cynatar-arena-51';
 import { swordGeometry, neonFrameGeometry, fruitGeometries, createFruitPatternCatalog, FRUIT_PATTERN_COUNT } from './geometry.js';
+/** @param {import('../../js/engine.js').Scene} scene */
+export async function createArenaCat(scene) {
+    const stealthCat=await scene.loadModel(new URL('./assets/stealth-cat.gltf',import.meta.url));
+    stealthCat.setPosition([3.3,.025,-2.15])
+        .setRenderOptions({castsShadow:false,receivesShadow:false,reflectivity:0})
+        .configureSprite({key:1,columns:8,rows:9,atlasBands:CAT_ATLAS_BANDS,arrivalPoseLead:.6,frames:8,fps:6,duration:24,startPause:2,
+            ambientInterval:24,cooldown:18,travel:[-3.15,0,1.67],travelControl:[-2.8,0,.05],combo:true,flipWithTravel:false,directionalView:{frames:8,frontStartFrame:32,frontObliqueStartFrame:40,sideStartFrame:0,rearObliqueStartFrame:48,rearStartFrame:56},endpointPause:12,idleStartFrame:8,idleFrames:8,idleFps:1.5,pettable:true,elevatedView:{startFrame:16,elevation:40,maxFrontPitch:25,pitch:65}});
+    return stealthCat;
+}
 export const NEON_GLOW=Object.freeze({strength:.4,radius:.045});
 // Behind the left shoulder (+Z): inspect by turning, keep forward gameplay clear.
 export const PAYTABLE_ORIGIN=/** @type {import('../../js/engine.d.ts').Vector3} */([-2.75,1.2,1.60]);
@@ -33,29 +48,7 @@ export function createFruitMesh(scene,fruit) {
  * @param {import('../../js/engine.js').Scene} scene */
 export async function createScene(scene) {
     scene.clear();
-    // One static draw for 80 individually bevelled tiles, with unreflective grout below.
-    const tilePositions=[],tileIndices=[],tileColors=[];
-    for(let row=0;row<10;row++)for(let col=0;col<8;col++){
-        const x=(col-3.5)*.75,z=1.875-row*.75,b=tilePositions.length/3;
-        for(const [half,y] of [[.363,0],[.371,-.012]])
-            tilePositions.push(x-half,y,z-half,x+half,y,z-half,x+half,y,z+half,x-half,y,z+half);
-        tileIndices.push(b,b+2,b+1,b,b+3,b+2);
-        const shade=(row+col)%2===0?[.052,.073,.10]:[.032,.047,.070];
-        tileColors.push(...shade,...shade);
-        for(let side=0;side<4;side++){
-            const next=(side+1)%4;
-            tileIndices.push(b+side,b+next,b+4+next,b+side,b+4+next,b+4+side);
-            tileColors.push(.021,.033,.047,.021,.033,.047);
-        }
-        tileIndices.push(b+4,b+5,b+6,b+4,b+6,b+7);
-        tileColors.push(.012,.018,.025,.012,.018,.025);
-    }
-    const floorTiles=scene.createMesh({positions:tilePositions,indices:tileIndices,triangleColors:tileColors})
-        .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false,reflectivity:.94});
-    const floorGrout=scene.createMesh({positions:[0,-.025].flatMap(y=>[-3,y,-5.25,3,y,-5.25,3,y,2.25,-3,y,2.25]),
-        indices:[0,2,1,0,3,2,4,5,6,4,6,7,0,1,5,0,5,4,1,2,6,1,6,5,2,3,7,2,7,6,3,0,4,3,4,7],color:[.006,.012,.020]})
-        .setPosition([0,-.025,0])
-        .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false});
+    const {floorTiles,floorGrout,floorMode,floorMetadata}=await createArenaFloor(scene);
     const {fruits,wild,variants:fruitPatterns}=createFruitPatternCatalog();
     const recipes=new WeakMap();
     fruitAssets.set(scene,recipes);
@@ -136,6 +129,8 @@ export async function createScene(scene) {
     // Existing preview/verification handles refer to the actual gallery fruit.
     const apples=fruits.map(fruit=>galleryIcons[catalog.indexOf(fruit)*3]);
     const previewPositions=fruits.map(fruit=>galleryPositions[catalog.indexOf(fruit)*3]);
+    const xpDrink=createXpDrink(scene);
+    const leftPetHand=createPetHand(scene,true), rightPetHand=createPetHand(scene,false);
     const blade = swordGeometry('right');
     const sword = scene.createMesh(blade).setPosition([0.45, 1.1, -0.2]).setEmission(1.4)
         .setCutter({base:[0,0,-0.1],tip:[0,0,-0.95]}).setBladePhysics({edge:[0,-1,0]}).setCutAssist(.35).setBladeContactResponse(true).setBladeTrail(true);
@@ -147,6 +142,10 @@ export async function createScene(scene) {
     const infoPanel = scene.createInfoPanel('diagnostics', {position:[100,-10000,100],width:VR_DEBUG_PANEL_WIDTH,height:VR_DEBUG_PANEL_HEIGHT});
     const timerPanel=scene.createInfoPanel('countdown',{position:[0,2.36,-2.15],width:1.18,height:.50})
         .setEmission(8).setRenderOptions({castsShadow:false,receivesShadow:false});
+    const arenaCabinet=await createArenaCabinet(scene);
+    const debugPillar=null; // Baked unlit column is part of the shared static environment asset.
+    const stealthCat=await createArenaCat(scene);
+    const birdFlights=await createBirdFlights(scene);
     const scorePanel=scene.createInfoPanel('score',{position:[0,1.90,-2.15],width:1.55,height:.25})
         .setEmission(4).setRenderOptions({castsShadow:false,receivesShadow:false});
     const scoreLabel=scene.createTextPanel({title:'SKORE',lines:[],position:[0,2.075,-2.15],width:.50,height:.10})
@@ -156,16 +155,16 @@ export async function createScene(scene) {
     // Fixed front-right scoreboard, clear of the central play lane.
     const scoreboardOrigin=/** @type {import('../../js/engine.d.ts').Vector3} */([1.6,1.6,-2.2]);
     const scoreboardYaw=Math.atan2(-scoreboardOrigin[0],-scoreboardOrigin[2]);
-    const scoreboardTitle=scene.createTextPanel({title:'NEJVYSSI SKORE',lines:[],
+    const scoreboardTitle=scene.createTextPanel({title:'TOP 10',lines:[],
         position:[scoreboardOrigin[0],scoreboardOrigin[1]+.59,scoreboardOrigin[2]],width:1.3,height:.15})
         .setRotation([0,scoreboardYaw,0]).setEmission(1.2)
         .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false});
     const scoreboardPanels=[scoreboardTitle];
     let scoreboardKey='';
-    /** Rebuild static text geometry only when the visible saved TOP5 changes.
+    /** Rebuild static text geometry only when the visible saved TOP10 changes.
      * @param {number[]} scores */
     const updateScoreboard=scores=>{
-        const top=scores.filter(score=>Number.isSafeInteger(score)&&score>=0).sort((a,b)=>b-a).slice(0,5);
+        const top=scores.filter(score=>Number.isSafeInteger(score)&&score>=0).sort((a,b)=>b-a).slice(0,10);
         const key=JSON.stringify(top);
         if(key===scoreboardKey)return;
         scoreboardKey=key;
@@ -173,7 +172,7 @@ export async function createScene(scene) {
         scoreboardPanels.splice(1).forEach(panel=>panel.remove());
         const labels=top.length?top.map((score,index)=>`${index+1}. ${score}`):['ZATIM BEZ SKORE'];
         labels.forEach((title,index)=>scoreboardPanels.push(scene.createTextPanel({title,lines:[],
-            position:[scoreboardOrigin[0],scoreboardOrigin[1]+.34-index*.22,scoreboardOrigin[2]],width:1.22,height:.16})
+            position:[scoreboardOrigin[0],scoreboardOrigin[1]+.34-index*.15,scoreboardOrigin[2]],width:1.22,height:.16})
             .setRotation([0,scoreboardYaw,0]).setScale(facing).setEmission(.9)
             .setRenderOptions({isStatic:true,castsShadow:false,receivesShadow:false})));
     };
@@ -191,17 +190,16 @@ export async function createScene(scene) {
     const logo = scene.createTextPanel({title:'APOLLO GAMES',lines:[],position:onBoard(0,3.11,-.158),width:2.20,height:.65}).setRotation([boardTilt,PAYTABLE_YAW,0]);
     const phasePanels=[['VOLBA','VYBER DRAZSI TROJICI'],['DOKONCI','DVA TED - TRETI ZA CHVILI'],['PRESNOST','MALY CIL - VELKA ODMENA'],['NACASOVANI','POCKEJ NA SROVNANI'],['SERIE','DRZ SVOJE DVA DRUHY'],['FINALE','DRZ DRUH A DOKONCI TROJICI']].map(([title,hint])=>({title,object:scene.createTextPanel({title,lines:[hint],position:[100,100,100],width:1.7,height:.23})
         .setEmission(2).setRenderOptions({castsShadow:false,receivesShadow:false})}));
-    const restartButton = scene.createTextPanel({title:'START',lines:[],position:RESTART_POSITION,width:.50,height:.22})
+    const restartButton = scene.createTextPanel({title:'RESTART',lines:[],position:[100,-10000,100],width:.50,height:.22})
         .setRotation([0,-Math.atan2(RESTART_POSITION[0],-RESTART_POSITION[2]),0]);
     /** @type {import("../../js/engine.d.ts").TriangleMeshOptions} */
     const pointerGeometry={positions:[0,1,0,0,-1,0,-1,0,0,1,0,0,0,0,1,0,0,-1],
         indices:[0,4,3,0,3,5,0,5,2,0,2,4,1,3,4,1,5,3,1,2,5,1,4,2],color:[.15,1,.35]};
     const pointers = ['left','right'].map(()=>scene.createMesh(pointerGeometry).setPosition([100,100,100]).setScale([.012,.012,.012])
         .setRenderOptions({castsShadow:false,receivesShadow:false}));
-    // Shared launch glints: presentation only, with no projectile/collider proxy.
-    const launchGlintAssets=[[.15,1,.75],[1,.25,.65],[1,.8,.2]].map(color=>scene.createMeshVariants({
-        positions:pointerGeometry.positions,indices:pointerGeometry.indices,
-        variants:[Array.from({length:8},()=>color).flat()]}));
+    // No launch streaks beneath fruit; keep the shared native reference empty.
+    /** @type {import('../../js/engine.d.ts').MeshVariants[]} */
+    const launchGlintAssets=[];
     const cynatar=await scene.loadFont3D(new URL('../../assets/fonts/cynatar/glyphs.json',import.meta.url));
     const fontPanels=[timerPanel,scorePanel,awardPanels[2],...stockScorePanels];
     /** @type {'cynatar'|'neon'} */
@@ -229,7 +227,7 @@ export async function createScene(scene) {
         }).catch(error=>{decorationsPromise=undefined;throw error;});
         return decorationsPromise;
     };
-    return {arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,scoreboardPanels,updateScoreboard,floorTiles, floorGrout, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, geometry, get scoreDisplay(){return scoreDisplay;}, loadDecorations, get decorationsReady(){return scoreDisplay!==null;}, logo, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
+    return {arenaCabinet,debugPillar,xpDrink,stealthCat,birdFlights,arenaFont,stockScorePanels,launchGlintAssets,phasePanels,scoreLabel,timerPanel,currentLabel,awardPanels,comboDisplay,scoreboardPanels,updateScoreboard,floorTiles, floorGrout, floorMode, floorMetadata, apples, fruits, playFruits, fruitPatterns, nextFruitVariant, previewPositions, sword, leftSword, leftPetHand, rightPetHand, geometry, get scoreDisplay(){return scoreDisplay;}, loadDecorations, get decorationsReady(){return scoreDisplay!==null;}, logo, infoPanel, scorePanel, comboRules, wild, boardTilt, galleryEarnedFrames, galleryRows, galleryIcons, galleryPatterns, galleryLabels, galleryFrames, galleryPositions, restartButton, pointers};
 }
 
 // Points per completed triple; adapted ranking, not the slot's cash payouts.

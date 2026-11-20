@@ -1,3 +1,4 @@
+struct SpriteAtlasBand { frames:vec4<u32>, rect:vec4<f32>, tiles:vec4<u32> };
 struct Light {
     position: vec3<f32>,
     _pad_p: f32,
@@ -176,7 +177,7 @@ fn shadow_visibility(index:u32,world:vec3<f32>,normal:vec3<f32>,light_direction:
 }
 
 
-struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4<u32>, extra:vec4<f32>, options:vec4<f32>, model:mat4x4<f32>, normal:mat4x4<f32>, transform:vec4<f32> };
+struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4<u32>, extra:vec4<f32>, options:vec4<f32>, model:mat4x4<f32>, normal:mat4x4<f32>, transform:vec4<f32>, sprite:vec4<f32>, billboard_camera:vec4<f32>, sprite_view:vec4<f32>, sprite_direction0:vec4<f32>, sprite_direction1:vec4<f32>, sprite_atlas:array<SpriteAtlasBand,8> };
 @group(3) @binding(0) var<uniform> material:Material;
 @group(2) @binding(0) var base_map:texture_2d<f32>;
 @group(2) @binding(1) var base_sampler:sampler;
@@ -189,7 +190,7 @@ struct Material { base:vec4<f32>, emissive:vec4<f32>, factors:vec4<f32>, uv:vec4
 @group(2) @binding(8) var emissive_map:texture_2d<f32>;
 @group(2) @binding(9) var emissive_sampler:sampler;
 struct Input { @location(0) position:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32> };
-struct Output { @builtin(position) pos:vec4<f32>, @location(0) world:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32> };
+struct Output { @builtin(position) pos:vec4<f32>, @location(0) world:vec3<f32>, @location(1) normal:vec3<f32>, @location(2) tangent:vec4<f32>, @location(3) uv0:vec2<f32>, @location(4) uv1:vec2<f32>, @location(5) uv2:vec2<f32>, @location(6) uv3:vec2<f32>, @location(7) uv4:vec2<f32>, @location(8) color:vec4<f32>, @location(9) @interpolate(flat) sprite_frame:f32, @location(10) @interpolate(flat) sprite_mirror:f32, @location(11) @interpolate(flat) sprite_region:vec4<f32> };
 // CPU-deformed draws retain the existing world-space path.
 fn transform_unit(v:vec3<f32>)->vec3<f32> {
     let length_squared=dot(v,v);
@@ -202,6 +203,9 @@ fn transform_unit(v:vec3<f32>)->vec3<f32> {
 }
 @vertex fn vs_main(v:Input)->Output {
     var o:Output;
+    o.sprite_frame=material.sprite.z;
+    o.sprite_mirror=material.transform.x;
+    o.sprite_region=vec4(0.0,0.0,1.0,1.0);
     var local_position=v.position; var local_normal=v.normal; var local_tangent=v.tangent;
     // GPU_SKIN_VERTEX
     o.world=local_position; o.normal=local_normal; o.tangent=local_tangent;
@@ -209,6 +213,97 @@ fn transform_unit(v:vec3<f32>)->vec3<f32> {
         o.world=(material.model*vec4(local_position,1.0)).xyz;
         o.normal=transform_unit((material.normal*vec4(local_normal,0.0)).xyz);
         o.tangent=vec4(transform_unit((material.model*vec4(local_tangent.xyz,0.0)).xyz),local_tangent.w*material.transform.x);
+    }
+    if(material.sprite.x>0.0) {
+        let center=material.model[3].xyz;
+        let camera=select(scene.camera_pos,material.billboard_camera.xyz,material.billboard_camera.w>0.5);
+        // The shared XR head position keeps one world-space plane for both eyes.
+        // Rotate about the authored foot anchor (local y=0), including pitch.
+        let delta=camera-center;
+        let distance=length(delta);
+        let facing=select(vec3(0.0,0.0,1.0),delta/max(distance,0.00001),distance>0.00001);
+        let directional=material.sprite_direction0.x>0.0 && material.sprite.z<material.sprite_direction0.x;
+        let heading_raw=vec3(material.model[2].x,0.0,material.model[2].z);
+        let heading=select(vec3(0.0,0.0,1.0),heading_raw/max(length(heading_raw),0.00001),length(heading_raw)>0.00001);
+        let heading_right=vec3(heading.z,0.0,-heading.x);
+        let pole_right=select(vec3(1.0,0.0,0.0),-heading_right,directional);
+        let horizontal=vec3(facing.z,0.0,-facing.x);
+        let horizontal_length=length(horizontal);
+        // At the vertical pole world-up cannot define a right vector. A fixed
+        // world-X fallback is finite and identical for both eyes, even overhead.
+        var right=select(pole_right,horizontal/max(horizontal_length,0.00001),horizontal_length>0.00001);
+        var basis_facing=facing;
+        let elevation=asin(clamp(facing.y,-1.0,1.0));
+        let below=material.sprite_view.x>0.0 && material.sprite_view.y<0.0 && elevation<=material.sprite_view.y;
+        if(below) {
+            // Underside overrides azimuth; retain the authoritative wing phase.
+            o.sprite_frame=material.sprite.z+material.sprite_view.x;
+            o.sprite_mirror=1.0;
+            // Continue towards vertical under the bird; a fixed pitch would
+            // flip its horizontal normal as the viewer crosses the flight path.
+            let pitch=min(elevation,material.sprite_view.w);
+            basis_facing=cross(right,vec3(0.0,1.0,0.0))*cos(pitch)+vec3(0.0,1.0,0.0)*sin(pitch);
+            // Belly artwork points up along flight, including directly below.
+            // Selected negative elevations keep heading away from this normal.
+            let flight_up=normalize(heading-basis_facing*dot(heading,basis_facing));
+            right=normalize(cross(flight_up,basis_facing));
+        } else if(directional) {
+            // Select a camera-relative walking band once per vertex. Exact
+            // overhead has no azimuth: use finite heading-based rear fallback.
+            let to_camera_raw=vec3(delta.x,0.0,delta.z);
+            let to_camera=select(-heading,to_camera_raw/max(length(to_camera_raw),0.00001),length(to_camera_raw)>0.00001);
+            let azimuth=atan2(dot(to_camera,heading_right),dot(to_camera,heading));
+            let sector=u32(floor(abs(azimuth)/0.78539816339+0.5));
+            var start=material.sprite_direction0.y;
+            if(sector==1u) { start=material.sprite_direction0.z; }
+            if(sector==2u) { start=material.sprite_direction0.w; }
+            if(sector==3u) { start=material.sprite_direction1.x; }
+            if(sector>=4u) { start=material.sprite_direction1.y; }
+            o.sprite_frame=material.sprite.z+start;
+            o.sprite_mirror=select(1.0,-1.0,azimuth>0.0 && sector>0u && sector<4u);
+            let pitch=clamp(asin(clamp(facing.y,-1.0,1.0)),-1.1344640138,1.1344640138);
+            basis_facing=cross(right,vec3(0.0,1.0,0.0))*cos(pitch)+vec3(0.0,1.0,0.0)*sin(pitch);
+        } else if(material.sprite_view.x>0.0) {
+            let elevated=material.sprite_view.y>0.0 && elevation>=material.sprite_view.y;
+            // Top-down idle art stays aligned with the incoming walking direction.
+            // Moving the viewer across the foot anchor must not spin the resting pose.
+            if(elevated && material.sprite_direction0.x>0.0) { right=heading_right; }
+            o.sprite_frame+=select(0.0,material.sprite_view.x,elevated);
+            let pitch=select(clamp(elevation,-material.sprite_view.z,material.sprite_view.z),material.sprite_view.w,elevated);
+            basis_facing=cross(right,vec3(0.0,1.0,0.0))*cos(pitch)+vec3(0.0,1.0,0.0)*sin(pitch);
+        }
+        if((material.sprite_atlas[0].tiles.w&0xfe000000u)==0xba000000u) {
+            // Fragments retain the authoritative hit plane for every observer.
+            right=normalize(material.model[0].xyz)*material.transform.x;
+            basis_facing=normalize(material.model[2].xyz);
+        }
+        let up=cross(basis_facing,right);
+        o.world=center+right*(local_position.x*length(material.model[0].xyz))+up*(local_position.y*length(material.model[1].xyz))+basis_facing*(local_position.z*length(material.model[2].xyz));
+        o.normal=basis_facing;
+        if((material.sprite_atlas[0].tiles.w & 0x00400000u)!=0u) {
+            let selected=u32(o.sprite_frame);
+            if(selected<8u) { o.sprite_frame=f32(64u+selected%2u); }
+            else if(selected<16u) { o.sprite_frame=70.0; }
+            else if(selected<32u) { o.sprite_frame=71.0; }
+            else if(selected<40u) { o.sprite_frame=f32(66u+selected%2u); }
+            else if(selected<48u) { o.sprite_frame=f32(68u+selected%2u); }
+        }
+        let grid=material.sprite.xy;
+        o.sprite_region=vec4(vec2(o.sprite_frame%grid.x,floor(o.sprite_frame/grid.x))/grid,vec2(1.0)/grid);
+        if(material.sprite_atlas[0].frames.y>0u) {
+            let frame=u32(o.sprite_frame);
+            for(var i=0u;i<8u;i++) {
+                let band=material.sprite_atlas[i];
+                if(band.frames.y>0u && frame>=band.frames.x && frame-band.frames.x<band.frames.y) {
+                    let index=(frame-band.frames.x)%max(band.frames.z,1u);
+                    var tile_offset=index;
+                    if(band.tiles.y>0u) { tile_offset=(band.tiles.z>>(index*4u))&15u; }
+                    let tile=band.frames.w+tile_offset;
+                    o.sprite_region=vec4(band.rect.xy+vec2<f32>(f32(tile%max(band.tiles.x,1u)),f32(tile/max(band.tiles.x,1u)))*band.rect.zw,band.rect.zw);
+                    break;
+                }
+            }
+        }
     }
     o.pos=scene.view_projection*vec4(o.world,1.0);
     o.uv0=v.uv0; o.uv1=v.uv1; o.uv2=v.uv2; o.uv3=v.uv3; o.uv4=v.uv4; o.color=v.color;
@@ -218,12 +313,31 @@ fn uv(v:Output,index:u32)->vec2<f32> { return select(v.uv0,v.uv1,index==1u); }
 fn linear_color(c:vec3<f32>)->vec3<f32> { return select(c/12.92,pow((c+vec3(0.055))/1.055,vec3(2.4)),c>vec3(0.04045)); }
 // Rust specializes these sample expressions by actual map presence. Keep the
 // fallback normal decoder and complete derivative/TBN path in surface unchanged.
-fn sample_base(uv:vec2<f32>)->vec4<f32> { return textureSample(base_map,base_sampler,uv); }
+fn sample_base(uv:vec2<f32>,frame:f32,mirror:f32,region:vec4<f32>)->vec4<f32> {
+    var atlas_uv=uv;
+    if(material.sprite.x>0.0) {
+        let inset=vec2(0.5)/(vec2<f32>(textureDimensions(base_map))*region.zw);
+        // Billboard geometry deliberately uses absolute scale; preserve root mirroring in UVs.
+        let sprite_uv=vec2(select(uv.x,1.0-uv.x,mirror<0.0),uv.y);
+        atlas_uv=region.xy+clamp(sprite_uv,inset,vec2(1.0)-inset)*region.zw;
+    }
+    let texel=textureSample(base_map,base_sampler,atlas_uv);
+    let clip=material.sprite_atlas[0].tiles.w;
+    if(material.sprite.x>0.0 && (clip&0xfe000000u)==0xba000000u) {
+        // Clip geometry UVs, independently of the frozen artwork's mirror flag.
+        let angle=f32(clip&4095u)*(6.28318530718/4096.0);
+        let offset=(f32((clip>>12u)&4095u)-2048.0)/2047.0;
+        let distance=dot(vec2(cos(angle),sin(angle)),uv-vec2(0.5))-offset;
+        let positive=(clip&0x01000000u)!=0u;
+        if(select(distance>0.0,distance<=0.0,positive)) { discard; }
+    }
+    return texel;
+}
 fn sample_mr(uv:vec2<f32>)->vec4<f32> { return textureSample(mr_map,mr_sampler,uv); }
 fn sample_normal(uv:vec2<f32>)->vec4<f32> { return textureSample(normal_map,normal_sampler,uv); }
 fn sample_ao(uv:vec2<f32>)->vec4<f32> { return textureSample(ao_map,ao_sampler,uv); }
 fn sample_emissive(uv:vec2<f32>)->vec4<f32> { return textureSample(emissive_map,emissive_sampler,uv); }
-fn base_color(v:Output)->vec4<f32> { let t=sample_base(v.uv0); return t*material.base*v.color; }
+fn base_color(v:Output)->vec4<f32> { let t=sample_base(v.uv0,v.sprite_frame,v.sprite_mirror,v.sprite_region); return t*material.base*v.color; }
 fn alpha_test(alpha:f32) { if(material.extra.y==1.0 && alpha<material.extra.x) { discard; } }
 // Only the opaque, unclipped color variant omits this call. Shadow alpha tests
 // remain separate so their material coverage is never specialized away.
@@ -233,9 +347,27 @@ fn surface_alpha_clip(v:Output,alpha:f32) {
 }
 fn unit(v:vec3<f32>)->vec3<f32> { return v*inverseSqrt(max(dot(v,v),0.000000000001)); }
 fn surface(v:Output,front:bool)->vec4<f32> {
+    let base=base_color(v);
+    // Standard unlit uses base color only. Its uniform branch skips PBR work;
+    // line/point mode 1 retains the existing base-plus-emission behavior below.
+    // Opt-in bounded source glare: depth-tested geometry, no screen-space pass.
+    if(material.extra.w==3.0) {
+        let facing=max(0.0,dot(unit(v.normal),unit(scene.camera_pos-v.world)));
+        let alignment=smoothstep(0.80,0.985,facing);
+        let r=length(v.uv0*2.0-vec2(1.0));
+        let halo=pow(max(0.0,1.0-r),2.0);
+        let core=1.0-smoothstep(0.04,0.30,r);
+        let alpha=clamp(base.a*alignment*(halo*0.85+core*0.65),0.0,0.96);
+        surface_alpha_clip(v,alpha);
+        return vec4(appearance_color(base.rgb*2.5,1.0/v.pos.w),alpha);
+    }
+    if(material.extra.w==2.0) {
+        surface_alpha_clip(v,base.a);
+        return vec4(appearance_color(base.rgb,1.0/v.pos.w),base.a);
+    }
     let normal_variation=max(abs(dpdx(unit(v.normal))),abs(dpdy(unit(v.normal))));
     let p1=dpdx(v.world); let p2=dpdy(v.world); let u1=dpdx(v.uv2); let u2=dpdy(v.uv2);
-    let base=base_color(v); let emission=sample_emissive(v.uv4).rgb*material.emissive.rgb;
+    let emission=sample_emissive(v.uv4).rgb*material.emissive.rgb;
     surface_alpha_clip(v,base.a);
     if(material.extra.w>0.5) { return vec4(appearance_color(base.rgb+emission,1.0/v.pos.w),base.a); }
     var n=unit(v.normal); let view=unit(scene.camera_pos-v.world);

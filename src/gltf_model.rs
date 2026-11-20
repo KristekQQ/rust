@@ -86,6 +86,9 @@ pub struct ModelMaterial {
     pub alpha_mode: AlphaMode,
     pub alpha_cutoff: f32,
     pub double_sided: bool,
+    pub unlit: bool,
+    /// Opt-in local camera-angle glare; authored through material extras.
+    pub view_glare: bool,
 }
 #[derive(Clone, Debug)]
 pub struct ModelImage {

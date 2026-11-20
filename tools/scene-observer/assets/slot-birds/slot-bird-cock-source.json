@@ -1,0 +1,28 @@
+{
+  "species": "cock",
+  "sourceUrls": {
+    "cock_anim.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/cock_anim.plist?v=i81fko&b=rc-26.07",
+    "cock_anim.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/cock_anim.png?v=cyx4x7&b=rc-26.07"
+  },
+  "frames": [
+    "cock_BASE_01.png",
+    "cock_BASE_03.png",
+    "cock_BASE_05.png",
+    "cock_BASE_07.png",
+    "cock_BASE_09.png",
+    "cock_BASE_11.png",
+    "cock_BASE_13.png",
+    "cock_BASE_15.png",
+    "cock_BASE_17.png",
+    "cock_BASE_19.png",
+    "cock_BASE_21.png",
+    "cock_BASE_23.png",
+    "cock_BASE_25.png",
+    "cock_BASE_27.png",
+    "cock_BASE_29.png",
+    "cock_BASE_31.png"
+  ],
+  "sourceAnimation": "BASE (gliding presentation, not authored flying cycle)",
+  "processing": "plist trim reconstruction, 16 evenly sampled base poses, 192px cells",
+  "sourceSha256": "904f7b33b717e1d28c416c2608214ebd19fa9821fd32b670ee1b7c811cee88e1"
+}

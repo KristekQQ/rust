@@ -135,6 +135,30 @@ impl NeonSimulation {
             .restore_scores(&mut self.scene, &scores)
             .map_err(error)
     }
+    pub fn restore_leaderboard(&mut self, json: &str) -> Result<(), JsValue> {
+        let entries: Vec<neon_core::scores::Entry> =
+            serde_json::from_str(json).map_err(|e| error(e.to_string()))?;
+        if entries.len() > 10 {
+            return Err(error("Invalid saved leaderboard"));
+        }
+        self.game
+            .restore_leaderboard(&mut self.scene, entries)
+            .map_err(error)
+    }
+    /// An HTTP reply may be older than input batches already processed by this worker.
+    pub fn restore_leaderboard_if_current(
+        &mut self,
+        json: &str,
+        expected_sequence: u32,
+    ) -> Result<(), JsValue> {
+        let state = self.game.state();
+        if state["scoreEntrySequence"].as_u64() != Some(u64::from(expected_sequence))
+            || state["scoreEntryPending"].as_bool() != Some(false)
+        {
+            return Ok(());
+        }
+        self.restore_leaderboard(json)
+    }
     pub fn state(&self) -> String {
         self.game.state().to_string()
     }

@@ -7,11 +7,12 @@ const MAX_INDICES: usize = 3_000_000;
 const MAX_BYTES: usize = 128 * 1024 * 1024;
 const MAX_NODES: usize = 100_000;
 
-#[derive(Clone, Debug)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ImportedVertex {
     pub position: [f32; 3],
-    pub normal: [f32; 3],
     pub color: [f32; 3],
+    pub normal: [f32; 3],
 }
 #[derive(Clone, Debug)]
 pub struct ImportedMesh {
@@ -27,7 +28,10 @@ fn document(bytes: &[u8]) -> Result<gltf::Gltf, String> {
         return Err("glTF exceeds the 128 MiB input limit".into());
     }
     let gltf = gltf::Gltf::from_slice(bytes).map_err(|e| format!("Invalid glTF: {e}"))?;
-    if let Some(extension) = gltf.extensions_required().next() {
+    if let Some(extension) = gltf
+        .extensions_required()
+        .find(|name| *name != "KHR_materials_unlit")
+    {
         return Err(format!(
             "Required glTF extension is unsupported: {extension}"
         ));
@@ -764,7 +768,10 @@ fn core_document(bytes: &[u8]) -> Result<gltf::Gltf, String> {
         return Err("glTF exceeds the 128 MiB input limit".into());
     }
     let doc = gltf::Gltf::from_slice(bytes).map_err(|e| format!("Invalid glTF: {e}"))?;
-    if let Some(extension) = doc.extensions_required().next() {
+    if let Some(extension) = doc
+        .extensions_required()
+        .find(|name| *name != "KHR_materials_unlit")
+    {
         return Err(format!("Required glTF extension unsupported: {extension}"));
     }
     if doc.nodes().count() > MAX_NODES
@@ -945,7 +952,10 @@ pub fn parse_model(
         cameras: vec![],
         warnings: vec![],
     };
-    for extension in gltf.extensions_used() {
+    for extension in gltf
+        .extensions_used()
+        .filter(|name| *name != "KHR_materials_unlit")
+    {
         asset.warnings.push(format!(
             "Optional extension {extension} ignored; using glTF core fallback"
         ));
@@ -982,6 +992,16 @@ pub fn parse_model(
             },
             alpha_cutoff: material.alpha_cutoff().unwrap_or(0.5),
             double_sided: material.double_sided(),
+            unlit: material.unlit(),
+            view_glare: material.unlit()
+                && material.alpha_mode() == gltf::material::AlphaMode::Blend
+                && material
+                    .extras()
+                    .as_ref()
+                    .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw.get()).ok())
+                    .is_some_and(|value| {
+                        value.get("viewGlare").and_then(|v| v.as_bool()) == Some(true)
+                    }),
         };
         let factors = m
             .base_color_factor
@@ -1857,6 +1877,50 @@ mod core_tests {
         doc["buffers"][0]["byteLength"] = json!(bytes.len());
         parse_model(&serde_json::to_vec(&doc).unwrap(), &[bytes], &images)
     }
+    #[test]
+    fn local_view_glare_requires_explicit_unlit_blended_material() {
+        let (mut doc, bytes) = fixture();
+        doc["extensionsUsed"] = json!(["KHR_materials_unlit"]);
+        doc["materials"] = json!([
+            {"extras":{"viewGlare":true},"extensions":{"KHR_materials_unlit":{}},"alphaMode":"BLEND"},
+            {"extras":{"viewGlare":true},"alphaMode":"BLEND"},
+            {"extras":{"viewGlare":true},"extensions":{"KHR_materials_unlit":{}}}
+        ]);
+        let asset = parse_fixture(doc, bytes, vec![]).unwrap();
+        assert!(asset.materials[0].view_glare);
+        assert!(!asset.materials[1].view_glare);
+        assert!(!asset.materials[2].view_glare);
+    }
+    #[test]
+    fn standard_unlit_material_and_required_extension_are_supported() {
+        let (mut doc, bytes) = fixture();
+        doc["materials"] = json!([
+            {"extensions":{"KHR_materials_unlit":{}},
+             "pbrMetallicRoughness":{"baseColorFactor":[0.1,0.2,0.3,0.4]},
+             "emissiveFactor":[0.9,0.8,0.7],"alphaMode":"BLEND"},
+            {"pbrMetallicRoughness":{"baseColorFactor":[0.5,0.6,0.7,1.0]}}
+        ]);
+        doc["meshes"][0]["primitives"][0]["material"] = json!(0);
+        doc["extensionsUsed"] = json!(["KHR_materials_unlit"]);
+        doc["extensionsRequired"] = json!(["KHR_materials_unlit"]);
+        let encoded = serde_json::to_vec(&doc).unwrap();
+        assert!(buffer_uris(&encoded).is_ok());
+        assert!(resource_uris(&encoded).is_ok());
+        let asset = parse_fixture(doc.clone(), bytes.clone(), vec![]).unwrap();
+        assert!(asset.materials[0].unlit);
+        assert!(!asset.materials[1].unlit);
+        assert_eq!(asset.materials[0].base_color_factor, [0.1, 0.2, 0.3, 0.4]);
+        assert_eq!(asset.materials[0].emissive_factor, [0.9, 0.8, 0.7]);
+        assert_eq!(asset.materials[0].alpha_mode, AlphaMode::Blend);
+        assert!(asset.warnings.is_empty());
+        doc["extensionsRequired"] = json!(["KHR_materials_unlit", "UNKNOWN_required"]);
+        doc["extensionsUsed"] = json!(["KHR_materials_unlit", "UNKNOWN_required"]);
+        let encoded = serde_json::to_vec(&doc).unwrap();
+        assert!(buffer_uris(&encoded).is_err());
+        assert!(resource_uris(&encoded).is_err());
+        assert!(parse_fixture(doc, bytes, vec![]).is_err());
+    }
+
     #[test]
     fn shared_morph_weights_and_invalid_pose_lengths_are_rejected() {
         let (doc, bytes) = fixture();

@@ -2,6 +2,7 @@ import net from 'node:net';
 import {timingSafeEqual} from 'node:crypto';
 import {WireCache,CACHE_LIMIT} from './protocol.mjs';
 import {decodeByteDelta,isByteDelta} from './byte-delta.mjs';
+import {unwrapNativePacket} from './native-compression.mjs';
 
 /** Authenticated, ordered generic scene ingress. One publisher, one ACK in flight. */
 export async function createNativeSceneBridge({port=8793,host='0.0.0.0',token,initialSnapshot=null,onFrame=()=>{}}={}){
@@ -37,11 +38,12 @@ export async function createNativeSceneBridge({port=8793,host='0.0.0.0',token,in
           if(session!==null&&session!==meta.session)throw Error('Session changed within scene stream');
           session=meta.session;
           // All native deltas are ingested in order; per-browser snapshots can coalesce.
-          const payload=new Uint8Array(pending.subarray(8+jsonLength,size));
+          const transportPayload=new Uint8Array(pending.subarray(8+jsonLength,size));
+          const payload=unwrapNativePacket(transportPayload,CACHE_LIMIT);
           let raw=payload;
           if(isByteDelta(payload)){deltaBase=decodeByteDelta(deltaBase,payload,{maxBytes:CACHE_LIMIT});raw=deltaBase.bytes;counters[payload[4]?'deltaFrames':'fullFrames']++;}
           else{if(payload.length<68)throw Error('Truncated native wire');if(deltaBase)throw Error('Native transport encoding changed');counters.fullFrames++;}
-          cache.ingest(raw);counters.receivedBytes+=payload.length;counters.rawBytes+=raw.length;
+          cache.ingest(raw);counters.receivedBytes+=transportPayload.length;counters.rawBytes+=raw.length;
           pending=pending.subarray(size);latest={...meta,mode:'live'};everSnapshot=true;counters.accepted++;
           onFrame(latest,cache);socket.write(Buffer.from([1]));
         }

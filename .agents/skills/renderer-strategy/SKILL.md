@@ -78,6 +78,11 @@ include its cost and retained memory in the experiment rather than hiding it.
 For resource/pass invariants use [frame-pipeline](../frame-pipeline/SKILL.md);
 for direct Quest XR support use [quest-webgpu-xr](../quest-webgpu-xr/SKILL.md).
 
+## Animated cards and short-lived overlays
+
+- Treat shared texture identity and per-instance presentation state separately. The [glTF queue](../../../src/render/gltf_gpu.rs) breaks sprite batches where a single draw uniform would lose each card's frame, mirroring, atlas region or cut side. To batch a flock, first supply those values per instance; test two copies of the same asset with different frames and opposite cut sides in the same view. Check the shader permutations with and without a base map as well as actual pixels.
+- For a localized temporary visor effect, [Neon's splat pass](../../../src/render/visor_splat.rs) uses four bounded quads in one draw per rendered view. The [XR caller](../../../native/neon/src/app.rs) encodes the pass only while the timer is active. Consider this for local overlays when their appearance can be produced without sampling scene color. Measure active fill cost, including overlap, and check inactive frames for a redundant pass.
+
 ## Learn, prove and generalize
 
 Use relevant techniques from other renderers, including Three.js, as normal

@@ -1,0 +1,28 @@
+{
+  "species": "duck",
+  "sourceUrls": {
+    "duck_anim.plist": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/duck_anim.plist?v=uer55b&b=rc-26.07",
+    "duck_anim.png": "https://czapl0-prod.apollogames.com/casino-games/SlotBirds/res/gfx/gameResources/_bitmaps/duck_anim.png?v=g181hj&b=rc-26.07"
+  },
+  "frames": [
+    "duck_BASE_01.png",
+    "duck_BASE_02.png",
+    "duck_BASE_04.png",
+    "duck_BASE_06.png",
+    "duck_BASE_08.png",
+    "duck_BASE_10.png",
+    "duck_BASE_12.png",
+    "duck_BASE_14.png",
+    "duck_BASE_16.png",
+    "duck_BASE_17.png",
+    "duck_BASE_19.png",
+    "duck_BASE_21.png",
+    "duck_BASE_23.png",
+    "duck_BASE_25.png",
+    "duck_BASE_27.png",
+    "duck_BASE_29.png"
+  ],
+  "sourceAnimation": "BASE (gliding presentation, not authored flying cycle)",
+  "processing": "plist trim reconstruction, 16 evenly sampled base poses, 192px cells",
+  "sourceSha256": "57dc6b42745273220f15c0cb26f5d633f5a15a819bf299b72b46020c6c8490a5"
+}

@@ -26,3 +26,21 @@ test('deterministic mixed edits and changing lengths roundtrip without base drif
   const p=encodeByteDelta(sender,bytes);receiver=decodeByteDelta(receiver,p.payload);assert.deepEqual(receiver.bytes,bytes);sender={sequence:p.sequence,bytes};
  }
 });
+
+test('aligned metadata keeps exact scene bytes and capacity across header growth/shrink',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {encodePacket,decodePacket}=await import('../tools/scene-observer/protocol.mjs');
+ const wire=new Uint8Array(await readFile(new URL('fixtures/native-scene/initial.nwr',import.meta.url)));
+ let previous=null,receiver=null,capacity=0;const sizes=[];
+ for(const score of [9,10,9,100]){
+  const meta={session:'test',sampledAt:1,mode:'live',state:{score}};
+  const packet=encodePacket(meta,wire,capacity);const next=new DataView(packet.buffer).getUint32(0,true);assert.ok(next>=capacity);capacity=next;
+  const delta=encodeByteDelta(previous,packet);receiver=decodeByteDelta(receiver,delta.payload);
+  const decoded=decodePacket(receiver.bytes);assert.deepEqual(decoded.meta,meta);assert.deepEqual(decoded.wire,wire);
+  sizes.push(delta.payload.length);previous={sequence:delta.sequence,bytes:packet};
+ }
+ assert.ok(sizes.slice(1).every(n=>n<200));
+ const meta={session:'test',sampledAt:1,mode:'live',state:{text:'x'.repeat(65000)}};
+ assert.deepEqual(decodePacket(encodePacket(meta,wire,65536)).meta,meta);
+ assert.throws(()=>encodePacket(meta,wire,65537),/capacity/);
+});

@@ -58,3 +58,9 @@ objektů a CPU řezání, společný render handle, přesné RGB v lookup textu�
 glow hrany, union alpha subset a životnost do poslední reference. Průhlednost
 vyžaduje řazení jednotlivých instancí. Ověř barvy obou backendů a skutečné snížení
 počtu GPU meshů/draw calls; FPS v brýlích se měří zvlášť.
+
+## Trace a Neon scene from authoring to delivery
+
+In the checkout that owns native Neon, the APK exporter reads `native/neon/export-source/`. A change under `examples/neon-arena/` alone may never enter its scene. For changes shared by web and Quest, check the actual entry point and source on each side. Set `NEON_EXPORT_OUT` to a fresh temporary directory and run `node native/neon/scripts/export-scene.mjs`. Compare each generated relative path and its bytes with the corresponding `assets/neon/` entry in the candidate APK. Check separately packaged assets (for example the authored sword halo), library, manifest and signing identity as appropriate. Export parity covers content; gameplay and headset acceptance have their own checks.
+
+Keep new test fixtures reachable from their normal runners. A page that passes when opened by hand contributes no coverage to a gate that never selects it. Register shader, atlas and camera regressions with the maintained browser runner and exercise the affected backends. For a gameplay change also check the host-side and shared-core tests reached by the release checkout.

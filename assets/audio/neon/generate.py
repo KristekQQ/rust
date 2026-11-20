@@ -89,6 +89,9 @@ render('round_start', 'Začátek kola', .85, 'tone', notes=((0,440,.23),(.10,659
 render('round_end', 'Konec kola', 1.1, 'tone', notes=((0,880,.21),(.14,659.25,.22),(.28,440,.26)), spatial=False)
 render('ui_confirm', 'Potvrzení v menu', .20, 'tone', notes=((0,880,.20),(.045,1320,.16)), spatial=False)
 
+from generate_music import generate as generate_music
+manifest.extend(generate_music(save, clips))
+
 # A spaced playlist, then a short illustrative gameplay mix. No runtime dependencies.
 demo = []
 timeline = []

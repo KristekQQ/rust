@@ -1,0 +1,15 @@
+Cat atlas source recipe (corrected: intact frames only)
+
+Runtime: stealth-cat-carry.png, 2048x2304, eight unchanged atlas bands.
+Source frames: stealth-cat-frames/normal-00..31.png (256px), close-00..05.png (512px).
+manifest.json references full matching sources for the eight carry tiles; no donor mouth/face compositing. Carry71 downsamples the complete close-00 source to256px.
+All cat eyes, muzzle, body, silhouette, color and placement come from one intact source per pose. Original smiling mouths are retained. Historical *-generated.png files are unused rejected authoring experiments, not runtime inputs.
+A4px transparent guard removes only border pixels below alpha90; the glTF alpha cutoff is.35. Visible geometry is never cropped, shifted or resized except the existing carry71 downsample.
+
+Initial extraction (do not rerun after intentionally retouching standalone sources):
+node scripts/pack-cat-carry-atlas.mjs extract examples/neon-arena/assets/stealth-cat.png examples/neon-arena/assets/stealth-cat-frames
+
+Pack after editing any standalone full pose:
+node scripts/pack-cat-carry-atlas.mjs pack examples/neon-arena/assets/stealth-cat-frames examples/neon-arena/assets/stealth-cat-carry.png examples/neon-arena/assets/stealth-cat-carry-bands.json examples/neon-arena/assets/stealth-cat-carry-preview.png examples/neon-arena/assets/stealth-cat-close-preview.png
+
+Only stealth-cat-carry.png is referenced by runtime glTF. Standalone sources, previews, manifest, prompts and generated experiments are not copied into observer/native runtime export assets.

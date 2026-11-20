@@ -1,5 +1,43 @@
 # Generic scene observer — native Quest to Rust/WASM
 
+## Short LAN addresses
+
+The viewer gateway provides `/observer` and `/stream`, with a shared landing
+page at `/`. Type the four-digit pairing code shown by the gateway once in each
+browser. The code is valid for 15 minutes after gateway startup; restarting the
+gateway issues a fresh code without revoking remembered viewers. A persistent
+HttpOnly cookie remembers viewer access for 30 days; no long token
+needs to be typed into the address bar. Clearing cookies, changing the gateway
+hostname/IP or expiration requires pairing again. The gateway remains viewer-only.
+
+For an explicitly trusted LAN, `--pair-code-file /absolute/private/pair-code.txt`
+selects a permanent four-digit code instead. The file is created mode0600 if absent;
+its code survives gateway restarts and has no expiration. Attempt limits remain,
+but a permanent four-digit code offers less guessing resistance than temporary
+pairing. Keep the high-entropy auth file as well to preserve remembered browsers.
+
+Run the existing receiver first, then start the gateway with private local files:
+
+```sh
+node tools/scene-observer/lan-viewer.mjs --host YOUR_MAC_IPV4 --port 8894 \
+  --upstream http://127.0.0.1:8891 \
+  --auth-file /absolute/private/viewer-auth.key \
+  --stream-config /absolute/private/stream.json
+```
+
+The auth file contains the private 64-hex session secret and preserves remembered
+browser access across gateway restarts.
+The stream configuration is `{"url":"http://127.0.0.1:8088/?token=CURRENT_STREAM_TOKEN"}`.
+Keep these files outside tracked source and readable only by the owner. Forward
+port 8088 through the current Wi-Fi ADB connection. Update the private stream file
+after a new capture session; it is reread for new requests without changing the
+short browser addresses or restarting the gateway. Android screen-sharing consent
+is still required when starting a new Quest Stream capture session.
+
+Only stream transport runs through the gateway. It does not change Neon rendering,
+reinstall the headset applications or request new capture consent for an existing
+session. Legacy token links remain supported for compatibility.
+
 The native path now mirrors the engine's supported render publication rather than authoring placeholder swords in JavaScript. A shared model/variant has a stable resource ID; scene objects retain their IDs and exact transforms/model matrices. Cutting removes the source object and introduces the real detached triangle meshes; later removal clears them. The optional game state includes flying object IDs and fragment/cut counts. Rendering does not require a fruit-name switch or duplicate physics/gameplay in the viewer.
 
 ## Run
@@ -64,3 +102,54 @@ Open `/tools/scene-observer/network-demo.html` on the same local receiver. This 
 `native/neon/src/bin/observer-network-demo.rs` generates the deterministic36-second60Hz source recording in `tools/scene-observer/fixtures/network-demo/`. Five staggered ballistic fruit throws and two independently swinging swords use reproducible irregular timings, directions and pauses. The source embeds child/parent identity mappings in each NWRv4 snapshot; no geometry or motion is reconstructed in JavaScript. Four fruit streams are sliced by the real Rust CPU cutter near the apex: the source object is removed, two capped flesh-colored meshes are published, separate/spin, then expire before a new throw. The visible sword sweep is scheduled to the authored cut time (not headset tracking). Rust authors model geometry and poses; the browser changes only delivery timing and forwards snapshots. The test does not claim that the real Quest connection has that latency or throughput. Hidden tabs pause this local demonstration timeline.
 
 Checks: `node --test tests/scene-observer-network-demo.test.mjs` validates timing/order/stall/queue caps; the maintained `scene-observer-network-demo` browser case verifies actual foreground pixels, a visible raw-versus-smooth difference at4Hz+150ms, and coherent recovery after a2-second stall on WebGPU and WebGL.
+
+## WebSocket receive/render isolation
+
+The browser ingests each ordered wire delta into a bounded `WireCache` before
+acknowledging it. RAF consumes a coalesced latest publication with all still-live
+assets; skipping a render must not skip asset ingestion. ACK is no longer coupled
+to GPU application, audio, or a background-throttled animation callback. This
+retains one message in flight per viewer rather than creating an unbounded queue.
+
+Generic scene reconnects reuse the GPU engine. Each new transport resets asset
+knowledge and rebases consecutive wire sequence plus render/static/shadow counters.
+The first replacement snapshot disables interpolation so reused IDs cannot blend
+from the old source. Pose-only and replay mode transitions keep their separate
+initialization path. A two-second clock heartbeat reconnects after over six seconds
+without a response/data; decode/apply errors explicitly recover instead of leaving
+an unacknowledged frame stuck. This cannot prevent browser main-thread suspension,
+and native-source stalls and actual network latency still need device measurement.
+
+Checks: `node --test tests/scene-observer-inbox.test.mjs` and the maintained
+`scene-observer-delivery` browser case, including a20-second presentation pause,
+cut/removal coalescing, new-session cache invalidation and silent-socket recovery.
+
+Native WebSocket packets reserve JSON metadata capacity in512-byte buckets,
+nonshrinking per viewer/session (max65536bytes). ASCII-space padding remains
+valid JSON for legacy decoders. This avoids shifting the following binary wire
+on every metadata length change, preserving NDP1 fixed-offset patch compression.
+Initial snapshots and bucket growth can still require larger packets. A live
+149-frame same-input comparison reduced encoded bytes72.44%; this is bandwidth
+evidence, not proof of fixing all network stalls or end-to-end latency.
+
+### Compressed cut bursts
+
+The native scene receiver accepts optional `NZP1` envelopes: four magic bytes, a little-endian u32 decoded NDP1 length, then a standard zlib stream. It validates the decoded bound, checksum, exact length, NDP1 magic and absence of trailing compressed data before ordinary delta/scene validation. Legacy NDP1 remains supported. Deploy this receiver before an APK that sends NZP1; older receivers do not understand the wrapper.
+
+The LAN viewer negotiates WebSocket permessage-deflate, level1 and no context takeover, for messages above4KiB. This preserves exact geometry and the existing ACK/coalescing flow. Browser throughput reports message bytes after WebSocket decompression, not on-air Wi-Fi bytes. Geometry reconstruction from cut recipes remains a separate proposed protocol change.
+
+### Buffered source-timestamp playback
+
+The live generic-scene viewer uses Rust-owned `setScenePlayback({delayMs:50,maxExtrapolationMs:80,maxDistance:2})` and `enqueueScenePublication(bytes,sourceTime)`. It retains ordered decoded snapshots and samples a continuously advancing presentation timeline. Persistent transforms use guarded Hermite position interpolation and quaternion SLERP; packet arrival does not restart motion from the currently displayed pose. Cuts, spawns, removals and material changes commit at the source timestamp. New fragments need their own motion samples; persistent cut lineage is not a repeated topology change.
+
+The 50 ms playback buffer trades display latency for resilience to uneven delivery. Only eligible dynamic fruit/fragments extrapolate, for at most80ms. Swords hold rather than inventing hand motion. A short starvation recovery applies one shared bounded80ms pose-error correction; ordinary arrivals do not restart it. Recovery clock speed is bounded0.9–1.1, with a60ms deadband. Source gaps over1s explicitly rebuffer and increment a diagnostic counter. This cannot hide arbitrary outages or initial GPU asset upload stalls.
+
+`sourceSampledAt` carries the original native source clock for playback; normalized `sampledAt` remains the wall-clock age/uncertainty measurement. Relay clock recalibration must not reorder the presentation timeline. A real source-clock reversal is rejected and causes a fresh session; no fabricated timestamps. Metadata, score and audio follow committed presentation sequence. Audio still requires a browser gesture.
+
+Transport delta caches still ingest before ACK. The viewer inbox and Rust queue each have128-frame/32MiB bounds. Overflow rejects explicitly and reconnects for a full snapshot; no required geometry delta is silently dropped. Reconnection reuses the renderer, resets the playback timeline and rebases sequences from the last actually committed snapshot, not the last enqueued snapshot. Parsed asset deltas are retained until their ordered boundary. This changes browser playback, not native gameplay or transmitted object frequency.
+
+The `Záře` toggle affects only the observer's glow pass. Use it during irregular hand movement to distinguish the halo from the bright physical blade geometry and motion trails. It is diagnostic isolation, not evidence that the reported detached-edge artifact has been fixed.
+
+Legacy `setSceneInterpolation` and `setScenePrediction` remain opt-in engine APIs for existing callers; the live generic observer no longer uses their chase-latest mode. The recorded replay path retains its existing behavior. Browser scenarios: `scene-observer-playback`, `scene-observer-delivery`, `scene-observer-interpolation`, and `observer-sword-glow`. Native timeline tests use filter `playback_`; inbox/relay tests include clock recalibration and ordered topology retention. Evidence for this implementation lives in `output/playback/`; worn Quest acceptance is separate.
+
+Design references: [Gaffer snapshot interpolation](https://gafferongames.com/post/snapshot_interpolation/) and [Mirror's snapshot timeline](https://github.com/MirrorNetworking/Mirror/blob/master/Assets/Mirror/Core/SnapshotInterpolation/SnapshotInterpolation.cs). The implementation is local Rust code, not a dependency on those projects.

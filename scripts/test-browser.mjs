@@ -23,6 +23,9 @@ if (browserNode && await realpath(browserNode) !== await realpath(process.execPa
 }
 
 const suites = [
+    {name:'scene-observer-playback',path:'tests/scene-observer-playback.html',status:'#result',pageScreenshot:true},
+    {name:'observer-sword-glow',path:'tests/observer-sword-glow.html',status:'#result',pageScreenshot:true},
+    {name:'observer-debug-bounds',path:'tests/observer-debug-bounds.html',status:'#result',pageScreenshot:true},
     {name:"animation-workspace",path:"tests/animation-workspace.html",status:"#result",xrReport:true},
     {name:"gltf-publication",path:"tests/gltf-publication.html",status:"#result"},
     {name:"main-view-culling",path:"tests/main-view-culling.html",status:"#result"},
@@ -97,6 +100,10 @@ const suites = [
     { name: 'neon-native-parity', path: 'tests/neon-native-parity.html', status:'#result', backends:['webgl','webgpu'] },
     { name: 'neon-native-parity-xr', path: 'tests/neon-native-parity.html?xr=1', status:'#result', backends:['webgl'], xrReport:true },
     { name: 'neon-paytable-xr', path: 'tests/neon-paytable-xr.html', status: '#result', backends:['webgl'], xrReport:true },
+    ...['stealth-cat', 'cat-elevated-view', 'cat-directional-view', 'cat-atlas-bands'].map(name => ({
+        name, path: `tests/${name}.html`, status: '#result',
+    })),
+    ...['texture','normal'].map(floor=>({name:'neon-floor-'+floor,path:'tests/neon-floor.html?floor='+floor,status:'#result'})),
     { name: 'neon-arena-xr', path: 'tests/neon-arena-xr.html', status: '#result', backends:['webgl'], xrReport:true, softwareTimeoutMs:1800000 },
     { name: 'neon-arena', path: 'examples/neon-arena/?verify=1', status: '#result', softwareTimeoutMs:600000 },
     { name: 'neon-arena-legacy', path: 'examples/neon-arena/legacy.html', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
@@ -366,6 +373,7 @@ try {
         try {
             const url = new URL(suite.path, baseUrl);
             url.searchParams.set('backend', backend === 'webgl' ? 'webgl' : 'auto');
+            if (suite.name === 'observer-debug-bounds') url.searchParams.set('profile', process.env.VERIFY_WASM_PROFILE || 'dev');
             if (arenaLegacyStress && suite.name === 'arena-minute') url.searchParams.set('legacyStress','1');
             if (xrSlow && suite.xrReport) url.searchParams.set('slow','1');
             result.url = url.href;

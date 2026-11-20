@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import {once} from 'node:events';
+import {deflateSync} from 'node:zlib';
 import {readFile} from 'node:fs/promises';
 import WebSocket from 'ws';
 import {createObserverServer} from '../tools/scene-observer/server.mjs';
@@ -12,9 +13,11 @@ const root=new URL('./fixtures/native-scene/',import.meta.url);
 const token='05'.repeat(16);
 const wait=async predicate=>{for(let i=0;i<200;i++){if(await predicate())return;await new Promise(r=>setTimeout(r,10));}throw Error('Condition timeout');};
 const sourceBases=new WeakMap();
-async function frame(socket,wire,state={}){
+async function frame(socket,wire,state={},sampledAt=Date.now()){
  const encoded=encodeByteDelta(sourceBases.get(socket),new Uint8Array(wire));sourceBases.set(socket,{sequence:encoded.sequence,bytes:new Uint8Array(wire)});wire=encoded.payload;
- const meta=Buffer.from(JSON.stringify({session:'rust-cut',sampledAt:Date.now(),state}));
+ // Exercise compressed cut bursts interleaved with legacy motion packets.
+ if(state.fragments===2){const header=Buffer.alloc(8);header.write('NZP1');header.writeUInt32LE(wire.length,4);wire=Buffer.concat([header,deflateSync(wire,{level:1})]);}
+ const meta=Buffer.from(JSON.stringify({session:'rust-cut',sampledAt,state}));
  const lengths=Buffer.alloc(8);lengths.writeUInt32LE(meta.length);lengths.writeUInt32LE(wire.length,4);
  const ack=once(socket,'data');socket.write(Buffer.concat([lengths,meta,wire]));assert.deepEqual((await ack)[0],Buffer.from([1]));
 }
@@ -64,4 +67,22 @@ test('a restored real snapshot can be viewed while native tracking is offline',a
  const relay=await createObserverServer({port:0,nativeSnapshot,nativePoses:{port:0,scenePort:0,host:'127.0.0.1',token}});let client;
  try{client=await viewer(relay.url);await wait(()=>client.packets.length===1);assert.equal(client.packets[0].meta.session,'restored-session');assert.ok(Date.now()-client.packets[0].meta.sampledAt>5000);assert.equal((await(await fetch(relay.url+'/api/scene')).json()).connected,false);}
  finally{client?.ws.terminate();await relay.close();}
+});
+
+test('playback source timestamp survives a backwards wall-clock calibration adjustment',async()=>{
+ const relay=await createObserverServer({port:0,nativePoses:{port:0,scenePort:0,host:'127.0.0.1',token}});let pose,source,client;
+ try{
+  pose=await startNativePoseFixture({port:relay.nativeBridge.port,token});await wait(()=>relay.nativeBridge.latest);
+  const {port}=await(await fetch(relay.url+'/api/scene')).json();source=net.connect(port,'127.0.0.1');await once(source,'connect');
+  source.write(Buffer.concat([Buffer.from('NSC1'),Buffer.from(token,'hex')]));
+  const at=Date.now();await frame(source,await readFile(new URL('initial.nwr',root)),{},at);
+  client=await viewer(relay.url);await wait(()=>client.packets.length===1);
+  const normalize=relay.nativeBridge.normalizeTimestamp;
+  relay.nativeBridge.normalizeTimestamp=t=>({...normalize(t),sampledAt:normalize(t).sampledAt-500});
+  client.ws.send(JSON.stringify({type:'ack'}));
+  await frame(source,await readFile(new URL('motion.nwr',root)),{},at+50);await wait(()=>client.packets.length===2);
+  const [a,b]=client.packets.map(p=>p.meta);
+  assert.equal(a.sourceSampledAt,at);assert.equal(b.sourceSampledAt,at+50);
+  assert.ok(b.sampledAt<a.sampledAt,'fixture must exercise backwards wall-clock normalization');
+ }finally{client?.ws.terminate();source?.destroy();await pose?.close();await relay.close();}
 });

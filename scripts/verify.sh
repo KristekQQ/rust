@@ -31,6 +31,7 @@ if [[ "$mode" != browser ]]; then
     check harness npm run test:harness
     check xr-platform npm run test:xr
     if [[ -f games/neon-core/Cargo.toml ]]; then
+        check gltf-sprite-shaders cargo test --locked --features native-render --lib gltf_sprite_material_shader_variants_validate_without_gpu
         check neon-core-format cargo fmt --manifest-path games/neon-core/Cargo.toml --check
         check neon-core cargo test --manifest-path games/neon-core/Cargo.toml --locked --target-dir target --lib
         check native-rim-format cargo fmt --manifest-path native/rim/Cargo.toml --check

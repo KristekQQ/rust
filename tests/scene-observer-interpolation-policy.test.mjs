@@ -10,3 +10,13 @@ test('sustained cadence changes adapt both ways while rejecting invalid samples'
  const p=new InterpolationCadence();for(const t of [0,250,500,750])p.sample(t);assert.equal(p.duration,250);
  for(const t of [800,850,900,950,1000,1050,1100])p.sample(t);assert.equal(p.duration,55);assert.equal(p.sample(NaN),null);
 });
+
+test('arrival jitter extends smoothing for swords despite steady source clock, then recovers',()=>{
+ const p=new InterpolationCadence();let arrival=0;
+ for(let i=0;i<42;i++){arrival+=[50,50,130,10,10,50,50][i%7];p.sample(i*50,arrival);}
+ assert.equal(p.duration,130);
+ for(let i=42;i<85;i++){arrival+=50;p.sample(i*50,arrival);}
+ assert.equal(p.duration,55);
+ arrival+=10000;p.sample(4250,arrival);
+ assert.equal(p.duration,55);
+});

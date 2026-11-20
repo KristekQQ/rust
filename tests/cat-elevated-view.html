@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8"><title>Sprite elevated artwork selection</title>
+<canvas id="gpu-canvas"></canvas><pre id="result">RUNNING</pre>
+<script type="module">
+import {initEngine} from '../js/engine.js';
+import {capturePixels} from './pixels.js';
+import {installXRSimulator} from './xr/simulator.js';
+const result=document.querySelector('#result'),canvas=document.querySelector('canvas');
+let engine,sim,url,presenting=false;
+try {
+ const backend=new URLSearchParams(location.search).get('backend')||'auto';
+ if(backend==='webgl')sim=installXRSimulator({clockTimers:false});
+ engine=await initEngine(canvas,{backend});document.documentElement.dataset.rendererBackend=engine.renderer_backend();
+ engine.resize(640,480);engine.setCameraHandedness('right');
+ engine.set_grid_visible(false);engine.set_light_helpers_visible(false);engine.set_render_effects(false,false);engine.setBackgroundColor([0,0,0]);engine.setNeonGlow({strength:0});
+ for(const effect of ['ssr','bloom','fxaa'])engine.postprocessing.disable(effect);
+ const source=new URL('../tools/scene-observer/assets/stealth-cat/stealth-cat.gltf',import.meta.url);
+ const asset=await(await fetch(source)).json();
+ const texture=document.createElement('canvas');texture.width=64;texture.height=128;
+ const ctx=texture.getContext('2d');ctx.fillStyle='#ff0808';ctx.fillRect(0,0,64,64);ctx.fillStyle='#08ff08';ctx.fillRect(0,64,64,64);
+ asset.images=[{uri:texture.toDataURL()}];
+ for(const buffer of asset.buffers)if(buffer.uri&&!buffer.uri.startsWith('data:'))buffer.uri=new URL(buffer.uri,source).href;
+ url=URL.createObjectURL(new Blob([JSON.stringify(asset)],{type:'model/gltf+json'}));
+ const cat=await engine.scene.loadModel(new URL(url));
+ cat.setRenderOptions({castsShadow:false,receivesShadow:false,reflectivity:0}).configureSprite({key:74,columns:1,rows:2,frames:1,fps:.001,duration:120,ambientInterval:1000,cooldown:0,travel:[0,0,0],elevatedView:{startFrame:1,elevation:50,maxFrontPitch:25,pitch:65}});
+ if(!cat.triggerSprite())throw Error('Could not activate diagnostic sprite');
+ const evidence=[];
+ function check(image,label,top){
+  let red=0,green=0;
+  for(let i=0;i<image.data.length;i+=4){const r=image.data[i],g=image.data[i+1];if(r>60&&r>g*2)red++;if(g>60&&g>r*2)green++;}
+  evidence.push({label,red,green});
+  if((top?green:red)<1000||(top?red:green)>20)throw Error('Wrong band or collapsed geometry: '+JSON.stringify(evidence.at(-1)));
+  const state=engine.scene.spriteState(74);if(state.frame!==0||!state.visible)throw Error('Viewer altered authoritative sprite state');
+ }
+ function position(degrees,yaw=0){const a=degrees*Math.PI/180,b=yaw*Math.PI/180;return [2*Math.cos(a)*Math.sin(b),2*Math.sin(a),2*Math.cos(a)*Math.cos(b)];}
+ for(const [label,degrees,yaw] of [['front',0,0],['below threshold',49,0],['above threshold',51,0],['overhead',89,0],['upper side',70,70],['back below threshold',49,0]]){
+  engine.setCameraView(position(degrees,yaw),[0,0,0]);check(await capturePixels(canvas),label,degrees>=50);
+ }
+ if(sim){
+  await engine.xr.enter();presenting=true;
+  for(const degrees of [49,51,89]){
+   const pitch=-degrees*Math.PI/180;
+   sim.frame({dt:0,head:{position:position(degrees),orientation:[Math.sin(pitch/2),0,0,Math.cos(pitch/2)]}});
+   if(engine.xr.lastError)throw Error(engine.xr.lastError);
+   check(sim.pixels('left'),'stereo left '+degrees,degrees>=50);check(sim.pixels('right'),'stereo right '+degrees,degrees>=50);
+  }
+ }
+ result.textContent='PASS: '+JSON.stringify(evidence);
+} catch(error){result.textContent='FAIL: '+(error.stack||error);console.error(error);}
+finally {if(presenting)await engine.xr.exit();engine?.dispose();sim?.dispose();if(url)URL.revokeObjectURL(url);}
+</script>

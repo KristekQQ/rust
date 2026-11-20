@@ -711,7 +711,15 @@ impl CutMesh {
             }
             for component in components(triangles) {
                 let piece = Self::compact(&positions, component)?;
-                piece.validate()?;
+                if let Err(error) = piece.validate() {
+                    if ribbon.is_some() {
+                        // A grazing tracked stroke can shave off a numerically invalid sliver.
+                        // Discard this candidate before any fragment replaces the original.
+                        *progress = 0.;
+                        return Ok(None);
+                    }
+                    return Err(error);
+                }
                 pieces.push(piece);
             }
         }
@@ -1277,6 +1285,31 @@ mod tests {
     }
     fn assert_near(a: Vec3, b: Vec3) {
         assert!((a - b).length() < 2e-5, "{a:?} != {b:?}");
+    }
+
+    #[test]
+    fn tracked_corner_sliver_does_not_abort_the_next_cut() {
+        let mesh = cube();
+        let center = Vec3::splat(1. - 0.00015);
+        let along = Vec3::new(1., -1., 0.);
+        let across = Vec3::new(1., 1., -2.);
+        let first = [center - along - across, center + along - across];
+        let second = first.map(|p| p + 2. * across);
+        let strict = mesh.slice(first[0], first[1], 2. * across, Vec3::X);
+        assert_eq!(
+            strict.err().as_deref(),
+            Some("Mesh must be closed, manifold and outward oriented")
+        );
+        let (progress, cut) = mesh
+            .slice_ribbon_progress(&[first, second], Vec3::X, 0.75)
+            .unwrap();
+        assert_eq!(progress, 0.);
+        assert!(cut.is_none());
+        let bottom = [Vec3::new(0., -2., -2.), Vec3::new(0., -2., 2.)];
+        assert!(mesh
+            .slice_ribbon(&[bottom, bottom.map(|p| p + Vec3::Y * 4.)], Vec3::X)
+            .unwrap()
+            .is_some());
     }
 
     #[test]

@@ -339,6 +339,10 @@ mod android {
             asset!("round_start"),
             asset!("round_end"),
             asset!("ui_confirm"),
+            asset!("neon_bar_intro"),
+            asset!("neon_bar_drive"),
+            asset!("neon_bar_final"),
+            asset!("neon_bar_break"),
         ])
     }
     pub(super) fn run(

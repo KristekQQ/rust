@@ -14,6 +14,7 @@ name = "neon-preview"
 path = "src/main.rs"
 
 [dependencies]
+flate2 = "=1.1.10"
 neon-core = { path = "../../games/neon-core" }
 kristek-rim-native = { path = "../rim", default-features = false }
 webgpu_wasm = { path = "../..", features = ["native-render"] }

@@ -83,3 +83,11 @@ fingerprints, backend and settings, not just a scene label or Git SHA. Use
 Report edits, commit, push, CI and physical headset acceptance separately.
 
 Existing chats may need to reread AGENTS.md; do not claim automatic adoption.
+
+### Verify the release checkout
+
+Before assembling a release from several worktrees, compare each checkout to the intended remote base. Inspect both tracked changes and non-ignored untracked files, especially new assets, tests and project skills. Keep development artifacts in the integration only when a real input or test requires them. Use `git diff --cached --name-status` to preserve unrelated staging and review the release manifest.
+
+The verification receipt covers the checkout inputs, including untracked code. The pre-push hook runs against its working directory; a passing run in a dirty development checkout does not establish that a different ref contains all tested files. Run the final gate on the assembled release inputs. After committing, check that HEAD is the push source, that all intended files are in its tree and that tested inputs match. A folder of generated APKs, a source dump or a passing observer transport test alone cannot identify everything that shipped.
+
+For Neon, identify both the APK source and the checkout serving the LAN viewer. When they differ, integrate the intended sender, receiver, assets and protocol tests together. Exercise the packaged pair for changes that cross this boundary. Validate changed project skills separately when documentation is outside the verification cache key.

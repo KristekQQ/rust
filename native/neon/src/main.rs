@@ -1,5 +1,8 @@
 //! Deterministic native renderer/tracking replay; no headset or OpenXR emulation claim.
+mod preview_cut_burst;
+
 use glam::{Mat4, Vec3};
+use kristek_neon_native::app::SwordGlowProxy;
 use kristek_neon_native::app::{
     App, NEON_GLOW_RADIUS, NEON_GLOW_STRENGTH, NEON_SSR_SCALE, NEON_SSR_STRENGTH,
 };
@@ -14,12 +17,32 @@ use std::{
 };
 use webgpu_wasm::render::profiler;
 use webgpu_wasm::render::target::{RenderTarget, RenderView, Viewport};
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = std::env::args().collect();
     let benchmark_frames = cli_value::<u32>(&args, "--benchmark-frames")?.unwrap_or(0);
     let benchmark_warmup = cli_value::<u32>(&args, "--benchmark-warmup")?.unwrap_or(60);
     let benchmark_period_ms = cli_value::<f64>(&args, "--benchmark-period-ms")?.unwrap_or(16.667);
     let size = cli_value::<u32>(&args, "--size")?;
+    let cut_burst = args.iter().any(|arg| arg == "--cut-pool-burst");
+    let cut_pool = args.iter().any(|arg| arg == "--cut-buffer-pool");
+    let inspect_cut = cut_burst || args.iter().any(|arg| arg == "--look-at-cut");
+    let worker_upload = !args.iter().any(|arg| arg == "--cut-upload-on-render");
+    let cut_burst_count = cli_value::<u32>(&args, "--cut-burst-count")?;
+    if cut_burst_count.is_some() && !cut_burst {
+        return Err("--cut-burst-count requires --cut-pool-burst".into());
+    }
+    let cut_burst_count = cut_burst_count.unwrap_or(preview_cut_burst::MAX_CUTS);
+    if !(2..=preview_cut_burst::MAX_CUTS).contains(&cut_burst_count) {
+        return Err(format!(
+            "--cut-burst-count must be in 2..={}",
+            preview_cut_burst::MAX_CUTS
+        )
+        .into());
+    }
+    if cut_pool && (!inspect_cut || !worker_upload) {
+        return Err("--cut-buffer-pool requires a cut fixture with worker upload".into());
+    }
     if benchmark_frames > 3600 {
         return Err("--benchmark-frames must be in 0..=3600".into());
     }
@@ -33,6 +56,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     if size.is_some_and(|size| !(128..=2048).contains(&size) || size % 64 != 0) {
         return Err("--size must be a multiple of 64 in 128..=2048".into());
     }
+    let inspect_swords = args.iter().any(|a| a == "--look-at-swords");
+    let sword_roll = cli_value::<f32>(&args, "--sword-roll")?;
+    if sword_roll.is_some_and(|degrees| !degrees.is_finite() || !inspect_swords) {
+        return Err("--sword-roll requires finite degrees and --look-at-swords".into());
+    }
+    let sword_proxy_path = cli_value::<PathBuf>(&args, "--sword-glow-proxy")?;
     let glow_off = args.iter().any(|a| a == "--glow-off");
     let glow_resolution = cli_value::<f32>(&args, "--glow-resolution")?.unwrap_or(1.0);
     if glow_resolution != 1.0 && glow_resolution != 0.5 {
@@ -50,6 +79,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets"));
     let read = |name: &str| std::fs::read(assets.join(name)).map_err(|e| format!("{name}: {e}"));
     if args.iter().any(|a| a == "--xr") {
+        if cut_burst || cut_pool {
+            return Err("Cut pool replay flags require the offscreen fixture".into());
+        }
+        if sword_proxy_path.is_some() || sword_roll.is_some() {
+            return Err("Sword glow proxy and roll require the offscreen fixture".into());
+        }
         return kristek_rim_native::xr::run_with(
             "Kristek Neon Native",
             &read,
@@ -57,6 +92,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             &mut |d, q, f, read| Ok(Box::new(App::new(d, q, f, read, None)?) as Box<dyn HostApp>),
         );
     }
+    let sword_proxy = sword_proxy_path
+        .as_ref()
+        .map(|path| -> Result<SwordGlowProxy, Box<dyn Error>> {
+            let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+            serde_json::from_slice(&bytes).map_err(|e| format!("{}: {e}", path.display()).into())
+        })
+        .transpose()?;
     let out = args
         .iter()
         .position(|a| a == "--output")
@@ -92,8 +134,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     if glow_off {
         app.renderer.configure_neon_glow(0., NEON_GLOW_RADIUS);
     }
-    let inspect_swords = args.iter().any(|a| a == "--look-at-swords");
-    let inspect_cut = args.iter().any(|a| a == "--look-at-cut");
     let width = size.unwrap_or(if inspect_swords {
         1280
     } else if args.iter().any(|a| a == "--look-at-info") {
@@ -161,7 +201,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else if args.iter().any(|a| a == "--look-at-info") {
         glam::camera::rh::view::look_at_mat4(
             Vec3::new(0., 1.7, 0.),
-            kristek_rim_native::info::OFFSET,
+            kristek_neon_native::app::PERFORMANCE_PANEL_OFFSET,
             Vec3::Y,
         )
         .inverse()
@@ -174,14 +214,37 @@ fn main() -> Result<(), Box<dyn Error>> {
         angle_up: 0.7,
         angle_down: -0.7,
     };
+    let views = [-0.032, 0.032].map(|offset| {
+        let world = head * Mat4::from_translation(Vec3::new(offset, 0., 0.));
+        RenderView {
+            view_projection: projection(fov, 0.08, 350.) * world.inverse(),
+            camera_position: world.w_axis.truncate(),
+        }
+    });
+    let render_target = RenderTarget {
+        color: &color,
+        depth: &depth,
+        material_mask: false,
+        auxiliary: None,
+        color_format: format,
+        depth_format: wgpu::TextureFormat::Depth32Float,
+        width,
+        height,
+        viewport: Viewport::full(width, height),
+        color_load: wgpu::LoadOp::Load,
+        depth_load: wgpu::LoadOp::Clear(1.),
+        depth_store: wgpu::StoreOp::Discard,
+    };
     // Broadside inspection poses expose the actual equipped meshes in both eyes.
     let sword_poses = [-1., 1.].map(|side| {
-        Some(
-            Mat4::from_translation(Vec3::new(side * 0.24, 1.25, -0.95))
-                * Mat4::from_rotation_z(side * -0.10)
-                * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2)
-                * Mat4::from_rotation_x(std::f32::consts::FRAC_PI_2),
-        )
+        let pose = Mat4::from_translation(Vec3::new(side * 0.24, 1.25, -0.95))
+            * Mat4::from_rotation_z(side * -0.10)
+            * Mat4::from_rotation_y(std::f32::consts::FRAC_PI_2)
+            * Mat4::from_rotation_x(std::f32::consts::FRAC_PI_2);
+        // The blade extends along local -Z from the grip.
+        Some(sword_roll.map_or(pose, |degrees| {
+            pose * Mat4::from_rotation_z(-(degrees % 360.).to_radians())
+        }))
     });
     let mut tracking_recovery = false;
     for frame in 0..102 {
@@ -243,6 +306,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         ..Default::default()
     })?;
+    let mut cut_burst_report = None;
     if inspect_cut {
         // Explicit offscreen fixture: the real authored fruit, tracked katana,
         // grip velocity, cap-derived plane, pooled texture and live animation.
@@ -258,46 +322,89 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Use the SAME simulation worker -> publication -> render mirror path
         // as OpenXR. A local Game on renderer.scene would bypass semantic tags.
         let mut scene = webgpu_wasm::scene::SceneManager::default();
-        let content = kristek_neon_native::content::Content::load(&mut scene, &read)?;
+        let mut content = kristek_neon_native::content::Content::load(&mut scene, &read)?;
+        if cut_burst {
+            preview_cut_burst::schedule(&mut content, cut_burst_count);
+        }
         let mut game = kristek_neon_native::game::Game::new(&mut scene, &content, None)?;
         game.start(&mut scene)?;
-        game.cue_index = 24;
-        game.spawn(
-            &mut scene,
-            &[kristek_neon_native::game::Recipe {
-                fruit: "watermelon".into(),
-                scale: 0.126,
-                position: [0.45, 1.35, -1.1],
-                velocity: [0.; 3],
-                gravity: 0.,
-                lifetime: 5.,
-            }],
-            false,
-        )?;
-        app.simulation = kristek_neon_native::simulation::Simulation::new(scene, game)?;
+        if !cut_burst {
+            game.cue_index = 24;
+        }
+        game.spawn(&mut scene, &[preview_cut_burst::recipe()], false)?;
+        let adopted_before = app.renderer.worker_cut_meshes_adopted;
+        app.simulation = if cut_pool {
+            kristek_neon_native::simulation::Simulation::new_with_cut_pool(
+                scene,
+                game,
+                device.clone(),
+                queue.clone(),
+            )?
+        } else if worker_upload {
+            kristek_neon_native::simulation::Simulation::new_with_cut_device(
+                scene,
+                game,
+                device.clone(),
+            )?
+        } else {
+            kristek_neon_native::simulation::Simulation::new(scene, game)?
+        };
         // This fixture starts a new sequence space; the old worker's publication
         // counter must not make tick_replay skip waiting for the new worker.
         app.applied_sequence = 0;
-        for step in 0..25 {
-            let dt = 0.025 / speed;
-            let mut f = FrameInput {
-                dt,
-                head: Some(Mat4::from_translation(Vec3::new(0., 1.55, 0.))),
-                ..Default::default()
-            };
-            f.hands[1] = Some(Mat4::from_translation(Vec3::new(
-                0.45,
-                1. + step as f32 * 0.025,
-                -0.45,
-            )));
-            app.tick_replay(f)?;
-            if app.simulation_state["cuts"].as_u64().unwrap_or(0) > 0 {
-                break;
+        if cut_burst {
+            cut_burst_report = Some(preview_cut_burst::run(
+                &mut app,
+                cut_burst_count,
+                speed,
+                worker_upload,
+                cut_pool,
+                |app, hit| {
+                    fix_replay_diagnostics(app);
+                    app.render(views[0], &render_target, 1)?;
+                    if let Some(hit) = hit {
+                        write_replay_image(
+                            &device,
+                            &queue,
+                            &target,
+                            width,
+                            height,
+                            &out.join(format!("cut-{hit:02}.png")),
+                        )?;
+                    } else {
+                        device.poll(wgpu::PollType::wait_indefinitely())?;
+                    }
+                    Ok(())
+                },
+            )?);
+        } else {
+            profiler::initialize(&device);
+            for step in 0..25 {
+                profiler::begin_frame();
+                let started = Instant::now();
+                app.tick_replay(preview_cut_burst::swing(step, speed))?;
+                let replay_ms = started.elapsed().as_secs_f64() * 1000.;
+                profiler::end_frame(&device, &queue);
+                if app.simulation_state["cuts"].as_u64().unwrap_or(0) > 0 {
+                    let stats = profiler::stats();
+                    eprintln!(
+                        "Cut frame replay_ms={replay_ms:.3} mesh_install_ms={} mesh_upload_ms={}",
+                        stats["cpu"]["mesh.install"]["lastMs"],
+                        stats["cpu"]["mesh.upload"]["lastMs"]
+                    );
+                    break;
+                }
+            }
+            profiler::reset();
+            if app.simulation_state["cuts"].as_u64().unwrap_or(0) == 0 {
+                return Err("Tracked inspection katana missed authored fruit".into());
             }
         }
-        if app.simulation_state["cuts"].as_u64().unwrap_or(0) == 0 {
-            return Err("Tracked inspection katana missed authored fruit".into());
+        let adopted = app.renderer.worker_cut_meshes_adopted - adopted_before;
+        if (worker_upload && adopted < 2) || (!worker_upload && adopted != 0) {
+            return Err(format!("Unexpected worker cut mesh adoption count: {adopted}").into());
         }
+        eprintln!("Worker-prepared GPU cut meshes adopted by renderer: {adopted}");
         let mut remaining = age;
         while remaining > 0. {
             let dt = remaining.min(0.05);
@@ -318,62 +425,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         app.renderer.finish_scene_updates();
     }
+    if cut_burst || benchmark_frames > 0 {
+        fix_replay_diagnostics(&mut app);
+    }
+    if let Some(proxy) = &sword_proxy {
+        app.set_sword_glow(proxy)?;
+    }
     if benchmark_frames > 0 {
-        // Runtime worker/age numbers vary between processes. Keep a visible,
-        // fixed panel in this frozen GPU fixture instead of masking its pixels.
-        let rows: Vec<_> = [
-            "RENDER",
-            "FPS APP",
-            "DISPLAY HZ",
-            "FRAME MS",
-            "FRAME P95",
-            "APP+WAIT MS",
-            "UPDATE MS",
-            "SIM MS",
-            "UPLOAD B",
-            "VISIBLE",
-            "OBJECTS",
-            "DRAWS",
-            "SIM AGE MS",
-        ]
-        .into_iter()
-        .map(|key| {
-            (
-                key,
-                if key == "RENDER" {
-                    "RUST VULKAN".into()
-                } else {
-                    "N/A".into()
-                },
-            )
-        })
-        .collect();
-        app.renderer.scene.update_info_panel(app.info.panel, &rows);
-        app.renderer.finish_scene_updates();
         // Freeze the replay exactly where the ordinary image QA starts. No tick,
         // scene finalization or frame_submitted call belongs in this loop.
-        let views = [0, 1].map(|eye| {
-            let world = head
-                * Mat4::from_translation(Vec3::new(if eye == 0 { -0.032 } else { 0.032 }, 0., 0.));
-            RenderView {
-                view_projection: projection(fov, 0.08, 350.) * world.inverse(),
-                camera_position: world.w_axis.truncate(),
-            }
-        });
-        let render_target = RenderTarget {
-            color: &color,
-            depth: &depth,
-            material_mask: false,
-            auxiliary: None,
-            color_format: format,
-            depth_format: wgpu::TextureFormat::Depth32Float,
-            width,
-            height,
-            viewport: Viewport::full(width, height),
-            color_load: wgpu::LoadOp::Load,
-            depth_load: wgpu::LoadOp::Clear(1.),
-            depth_store: wgpu::StoreOp::Discard,
-        };
         let mut samples = Vec::with_capacity((benchmark_frames / 30 + 2) as usize);
         let mut observations = Vec::with_capacity((total_frames / 10 + 2) as usize);
         let mut last_sample = 0;
@@ -437,7 +497,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "totalRenderedFrames":total_frames,"periodMs":benchmark_period_ms,
                 "width":width,"height":height,"eyesPerFrame":2,"ssrEnabled":ssr_enabled,
                 "glowOff":glow_off,"fontGlowAtlas":font_glow_atlas,"glowResolution":glow_resolution,
-                "view":if inspect_cut {"cut"} else {"player"},"format":format!("{:?}",format),
+                "view":if inspect_cut {"cut"} else if inspect_swords {"swords"} else if args.iter().any(|a| a == "--look-at-floor") {"floor"} else {"player"},"format":format!("{:?}",format),
+                "swordRollDegrees":sword_roll,
+                "swordGlowProxySegments":sword_proxy.as_ref().map(|proxy| [proxy.left.len(), proxy.right.len()]),
                 "effectParams":{"ssrStrength":NEON_SSR_STRENGTH,"ssrScale":NEON_SSR_SCALE,
                     "glowStrength":if glow_off {0.} else {NEON_GLOW_STRENGTH},"glowRadius":NEON_GLOW_RADIUS},
                 "depthStore":"Discard","frozenSimulation":true,"assets":assets,
@@ -454,79 +516,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         app.renderer.main_draw_calls = 0;
     }
     let mut pixels = Vec::new();
-    for eye in 0..2 {
-        let world = Mat4::IDENTITY
-            * head
-            * Mat4::from_translation(Vec3::new(if eye == 0 { -0.032 } else { 0.032 }, 0., 0.));
-        let view = RenderView {
-            view_projection: projection(fov, 0.08, 350.) * world.inverse(),
-            camera_position: world.w_axis.truncate(),
-        };
-        app.render(
-            view,
-            &RenderTarget {
-                color: &color,
-                depth: &depth,
-                material_mask: false,
-                auxiliary: None,
-                color_format: format,
-                depth_format: wgpu::TextureFormat::Depth32Float,
-                width,
-                height,
-                viewport: Viewport::full(width, height),
-                color_load: wgpu::LoadOp::Load,
-                depth_load: wgpu::LoadOp::Clear(1.),
-                depth_store: wgpu::StoreOp::Discard,
-            },
-            eye + 1,
-        )?;
-        let bytes = (width * height * 4) as u64;
-        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Replay readback"),
-            size: bytes,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let mut encoder = device.create_command_encoder(&Default::default());
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: &target,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(width * 4),
-                    rows_per_image: Some(height),
-                },
-            },
-            wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-        );
-        queue.submit([encoder.finish()]);
-        let (send, recv) = std::sync::mpsc::channel();
-        buffer
-            .slice(..)
-            .map_async(wgpu::MapMode::Read, move |result| {
-                let _ = send.send(result);
-            });
-        device.poll(wgpu::PollType::wait_indefinitely())?;
-        recv.recv()??;
-        let data = buffer.slice(..).get_mapped_range()?.to_vec();
-        buffer.unmap();
-        let file =
-            std::fs::File::create(out.join(if eye == 0 { "left.png" } else { "right.png" }))?;
-        let mut encoder = png::Encoder::new(file, width, height);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        encoder.write_header()?.write_image_data(&data)?;
-        pixels.push(data);
+    for (eye, (view, file)) in views.into_iter().zip(["left.png", "right.png"]).enumerate() {
+        app.render(view, &render_target, eye as u32 + 1)?;
+        pixels.push(write_replay_image(
+            &device,
+            &queue,
+            &target,
+            width,
+            height,
+            &out.join(file),
+        )?);
     }
     let different = pixels[0]
         .chunks_exact(4)
@@ -548,11 +547,107 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let report = serde_json::json!({"status":"PASS","host":"native offscreen replay","backend":format!("{:?}",info.backend),"adapter":info.name,"stereoDifferentPixels":different,"uniqueColors":unique,"ssrEnabled":ssr_enabled,"ssrWork":reflection_work,"sceneModelRoots":app.renderer.scene.models().len(),"renderer":app.renderer.debug_values(),"trackingLossRecovery":tracking_recovery,"trackingPausePreserved":tracking_pause_preserved,"game":app.simulation_state,"executionOS":std::env::consts::OS,"physicalQuest":cfg!(target_os = "android") && std::env::var("NEON_PHYSICAL_DEVICE").as_deref() == Ok("Quest_3"),"openxrRuntime":false,"fpsMeasurement":false,"assets":assets,"background":[0.,0.,0.]});
     std::fs::write(out.join("report.json"), serde_json::to_vec_pretty(&report)?)?;
+    if let Some(burst) = cut_burst_report {
+        std::fs::write(
+            out.join("cut-burst.json"),
+            serde_json::to_vec_pretty(&burst)?,
+        )?;
+    }
+
     eprintln!(
         "Native replay PASS: {unique} colors, {different} stereo pixels; {}",
         out.display()
     );
     Ok(())
+}
+
+fn fix_replay_diagnostics(app: &mut App) {
+    // Wall-clock worker and age values differ across otherwise identical runs.
+    let rows: Vec<_> = [
+        "RENDER",
+        "FPS APP",
+        "DISPLAY HZ",
+        "FRAME MS",
+        "FRAME P95",
+        "APP+WAIT MS",
+        "UPDATE MS",
+        "SIM MS",
+        "UPLOAD B",
+        "VISIBLE",
+        "OBJECTS",
+        "DRAWS",
+        "SIM AGE MS",
+    ]
+    .into_iter()
+    .map(|key| {
+        (
+            key,
+            if key == "RENDER" {
+                "RUST VULKAN".into()
+            } else {
+                "N/A".into()
+            },
+        )
+    })
+    .collect();
+    app.renderer.scene.update_info_panel(app.info.panel, &rows);
+    app.renderer.finish_scene_updates();
+}
+
+fn write_replay_image(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    target: &wgpu::Texture,
+    width: u32,
+    height: u32,
+    path: &std::path::Path,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    let bytes = (width * height * 4) as u64;
+    let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Replay readback"),
+        size: bytes,
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let mut encoder = device.create_command_encoder(&Default::default());
+    encoder.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture: target,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buffer,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width * 4),
+                rows_per_image: Some(height),
+            },
+        },
+        wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+    );
+    queue.submit([encoder.finish()]);
+    let (send, recv) = std::sync::mpsc::channel();
+    buffer
+        .slice(..)
+        .map_async(wgpu::MapMode::Read, move |result| {
+            let _ = send.send(result);
+        });
+    device.poll(wgpu::PollType::wait_indefinitely())?;
+    recv.recv()??;
+    let data = buffer.slice(..).get_mapped_range()?.to_vec();
+    buffer.unmap();
+    let file = std::fs::File::create(path)?;
+    let mut encoder = png::Encoder::new(file, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder.write_header()?.write_image_data(&data)?;
+    Ok(data)
 }
 
 /// Optional numeric flags reject missing/invalid values before GPU setup.

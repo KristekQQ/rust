@@ -1,3 +1,4 @@
+import {ModelObject} from '../../js/engine.js';
 import {ARENA_REVISION,PAYTABLE_ORIGIN,NEON_GLOW,FRUIT_OPACITY,FRUIT_OPACITY_VARIATION,createFruitMesh} from './scene.js';
 /** @param {import('../../js/engine.d.ts').Engine} engine
  * @param {Awaited<ReturnType<typeof import('./scene.js').createScene>>} world
@@ -68,7 +69,15 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         if(fontCore<3)throw new Error(`Countdown lacks a rendered luminous Cynatar face (${fontCore})`);
         assertForeground(forwardImage,'forward neon countdown and score');
         const stats=engine.postprocessing.stats();
-        if(stats.passes!==0||stats.targets!==0||world.floorTiles.meshInfo.triangles!==960||!world.floorTiles.meshInfo.closed||world.floorGrout===world.floorTiles||world.floorGrout.meshInfo.triangles!==12||world.floorGrout.meshInfo.position[1]>-.02)throw new Error('Arena must preserve native tiled floor, recessed grout and disabled default postprocessing');
+        if(stats.passes!==0||stats.targets!==0)throw new Error('Arena must keep default postprocessing disabled');
+        if(world.floorMode==='baseline'){
+            if(world.floorTiles.meshInfo.triangles!==960||!world.floorTiles.meshInfo.closed||world.floorGrout===world.floorTiles||world.floorGrout.meshInfo.triangles!==12||world.floorGrout.meshInfo.position[1]>-.02)throw new Error('Baseline tiled floor/grout changed');
+        }else{
+            const spotlight=world.floorMode==='spotlight';
+            if(!(world.floorTiles instanceof ModelObject)||world.floorGrout!==world.floorTiles
+                ||world.floorTiles.info.primitives!==(spotlight?2:1)||world.floorMetadata.triangles!==(spotlight?14:2))
+                throw new Error(`Unexpected geometry for ${world.floorMode} floor: ${JSON.stringify(world.floorMetadata)}`);
+        }
         if(world.timerPanel.meshInfo.position[0]!==0||world.timerPanel.meshInfo.position[1]<=world.scorePanel.meshInfo.position[1]||world.galleryIcons.some(icon=>icon.meshInfo.position[0]>-2.4))
             throw new Error('Countdown/score are not ahead with the paytable to the left');
 
@@ -102,7 +111,7 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         }
         const shared=engine.debugStats().sharedMeshes;
         const glintAssets=world.launchGlintAssets.length;
-        if(glintAssets!==3)throw new Error('Launch show must reuse exactly three small color assets');
+        if(glintAssets!==0)throw new Error('Fruit launch streaks must stay disabled');
         if(!shared||shared.assets!==12+glintAssets+font.glyphMeshes||shared.gpuMeshes!==12+glintAssets+font.glyphMeshes||shared.liveInstances!==70+font.liveGlyphs+(engine.xr.comboDisplayState?.chains?.reduce((sum,c)=>sum+c.frames.length+c.icons.length,0)??0)||shared.colorTableBytes<=0)
             throw new Error(`Fruit geometry is not shared by kind: ${JSON.stringify(shared)}`);
         // Thirty fruit icons use ten groups; forty frames use two more.
