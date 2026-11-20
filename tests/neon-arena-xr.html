@@ -29,6 +29,8 @@ const report=await run.execute(async test=>{
     const {engine,world}=app;
     // Keep legacy cutting/score probes isolated; ten-target coverage lives in arena-waves.
     app.arenaTools.call('arena_configure',{count:1,program:'practice'});
+    // These scripted swings assert fruit-only rewards throughout the round.
+    for(const bird of world.birdFlights)bird.remove();
     test.assert(engine.renderer_backend()==='Gl','actual WebGL production arena');
     const reports=[];
     engine.xr.addEventListener('cut',event=>reports.push({...event.detail,info:event.detail.pieces.map(p=>p.meshInfo),colors:event.detail.pieces.map(p=>p.meshSnapshot.colors)}));

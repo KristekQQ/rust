@@ -20,7 +20,7 @@ window.addEventListener('message',event=>{
  if(event.data.type==='demo-error')fail(event.data.error);
  if(event.data.type==='demo-ready'){
   ready.add(f);document.documentElement.dataset.rendererBackend=event.data.backend;configure();
-  if(ready.size===2&&!started){started=true;start=performance.now();requestAnimationFrame(tick);if(params.has('verify'))void verify();}
+  if(ready.size===2&&!started){started=true;start=performance.now();if(params.has('verify'))void verify();else requestAnimationFrame(tick);}
  }
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=performance.now();else if(hiddenAt!==null){hiddenMs+=performance.now()-hiddenAt;hiddenAt=null;}});
@@ -31,15 +31,14 @@ function sourceThrough(target){
  }
  ingested=target;return cache.packetFor(peer);
 }
-function tick(now){
- try{
+function advance(now,wallTime){
   if(!document.hidden){
    clock=now-start-hiddenMs;const c=config(),period=1000/c.hz;
-   if(clock>=nextSample){network.enqueue(Math.floor(clock*manifest.sourceHz/1000),clock,Date.now());sent++;nextSample=Math.max(nextSample+period,clock+period*.1);}
+   if(clock>=nextSample){network.enqueue(Math.floor(clock*manifest.sourceHz/1000),clock,wallTime);sent++;nextSample=Math.max(nextSample+period,clock+period*.1);}
    const delivery=network.receive(clock);
    if(delivery){
     const wire=sourceThrough(delivery.frame);packetBytes=wire.length;packets++;coalesced+=delivery.coalesced;lastReceived=clock;
-    receipts.push({at:clock,latency:Date.now()-delivery.sampledAt});if(receipts.length>24)receipts.shift();
+    receipts.push({at:clock,latency:wallTime-delivery.sampledAt});if(receipts.length>24)receipts.shift();
     const sourceFrame=delivery.frame%manifest.frames.length;
     const liveCuts=manifest.cuts.filter(c=>c.frame<=sourceFrame&&c.pieces.every(id=>cache.assets[0].has(id)));
     const cut=liveCuts.at(-1);
@@ -53,16 +52,37 @@ function tick(now){
    $('#stats').textContent=c.hz+' pakety/s nastaveno · '+observed.toFixed(1)+'/s přijato · zpoždění '+Math.round(latency)+' ms';
    document.documentElement.dataset.networkDemo=JSON.stringify({sent,packets,observedHz:observed,latencyMs:latency,pending:network.queue.length,coalesced,packetBytes,sourceHz:manifest.sourceHz});
   }
-  requestAnimationFrame(tick);
- }catch(e){fail(e.message);}
+}
+function tick(now){
+ try{advance(now,Date.now());requestAnimationFrame(tick);}catch(e){fail(e.message);}
 }
 function fail(message){$('#connection').textContent='Chyba: '+message;$('#result').hidden=false;$('#result').textContent='FAIL: '+message;console.error(message);}
 const until=async fn=>{for(let i=0;i<800;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('Test timeout');};
 async function verify(){
+ const views=frames.map(f=>f.contentWindow.networkDemoFrame);
+ const [left,right]=views;
+ const wallStart=Date.now();
+ let elapsed=0;
+ const restore=[];
+ // Exercise the real transport and both renderers at the same simulated instant.
+ // GPU readback can take longer than the entire 250 ms interpolation interval.
+ const step=async()=>{
+  elapsed+=50;
+  advance(start+elapsed,wallStart+elapsed);
+  await until(()=>views.every(view=>view.received===packets));
+  await new Promise(requestAnimationFrame);
+ };
  try{
-  await until(()=>packets>=7);const next=packets+1;await until(()=>packets>=next);await new Promise(r=>setTimeout(r,25));
-  const left=frames[0].contentWindow.networkDemoFrame,right=frames[1].contentWindow.networkDemoFrame;
-  await until(()=>left.received>=packets&&right.received>=packets);
+  for(const frame of frames){
+   const perf=frame.contentWindow.performance,initial=perf.now();
+   const original=Object.getOwnPropertyDescriptor(perf,'now');
+   Object.defineProperty(perf,'now',{configurable:true,value:()=>initial+elapsed});
+   restore.push(()=>original?Object.defineProperty(perf,'now',original):Reflect.deleteProperty(perf,'now'));
+  }
+  advance(start,wallStart);
+  // At 1950 ms the eighth packet has been applied for 50 ms in both views.
+  for(let i=0;i<39;i++)await step();
+  if(packets!==8)throw Error('Expected eight delivered packets at 1950 ms, got '+packets);
   const [a,b]=await Promise.all([left.capture(),right.capture()]);
   const {assertForeground,assertChanged}=await import('../../tests/pixels.js');
   if(left.cutChecks<2||right.cutChecks<2)throw Error('Actual cut halves and source removal were not verified in both renderers');
@@ -70,10 +90,16 @@ async function verify(){
   if(frames[0].contentDocument.documentElement.dataset.interpolationMs!=='0'||frames[1].contentDocument.documentElement.dataset.interpolationMs!=='250')throw Error('Wrong comparison configuration');
   if(receipts.slice(-6).some(r=>r.latency<140))throw Error('Configured150ms delay was not applied');
   const hz=(receipts.length-1)*1000/(receipts.at(-1).at-receipts[0].at);if(hz<3.2||hz>4.8)throw Error('Delivery is not4Hz: '+hz);
-  network.stall(clock,2000);const before=packets;await new Promise(r=>setTimeout(r,700));if(packets!==before)throw Error('Simulated outage still delivers frames');
-  await until(()=>packets>before);if(!coalesced)throw Error('Stall did not coalesce old updates');
+  network.stall(clock,2000);const before=packets;
+  for(let i=0;i<39;i++)await step();
+  if(packets!==before)throw Error('Simulated outage still delivers frames');
+  await step();if(packets<=before||!coalesced)throw Error('Stall did not deliver the coalesced update');
   $('#result').textContent='PASS: same Rust scene at4Hz+150ms; real cut halves and parent removal; visible interpolation difference;2s outage and coherent recovery';
  }catch(e){fail(e.message);}
+ finally{
+  for(const reset of restore)reset();
+  start=performance.now()-clock-hiddenMs;requestAnimationFrame(tick);
+ }
 }
 try{
  const [m,b]=await Promise.all([fetch('./fixtures/network-demo/manifest.json'),fetch('./fixtures/network-demo/frames.bin')]);
