@@ -32,6 +32,8 @@ For physical Quest GPU/performance evidence use [quest-hardware-profiling](.agen
 
 For frame scheduling, transient textures/buffers, pass dependencies and CPU/GPU profiling use [frame-pipeline](.agents/skills/frame-pipeline/SKILL.md); the extension guide is [FRAME_PIPELINE.md](docs/FRAME_PIPELINE.md). For quality-preserving render optimization, keep resolution/effects fixed and compare deterministic before/after pixels on each affected backend. Pass/submit reductions and desktop timings are evidence of changed work, not proof of Quest FPS gains.
 
+For in-headset FPS panels, controller aiming and in-world score entry, use [xr-spatial-ui](.agents/skills/xr-spatial-ui/SKILL.md).
+
 For shared XR player/inventory work use [xr-player-equipment](.agents/skills/xr-player-equipment/SKILL.md). For cut-impact visuals and speed tuning use [cut-feedback-tuning](.agents/skills/cut-feedback-tuning/SKILL.md); prefer existing configuration knobs for numeric iteration.
 
 For reusable 3D fonts, glyph imports, text layout and neon lettering use [mesh-fonts](.agents/skills/mesh-fonts/SKILL.md); existing bitmap panels and numeric tubes stay supported.

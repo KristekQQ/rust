@@ -13,7 +13,7 @@ Reproduce the same passage from idle into fruit launch, a burst of cuts and reco
 
 For the LAN observer, check the viewer JS actually served through the listener and look for the active playback branch. The verified Neon LAN viewer uses a **50 ms** source-timestamp buffer. Eligible fruit and fragments can extrapolate for up to **80 ms** beyond the latest source sample; swords hold their last known pose during starvation. After the cap, fruit also holds until fresh data arrives. These settings are separate; adding them does not give measured end-to-end latency. The headset game has its own frame timing.
 
-The owning checkouts can differ: in the LAN server checkout inspect `tools/scene-observer/viewer.js` and `src/scene_playback.rs`. The legacy/replay [cadence policy](../../../tools/scene-observer/interpolation-policy.mjs) starts at 60 ms and adapts to source cadence. Measure the active branch before changing either value.
+The [LAN viewer](../../../tools/scene-observer/viewer.js) and [Rust playback clock](../../../src/scene_playback.rs) ship together on main. On a split worktree verify that the running receiver and its served WASM support the same protocol as the publisher. For a live smoke test, confirm accepted deltas on `/api/scene`, then check that `sceneObserver.playback.sequence` advances in the rendered view. The legacy/replay [cadence policy](../../../tools/scene-observer/interpolation-policy.mjs) starts at 60 ms and adapts to source cadence. Measure the active branch before changing either value.
 
 ## Send changes and preserve continuity
 

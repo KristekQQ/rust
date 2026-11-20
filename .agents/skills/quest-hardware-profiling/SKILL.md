@@ -25,6 +25,8 @@ device takeover. Preserve existing task authorization instead of asking again.
 - **Physics:** isolate simulation/contact/cutting/publication timings. The
   aggregate worker/game duration includes more than physics; do not relabel it.
 
+For a scripted Neon round, record the installed APK hash and compare the player's real `files/neon-top10.json` before and after replay. The [live recorder](../../../native/neon/scripts/measure.py) also checks the legacy TOP 5 path. Restore controller input and confirm a fresh live frame on the Wi-Fi serial before handing back the headset.
+
 ## Establish the session
 
 Locate the current source checkout and task record first: the project root may

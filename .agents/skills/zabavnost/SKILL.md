@@ -129,3 +129,7 @@ Simulated XR verifies rendering, timing and native rules, not comfort, headset
 FPS or human enjoyment. Honza's feedback overrides a prettier screenshot or
 analytically correct physics. Record only a short decision-changing observation;
 keep supporting articles and historical detail in the linked design notes.
+
+### Check overlapping launches on Quest
+
+Compare the [authored recipes](../../../examples/neon-arena/minute-scene.json) with the replay counters `cue_index`, `shots` and `flying` at each launch. Reaching the last cue alone can hide a missing finale. The [Neon scheduler](../../../games/neon-core/src/game.rs) advances its cue index before checking the late-cue and whole-wave capacity limits. Exercise a last wave with one previous target still airborne as well as an empty arena. Record the number actually spawned before tuning wave density.

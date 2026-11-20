@@ -1,3 +1,7 @@
+# Neon Arena and its scene observer
+
+The native sender, web observer and project skills ship together. Start with the [observer](.agents/skills/scene-observer/SKILL.md), [characters](.agents/skills/npc-characters/SKILL.md) or [spatial UI](.agents/skills/xr-spatial-ui/SKILL.md) guide. Physical Quest check on 2026-11-20, APK 0.13.82: the cue counter reached 51 with 139 of 149 authored targets launched. One previous fruit was still airborne when the ten-fruit finale reached the ten-target limit. Track this as an open gameplay case until verified on a later build. The [wave guide](.agents/skills/zabavnost/SKILL.md) describes the regression check.
+
 # Model publication — local CPU optimization, 2026-10-30
 
 [Report](docs/performance/model-publication/REPORT.md), [state](docs/performance/STATE.md). Branchcodex/model-gpu-publication, releaseWASMa81d6ee1. Upstream unchanged-model scans removed: static2048GL CPU callback~5→3.2–3.4ms; no generalFPS gain, production/dynamic results mixed.436native/173browserPASS,31strictnativepairs exact. Old image blockers and physicalQuest remain unverified; no shared deployment. Own preview8899 stillK. No automatic next optimization.
