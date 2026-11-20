@@ -94,20 +94,25 @@ await run.execute(async test=>{
     // Probe the authored hit orders through real tracked sword cuts and Rust scoring.
     // Separate from the full no-hit timeline above: this measures score decisions,
     // not whether a human can execute every authored moving target.
+    // Ambient bird hits grant their own score. Isolate the fruit-only probes.
+    for(const bird of app.world.birdFlights)bird.remove();
     for(const object of app.gameState().liveApples)if(object.exists)object.remove();
     const still={dt:1000/72,head:{position:[0,1.55,0],orientation:[0,0,0,1]},controllers:{}};
     const hitFruit=(name,probeX=1.8,keepFeedback=false)=>{
         const beforeScore=engine.xr.roundState.score;
+        lastCut=null;
         const fruit=app.world.fruits.find(f=>f.name===name);
         // Aim through one cherry body, not the genuine gap between its two lobes.
         const targetX=probeX-(name==='cherry'?.49*.06:0);
         sim.frame({...still,controllers:{right:{position:[probeX,1.8,-.45],orientation:[0,0,0,1],pressed:false}}});
         const target=launchApple(engine.scene,fruit,0,true,{position:[targetX,1.35,-1.1],scale:.06,velocity:[0,0,0],gravity:0,lifetime:2.6});
         for(let i=0;i<=24&&target.exists;i++)sim.frame({...still,controllers:{right:{position:[probeX,1.8-i/24*.9,-.45],orientation:[0,0,0,1],pressed:false}}});
-        test.assert(!target.exists,`authored scoring probe cuts real ${name}`,{player:engine.xr.player.state,sword:app.world.sword.meshInfo,round:engine.xr.roundState});
+        test.assert(!target.exists&&lastCut?.removed.includes(target.id),`authored scoring probe cuts real ${name}`,{player:engine.xr.player.state,sword:app.world.sword.meshInfo,round:engine.xr.roundState});
         if(engine.xr.roundState.mode==='chains'){
             const award=lastCut.scoreAwards.find(a=>a.original===target.id);
-            test.assert(award?.points===engine.xr.roundState.score-beforeScore,'actual cut carries its exact native hit plus chain-bonus reward');
+            const scoreIncrease=engine.xr.roundState.score-beforeScore;
+            test.assert(award?.points===scoreIncrease,'actual cut carries its exact native hit plus chain-bonus reward',
+                {fruit:name,target:target.id,scoreIncrease,award});
             const stock=engine.xr.comboDisplayState.chains.find(c=>c.kind===FRUIT_POINTS[name].label);
             test.assert(award?.totalPoints===stock?.earnedPoints,'hit caption total matches the corresponding stored-fruit total');
         }

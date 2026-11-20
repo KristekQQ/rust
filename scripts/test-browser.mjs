@@ -6,8 +6,9 @@ import { browserArgs } from './browser-options.mjs';
 import { parseShard, partitionCases, suiteTimeout } from './browser-suite-plan.mjs';
 import { createHash } from 'node:crypto';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import { mkdir, writeFile, readFile, readdir, realpath } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { root, assertFreshBuild } from './build-fingerprint.mjs';
 
 const localOption = key => {
@@ -29,7 +30,7 @@ const suites = [
     {name:"animation-workspace",path:"tests/animation-workspace.html",status:"#result",xrReport:true},
     {name:"gltf-publication",path:"tests/gltf-publication.html",status:"#result"},
     {name:"main-view-culling",path:"tests/main-view-culling.html",status:"#result"},
-    {name:"gltf-indices",path:"tests/gltf-indices.html",status:"#result"},
+    {name:"gltf-indices",path:"tests/gltf-indices.html",status:"#result",softwareTimeoutMs:600000},
     {name:"gltf-white-colors",path:"tests/gltf-white-colors.html",status:"#result"},
     {name:'gltf-instance-pool',path:'/tests/gltf-instance-pool.html',status:'#result'},
     {name:'rim-three-stress',path:'examples/rim-three/?verify=1',status:'#three-stress-result',backends:['webgl'],softwareTimeoutMs:600000},
@@ -78,7 +79,7 @@ const suites = [
     {name:"rim-stress-xr",path:"tests/rim-gameplay.html?stress=32",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-spatial-batches-xr",path:"tests/rim-gameplay.html?stress=256",status:"#result",xrReport:true,softwareTimeoutMs:600000},
     {name:"rim-gameplay",path:"tests/rim-gameplay.html",status:"#result",xrReport:true,softwareTimeoutMs:600000},
-    {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify'},
+    {name:'rim',path:'examples/rim/?verify=1',status:'#result',button:'#verify',softwareTimeoutMs:600000},
     { name: 'shadow-cache', path: 'tests/shadow-cache.html', status: '#result' },
     { name: 'gltf-material-cache', path: 'tests/gltf-material-cache.html', status: '#result' },
     { name: 'neon-enemies', path: 'examples/neon-enemies/?verify=1', status: '#result', button: '#verify', softwareTimeoutMs:600000 },
@@ -110,7 +111,7 @@ const suites = [
     {name:'xr-scene-foveation',path:'tests/xr-scene-foveation.html',status:'#result',backends:['webgl'],xrReport:true},
     {name:'xr-scene-foveation-asymmetric',path:'tests/xr-scene-foveation.html?asymmetric=1',status:'#result',backends:['webgl'],xrReport:true},
     {name:'xr-gl-presentation',path:'tests/xr-gl-presentation.html',status:'#result',backends:['webgl'],xrReport:true},
-    {name:'rim-gameplay-gl-shared',path:'tests/rim-gameplay.html?presentation=shared-framebuffer',status:'#result',backends:['webgl'],xrReport:true},
+    {name:'rim-gameplay-gl-shared',path:'tests/rim-gameplay.html?presentation=shared-framebuffer',status:'#result',backends:['webgl'],xrReport:true,softwareTimeoutMs:600000},
     { name: 'webxr-contract', path: 'tests/webxr-contract.html', status: '#result', backends: ['webgl'], xrReport: true },
     { name: 'webxr-simulation', path: 'tests/webxr-simulation.html', status: '#result', backends: ['webgl'], xrReport: true, softwareTimeoutMs:1200000 },
     { name: 'webxr-preview', path: 'examples/webxr/', interaction: 'webxr-preview', backends: ['webgl'] },
@@ -166,7 +167,7 @@ const executionPlan = partitionCases(backends.flatMap(backend => selected
     .map(suite => ({backend, suite}))), shard);
 const timeoutOptions = {software, timeout, timeoutExplicit};
 if (productionRoot) process.env.VERIFY_WASM_PROFILE = 'release';
-let browser, server;
+let browser, server, scoreDirectory;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function verifyHud(page, simpleScene = false) {
     const stats = () => page.evaluate(async () => (await import('./main.js')).engine.debugStats());
@@ -299,7 +300,9 @@ async function applicationFingerprint() {
     return hash.digest('hex');
 }
 async function startServer() {
-    const serverArgs = ['-u', 'scripts/serve-local.py', '0', '--score-file', path.join(output,'neon-parity-test-scores.json')];
+    // Qualifying for initials must be independent of scores from earlier test runs.
+    scoreDirectory = await mkdtemp(path.join(tmpdir(), 'neon-browser-scores-'));
+    const serverArgs = ['-u', 'scripts/serve-local.py', '0', '--score-file', path.join(scoreDirectory, 'scores.json')];
     if (productionRoot) serverArgs.push('--production', '--directory', productionRoot, '--test-directory', path.join(root, 'tests'));
     server = spawn('python3', serverArgs, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
     let log = '';
@@ -317,7 +320,12 @@ async function startServer() {
 }
 async function cleanup() {
     if (browser) await browser.close().catch(() => {});
-    if (server && server.exitCode === null) server.kill();
+    if (server && server.exitCode === null && server.signalCode === null) {
+        const stopped = new Promise(resolve => server.once('exit', resolve));
+        server.kill();
+        await stopped;
+    }
+    if (scoreDirectory) await rm(scoreDirectory, {recursive:true, force:true});
 }
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
     interrupted = true;

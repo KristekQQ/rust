@@ -234,8 +234,25 @@ export async function verifyArena(engine, world, canvas, previewCut) {
         const demo=previewCut(1,false); // Verify the alpha material at full diagnostic size.
         // Warm the first-use texture pipeline while native effect time is frozen.
         await wait();
-        engine.set_simulation_paused(false);await wait();engine.set_simulation_paused(true);
-        // An oblique view proves the flat disc surface, not only its edge-on silhouette.
+        // Give the debris 120 ms to separate while the impact is still visible.
+        // A handful of software-rendered frames can outlive the entire impact.
+        const originalNow=Object.getOwnPropertyDescriptor(performance,'now');
+        let time=performance.now();
+        Object.defineProperty(performance,'now',{configurable:true,value:()=>time});
+        try {
+            // Give the renderer one paused frame to adopt the controlled clock.
+            await new Promise(requestAnimationFrame);
+            engine.set_simulation_paused(false);
+            for(let frame=0;frame<6;frame++){
+                time+=20;
+                await new Promise(requestAnimationFrame);
+            }
+        }finally{
+            engine.set_simulation_paused(true);
+            if(originalNow)Object.defineProperty(performance,'now',originalNow);
+            else Reflect.deleteProperty(performance,'now');
+        }
+        // The oblique view exposes the surface of the cut disc.
         engine.setOrbitView([1.7,1.95,1.4],[0,1.35,-1.15]);await wait();
         const hitFrame=await capturePixels(canvas);
         const effectPositions=demo.feedback.objects.map(object=>object.meshInfo.position);

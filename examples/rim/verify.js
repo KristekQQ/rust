@@ -1,11 +1,21 @@
 import {capturePixels,assertForeground,assertChanged} from '../../tests/pixels.js';
 import {engine,content,game,view,play} from './main.js';
+let verifying=false;
 export async function verify(){
- const result=document.getElementById('result');if(!result)return;
+ const result=document.getElementById('result');if(!result||verifying)return;
  const assert=(/** @type {unknown} */v,/** @type {string} */m)=>{if(!v)throw Error(m);};
  const frames=async(n=6)=>{for(let i=0;i<n;i++)await new Promise(requestAnimationFrame);};
  const state=()=>{const s=engine.scene.rimState;if(!s)throw Error("Native game unavailable");return s;};
  const canvas=/** @type {HTMLCanvasElement} */(document.getElementById('gpu-canvas'));
+ const originalNow=Object.getOwnPropertyDescriptor(performance,'now');
+ let clockFrame=0;
+ const restoreClock=()=>{
+  if(!clockFrame)return;
+  cancelAnimationFrame(clockFrame);clockFrame=0;
+  if(originalNow)Object.defineProperty(performance,'now',originalNow);
+  else Reflect.deleteProperty(performance,'now');
+ };
+ verifying=true;
  try{
   assert(['BrowserWebGpu','Gl'].includes(engine.renderer_backend()),'Actual native renderer');
   const query=new URLSearchParams(location.search),build=document.querySelector('meta[name="engine-build"]')?.getAttribute('content');
@@ -18,6 +28,13 @@ export async function verify(){
   assert(content.environment.info.primitives===19,'Original city geometry');assert(game.collision.shapes.length===1065,'Original convex roofs/arches/columns');assert(game.healthDrops.length===4&&Number.isInteger(game.stagePanel.id),'Authored pooled HP pickups and stage panel');
   view('gate');const city=await capturePixels(canvas);assertForeground(city,'Actual Roman city',40000);
   view('forum');assertChanged(city,await capturePixels(canvas),'Original camera landmarks',20000);
+  // Keep the scripted input and blade sampling at 60 Hz even when rendering
+  // a frame in software takes longer. RAF still runs the real Rust renderer.
+  await frames(1);
+  let now=performance.now();
+  const advanceClock=()=>{now+=1000/60;clockFrame=requestAnimationFrame(advanceClock);};
+  Object.defineProperty(performance,'now',{configurable:true,value:()=>now});
+  clockFrame=requestAnimationFrame(advanceClock);
   view('gate');play();await frames();assert(state().enemies.filter(e=>e.phase!==3).length===1,'First wave: one small orbiter');
   const start=state().player.position;window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW'}));await frames(30);window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW'}));
   assert(state().player.position.z<start.z-.5,'Real keyboard drives collision-aware native player '+JSON.stringify({start,current:state().player}));
@@ -31,7 +48,8 @@ export async function verify(){
   const wounded=state().enemies.find(e=>e.id===enemy.id);
   assert(wounded?.hp===50&&wounded.phase!==3&&state().kills===0,'First gladius swing removes 50 HP without death or a cut');
   assert(state().cuts.queued===0&&state().cuts.pending===0&&state().cuts.pieces===0,'Nonfatal strike never queues worker geometry');
-  await new Promise(r=>setTimeout(r,450));
+  // Finish the 380 ms swing in simulation time before requesting a new one.
+  await frames(14);
   const target=state().enemies.find(e=>e.id===enemy.id);if(!target)throw Error('Wounded opponent disappeared');
   engine.scene.rimInput({teleport:[target.position[0],0,target.position[2]+1.1]});await frames(2);
   engine.scene.rimInput({slash:1});await frames(14);
@@ -45,6 +63,8 @@ export async function verify(){
   await snapshot('impact');await ageTo(.85);
   assert(state().cuts.motion.some(p=>p.distance>.4&&p.direction.some(v=>Math.abs(v)>.1)),'Actual opposite half offsets are visible before dissolve');
   await snapshot('separated');await ageTo(2.05);await snapshot('evaporating');
+  const fadeAge=stages[2].age;
+  assert(state().cuts.pieces>0&&fadeAge!==undefined&&fadeAge>=2.05&&fadeAge<2.25,'Evaporating frame still contains the fading cut fragments');
   assertChanged(stages[0].pixels,stages[1].pixels,'Actual separated render',40);
   assertChanged(stages[1].pixels,stages[2].pixels,'Actual dissolution render',40);
   Reflect.set(window,'rimVisualEvidence',stages.map(({label,png,age})=>({label,png,age})));
@@ -56,4 +76,5 @@ export async function verify(){
   engine.scene.rimInput({reset:true,pause:true});view('gate');
   result.textContent=`PASS: ${engine.renderer_backend()} · original city + 1065 convex shapes, native movement/dash/stamina/jump, one introductory orbiter, two gladius swings, actual Rust worker split geometry, synchronized frame pixels`;
  }catch(error){engine.scene.rimInput({reset:true,pause:true});result.textContent=`FAIL: ${error instanceof Error?error.message:String(error)}`;console.error(error);}
+ finally{restoreClock();verifying=false;}
 }

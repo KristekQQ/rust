@@ -141,11 +141,12 @@ export async function verifyFox(page, verifyHud) {
     };
     const enterGame = async () => {
         const bounds = await canvas.boundingBox();
-        // Puppeteer click dispatches move/down/up concurrently. Deliver the
-        // absolute cursor move while unlocked before the click captures it.
+        // Puppeteer mouse.click dispatches another move alongside the button
+        // events. Send the only absolute move while the cursor is unlocked.
         await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-        await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        await page.mouse.down();
+        await page.mouse.up();
         await waitGameState(true, 'Click enters fullscreen and pointer lock');
         await delay(120);
     };
