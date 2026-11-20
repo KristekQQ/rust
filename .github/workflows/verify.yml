@@ -26,6 +26,10 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --version 0.15.0 --locked
       - run: npm ci
+      - name: Install FFmpeg for Quest Stream playback tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Native, WASM, SDK and software WebGL smoke
         run: npm run verify -- --backend webgl --software --page basic
       - uses: actions/upload-artifact@v4
