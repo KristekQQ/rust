@@ -1,0 +1,507 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lom · živý shader</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080608;color:#fff0e9;font:14px system-ui,sans-serif}canvas{position:fixed;inset:0;width:100%;height:100%}footer{position:fixed;left:5vw;right:5vw;bottom:5vh;display:flex;align-items:end;justify-content:space-between;gap:20px}h1{font:italic 500 clamp(48px,8vw,112px)/.9 Georgia,serif;margin:0 0 12px;letter-spacing:-.07em}p{font:12px monospace;margin:0}nav{display:flex;gap:8px}button{padding:12px 18px;background:#171219d9;color:#fae8df;border:1px solid #897278;border-radius:30px;cursor:pointer}button:first-child{background:#ffe3d0;color:#261b22}@media(max-width:600px){footer{align-items:start;flex-direction:column}}
+#credit{margin-top:6px;font:11px system-ui,sans-serif;color:#decfcf}#credit a{color:inherit}</style><canvas id="screen" aria-label="Průlet temnými krystaly ke žhavému jádru"></canvas><footer><div><h1>Lom</h1><p id="status" role="status">Revision 2019 · studie podle NuSana</p><p id="credit"><a href="https://opengameart.org/content/bitten-by-the-rave-spider" target="_blank" rel="noopener">Bitten by the Rave Spider · Woolly Jammoth</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p></div><nav><button id="play">▶ Spustit</button><button id="choose">Vlastní skladba</button><input hidden id="file" type="file" accept="audio/*"></nav></footer>
+<script type="text/plain" id="vert">
+precision highp float;
+attribute vec2 cornerA,cornerB,cornerC;
+attribute vec3 bary;
+attribute float facet;
+uniform vec2 size;
+uniform float time,travel,impact;
+uniform vec3 band;
+varying vec3 tri,viewNormal,relative;
+varying vec2 face;
+varying float flank;
+const float tau=6.2831853;
+float hash(vec2 p){return fract(sin(dot(p,vec2(72.31,29.69)))*14753.41);}
+// Each stretch has a broad opening followed by a bank folding inward.
+// The envelopes reach zero at the joins so neighbouring stretches meet.
+vec3 stretch(float z){
+ float section=floor(z/38.);
+ float seed=hash(vec2(mod(section,251.),17.));
+ float u=fract(z/38.);
+ float openBay=smoothstep(.0,.16,u)*(1.-smoothstep(.25,.50,u));
+ float throat=smoothstep(.31,.59,u)*(1.-smoothstep(.70,.98,u));
+ return vec3(openBay,throat,seed);
+}
+vec2 axis(float z){
+ vec3 shape=stretch(z);
+ vec2 path=vec2(4.2*sin(z*.155+time*.17)+1.45*sin(z*.29-time*.21),
+                3.05*cos(z*.17+time*.12)+1.15*sin(z*.31+time*.20));
+ vec2 turn=vec2(cos(tau*shape.z),sin(tau*shape.z));
+ return path*(1.-.70*shape.x)+turn*shape.y*(1.6+.5*band.y);
+}
+vec3 wall(vec2 cell){
+ vec2 id=vec2(mod(cell.x,24.),cell.y+floor(travel/1.5)-4.);
+ float z=(id.y+.55*(hash(id)-.5))*1.5;
+ float angle=(id.x+.65*(hash(id.yx+4.)-.5))*tau/24.+.115*z+.43*sin(.24*z-time*.32);
+ float fold=cos(angle*3.+z*.27+time*.52);
+ float radius=2.65+.46*fold+.29*cos(angle*5.-z*.50)+.35*sin(z*.77)+(.82+.28*band.y)*(hash(id+9.)-.5);
+ radius+=impact*(.31*fold+.22*sin(2.*angle-z*.40));
+ vec3 shape=stretch(z);
+ float hand=shape.z>.50?1.:-1.;
+ float sweep=angle-tau*shape.z-hand*(z*.22+time*.67);
+ float bank=.5+.5*cos(sweep);
+ radius+=1.65*shape.x-shape.y*(.18+bank*(.90+.40*impact));
+ radius=max(1.37,radius);
+ angle+=hand*shape.y*(.70+.24*sin(time*2.2)+.26*impact);
+ vec2 ring=vec2(cos(angle),sin(angle))*radius*vec2(1.09,.93);
+ return vec3(axis(z)+ring,z);
+}
+void main(){
+ vec3 a=wall(cornerA),b=wall(cornerB),c=wall(cornerC);
+ // Keep the three shared corners in place. Lift an eccentric fourth point
+ // towards the airway; its crease to the opposite corner forms a long blade.
+ vec2 tile=floor((cornerA+cornerB+cornerC)/3.)+vec2(0.,floor(travel/1.5)-4.);
+ float seed=hash(mod(tile,251.));
+ vec3 root=.10*a+.26*b+.64*c;
+ vec2 radial=root.xy-axis(root.z);
+ float lift=(.22+.62*seed)*(.87+.31*impact);
+ float ripple=.5+.5*cos(root.z*1.12-time*6.+atan(radial.y,radial.x)*2.);
+ lift+=.45*ripple*impact;
+ vec3 tip=root-vec3(normalize(radial)*min(lift,.45*length(radial)),0.);
+ vec3 start=facet<.5?a:facet<1.5?b:c;
+ vec3 end=facet<.5?b:facet<1.5?c:a;
+ vec3 pos=start*bary.x+end*bary.y+tip*bary.z;
+ flank=facet;
+ vec3 section=stretch(travel);
+ vec2 sideSlip=vec2(cos(tau*section.z),sin(tau*section.z))*.34*section.y;
+ vec3 eye=vec3(axis(travel)+sideSlip,travel);
+ vec3 forward=normalize(vec3(axis(travel+3.8)-eye.xy,3.8));
+ vec3 right=normalize(cross(vec3(0.,1.,0.),forward));
+ vec3 up=cross(forward,right);
+ float roll=.14*sin(travel*.16)+(section.z-.5)*1.05*section.y;
+ vec3 side=right*cos(roll)+up*sin(roll);
+ up=cross(forward,side);
+ vec3 delta=pos-eye;
+ relative=vec3(dot(delta,side),dot(delta,up),dot(delta,forward));
+ vec3 n=normalize(cross(end-start,tip-start));
+ viewNormal=vec3(dot(n,side),dot(n,up),dot(n,forward));
+ float depth=relative.z;
+ gl_Position=vec4(relative.x*1.24*size.y/size.x,relative.y*1.24,depth*1.003-.16,depth);
+ tri=bary;
+ face=vec2(seed,(a.z+b.z+c.z)/3.);
+}
+</script>
+<script type="text/plain" id="frag">
+precision highp float;
+uniform float time,impact;
+uniform vec3 band;
+varying vec3 tri,viewNormal,relative;
+varying vec2 face;
+varying float flank;
+void main(){
+ vec3 n=normalize(viewNormal), ray=normalize(relative);
+ if(dot(n,ray)>0.)n=-n;
+ float d=length(relative), farWall=smoothstep(5.,21.,d);
+ // The two banks illuminate different sides as the passage coils.
+ float bankAngle=face.y*.20+time*.16;
+ float bank=dot(ray.xy,vec2(cos(bankAngle),sin(bankAngle)));
+ vec3 heat=mix(vec3(1.65,.40,.11),vec3(1.05,.19,1.22),smoothstep(-.20,.24,bank));
+ float bevel=min(tri.x,min(tri.y,tri.z));
+ float seam=smoothstep(.001,.011,bevel);
+ float ridge=exp(-195.*abs(bevel-.007));
+ vec3 reflected=reflect(ray,n);
+ float flash=pow(max(0.,dot(reflected,normalize(vec3(-.22,.26,.94)))),9.);
+ float shine=pow(max(0.,dot(reflected,normalize(vec3(.55,-.12,.82)))),18.);
+ float grazing=pow(1.-max(0.,dot(n,-ray)),3.);
+ vec3 base=mix(vec3(.008,.007,.011),vec3(.12,.116,.13),pow(face.x,2.8));
+ vec3 col=base*(.32+abs(n.y)*.88)+vec3(.85,.77,.85)*shine*(.55+.80*band.z);
+ col+=heat*(flash*.72+grazing*.13+ridge*(.05+.55*flash))*smoothstep(1.,8.,d);
+ col*=.50+.50*seam;
+ col*=flank>.5&&flank<1.5?.52:1.;
+ col+=vec3(.82,.80,.88)*ridge*(.12+.70*flash);
+ col*=.48+.52*smoothstep(1.,9.,d);
+
+ // Optical depth follows the visible wall; a close outside bend eclipses the glow.
+ float haze=farWall*(.50+.50*farWall);
+ float vapor=sin(relative.y*1.31-time*.9+1.3*sin(relative.x*.86))+sin(relative.x*2.-relative.z*.62);
+ float plume=.63+.16*vapor+.10*sin(relative.y*5.2+vapor);
+
+ col+=heat*haze*plume*(.86+1.52*impact)+vec3(1.30,.76,.91)*pow(haze,3.)*(.72+1.65*impact);
+ gl_FragColor=vec4(pow(1.-exp(-col*1.62),vec3(.83)),1.);
+}
+</script><script src="mesh.js"></script><script>
+const RAVE_BPM = 148;
+
+function createScore(ctx, destination) {
+  const d = 60 / RAVE_BPM / 4;
+  const hz = note => 440 * 2 ** ((note - 69) / 12);
+  const roots = [0, 0, -2, -5];
+  // Each acid event is [pitch offset, accent | slide to next].
+  const patterns = [
+    [[0,1],null,[0,0],[3,2],[7,1],null,[0,0],[-2,0],null,[0,1],[12,2],[10,0],[7,1],null,[3,2],[0,0]],
+    [[0,1],[0,0],null,[7,1],[5,2],[3,0],null,[0,1],[-2,2],[0,0],[12,1],null,[10,0],[7,2],[3,0],[0,1]],
+    [[0,1],null,[12,2],[7,0],null,[0,0],[3,2],[0,1],[0,0],null,[7,0],[10,2],[12,1],null,[3,2],[0,0]],
+    [[0,1],[7,2],[12,0],null,[0,1],[3,2],[7,0],[10,1],null,[12,0],[15,2],[12,1],[7,0],null,[3,2],[0,0]]
+  ];
+  const intro = [[0,1],null,null,[3,2],[7,0],null,null,null,[0,0],null,null,[7,1],null,null,[3,2],[0,0]];
+  const bridge = [[12,1],null,null,null,null,null,[15,2],[12,0],null,null,[7,1],null,null,null,null,null];
+  const brightness = [320, 385, 460, 525, 560, 720, 610, 760, 220, 375, 475, 730, 1010, 730, 850, 1090];
+  const noise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.27), ctx.sampleRate);
+  const samples = noise.getChannelData(0);
+  let seed = 71361;
+  for (let i = 0; i < samples.length; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    samples[i] = seed / 2147483648 - 1;
+  }
+  const driveCurve = new Float32Array(257);
+  for (let i = 0; i < driveCurve.length; i++) {
+    driveCurve[i] = Math.tanh(1.85 * (i / 128 - 1)) / Math.tanh(1.85);
+  }
+  let playing;
+
+  function start(accentAnalyser, onKick) {
+    if (playing) return playing.beginning;
+    const output = ctx.createGain();
+    output.gain.value = 0.91;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -12;
+    compressor.knee.value = 13;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.004;
+    compressor.release.value = 0.095;
+    compressor.connect(output).connect(destination);
+    output.connect(accentAnalyser);
+    const echo = ctx.createGain();
+    echo.gain.value = 0.3;
+    const effects = [];
+    for (const [steps, pan] of [[3, -0.76], [5, 0.76]]) {
+      const delay = ctx.createDelay();
+      delay.delayTime.value = d * steps;
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'bandpass';
+      tone.frequency.value = pan < 0 ? 1870 : 1120;
+      tone.Q.value = 0.48;
+      const feedback = ctx.createGain();
+      feedback.gain.value = 0.3;
+      const stereo = ctx.createStereoPanner();
+      stereo.pan.value = pan;
+      echo.connect(delay).connect(tone);
+      tone.connect(feedback).connect(delay);
+      tone.connect(stereo).connect(compressor);
+      effects.push(delay, tone, feedback, stereo);
+    }
+
+    const sources = new Set();
+    const beginning = ctx.currentTime + 0.045;
+    let step = 0;
+
+    function voice(source, nodes, time, duration) {
+      const ending = time + duration;
+      const active = { source, ending };
+      sources.add(active);
+      source.onended = () => {
+        sources.delete(active);
+        for (const node of [source, ...nodes]) node.disconnect();
+      };
+      source.start(time);
+      source.stop(ending);
+    }
+
+    function kick(time, volume) {
+      onKick(time, volume / 0.87);
+      const body = ctx.createOscillator();
+      const amp = ctx.createGain();
+      body.frequency.setValueAtTime(183, time);
+      body.frequency.exponentialRampToValueAtTime(54, time + 0.039);
+      body.frequency.exponentialRampToValueAtTime(45, time + 0.24);
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.linearRampToValueAtTime(volume, time + 0.002);
+      amp.gain.exponentialRampToValueAtTime(volume * 0.67, time + 0.054);
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + 0.28);
+      body.connect(amp).connect(compressor);
+      voice(body, [amp], time, 0.291);
+      percussion(time, 'click', volume * 0.075);
+    }
+
+    function percussion(time, kind, volume) {
+      const source = ctx.createBufferSource();
+      source.buffer = noise;
+      const filter = ctx.createBiquadFilter();
+      const clap = kind === 'clap';
+      filter.type = clap ? 'bandpass' : 'highpass';
+      filter.frequency.value = clap ? 1660 : kind === 'click' ? 3800 : 7100;
+      filter.Q.value = clap ? 1.05 : 0.28;
+      const amp = ctx.createGain();
+      const stereo = ctx.createStereoPanner();
+      stereo.pan.value = kind === 'closed' ? -0.24 : kind === 'open' ? 0.28 : 0;
+      const length = kind === 'click' ? 0.012 : kind === 'closed' ? 0.036 : 0.15;
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.linearRampToValueAtTime(volume, time + 0.002);
+      if (clap) {
+        amp.gain.exponentialRampToValueAtTime(volume * 0.23, time + 0.011);
+        amp.gain.linearRampToValueAtTime(volume * 0.79, time + 0.014);
+        amp.gain.exponentialRampToValueAtTime(volume * 0.14, time + 0.025);
+        amp.gain.linearRampToValueAtTime(volume * 0.53, time + 0.028);
+      }
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + length);
+      source.connect(filter).connect(amp).connect(stereo).connect(compressor);
+      if (clap) stereo.connect(echo);
+      voice(source, [filter, amp, stereo], time, length + 0.008);
+    }
+
+    function bass(time, pitch, volume) {
+      const body = ctx.createOscillator();
+      const amp = ctx.createGain();
+      body.type = 'triangle';
+      body.frequency.value = hz(pitch);
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.linearRampToValueAtTime(volume, time + 0.014);
+      amp.gain.exponentialRampToValueAtTime(volume * 0.77, time + 0.082);
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + 0.181);
+      body.connect(amp).connect(compressor);
+      voice(body, [amp], time, 0.19);
+    }
+
+    function acidLine(time, pattern, root, cutoffFloor, volume) {
+      const oscillator = ctx.createOscillator();
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.value = hz(root);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 12.5;
+      const drive = ctx.createWaveShaper();
+      drive.curve = driveCurve;
+      drive.oversample = '2x';
+      const amp = ctx.createGain();
+      amp.gain.value = 0.0001;
+      oscillator.connect(filter).connect(drive).connect(amp).connect(compressor);
+      amp.connect(echo);
+
+      pattern.forEach((event, position) => {
+        if (!event) return;
+        const [pitch, flags] = event;
+        const onset = time + position * d;
+        const previous = pattern[position - 1];
+        const slidingIn = previous && (previous[1] & 2);
+        const slidingOut = pattern[position + 1] && (flags & 2);
+        const accented = flags & 1;
+        const level = volume * (accented ? 1.36 : 0.67);
+        const cutoff = cutoffFloor * (accented ? 5.8 : 3.3);
+        if (slidingIn) {
+          oscillator.frequency.setValueAtTime(hz(root + previous[0]), onset);
+          oscillator.frequency.exponentialRampToValueAtTime(hz(root + pitch), onset + d * 0.59);
+        } else {
+          oscillator.frequency.setValueAtTime(hz(root + pitch), onset);
+          filter.frequency.setValueAtTime(cutoffFloor, onset);
+          amp.gain.setValueAtTime(0.0001, onset);
+        }
+        filter.frequency.exponentialRampToValueAtTime(cutoff, onset + (slidingIn ? 0.028 : 0.008));
+        filter.frequency.exponentialRampToValueAtTime(cutoffFloor * (slidingOut ? 1.45 : 0.66), onset + d * 0.91);
+        amp.gain.linearRampToValueAtTime(level, onset + (slidingIn ? 0.024 : 0.005));
+        amp.gain.exponentialRampToValueAtTime(
+          slidingOut ? level * 0.66 : 0.0001, onset + d * (slidingOut ? 0.98 : accented ? 0.84 : 0.66)
+        );
+      });
+      voice(oscillator, [filter, drive, amp], time, d * 16);
+    }
+
+    function stab(time, root, volume, wide) {
+      const notes = wide ? [0, 7, 12, 15, 19, 24] : [0, 7, 12, 15];
+      notes.forEach((pitch, index) => {
+        const oscillator = ctx.createOscillator();
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = hz(root + pitch);
+        oscillator.detune.value = (index % 2 ? 1 : -1) * (5 + index * 2);
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(wide ? 6900 : 3350, time);
+        filter.frequency.exponentialRampToValueAtTime(490, time + 0.19);
+        const amp = ctx.createGain();
+        amp.gain.setValueAtTime(0.0001, time);
+        amp.gain.linearRampToValueAtTime(volume / notes.length, time + 0.008);
+        amp.gain.exponentialRampToValueAtTime(0.0001, time + (wide ? 0.38 : 0.31));
+        const stereo = ctx.createStereoPanner();
+        stereo.pan.value = (index / (notes.length - 1) - 0.5) * 1.7;
+        oscillator.connect(filter).connect(amp).connect(stereo).connect(compressor);
+        stereo.connect(echo);
+        voice(oscillator, [filter, amp, stereo], time, 0.4);
+      });
+    }
+
+    function noiseRise(time) {
+      const source = ctx.createBufferSource();
+      source.buffer = noise;
+      source.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.Q.value = 0.62;
+      const amp = ctx.createGain();
+      const length = d * 15.25;
+      filter.frequency.setValueAtTime(320, time);
+      filter.frequency.exponentialRampToValueAtTime(7950, time + length);
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.exponentialRampToValueAtTime(0.19, time + length * 0.9);
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + length);
+      source.connect(filter).connect(amp).connect(compressor);
+      voice(source, [filter, amp], time, length + 0.005);
+    }
+
+    function sequence(index, time) {
+      const beat = index % 16;
+      const bar = Math.floor(index / 16) % 16;
+      const root = roots[bar % 4];
+      const inBreak = bar >= 8 && bar < 12;
+      const drop = bar >= 12;
+
+      if (beat === 0) {
+        const pattern = bar < 2 ? intro : bar < 8 ? patterns[bar % 4] :
+          bar < 10 ? bridge : patterns[(bar + 1) % 4];
+        acidLine(time, pattern, 41 + root, brightness[bar], inBreak ? 0.12 : drop ? 0.215 : 0.16);
+        if (bar === 11) noiseRise(time);
+      }
+      if (beat % 4 === 0 && (!inBreak || (beat === 0 && bar % 2 === 0))) {
+        kick(time, (beat === 0 ? 0.87 : 0.73) * (inBreak ? 0.68 : 1));
+      }
+      if (beat % 4 === 2 && !inBreak) {
+        percussion(time, 'open', drop ? 0.23 : 0.16);
+        if (bar > 0) bass(time + 0.008, 29 + root, drop ? 0.33 : 0.24);
+      }
+      if (!inBreak && bar >= 2 && beat % 2 === 1) {
+        percussion(time + 0.009, 'closed', beat % 4 === 3 ? 0.119 : 0.081);
+      }
+      if (!inBreak && bar >= 2 && (beat === 4 || beat === 12)) {
+        percussion(time + 0.006, 'clap', drop ? 0.27 : 0.21);
+      }
+      const buildRoll = bar === 11 && beat >= 4 && beat < 15 && (beat % 2 === 0 || beat >= 11);
+      if ((bar === 10 && beat % 4 === 0) || buildRoll) {
+        percussion(time, 'clap', 0.058 + beat * 0.012);
+      }
+      const grooveStab = bar >= 4 && bar < 8 && (beat === 3 || (bar % 2 === 1 && beat === 10));
+      const breakStab = inBreak && (beat === 0 || (bar < 10 && beat === 9));
+      const dropStab = drop && (beat === 0 || beat === 7 || beat === 10);
+      if (grooveStab || breakStab || dropStab) {
+        stab(time, 53 + root, drop ? 0.34 : inBreak ? 0.22 : 0.24, drop || inBreak);
+      }
+      if (bar === 15 && beat === 15) stab(time, 53, 0.21, false);
+    }
+
+    function schedule() {
+      const now = ctx.currentTime;
+      step = Math.max(step, Math.ceil((now + 0.006 - beginning) / d));
+      while (beginning + step * d < now + 0.15) {
+        sequence(step, beginning + step * d);
+        step++;
+      }
+    }
+
+    schedule();
+    const timer = setInterval(schedule, 23);
+    playing = {
+      beginning,
+      stop() {
+        clearInterval(timer);
+        const now = ctx.currentTime;
+        const end = now + 0.025;
+        output.gain.setValueAtTime(output.gain.value, now);
+        output.gain.linearRampToValueAtTime(0, end);
+        for (const active of sources) {
+          if (active.ending > end) active.source.stop(end);
+        }
+        setTimeout(() => {
+          for (const node of [output, compressor, echo, ...effects]) node.disconnect();
+        }, 46);
+      }
+    };
+    return beginning;
+  }
+
+  function stop() {
+    if (!playing) return;
+    playing.stop();
+    playing = undefined;
+  }
+
+  return { start, stop };
+}
+const el=id=>document.getElementById(id),canvas=el('screen'),play=el('play'),statusLine=el('status');
+const kicks=[];
+let ctx,fft,spectrum,score,source,started=false,epoch=0,trackName=statusLine.textContent;
+function setup(){
+ if(ctx)return;
+ ctx=new AudioContext();fft=ctx.createAnalyser();fft.fftSize=1024;fft.smoothingTimeConstant=.22;
+ spectrum=new Uint8Array(fft.frequencyBinCount);fft.connect(ctx.destination);score=createScore(ctx,fft);
+}
+function label(){play.textContent=ctx.state==='running'&&started?'Ⅱ Pauza':'▶ Pokračovat';statusLine.textContent=trackName}
+function startBuffer(buffer,name,loopStart=0){
+ const next=ctx.createBufferSource();next.buffer=buffer;next.loop=true;next.loopStart=loopStart;
+ next.connect(fft);const when=ctx.currentTime;next.start(when);
+ score.stop();if(source){source.stop();source.disconnect()}
+ source=next;epoch=when;started=true;trackName=name;label();
+}
+async function startDefault(){
+ try{
+  const response=await fetch('./bitten_by_the_rave_spider.ogg');
+  if(!response.ok)throw Error('Hudební soubor se nepodařilo načíst.');
+  const buffer=await ctx.decodeAudioData(await response.arrayBuffer());
+  startBuffer(buffer,'140 BPM · Bitten by the Rave Spider',16*4*60/140);
+ }catch{
+  const tap=ctx.createAnalyser();
+  epoch=score.start(tap,(at,strength)=>{kicks.push({at,strength});if(kicks.length>12)kicks.shift()});
+  started=true;trackName='Náhradní syntezátorová stopa · 148 BPM';label();
+ }
+}
+play.onclick=async()=>{
+ play.disabled=el('choose').disabled=true;
+ try{setup();if(started&&ctx.state==='running')await ctx.suspend();
+ else{await ctx.resume();if(!started)await startDefault()}label()}
+ catch(e){statusLine.textContent=e.message}finally{play.disabled=el('choose').disabled=false}
+};
+el('choose').onclick=()=>el('file').click();
+el('file').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;e.target.value='';play.disabled=el('choose').disabled=true;
+ try{setup();await ctx.resume();startBuffer(await ctx.decodeAudioData(await f.arrayBuffer()),f.name)}
+ catch(e){statusLine.textContent='Soubor se nepodařilo načíst.'}finally{play.disabled=el('choose').disabled=false}
+};
+function render(){
+ const gl=canvas.getContext('webgl',{alpha:false,depth:true,antialias:false});
+ if(!gl)throw Error('WebGL není k dispozici.');
+ const program=gl.createProgram();
+ for(const [type,src] of [[gl.VERTEX_SHADER,el('vert').textContent],[gl.FRAGMENT_SHADER,el('frag').textContent]]){
+  const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));gl.attachShader(program,sh);
+ }
+ gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+ const meshCount=bindLomMesh(gl,program);
+ gl.enable(gl.DEPTH_TEST);gl.clearColor(.18,.047,.12,1);
+ const u=Object.fromEntries(['time','size','band','travel','impact'].map(k=>[k,gl.getUniformLocation(program,k)])),levels=[0,0,0];
+ const freqs=[[36,155],[220,1500],[4100,10500]],idle=performance.now();
+ const bassDb=new Float32Array(32);
+ let travel=0,previousTime=0,lastEpoch=-1,previousBass=0,bassFloor=0,impact=0,lastOnset=-1;
+ function frame(now){
+  const scale=Math.min(devicePixelRatio,1.35,1050/Math.max(innerWidth,innerHeight)),w=Math.max(1,Math.round(innerWidth*scale)),h=Math.max(1,Math.round(innerHeight*scale));
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+  if(started&&ctx.state==='running'){fft.getByteFrequencyData(spectrum);freqs.forEach(([lo,hi],k)=>{
+   const unit=ctx.sampleRate/fft.fftSize,a=Math.ceil(lo/unit),b=Math.min(spectrum.length,Math.ceil(hi/unit));let sum=0;
+   for(let i=a;i<b;i++)sum+=spectrum[i]**2;levels[k]=Math.sqrt(sum/Math.max(1,b-a))/255;
+  })}
+  const time=started?Math.max(0,ctx.currentTime-epoch):(now-idle)/1000;
+  if(lastEpoch!==epoch){lastEpoch=epoch;previousTime=time;previousBass=bassFloor=impact=0;lastOnset=-1}
+  const dt=Math.max(0,time-previousTime);previousTime=time;
+  if(dt>0){
+   impact*=Math.exp(-dt/.17);
+   if(started&&!source){
+    const k=kicks.findLast(note=>note.at<=ctx.currentTime);
+    if(k)impact=Math.min(1,k.strength)*Math.exp(-(ctx.currentTime-k.at)/.17);
+   }else if(source){
+    fft.getFloatFrequencyData(bassDb);
+    const bin=ctx.sampleRate/fft.fftSize;let power=0;
+    for(let i=Math.max(1,Math.ceil(34/bin));i<=Math.min(31,Math.ceil(145/bin));i++)power+=10**(bassDb[i]/10);
+    const bass=Math.sqrt(power);
+    if(time-lastOnset>.18 && bass>.006 && bass>bassFloor*1.20 && bass>previousBass+.001){
+     impact=Math.min(1,.65+3*(bass-bassFloor));lastOnset=time;
+    }
+    bassFloor+=(bass-bassFloor)*(1-Math.exp(-dt/.30));previousBass=bass;
+   }
+   travel+=dt*2.25*(4.1+2.3*levels[0]+6.8*impact);
+  }
+  gl.viewport(0,0,w,h);gl.uniform1f(u.time,time);
+  gl.uniform1f(u.travel,travel);gl.uniform1f(u.impact,impact);
+  gl.uniform2f(u.size,w,h);gl.uniform3fv(u.band,levels);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,meshCount);requestAnimationFrame(frame)
+ }
+ requestAnimationFrame(frame);
+}
+try{render()}catch(e){statusLine.textContent=e.message;play.disabled=el('choose').disabled=true}
+</script></html>

@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="cs">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Výboj · Shadertoy</title>
+ <link rel="icon" href="data:,">
+ <style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0a0a0a; color: #f5f5f5; font: 13px system-ui, sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  footer {
+   position: fixed;
+   right: max(12px, env(safe-area-inset-right));
+   bottom: max(12px, env(safe-area-inset-bottom));
+   max-width: calc(100vw - 24px);
+  }
+  nav, .panel, #status {
+   background: #141414ed;
+   border: 1px solid #cccccc55;
+   border-radius: 13px;
+  }
+  nav { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 4px; }
+  #otherScene { color: inherit; padding: 4px; text-underline-offset: 3px; }
+  h1 { margin: 0 7px; color: #eeeeee; font-size: 14px; letter-spacing: .04em; }
+  button, summary {
+   color: inherit;
+   background: transparent;
+   border: 0;
+   border-radius: 8px;
+   padding: 8px 9px;
+   font: inherit;
+   white-space: nowrap;
+   cursor: pointer;
+  }
+  #play { background: #dedede; color: #191919; font-weight: 650; }
+  button:hover:not(:disabled), summary:hover { background: #333333; }
+  #play:hover:not(:disabled) { background: #f4f4f4; }
+  :is(button, summary, a):focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+  button:disabled { opacity: .65; cursor: wait; }
+  summary { list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: " +"; color: #c3c3c3; }
+  details[open] summary::after { content: " −"; }
+  .panel {
+   position: absolute;
+   right: 0;
+   bottom: calc(100% + 6px);
+   width: min(270px, 100%);
+   padding: 12px;
+   line-height: 1.5;
+  }
+  .panel button { border: 1px solid #cccccc55; }
+  .panel p { margin: 8px 0 0; }
+  .credit { font-size: 11px; color: #d9d9d9; }
+  .credit a { color: inherit; }
+  #status {
+   position: absolute;
+   right: 0;
+   bottom: calc(100% + 6px);
+   width: max-content;
+   max-width: 100%;
+   overflow-wrap: anywhere;
+   margin: 0;
+   padding: 6px 10px;
+  }
+  #status:empty { display: none; }
+  .panel #status { position: static; margin-top: 8px; }
+  @media (max-width: 410px) {
+   nav { gap: 3px; }
+   h1 { margin: 0 4px; font-size: 13px; }
+   button, summary { padding-inline: 6px; font-size: 12px; }
+  }
+ </style>
+</head>
+<body>
+ <canvas id="screen" tabindex="0" title="Kameru otočíš tažením nebo šipkami" aria-label="Hudebně animované tornádo. Kameru otočíš tažením nebo šipkami."></canvas>
+ <footer>
+  <nav aria-label="Ovládání náhledu">
+   <h1 id="sceneTitle">Výboj</h1>
+   <a id="otherScene" href="?scena=taveni">Tavení</a>
+   <button id="play" type="button">Přehrát hudbu</button>
+   <button id="autoOrbit" type="button" hidden>Obnovit oblet</button>
+   <button id="choose" type="button">Vlastní skladba</button>
+   <input hidden id="file" type="file" accept="audio/*">
+   <details id="export">
+    <summary>Shadertoy</summary>
+    <div class="panel" id="exportPanel">
+     <button id="copy" type="button" disabled>Kopírovat Image</button>
+     <p>Vlož kód do Image a u iChannel0 vyber hudbu.</p>
+     <p id="lomInfo" hidden>Pro pohyb Lomu a hudební přechody vlož <a id="bufferDownload" download="vir-buffer-a.glsl">vir-buffer-a.glsl</a> do Buffer A. Do jeho iChannel0 připoj Music a do iChannel1 Buffer A. Buffer A připoj také do iChannel1 panelu Image.</p>
+     <p id="shellInfo">Pro scénu po krystalech patří do iChannel1 <a download href="./lastura.png">datová textura lastury</a> (VFlip vypnout). Model <a href="https://github.com/raymondyfei/SharedTestModels">SharedTestModels · CC0</a>.</p>
+     <p class="credit">
+      <a href="https://opengameart.org/content/bitten-by-the-rave-spider" target="_blank" rel="noopener">Bitten by the Rave Spider · Woolly Jammoth</a>
+      · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>
+     </p>
+    </div>
+   </details>
+  </nav>
+  <p id="status" role="status"></p>
+ </footer>
+ <script>
+  const el = id => document.getElementById(id);
+  const canvas = el('screen');
+  const scene = new URLSearchParams(location.search).get('scena');
+  const melting = scene === 'taveni';
+  const vortexOnly = scene === 'vir';
+  if (vortexOnly) {
+   document.title = 'Vír · Kamera podle hudby';
+   el('lomInfo').hidden = false;
+   el('sceneTitle').textContent = 'Vír';
+   el('otherScene').textContent = 'Celé demo';
+   el('otherScene').href = location.pathname;
+   el('shellInfo').hidden = true;
+  }
+  if (melting) {
+   el('shellInfo').hidden = true;
+   document.title = 'Tavení · Shadertoy';
+   el('sceneTitle').textContent = 'Tavení';
+   el('otherScene').textContent = 'Výboj';
+   el('otherScene').href = location.pathname;
+   canvas.setAttribute('aria-label', 'Tající krystaly. Kameru otočíš tažením nebo šipkami.');
+  }
+  const play = el('play');
+  const choose = el('choose');
+  const file = el('file');
+  const copy = el('copy');
+  const exportMenu = el('export');
+  const statusLine = el('status');
+  const idleEpoch = performance.now();
+  let ctx, fft, source;
+  let started = false;
+  let audioEpoch = 0;
+  let statusTimeout;
+  let wakeRenderer = () => {};
+
+  function showStatus(message, persistent = false) {
+   clearTimeout(statusTimeout);
+   statusLine.textContent = message;
+   if (!persistent) statusTimeout = setTimeout(() => { statusLine.textContent = ''; }, 3600);
+  }
+
+  exportMenu.ontoggle = () => {
+   const container = exportMenu.open ? el('exportPanel') : exportMenu.closest('footer');
+   container.append(statusLine);
+  };
+
+  function setupAudio() {
+   if (ctx) return;
+   ctx = new AudioContext();
+   ctx.addEventListener('statechange', () => wakeRenderer());
+   fft = ctx.createAnalyser();
+   fft.fftSize = 1024;
+   fft.smoothingTimeConstant = .22;
+   fft.connect(ctx.destination);
+  }
+
+  function visualTime(now) {
+   return started ? ctx.currentTime - audioEpoch : (now - idleEpoch) / 1000;
+  }
+
+  function startBuffer(buffer, name, loopStart = 0) {
+   const next = ctx.createBufferSource();
+   next.buffer = buffer;
+   next.loop = true;
+   next.loopStart = loopStart;
+   next.connect(fft);
+   audioEpoch = ctx.currentTime;
+   next.start(audioEpoch);
+   if (source) {
+    source.stop();
+    source.disconnect();
+   }
+   source = next;
+   started = true;
+   wakeRenderer();
+   showStatus(name);
+  }
+
+  async function changeAudio(action) {
+   play.disabled = choose.disabled = true;
+   try {
+    setupAudio();
+    await action();
+   } catch (error) {
+    showStatus(error.message, true);
+   } finally {
+    play.textContent = !started ? 'Přehrát hudbu' : ctx.state === 'running' ? 'Pozastavit hudbu' : 'Pokračovat';
+    play.disabled = choose.disabled = false;
+   }
+  }
+
+  play.onclick = () => changeAudio(async () => {
+   if (started && ctx.state === 'running') {
+    await ctx.suspend();
+    return;
+   }
+   await ctx.resume();
+   if (started) return;
+   try {
+    const response = await fetch('../lom/bitten_by_the_rave_spider.ogg');
+    if (!response.ok) throw Error();
+    const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
+    startBuffer(buffer, 'Bitten by the Rave Spider', 16 * 4 * 60 / 140);
+   } catch {
+    throw Error('Skladbu se nepodařilo načíst. Můžeš vybrat vlastní soubor.');
+   }
+  });
+
+  choose.onclick = () => file.click();
+  file.onchange = () => {
+   const track = file.files[0];
+   file.value = '';
+   if (!track) return;
+   changeAudio(async () => {
+    try {
+     const buffer = await ctx.decodeAudioData(await track.arrayBuffer());
+     await ctx.resume();
+     startBuffer(buffer, track.name);
+    } catch {
+     throw Error('Soubor se nepodařilo přehrát.');
+    }
+   });
+  };
+
+  async function copySource(body) {
+   try {
+    await navigator.clipboard.writeText(body);
+    showStatus('Image zkopírován.');
+   } catch {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([body], { type: 'text/plain' }));
+    link.download = 'image.glsl';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 30000);
+    showStatus('Image uložen jako image.glsl.');
+   }
+  }
+
+  // Only the camera has memory: compare a fast kick envelope to its moving
+  // background, then ease towards the next shot instead of jumping on FFT noise.
+  function createVortexDirector() {
+   let fast = 0, slow = 0, cooldown = 0, armed = true, beats = 0;
+   let target = 0, guide = 0, shot = 0, mids = 0, highs = 0;
+   const result = new Float32Array(4);
+   return (dt, low, mid, high, automatic) => {
+    const follow = tau => -Math.expm1(-dt/tau);
+    const level = Math.max(0, (Math.exp(6*low)-1)/(Math.exp(6)-1));
+    fast += (level-fast)*follow(.045);
+    slow += (level-slow)*follow(.48);
+    cooldown -= dt;
+    if (fast-slow < .018) armed = true;
+    if (armed && cooldown <= 0 && fast-slow > .065 && fast > .12) {
+     armed = false;
+     cooldown = .24;
+     if (automatic && ++beats % 4 === 2) target++;
+    }
+    guide += (target-guide)*follow(.24);
+    shot += (guide-shot)*follow(.25);
+    mids += (mid-mids)*follow(.36);
+    highs += (high-highs)*follow(.30);
+    result[0] = shot;
+    result[1] = fast;
+    result[2] = mids;
+    result[3] = highs;
+    return result;
+   };
+  }
+
+  function compileProgram(gl, body) {
+   const vertex = `#version 300 es
+void main() {
+ vec2 corner = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+ gl_Position = vec4(corner * 2. - 1., 0., 1.);
+}`;
+   const fragment = `#version 300 es
+precision highp float;
+precision highp int;
+uniform vec3 iResolution;
+uniform float iTime, iTimeDelta;
+uniform int iFrame;
+uniform vec4 uOrbit;
+uniform vec4 uVortexShot;
+#define VYBOJ_CAMERA_INPUT
+uniform highp sampler2D iChannel0;
+uniform highp sampler2D iChannel1;
+uniform float uShellReadyAt;
+out vec4 pixel;
+${body}
+void main() {
+ mainImage(pixel, gl_FragCoord.xy);
+}`;
+   const program = gl.createProgram();
+   for (const [kind, code] of [[gl.VERTEX_SHADER, vertex], [gl.FRAGMENT_SHADER, fragment]]) {
+    const shader = gl.createShader(kind);
+    gl.shaderSource(shader, code);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
+    gl.attachShader(program, shader);
+    gl.deleteShader(shader);
+   }
+   gl.linkProgram(program);
+   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
+   return program;
+  }
+
+  async function shaderSource(url) {
+   const response = await fetch(url, { cache: 'no-cache' });
+   if (!response.ok) throw Error('Shader se nepodařilo načíst: ' + url);
+   return response.text();
+  }
+
+  // Three texels track LOM motion; three more schedule the musical cuts.
+  function createLomMotion(gl, sourceCode, image, seed) {
+   const program = compileProgram(gl, 'uniform float uSpeedAmount;\n#define LOM_SPEED_AMOUNT uSpeedAmount\n' + sourceCode);
+   gl.useProgram(program);
+   gl.uniform1i(gl.getUniformLocation(program, 'iChannel0'), 0);
+   gl.uniform1i(gl.getUniformLocation(program, 'iChannel1'), 1);
+   gl.uniform1ui(gl.getUniformLocation(program, 'uCueSeed'), seed);
+   const delta = gl.getUniformLocation(program, 'iTimeDelta');
+   const frame = gl.getUniformLocation(program, 'iFrame');
+   const amount = gl.getUniformLocation(program, 'uSpeedAmount');
+   gl.activeTexture(gl.TEXTURE1);
+   const buffers = Array.from({ length: 2 }, () => {
+    const tex = gl.createTexture(), fb = gl.createFramebuffer();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, 6, 1);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw Error('Buffer pohybu Lomu nelze vytvořit.');
+    return { tex, fb };
+   });
+   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+   gl.activeTexture(gl.TEXTURE0);
+   gl.disable(gl.DITHER);
+   gl.useProgram(image);
+   gl.uniform1i(gl.getUniformLocation(image, 'iChannel1'), 1);
+   let read = 0, index = 0, previousTime = 0, previousTrack = null;
+   return clock => {
+    if (source !== previousTrack) { index = 0; previousTrack = source; }
+    gl.useProgram(program);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, buffers[1-read].fb);
+    gl.viewport(0, 0, 6, 1);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, buffers[read].tex);
+    gl.uniform1f(delta, index ? clock-previousTime : 0);
+    gl.uniform1i(frame, index++);
+    gl.uniform1f(amount, started ? .35 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    read = 1-read; previousTime = clock;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, buffers[read].tex);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.useProgram(image);
+   };
+  }
+
+  async function render() {
+   const [sceneSource, lomSource, motionSource, cuesSource] = await Promise.all([
+    shaderSource(melting ? './taveni.glsl' : './image.glsl'),
+    vortexOnly ? shaderSource('../lom-pixel/image.glsl') : null,
+    vortexOnly ? shaderSource('../lom-pixel/motion.glsl') : null,
+    vortexOnly ? shaderSource('./cues.glsl') : null
+   ]);
+   const body = vortexOnly
+    ? '#define VYBOJ_VORTEX_ONLY\n#define mainImage lomMain\n' + lomSource + '\n#undef mainImage\n' + sceneSource
+    : sceneSource;
+   const bufferSource = vortexOnly
+    ? '#define mainImage lomMotion\n' + motionSource + '\n#undef mainImage\n' + cuesSource
+    : '';
+   if (vortexOnly) el('bufferDownload').href = URL.createObjectURL(new Blob([bufferSource], { type: 'text/plain' }));
+   copy.onclick = () => copySource(body);
+   copy.disabled = false;
+
+   const gl = canvas.getContext('webgl2', { depth: false, antialias: false, alpha: false });
+   if (!gl) throw Error('Náhled vyžaduje WebGL 2.');
+   const image = compileProgram(gl, body);
+   gl.useProgram(image);
+   const resolution = gl.getUniformLocation(image, 'iResolution');
+   const time = gl.getUniformLocation(image, 'iTime');
+   gl.uniform1i(gl.getUniformLocation(image, 'iChannel0'), 0);
+
+   // LOM reads its own bands and shares the original 512-bin Music input.
+   const spectrum = new Uint8Array(vortexOnly ? 512 : 182);
+   let lastTime = -1;
+   const camera = gl.getUniformLocation(image, 'uOrbit');
+   const shotInput = gl.getUniformLocation(image, 'uVortexShot');
+   const seed = vortexOnly ? crypto.getRandomValues(new Uint32Array(1))[0] : 0;
+   if (vortexOnly) gl.uniform1ui(gl.getUniformLocation(image, 'uEncounterSeed'), seed);
+   const directVortex = createVortexDirector();
+   const autoButton = el('autoOrbit');
+   let pointer = null, lastX = 0, lastY = 0;
+   let yaw = 0, lift = 0, goalYaw = 0, goalLift = 0;
+   let pathTime = 0, orbitSpeed = 1, drive = 0, cameraStamp = 0;
+   function steer(dx, dy) {
+    autoButton.hidden = false;
+    goalYaw += dx;
+    goalLift = Math.max(-1, Math.min(1, goalLift + dy));
+    schedule();
+   }
+   canvas.onpointerdown = event => {
+    if (pointer !== null || event.button !== 0) return;
+    pointer = event.pointerId;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    canvas.setPointerCapture(pointer);
+   };
+   canvas.onpointermove = event => {
+    if (event.pointerId !== pointer) return;
+    steer((lastX-event.clientX)*2*Math.PI/canvas.clientWidth,
+          (lastY-event.clientY)*1.7/canvas.clientHeight);
+    lastX = event.clientX;
+    lastY = event.clientY;
+   };
+   canvas.onlostpointercapture = event => {
+    if (event.pointerId === pointer) pointer = null;
+   };
+   canvas.onkeydown = event => {
+    const steps = { ArrowLeft: [.17,0], ArrowRight: [-.17,0], ArrowUp: [0,.08], ArrowDown: [0,-.08] };
+    if (steps[event.key]) {
+     event.preventDefault();
+     steer(...steps[event.key]);
+    }
+   };
+   autoButton.onclick = () => {
+    autoButton.hidden = true;
+    // Resume from the current azimuth, and ease back into the vertical sweep.
+    goalLift = 0;
+    canvas.focus();
+    schedule();
+   };
+   const audioTexture = gl.createTexture();
+   gl.bindTexture(gl.TEXTURE_2D, audioTexture);
+   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+   gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 512, 2, 0, gl.RED, gl.UNSIGNED_BYTE, null);
+
+   // A complete placeholder keeps the crystal scene drawable during loading.
+   // Publish the atlas and its reveal time together, only after upload succeeds.
+   let revealFrom = 0;
+   const advanceLom = vortexOnly ? createLomMotion(gl, bufferSource, image, seed) : null;
+   const shellReady = gl.getUniformLocation(image, 'uShellReadyAt');
+   if (!melting && !vortexOnly) {
+    const shellTexture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, shellTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(3));
+    gl.uniform1i(gl.getUniformLocation(image, 'iChannel1'), 1);
+    gl.activeTexture(gl.TEXTURE0);
+    async function preloadShell() {
+     const response = await fetch('./lastura.png');
+     if (!response.ok) throw Error();
+     const atlas = await createImageBitmap(await response.blob(), {
+      colorSpaceConversion: 'none', premultiplyAlpha: 'none', imageOrientation: 'none'
+     });
+     try {
+      if (atlas.width !== 1024 || atlas.height !== 245) throw Error();
+      gl.activeTexture(gl.TEXTURE1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, gl.RGB, gl.UNSIGNED_BYTE, atlas);
+      if (gl.getError() !== gl.NO_ERROR) throw Error();
+      revealFrom = visualTime(performance.now());
+     } finally {
+      gl.activeTexture(gl.TEXTURE0);
+      atlas.close();
+     }
+     schedule();
+    }
+    preloadShell().catch(() => showStatus('Lasturu se nepodařilo načíst. Pokračuje krystalová scéna.', true));
+   }
+   // Only reduce shading resolution after a sustained run of late frames.
+   // Allow a longer stable interval before restoring detail.
+   let quality = 1, lastFrame = 0, elapsed = 0, samples = 0, queued = 0;
+   function schedule() {
+    if (!queued && !document.hidden) queued = requestAnimationFrame(frame);
+   }
+   function frame(now) {
+    queued = 0;
+    const moving = !started || ctx.state === 'running';
+    const dt = now - lastFrame;
+    if (moving && lastFrame && dt > 0 && dt < 500) {
+     elapsed += dt;
+     samples++;
+     if (elapsed >= 600 && elapsed / samples > 24) {
+      quality = Math.max(.60, quality * .86);
+      elapsed = samples = 0;
+     } else if (elapsed >= 2400) {
+      if (elapsed / samples < 18.5) quality = Math.min(1, quality + .065);
+      elapsed = samples = 0;
+     }
+    } else {
+     elapsed = samples = 0;
+    }
+    lastFrame = moving ? now : 0;
+    const longest = Math.max(innerWidth, innerHeight);
+    const full = Math.min(devicePixelRatio, 900 / longest);
+    const scale = Math.min(full, Math.max(460 / longest, full * quality));
+    const width = Math.max(1, Math.round(innerWidth * scale));
+    const height = Math.max(1, Math.round(innerHeight * scale));
+    const resized = canvas.width !== width || canvas.height !== height;
+    const clock = visualTime(now);
+    const seconds = cameraStamp ? Math.min(.10, (now-cameraStamp)/1000) : 1/60;
+    cameraStamp = now;
+    const follow = -Math.expm1(-seconds/.105);
+    yaw += (goalYaw-yaw)*follow;
+    lift += (goalLift-lift)*follow;
+    const settling = Math.abs(goalYaw-yaw)+Math.abs(goalLift-lift) > .0001;
+    const stepTime = lastTime < 0 || clock < lastTime ? 0 : Math.min(.1, clock-lastTime);
+    orbitSpeed += ((autoButton.hidden ? 1 : 0)-orbitSpeed)*(-Math.expm1(-seconds/.26));
+    pathTime += stepTime*orbitSpeed;
+    if (clock < lastTime) revealFrom = 0;
+    lastTime = clock;
+    if (resized) {
+     canvas.width = width;
+     canvas.height = height;
+    }
+    if (started && ctx.state === 'running') {
+     fft.getByteFrequencyData(spectrum);
+     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, spectrum.length, 1, gl.RED, gl.UNSIGNED_BYTE, spectrum);
+    }
+    if (advanceLom) advanceLom(clock);
+    const bass = .62*spectrum[2]+.38*spectrum[4];
+    const body = .48*spectrum[9]+.32*spectrum[21]+.20*spectrum[43];
+    const air = .43*spectrum[74]+.34*spectrum[121]+.23*spectrum[181];
+    const energy = (.56*bass+.32*body+.12*air)/255;
+    drive += (energy-drive)*(-Math.expm1(-stepTime/.55));
+    if (vortexOnly) gl.uniform4fv(shotInput, directVortex(stepTime, bass/255, body/255, air/255, autoButton.hidden));
+    gl.uniform4f(camera, yaw, lift, pathTime, drive);
+    gl.viewport(0, 0, width, height);
+    gl.uniform3f(resolution, width, height, 1);
+    gl.uniform1f(time, clock);
+    if (!melting && !vortexOnly) gl.uniform1f(shellReady, revealFrom);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (moving || settling) schedule();
+   }
+   wakeRenderer = schedule;
+   window.addEventListener('resize', schedule);
+   document.addEventListener('visibilitychange', () => { lastFrame = 0; schedule(); });
+   schedule();
+  }
+
+  render().catch(error => showStatus(error.message, true));
+ </script>
+</body>
+</html>

@@ -1,0 +1,2737 @@
+<!doctype html>
+<html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vesper — shaderové intro</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#08070d;color:#ffefe6;font:15px Inter,system-ui,sans-serif}canvas{position:fixed;inset:0;width:100%;height:100%}main{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(20px,4vw,65px);pointer-events:none}header,footer{display:flex;justify-content:space-between;align-items:center;gap:20px}header{font:12px ui-monospace,monospace;letter-spacing:.14em}header b{font-size:15px}header b:before{content:"";display:inline-block;width:11px;height:11px;background:#ff965e;border-radius:50%;margin-right:12px}header span{color:#b6a6b5}h1{font:italic 500 clamp(64px,10vw,170px)/.83 Georgia,serif;letter-spacing:-.08em;margin:0 0 18px}p{margin:0;font:12px ui-monospace,monospace;color:#dcbdba}nav{pointer-events:auto;display:flex;flex-wrap:wrap;gap:8px}button{background:#19121dcf;color:#fae6de;border:1px solid #70595f;border-radius:28px;padding:12px 18px;font:inherit;cursor:pointer}button:first-child{background:#ffe2cb;color:#25121a;border-color:transparent}button:hover{filter:brightness(1.18)}button:focus-visible{outline:3px solid coral}#status{max-width:65vw;overflow-wrap:anywhere}footer{align-items:flex-end}@media(max-width:800px){footer{align-items:start;flex-direction:column}header{font-size:10px}button{font-size:14px}main{padding:22px}}
+[hidden]{display:none!important}#steer{font-size:11px;color:#d6c9cc;margin-bottom:6px}:fullscreen main{transition:opacity .3s}:fullscreen.hide-controls{cursor:none}:fullscreen.hide-controls main{opacity:0}:fullscreen.hide-controls nav{pointer-events:none}</style>
+<canvas id="screen" aria-label="Průlet organickým fraktálním útesem reagujícím na hudbu"></canvas>
+<main><header><b>VESPER</b><span id="sceneLabel">LASERY / DROP</span></header>
+<footer><div><h1>Vesper</h1><p id="steer">← ↑ ↓ → &nbsp; Volba odbočky</p><p id="status" role="status">Vesper Acid · 148 BPM</p><meter id="liveLevel" aria-label="Síla zvuku z karty" min="0" max="1" value="0" hidden></meter></div><nav aria-label="Přehrávání"><button id="play">▶ Spustit</button><button id="mode">Střídat scény</button><button id="fracture" hidden>Rozpad na devět kusů</button><button id="choose">Vlastní skladba</button><button id="tabAudio" hidden>Zvuk z karty</button><input type="file" id="file" accept="audio/*" hidden><button id="full" title="Celá obrazovka" aria-label="Celá obrazovka">⛶</button></nav></footer></main>
+<script id="tunnel-frag" type="text/plain">
+uniform vec4 tunnelHits; // age and strength of the two most recent bass attacks
+float pulseRing(float r,vec2 hit){
+ float age=hit.x;
+ float wave=.10+.55*age+3.6*age*age;
+ float width=.028+.075*wave;
+ float d=(r-wave)/width;
+ return hit.y*exp(-d*d)*smoothstep(0.,.032,age)*(1.-smoothstep(.56,.77,age));
+}
+vec3 tunnel(vec2 p){
+ p=layerPoint(p,1.5)-.13*vec2(sin(time*.8),cos(time*.63));
+ float r=max(length(p),.008), a=atan(p.y,p.x);
+ float shock=pulseRing(r,tunnelHits.xy)+pulseRing(r,tunnelHits.zw);
+ float z=1./(r+.08+.026*shock), travel=z+time*1.65+2.35*passageEye.z;
+ float twist=a+.58*sin(z*.82-time*.38)+.2*time+.49*percussion.y*sin(.74*z-.38*time);
+ float ribs=abs(fract(travel*1.65)-.5);
+ float seams=abs(sin(6.*twist));
+ vec3 tint=mix(vec3(.03,1.1,.86),vec3(.37,.06,.94),.5+.5*cos(twist*3.+travel*.8));
+ float edge=exp(-25.*ribs)+.32*exp(-6.*ribs);
+ float rail=exp(-22.*seams);
+ float depth=smoothstep(.035,.55,r);
+ vec3 flare=smoothstep(.05,.23,r)*shock*(.30+.80*edge)*mix(tint,vec3(.74,1.,1.),.42);
+ float glint=percussion.z*rail*pow(.5+.5*cos(3.*twist+travel*1.9),4.);
+ return 1.55*flare+depth*glint*vec3(.78,.87,1.24)+vec3(.009,.014,.03)+depth*tint*(edge*(.38+.9*band.x)+rail*(.32+band.z+1.5*percussion.z))+
+   depth*vec3(.58,.92,.9)*rail*edge;
+}
+</script>
+<script src="../lom/mesh.js"></script><script src="concert.js"></script><script src="prague-sky.js"></script>
+<script id="meeting-fog" type="text/plain">
+precision highp float;
+uniform sampler2D plate;
+uniform vec2 size;
+uniform float clock;
+vec3 depthBins(float z){
+ float slice=clamp((z-1.4)/.72,0.,2.);
+ return max(vec3(0.),1.-abs(slice-vec3(0.,1.,2.)));
+}
+// RGB stores density at three distances from the viewer, near to far.
+void main(){
+ vec2 screen=(2.*gl_FragCoord.xy-size)/size.y;
+ vec3 density=vec3(0.);
+ float halfWidth=size.x/size.y;
+ for(int nozzle=0;nozzle<2;nozzle++){
+  float side=float(nozzle)*2.-1.,period=.49+.04*side;
+  float stream=clock/period+.42*float(nozzle);
+  for(int j=0;j<16;j++){
+   float birth=floor(stream)-float(j),age=(fract(stream)+float(j))*period;
+   if(birth<0. || age>7.3)continue;
+   // Packets leave the same outlets with different inward momentum.
+   // The slower exhaust rolls up the wings while the stronger jets meet.
+   float lane=mod(birth+float(nozzle)*2.,5.);
+   float edgeFlow=lane<2.?1.:(lane<3.?.58:0.);
+   float join=clamp(age/mix(3.1,5.1,edgeFlow),0.,1.);
+   float momentum=(1.-join)*(1.-join);
+   float rise=max(0.,age-3.1),seed=birth*2.39996+side*1.7;
+   // The opposed horizontal velocities decay to zero at the meeting point.
+   // Warm mixed air then accelerates upward towards its terminal rise speed.
+   float y=-.94+mix(.17,.20,edgeFlow)*age+(1.-edgeFlow)*.15*(rise-(1.-exp(-1.6*rise))/1.6);
+   float mixing=smoothstep(1.15,3.25,age);
+   float drift=.11*sin(.93*clock-2.6*y)+.065*sin(1.7*y+.37*clock);
+   float curl=seed+age*1.18;
+   float depth=2.35+.25*side*momentum+mixing*(.51*sin(curl)-.11*rise);
+   float outer=.83+.12*sin(.78*age+seed);
+   float laneX=mix(momentum,outer+(1.-outer)*momentum,edgeFlow);
+   float x=side*.98*halfWidth*laneX+mixing*(drift+.14*cos(curl))+.055*join*sin(seed);
+   vec2 center=vec2(x,y)*2.35/depth;
+   float spread=.105+.145*sqrt(age)+.045*rise;
+   vec2 radius=vec2(spread*(1.42+.34*edgeFlow),.13+.133*age)*2.35/depth;
+   radius.x*=clamp(halfWidth/1.6,.66,1.45);
+   vec2 pos=screen-center;
+   if(dot(pos,pos)>dot(radius,radius))continue;
+   float angle=side*(.16+.26*join)+.31*mixing*sin(curl);
+   pos=mat2(cos(angle),sin(angle),-sin(angle),cos(angle))*pos;
+   vec2 q=.5*pos/radius;
+   q.x*=mod(birth,2.)*2.-1.;
+   if(max(abs(q.x),abs(q.y))>.55)continue;
+   q+=.035*vec2(sin(8.*q.y+.71*age+seed),cos(9.*q.x-.46*age+seed));
+   vec2 uv=.5+q*vec2(1.,-1.);
+   vec2 edge=smoothstep(vec2(0.),vec2(.045),min(uv,1.-uv));
+   float mass=texture2D(plate,clamp(uv,0.,1.)).r*edge.x*edge.y;
+   mass*=smoothstep(0.,.19,age)*(1.-smoothstep(4.1,7.3,age))*(.90+.10*sin(seed));
+   mass*=mix(1.-.40*smoothstep(2.2,4.9,age),1.12,edgeFlow);
+   density+=mass*depthBins(depth);
+  }
+ }
+ // Look through a train of rolling billows launched at the viewer's feet.
+ // Perspective comes from the ray intersections and the distance to each
+ // billow, so its curls stay attached as it recedes towards the stage.
+ vec3 ray=vec3(screen/2.35,1.);
+ float flow=clock/1.05, footLight=0.;
+ for(int j=0;j<9;j++){
+  float birth=floor(flow)-float(j);
+  if(birth<0.)continue;
+  float age=(fract(flow)+float(j))*1.05;
+  float side=mod(birth,2.)*2.-1.,seed=birth*2.39996;
+  float z=-.35+1.06*age+.54*(1.-exp(-1.9*age));
+  float lift=smoothstep(2.2,7.4,age);
+  float loft=1.-exp(-1.35*age);
+  vec3 center=vec3(side*(.53+.21*sin(seed))+.14*sin(.66*age+seed),
+                   -1.18+.48*loft+.065*sin(.86*age+seed)+.57*lift,z);
+  float scale=.94+.14*cos(seed);
+  vec3 radii=scale*vec3(.43+.14*loft+.018*age,.29+.16*loft+.018*age,.68+.12*loft+.045*age);
+  vec3 d=ray/radii,c=center/radii;
+  float dd=dot(d,d),mid=dot(d,c)/dd;
+  float chord=1.-dot(mid*d-c,mid*d-c);
+  if(chord<=0.)continue;
+  float halfChord=sqrt(chord/dd);
+  float entry=max(.12,mid-halfChord),exitZ=mid+halfChord;
+  if(exitZ<=entry)continue;
+  float trans=1.;
+  for(int k=0;k<5;k++){
+   float sampleZ=mix(entry,exitZ,(float(k)+.5)/5.);
+   vec3 local=(sampleZ*ray-center)/radii;
+   float roll=.56*sin(.67*age+seed)+.30*local.y;
+   vec2 fold=mat2(cos(roll),sin(roll),-sin(roll),cos(roll))*local.xz;
+   vec2 uv=.5+.42*vec2(side*fold.x+.28*fold.y,-local.y+.23*fold.y);
+   uv+=.045*vec2(sin(local.y*5.+age*.72+seed),cos(fold.x*6.-age*.51+seed));
+   float curl=texture2D(plate,clamp(uv,0.,1.)).r;
+   float shell=1.-smoothstep(.52,1.,length(local));
+   float mass=3.85*curl*shell*(exitZ-entry)/5.*(1.-smoothstep(5.9,8.8,age));
+   density+=mass*depthBins(sampleZ);
+   // Separate illumination of the near-facing surface from its dark interior.
+   float facing=clamp(.54+.42*local.y-.36*local.z,0.,1.);
+   footLight+=trans*(1.-exp(-mass))*facing*(1.-smoothstep(1.6,5.1,sampleZ));
+   trans*=exp(-mass);
+  }
+ }
+ gl_FragColor=vec4(1.-exp(-1.45*density),1.-exp(-1.8*footLight));
+}
+</script>
+<script id="frag" type="text/plain">
+precision highp float;
+uniform vec2 size;
+uniform float time, showBeat, flight;
+uniform sampler2D vortexView,fogVolume;
+uniform bool hasVortex, wholeFracture;
+uniform float grainTone;
+uniform vec3 impactTrail; // the same accent at +80, +160 and +240 ms after impact
+uniform vec3 musicCue; // preparation, impact, preanalysed track
+uniform vec2 tourScenes;
+uniform bool chromPassage;
+uniform vec3 percussion; // kick, snare attack and high-frequency attack
+uniform vec3 band;
+uniform vec4 accents, wallAges;
+uniform vec3 camPos, camForward, camRight, camUp;
+uniform sampler2D starChart;
+uniform vec2 chartSize;
+uniform vec4 featuredStars[3];
+uniform float mood;
+uniform vec2 rave; // phrase intensity and signed kick accent
+mat2 turn(float a){float c=cos(a),s=sin(a);return mat2(c,s,-s,c);}
+// Displacement in units of the exit plane's distance from the resting eye.
+vec3 passageEye;
+vec2 layerPoint(vec2 ray,float depth){
+ return ray*(1.-passageEye.z/depth)+passageEye.xy/depth;
+}
+vec3 local(vec3 p){
+ p.xy=turn(-.34-.12*sin(time*.22)+.27*percussion.y)*p.xy;
+ p.yz=turn(.54+.26*sin(time*.29))*p.yz;
+ return p;
+}
+// Cut the rotating ribbon into persistent angular pieces, so each fragment
+// returns to its own place as the transient decays.
+float surface(vec3 p,float opening){
+ p=local(p);
+ float radial=length(p.xy),a=atan(p.y,p.x),wave=3.*a-time*.74;
+ vec2 q=vec2(radial-1.02-.21*percussion.x-(.115+.11*percussion.y)*cos(wave),p.z-.22*sin(wave));
+ float twist=1.5*a+.43*sin(wave)+time*.32+.62*percussion.y;
+ if(!wholeFracture && musicCue.z>.5){
+  // Tension twists the actual cross-section before the hit. The release
+  // follows both lips around the ring, using delayed samples of that hit.
+  twist+=musicCue.x*(.28+.22*sin(2.*a));
+  float phase=1.5*(1.-cos(a-.48))*.999;
+  vec4 taps=vec4(musicCue.y,impactTrail);
+  vec3 weights=clamp(phase-vec3(0.,1.,2.),0.,1.);
+  float release=taps.x+dot(taps.yzw-taps.xyz,weights);
+  opening=clamp(opening+release,0.,1.);
+ }
+ // Broad corrugations change the silhouette and the reflected studio lights.
+ if(!wholeFracture){
+  twist+=grainTone*(.23*sin(6.*a+.31*time)+.12*sin(11.*a-.19*time));
+  q.y-=grainTone*.033*cos(12.*a+.35*time);
+ }
+ float cut=-2.;
+ if(wholeFracture && opening>.001){
+  const float pitch=6.2831853/9.;
+  float sector=(a+.055*sin(3.*a+.8)+.038*sin(2.*a-.4))/pitch+4.5;
+  float id=mod(floor(sector),9.);
+  float seed=fract(id*.618034+.17);
+  float lift=opening*(.40+.60*seed);
+  q-=lift*vec2(.34,.39*sin(4.2*id+1.));
+  twist+=lift*(seed-.5)*2.2;
+  float edge=.5-abs(fract(sector)-.5);
+  cut=(.20*opening-edge)*pitch*radial;
+ }
+ q=turn(twist)*q;
+ vec2 axes=vec2(.31+band.x*.10+.14*percussion.x,.115+band.x*.035);
+ float ribbon=(length(q/axes)-1.)*axes.y;
+ if(!wholeFracture && opening>.001){
+  // Follow both lips of the half-twisted strip on a single double cover.
+  // Crossing the angular seam swaps the local lips but keeps the chip ID.
+  const float pitch=6.2831853/22.;
+  float side=q.x<0.?-1.:1.;
+  float angle=a+(side<0.?6.2831853:0.);
+  float cell=(angle+.041*sin(4.*angle)+.026*cos(7.*angle))/pitch;
+  float id=mod(floor(cell),44.),seed=fract((id+.5)*.618034);
+  vec2 lip=vec2(abs(q.x),side*q.y);
+  float burst=smoothstep(.43,.98,opening);
+  float root=axes.x*(.71+.048*sin(3.*angle+.8)+.032*cos(9.*angle)
+                      -burst*(.24+.20*seed));
+  float spine=max(ribbon,lip.x-root-.27*lip.y);
+  float peel=opening*smoothstep(.04,.77,opening+.42*seed);
+  vec2 offset=peel*vec2(.09+.22*seed,.105*sin(2.7*id+.4))
+             +burst*vec2(.08+.12*seed,.16*cos(2.7*id));
+  vec2 chip=turn(peel*(seed-.5)*1.85)*(lip-vec2(root,0.)-offset)+vec2(root,0.);
+  float shell=(length(chip/axes)-1.)*axes.y;
+  float ends=(abs(fract(cell)-.5)-(.5-peel*(.085+.12*seed)))*pitch*radial;
+  float flake=max(shell,max(root+.27*chip.y-chip.x,ends));
+  if(burst>.001){
+   // A second, oblique fault splits the tip off each lifted scale.
+   // Both shards use the same rest-space plane, so they fit again on release.
+   float tipRoot=mix(root,axes.x,.49+.14*seed);
+   float slope=.53*sin(1.9*id+.6);
+   flake=max(flake,chip.x-tipRoot+slope*chip.y);
+   vec2 tipPivot=vec2(tipRoot,0.);
+   vec2 flight=burst*vec2(.09+.21*seed,.22*cos(id*2.1+.7));
+   vec2 tip=turn(burst*(seed-.5)*3.6)*(chip-tipPivot-flight)+tipPivot;
+   float tipShell=(length(tip/axes)-1.)*axes.y;
+   float tipFace=tipRoot-tip.x-slope*tip.y;
+   float tipEnds=ends+pitch*radial*.085*burst;
+   flake=min(flake,max(tipShell,max(tipFace,tipEnds)));
+  }
+  return min(spine,flake);
+ }
+ return mix(ribbon,max(ribbon,cut),smoothstep(.001,.19,opening));
+}
+vec3 studio(vec3 r){
+ float a=atan(r.y,r.x), h=r.z+.18*sin(3.*a+time*.18);
+ vec3 c=mix(vec3(.022,.014,.047),vec3(.33,.10,.17),.5+.5*r.y);
+ c+=vec3(1.6,.49,.16)*exp(-9.*abs(h+.24));
+ c+=vec3(2.5,1.68,1.02)*exp(-28.*abs(h+.12));
+ c+=vec3(.52,.36,1.25)*exp(-8.*abs(h-.42));
+ c+=vec3(1.4,1.45,1.9)*exp(-36.*abs(h-.55));
+ return c;
+}
+vec3 chromeRibbon(vec2 uv){
+ float opening=smoothstep(.12,.78,percussion.x+.26*percussion.y);
+ if(!wholeFracture && musicCue.z>.5)
+  opening=.54*opening*(1.-.90*musicCue.x);
+ float fit=min(1.,size.x/size.y*.96);
+ if(!wholeFracture)fit*=.94-.10*smoothstep(.43,.98,opening);
+ if(!wholeFracture)uv=turn(.055*musicCue.x)*uv*vec2(1.+.085*musicCue.x,1.-.045*musicCue.x);
+ vec2 screen=uv/fit;
+ vec3 ro=vec3(passageEye.xy*(2.9/(2.12*fit)),3.95-2.9*passageEye.z);
+ vec3 rd=normalize(vec3(screen,-2.12));
+ screen=layerPoint(uv,2.3)/fit;
+ float fog=exp(-1.8*length(screen*vec2(.89,1.2)-vec2(.22,.03)));
+ vec3 col=vec3(.010,.007,.018)+fog*vec3(.050,.015,.035);
+ float closest=1.,edgeDepth=0.;
+ float t=max(.015,2.05-2.9*passageEye.z),d=1.;
+ for(int i=0;i<84;i++){
+  d=surface(ro+rd*t,opening);
+  if(d<closest){closest=d;edgeDepth=t;}
+  if(d<.0015 || t>5.6-2.9*passageEye.z) break;
+  t+=max(.001,d*.80);
+ }
+ // Reuse the nearest point on this ray to scatter light off the actual
+ // silhouette, including the inner rim and the individual flying flakes.
+ vec3 edgePoint=local(ro+rd*edgeDepth);
+ float warmth=.5+.5*sin(2.2*edgePoint.x+1.4*edgePoint.z+.24*time);
+ vec3 edgeLight=mix(vec3(.58,.19,1.32),vec3(1.55,.49,.17),smoothstep(.13,.87,warmth));
+ vec3 hotEdge=mix(edgeLight,vec3(1.45,1.24,1.34),.64);
+ float power=.98+.24*band.z+.23*percussion.y;
+ if(d>=.0015){
+  float gap=max(0.,closest-.0015);
+  // Project the ray clearance onto the image plane, so the scattering
+  // widths also follow the apparent contour during a camera move.
+  float spread=gap*3.95/max(edgeDepth,1.);
+  vec2 haze=exp(-spread*vec2(49.,16.));
+  col+=power*(hotEdge*1.65*exp(-spread*155.)
+             +edgeLight*(.91*haze.x+.28*haze.y));
+ }else{
+  vec3 p=ro+t*rd; vec2 e=vec2(.0016,0.);
+  vec3 n=normalize(vec3(surface(p+e.xyy,opening)-surface(p-e.xyy,opening),surface(p+e.yxy,opening)-surface(p-e.yxy,opening),surface(p+e.yyx,opening)-surface(p-e.yyx,opening)));
+  vec3 r=reflect(rd,n), lp=local(p);
+  float a=atan(lp.y,lp.x);
+  float grooves=.5+.5*cos(a*110.+lp.z*44.);
+  if(!wholeFracture){
+   float brush=sin(23.*a+6.*lp.z+.28*time);
+   vec3 tangent=rd-n*dot(rd,n);
+   n=normalize(n+.18*grainTone*brush*tangent);
+   r=reflect(rd,n);
+  }
+  vec3 metal=studio(r)*mix(vec3(.97,.64,.52),vec3(.75,.68,1.),.5+.5*sin(a+time*.2+band.y));
+  if(!wholeFracture){
+   vec3 satin=vec3(dot(metal,vec3(.24,.60,.16)))*vec3(.73,.82,1.13);
+   metal=mix(metal,satin,grainTone*.57);
+  }
+  metal*=.88+.12*grooves;
+  float rim=pow(1.-clamp(dot(n,-rd),0.,1.),2.6);
+  col=metal+power*rim*(1.58*edgeLight+1.32*rim*hotEdge)+pow(max(0.,dot(r,normalize(vec3(.6,.75,.3)))),32.)*vec3(1.5,1.1,.7)*(.35+2.*band.z);
+ }
+ return col;
+}
+// SHARED_TUNNEL
+float auroraHeight(float x,float z){
+ return (.13+.19*band.x)*sin(2.8*x+time*.27)+.24*sin(x*1.13-time*.24)+.08*cos(5.*x+z*2.)-.16+z*.32
+        +.31*percussion.x*sin(2.5*x+1.95*z)+.16*percussion.y*cos(6.*x-2.4*z);
+}
+// An unresolved star spreads its light over a pixel even at the smaller render sizes.
+vec3 skySeed(vec2 cell){
+ vec3 h=fract(cell.xyx*vec3(.1031,.1030,.0973));
+ h+=dot(h,h.yxz+33.33);
+ return fract((h.xxy+h.yzz)*h.zyx);
+}
+float skyMist(vec2 p){
+ vec2 i=floor(p),f=fract(p);
+ f=f*f*(3.-2.*f);
+ return mix(mix(skySeed(i).x,skySeed(i+vec2(1,0)).x,f.x),
+            mix(skySeed(i+vec2(0,1)).x,skySeed(i+1.).x,f.x),f.y);
+}
+vec3 starTint(float bv){
+ return mix(vec3(.76,.84,1.),vec3(1.,.77,.55),smoothstep(.05,.84,bv));
+}
+vec3 chartStars(vec2 p){
+ vec2 xy=(size+p*size.y)*.5;
+ vec2 cell=floor(xy/12.);
+ if(any(lessThan(cell,vec2(0.))) || cell.x*4.>=chartSize.x || cell.y>=chartSize.y)return vec3(0.);
+ vec3 color=vec3(0.);
+ for(int i=0;i<4;i++){
+  vec4 star=texture2D(starChart,(vec2(cell.x*4.+float(i),cell.y)+.5)/chartSize);
+  if(star.b==0.)break;
+  vec2 offset=12.*(fract(xy/12.)-(2.*star.rg-.5));
+  float mag=8.-10.2*star.b;
+  float intensity=.22*exp2(.88*(3.6-mag));
+  color+=starTint(star.a)*intensity*exp(-dot(offset,offset)/1.02);
+ }
+ return color;
+}
+vec3 beacon(vec2 delta,vec3 tint,float radius,float strength){
+ float r2=dot(delta,delta);
+ if(r2>.012)return vec3(0.);
+ float d=r2/(radius*radius);
+ // A compact white core sits inside a much fainter, chromatic scattering halo.
+ return strength*(vec3(1.,.98,.95)*exp(-.72*d)
+        +tint*(.42*exp(-.095*d)+.07*exp(-.009*d)));
+}
+vec3 solarStar(vec2 delta,float pixel){
+ float d=length(delta);
+ if(d>.21)return vec3(0.);
+ float heat=smoothstep(.12,.85,band.x);
+ float radius=.020;
+ vec2 q=delta/radius;
+ float r=d/radius,aa=pixel/radius;
+ vec2 dir=q/max(r,.001);
+ float angle=atan(dir.y,dir.x+.00001);
+ float surface=1.-smoothstep(1.-.5*aa,1.+.5*aa,r);
+ float mu=sqrt(max(0.,1.-r*r));
+ float granules=skyMist(q*3.4+vec2(time*.13,0.));
+ vec3 disc=mix(vec3(2.1,.73,.20),vec3(3.9,2.8,1.70),mu*(.66+.34*granules));
+ float height=max(0.,r-1.);
+ // Curved streamers split as they fan out from the limb.
+ float bend=angle+.12*log(1.+height)*sin(3.*angle+.22*time);
+ float fan=.5+.5*cos(5.*bend+.9*sin(3.*bend-.21*time));
+ float filaments=.5+.5*cos(17.*bend+1.6*sin(6.*bend+.27*time));
+ float extent=.54+(1.35+.88*heat)*fan*fan;
+ float corona=exp(-height/extent)*(.14+.31*fan*fan+.24*filaments*filaments);
+ // One tilted plasma arch, with both footpoints hidden by the photosphere.
+ vec2 arc=turn(.57)*q-vec2(1.01,.03);
+ float ellipse=length(arc/vec2(.76+.19*heat,.52));
+ float loop=exp(-abs(ellipse-1.)/max(.13,aa*1.4));
+ float edge=1.-smoothstep(.15,.21,d);
+ return edge*(disc*surface+(1.-surface)*(vec3(1.55,.62,.16)*corona
+       +vec3(1.15,.24,.06)*loop)+vec3(.15,.072,.022)*exp(-.43*height));
+}
+vec3 nightSky(vec2 p){
+ float pixel=2./size.y;
+ float horizon=1.-smoothstep(-1.,.32,p.y);
+ vec3 sky=mix(vec3(.004,.008,.019),vec3(.019,.027,.040),horizon)+chartStars(p);
+ for(int i=0;i<3;i++){
+  vec4 star=featuredStars[i];
+  vec2 offset=p-star.xy;
+  vec3 tint=starTint(star.z);
+  float strength=clamp(1.9-.24*star.w,.85,2.15);
+  if(i==0)sky+=solarStar(offset*2.25,pixel*2.25)*mix(vec3(1.),tint,.58)*strength*.72;
+  else sky+=beacon(offset,tint,max(.0032,pixel*.85),strength);
+ }
+ return sky;
+}
+// Average the luminous hem across the depth interval between two folds.
+float auroraHem(float a,float b){
+ const float width=.020;
+ float span=b-a;
+ if(abs(span)<.001)return exp(-abs(.5*(a+b))/width);
+ vec2 h=vec2(a,b);
+ vec2 integral=sign(h)*(1.-exp(-abs(h)/width));
+ return width*(integral.y-integral.x)/span;
+}
+vec3 aurora(vec2 p){
+ vec3 col=nightSky(p);
+ // Off-axis refraction bends the curtain while its centre stays in focus.
+ float side=p.x*size.y/size.x;
+ float lens=smoothstep(.48,1.04,abs(side));
+ vec2 ray=p;
+ ray.x*=1.-.105*lens;
+ ray.y-=lens*(.13+.055*sin(.59*time+2.2*side)+.065*percussion.x);
+ // A pleat rolls through the curtain. Each depth layer has its own
+ // tangent, so the illuminated edge winds through the fabric.
+ float focus=.51*sin(.63*time)+.15*sin(.94*time+.8);
+ float beatHeat=smoothstep(.10,.84,percussion.y);
+ float roll=.62*time+.42*percussion.x;
+ float glintX=focus+.22*sin(1.15*time+.55);
+ float lastHeight=0.;
+ for(int i=0;i<20;i++){
+  float z=float(i)/19.;
+  vec2 sheet=layerPoint(ray,.72+.72*z);
+  float dx=sheet.x-focus;
+  float gather=exp(-8.6*dx*dx);
+  float curl=5.6*dx+4.9*z-roll;
+  float flare=gather*(.70+.30*beatHeat);
+  float x=sheet.x*.93+.12+z*.63+.11*flare*cos(curl);
+  float h=sheet.y-auroraHeight(x,z)-.14*flare*sin(curl);
+  // A travelling fold gathers the filaments at their luminous lower edge.
+  float phase=3.5*x-.92*time+1.15*z+.35*sin(4.3*x+.32*time);
+  float crest=.5+.5*cos(phase);
+  crest*=crest;crest*=crest;
+  float fold=crest*(.43+.57*percussion.y);
+  h-=.077*fold*(1.-.5*z);
+  float previous=i==0?h:lastHeight;
+  float hem=auroraHem(previous,h);
+  float midHeight=.5*(previous+h);
+  lastHeight=h;
+  float strand=x*61.+5.*sin(x*5.+time*.21)+4.8*fold*exp(-5.*abs(h));
+  float rays=.58+.42*pow(.5+.5*sin(strand),2.);
+  float veil=exp(-max(midHeight,0.)*(7.-band.y*2.))*smoothstep(-.026,.014,midHeight);
+  vec3 tint=mix(vec3(.04,.96,.64),vec3(.55,.13,.98),smoothstep(.10,.54,h+z*.29));
+  col+=tint*veil*rays*(.07+band.z*.10+.20*percussion.z)+mix(vec3(.16,.47,.32),vec3(.45,1.,.78),fold)*hem*(.082+.23*fold);
+  // Narrow warm tangent inside a wider violet scattering lobe.
+  float tangent=smoothstep(.04,.98,cos(curl));
+  float sweep=sheet.x-glintX+.12*(z-.5);
+  float spark=exp(-29.*sweep*sweep)*tangent;
+  float glint=spark*(.40+1.45*beatHeat+.29*percussion.z);
+  col+=glint*(vec3(.79,.42,.16)*hem*.84
+            +vec3(.22,.048,.29)*exp(-abs(h)*13.))*(.38+.62*rays);
+  // Grazing light catches the silhouette on the front and rear folds.
+  if(lens>0. && (i==0 || i==19)){
+   float caustic=.45+.55*crest;
+   float split=lens*(.009+.024*percussion.z+.010*fold);
+   float aa=max(.0065,2.2/size.y);
+   vec2 gap=abs(vec2(h+split,h-split));
+   vec2 fringe=exp(-gap/(aa+.005))+.29*exp(-gap/.039);
+   vec3 ice=vec3(.12,1.40,1.56), rose=vec3(1.40,.26,.77);
+   col+=lens*caustic*(i==0?1.:.62)*(ice*fringe.x+rose*fringe.y);
+  }
+ }
+ return col;
+}
+vec3 fogLayers(vec2 p){
+ vec3 result;
+ for(int i=0;i<3;i++){
+  vec2 q=layerPoint(p,1.4+.72*float(i));
+  vec2 uv=.5+.5*q*vec2(size.y/size.x,1.);
+  result[i]=texture2D(fogVolume,clamp(uv,0.,1.))[i];
+ }
+ return result;
+}
+vec3 lasers(vec2 p){
+ const float lens=1.64,zLamp=3.65;
+ vec3 layers=fogLayers(p);
+ float mist=1.-exp(-1.35*dot(layers,vec3(.86,1.,.96)));
+ vec3 col=vec3(.014,.005,.025)+mist*vec3(.17,.155,.205);
+ vec2 footUV=.5+.5*layerPoint(p,1.4)*vec2(size.y/size.x,1.);
+ float footLight=texture2D(fogVolume,clamp(footUV,0.,1.)).a;
+ vec3 floorTint=mix(vec3(.75,.39,.58),vec3(.34,.46,.81),smoothstep(-.85,.85,p.x));
+ col+=footLight*floorTint;
+ for(int i=0;i<2;i++){
+  float side=2.*float(i)-1.;
+  vec2 lamp=vec2(side*min(.91,.76*size.x/size.y),.46);
+  vec2 screen=layerPoint(p,zLamp),delta=screen-lamp;
+  vec3 tint=i==0?vec3(1.53,.034,.23):vec3(.17,.22,1.64);
+  vec2 inward=normalize(-lamp),tangent=vec2(-inward.y,inward.x);
+  float sweep=.66*sin(time*.78+side*.39)+.22*sin(time*.32-side*.62)+side*.17*percussion.y;
+  float spread=.71+.32*percussion.x;
+  float sightline=smoothstep(.68,.97,.5+.5*sin(.82*time+side*.45)+.22*musicCue.y);
+  float approach=mix(.90+.18*sin(.69*time+side),.026,sightline);
+  float eyeHit=0.;
+  // A ray leaves a fixed projector and crosses the viewer plane at 'impact'.
+  // In perspective its screen position is lamp + lens*impact*(1/z-1/zLamp).
+  for(int j=0;j<11;j++){
+   float k=(float(j)-5.)*.2;
+   float a=sweep+k*spread;
+   vec2 heading=inward*cos(a)+tangent*sin(a);
+   vec2 impact=heading*approach+tangent*(.026*k+.044*sin(.71*time+side));
+   float mag=max(.004,length(impact));
+   vec2 axis=impact/mag;
+   float along=dot(delta,axis);
+   if(along>0.){
+    float z=1./(1./zLamp+along/(lens*mag));
+    float r=max(1.7/size.y,lens*(.0029+.00042*(zLamp-z))/z);
+    float miss=abs(dot(delta,vec2(-axis.y,axis.x)))/r;
+    if(miss<13.){
+     vec3 gap=z-vec3(1.4,2.12,2.84);
+     vec3 overlap=exp(-gap*gap/vec3(.36,.32,.38));
+     float hit=1.-exp(-2.8*dot(overlap,layers));
+     float front=dot(layers,smoothstep(vec3(.04),vec3(.70),gap));
+     float pass=exp(-1.18*front)*smoothstep(.10,.30,z);
+     float core=exp(-miss*miss);
+     float halo=exp(-miss*mix(1.5,.26,hit));
+     col+=pass*(.74+.64*band.z+.62*percussion.z)*
+          (tint*(.24*core+hit*.82*halo)+mix(tint,vec3(1.63,1.50,1.87),hit*.43)*core*hit*2.7);
+    }
+   }
+   eyeHit=max(eyeHit,exp(-mag*mag/.0034));
+  }
+  // Looking back into a scanner concentrates glint at its actual fixed lens.
+  float r=length(delta);
+  // Broad forward scatter between the narrow cores gives the rolling
+  // centre a tint even as individual rays pass behind a nearer curl.
+  float sheetAngle=atan(dot(delta,tangent),dot(delta,inward)) - sweep;
+  float envelope=1.-smoothstep(spread*.55,spread+.07,abs(sheetAngle));
+  col+=tint*envelope*mist*(.10+.15*layers.y)*exp(-.40*r);
+  float bloom=eyeHit*(.50+.50*percussion.x);
+  col+=tint*(.020/(.022+r)+bloom*.44*exp(-r*5.4))+
+       mix(tint,vec3(1.8),.68)*(.43+2.8*bloom)*exp(-r*(82.-40.*bloom));
+ }
+ return col;
+}
+// Power-eight Mandelbulb. The orbit minimum supplies crevice color.
+vec2 bulb(vec3 p){
+ vec3 z=p;
+ float derivative=1.,r=length(z),trap=1.;
+ for(int i=0;i<6;i++){
+  if(r>2.2)break;
+  trap=min(trap,length(z.xy));
+  float theta=acos(clamp(z.z/max(r,.00001),-1.,1.))*8.;
+  float phi=8.*atan(z.y,z.x)+.82*percussion.y;
+  float r2=r*r,r4=r2*r2,r7=r4*r2*r;
+  derivative=8.*r7*derivative+1.;
+  z=r7*r*vec3(sin(theta)*cos(phi),sin(theta)*sin(phi),cos(theta))+p;
+  r=length(z);
+ }
+ return vec2(.5*log(max(r,.00001))*r/derivative,trap);
+}
+vec3 nacre(vec2 uv){
+ float fit=min(1.,size.x/size.y*.96);
+ vec2 screen=uv/(fit*(1.+.22*percussion.x));
+ vec3 ro=vec3(passageEye.xy*(2.75/(2.13*fit*(1.+.22*percussion.x))),3.75-2.75*passageEye.z);
+ vec3 rd=normalize(vec3(screen,-2.13));
+ mat2 yaw=turn(.45+time*.17),tilt=turn(.47+.16*sin(time*.23));
+ ro.yz=tilt*ro.yz; rd.yz=tilt*rd.yz;
+ ro.xz=yaw*ro.xz; rd.xz=yaw*rd.xz;
+ vec2 sky=turn(.32)*screen;
+ float dust=exp(-2.8*abs(sky.y+.09*sin(4.*sky.x)))*exp(-.65*abs(sky.x));
+ vec3 col=vec3(.008,.012,.031)+dust*vec3(.09,.069,.135);
+ vec2 st=screen*145.;
+ float seed=fract(sin(dot(floor(st),vec2(29.17,78.32)))*17258.13);
+ col+=vec3(.74,.82,1.)*smoothstep(.986,1.,seed)*exp(-14.*dot(fract(st)-.5,fract(st)-.5));
+ float b=dot(ro,rd),disc=b*b-dot(ro,ro)+1.33*1.33;
+ float objectDepth=20.;
+ if(disc>0.){
+  float span=sqrt(disc),t=max(.001,-b-span),end=-b+span;
+  vec2 sampleDE=vec2(1.);
+  for(int i=0;i<65;i++){
+   sampleDE=bulb(ro+rd*t);
+   if(sampleDE.x<.0015 || t>end)break;
+   t+=max(.001,sampleDE.x*.87);
+  }
+  if(t<end && sampleDE.x<.0015){
+   objectDepth=t;
+   vec3 p=ro+rd*t;
+   vec2 e=vec2(1.,-1.)*.0022;
+   vec3 n=normalize(e.xyy*bulb(p+e.xyy).x+e.yyx*bulb(p+e.yyx).x+
+                    e.yxy*bulb(p+e.yxy).x+e.xxx*bulb(p+e.xxx).x);
+   vec3 sun=normalize(vec3(-.6,.8,1.)),h=normalize(sun-rd);
+   float diffuse=max(dot(n,sun),0.),rim=pow(1.-max(dot(n,-rd),0.),2.);
+   float cavity=clamp(bulb(p+n*.09).x/.09,.14,1.);
+   float pearl=.5+.5*cos(11.*sampleDE.y+2.*dot(n,-rd)+band.y);
+   vec3 pigment=mix(vec3(.075,.32,.43),vec3(.99,.67,.43),smoothstep(.16,.85,pearl));
+   col=pigment*(.14+.95*diffuse)*cavity;
+   col+=cavity*(vec3(.55,.79,.92)*rim+vec3(1.6,1.22,.88)*pow(max(dot(n,h),0.),24.));
+   float wave=exp(-12.*abs(sin(4.*length(p)+2.*p.y-time*1.6)));
+   col+=vec3(.10,.73,.72)*wave*(.12+1.25*band.x)*(.3+rim);
+  }
+ }
+ // Particle disc in an inclined plane. Compare its ray depth with the bulb.
+ vec3 normal=normalize(vec3(.25,.80,.45));
+ normal=normalize(normal+vec3(.18*percussion.y,0.,.23*percussion.y));
+ float denom=dot(rd,normal);
+ if(abs(denom)>.006){
+  float t=-dot(ro,normal)/denom;
+  if(t>0. && t<objectDepth){
+   vec3 p=ro+t*rd; float r=length(p)/(1.+.15*percussion.x);
+   float discMask=smoothstep(1.30,1.36,r)*(1.-smoothstep(1.71,1.79,r));
+   float threads=.5+.5*cos(r*171.+.55*sin(7.*p.x));
+   float gap=smoothstep(.01,.035,abs(r-1.58));
+   vec3 tint=mix(vec3(.24,.39,.50),vec3(.93,.58,.31),threads);
+   col=mix(col,tint,discMask*gap*min(1.,.22+.57*threads+.46*percussion.z));
+  }
+ }
+ return col;
+}
+
+float tissue(vec3 p){return dot(sin(p),cos(p.zxy));}
+float shellLace(vec3 p){
+ vec3 q=p;
+ float edge=2.,weight=1.;
+ for(int i=0;i<4;i++){
+  q=abs(fract(q*.5+.5)*2.-1.);
+  edge=min(edge,abs(length(q.xy)-(.42+.12*q.z))/weight);
+  q.xy=turn(.71)*q.xy;q.yz=turn(.52)*q.yz;
+  q=q*2.35+vec3(.45,.28,.63);
+  weight*=1.32;
+ }
+ return exp(-75.*edge);
+}
+
+const float WORLD_PHASE=.0280499344; // 2 pi / 224
+vec3 habitats(vec3 p){
+ // Triangular weights leave broad regions of pure coral, sponge and shell.
+ float v=dot(p,vec3(5.,4.,3.))*WORLD_PHASE/6.2831853*3.;
+ v+=.43*sin(dot(p,vec3(2.,-3.,1.))*WORLD_PHASE)+.76*mood+.26*accents.y;
+ vec3 gap=abs(mod(v-vec3(0.,1.,2.)+1.5,3.)-1.5);
+ vec3 w=1.-smoothstep(vec3(.19),vec3(.82),gap);
+ return w/max(dot(w,vec3(1.)),.001);
+}
+float smoothUnionAir(float a,float b,float k){
+ float h=max(k-abs(a-b),0.)/k;
+ return max(a,b)+h*h*k*.25;
+}
+vec2 garden(vec3 p){
+ vec3 cell=floor((p+2.)/4.);
+ vec3 q=mod(p+2.,4.)-2.;
+ float angle=dot(mod(cell,56.),vec3(2.,3.,5.))*6.2831853/7.;
+ q.xz=turn(angle)*q.xz;
+ q.xy=turn(.55*sin(angle))*q.xy;
+ q.y+=1.;
+ float d=5.,order=0.,span=.76,width=.17;
+ for(int i=0;i<5;i++){
+  float h=clamp(q.y/span,0.,1.);
+  vec3 stem=q-vec3(0.,span*h,0.);
+  float dist=length(stem)-width*(1.-.4*h);
+  if(dist<d){d=dist;order=float(i)+h;}
+  q.y-=span;q.x=abs(q.x);
+  q.xy=turn(.56+.26*accents.y+.14*sin(angle+float(i)))*q.xy;
+  q.yz=turn(.38*sin(angle+float(i)*1.6))*q.yz;
+  span*=.68;width*=.66;
+ }
+ return vec2(d,order);
+}
+// Move the sampled surface itself. Grid axes stay open for every route.
+vec3 wallSpace(vec3 p,float depth){
+ vec4 phase=wallAges-depth/23.;
+ vec4 pulse=smoothstep(vec4(-.075),vec4(.055),phase)*
+            (1.-smoothstep(vec4(.055),vec4(.27),phase));
+ float squeeze=max(max(pulse.x,pulse.y),max(pulse.z,pulse.w));
+ vec3 grid=p*(6.2831853/14.);
+ vec3 sway=sin(grid.yzx+grid.zxy-time*1.75);
+ vec3 fins=sin(grid);
+ // On alternating kicks one side buckles ahead of its opposite.
+ vec3 counter=fins.yzx*(.74*rave.y+.36*squeeze)*rave.x;
+ return p+fins*((.40+.33*accents.y)*sway+1.12*squeeze-.20+counter);
+}
+float terrain(vec3 p,bool stepping){
+ vec3 q=mod(p+7.,14.)-7.;
+ vec3 r=vec3(length(q.yz),length(q.xz),length(q.xy));
+ float nearest=min(r.x,min(r.y,r.z)),node=length(q);
+ float airway=smoothUnionAir(2.20-nearest,4.05-node,.72);
+ // The final smooth union is at least airway plus relief. Each tissue
+ // term is bounded below by -3. Beyond the step cap the exact value is unused.
+ if(stepping && airway+.26*accents.x-.816>=.96/.53)return .96/.53;
+ vec3 w=habitats(p);
+ // Broader crossing chambers have three mutually perpendicular pairs of exits.
+ float room=smoothUnionAir(3.50-nearest,5.48-node,.88);
+ vec3 phase=p*(6.2831853/7.);
+ float coarse=tissue(phase+.45*sin(phase.zxy));
+ float detail=tissue(phase*3.+.73*coarse);
+ float grain=tissue(phase*8.+detail*.53);
+ float wall=room+.49*coarse+.17*detail+.04*grain;
+ float relief=.17*detail+.07*grain+.032*tissue(phase*17.+.85*grain);
+ float clearance=airway+.26*accents.x+relief;
+ float strut=(abs(coarse+.32*detail)-(.23+.13*band.x))*.71;
+ float sponge=(abs(coarse+.15*detail)-(.37+.20*accents.y))*.9;
+ float shellBound=max(3.55+.24*coarse-nearest,5.-node+.44*coarse)+.105;
+ float spongeBound=max(sponge,max(1.2075,1.14+.53*accents.x+.16*detail));
+ float upper=w.x*min(wall,strut)+w.y*min(room+1.1,spongeBound)+w.z*shellBound;
+ // Include slack for negligible blend weights omitted by the detailed path.
+ if(upper+.005<=clearance-.24)return clearance;
+ float shape=0.;
+ if(w.x>.0001){
+  float outer=min(wall,strut);
+  // A garden primitive has at most the root radius (daughter radii shrink).
+  if(outer>-.17)outer=min(outer,garden(p).x);
+  shape+=w.x*outer;
+ }
+ if(w.y>.0001){
+  // Bubble cells of two sizes punch rounded windows through the thick sponge.
+  vec3 folded=mod(p+1.75,3.5)-1.75;
+  folded+=.35*sin(phase.yzx+.5*coarse);
+  float windows=1.14+.53*accents.x+.16*detail-length(folded);
+  float pores=.49+.10*accents.y-length(mod(p+.875,1.75)-.875);
+  // Connected cavities repeat at successively smaller scales along each cell wall.
+  vec3 cavity=p/3.5+.075*sin(phase.yzx);
+  float hollow=-4.,size=3.5;
+  for(int level=0;level<4;level++){
+   vec3 foldedCell=fract(cavity+.5)-.5;
+   hollow=max(hollow,size*(.345-length(foldedCell)));
+   cavity=cavity*2.+vec3(.32,.27,.39)+.065*sin(foldedCell.zxy*6.);
+   size*=.5;
+  }
+  windows=max(windows,hollow);
+  shape+=w.y*min(room+1.1,max(sponge,max(windows,pores)));
+ }
+ if(w.z>.0001){
+  // Each axial passage grows its own scalloped, curling shell.
+  vec3 rib=cos(phase*2.+vec3(atan(q.y,q.z),atan(q.z,q.x),atan(q.x,q.y))*3.+.55*coarse);
+  vec3 shells=vec3(3.55)+.24*coarse-r-(.86+.52*accents.y)*pow(.5+.5*rib,vec3(3.));
+  float screw=max(shells.x,max(shells.y,shells.z));
+  shape+=w.z*smoothUnionAir(screw,5.-node+.44*coarse,.42);
+ }
+ return smoothUnionAir(shape,clearance,.24);
+}
+float tissueAt(vec3 p){return terrain(wallSpace(p,length(p-camPos)),false);}
+float sporeHash(vec2 p){return fract(sin(dot(p,vec2(35.17,27.83)))*12531.53);}
+vec3 spores(vec3 ro,vec3 ray,float end){
+ // March parallel slices along the dominant ray axis, in either direction.
+ vec3 d=ray,o=ro,f=camForward;
+ if(abs(d.x)>abs(d.y)&&abs(d.x)>abs(d.z)){d=d.yzx;o=o.yzx;f=f.yzx;}
+ else if(abs(d.y)>abs(d.z)){d=d.zxy;o=o.zxy;f=f.zxy;}
+ float side=sign(d.z),first=side>0.?floor(o.z)+1.:ceil(o.z)-1.;
+ vec3 light=vec3(0.);
+ for(int i=0;i<18;i++){
+  float z=first+side*float(i),t=(z-o.z)/d.z;
+  if(t>end)break;
+  vec2 grid=(o.xy+t*d.xy)*1.5,cell=mod(floor(grid),336.);
+  float seed=sporeHash(cell+mod(z,224.));
+  vec2 pt=fract(grid)-(.18+.64*vec2(seed,sporeHash(cell.yx+seed)));
+  pt+=.05*vec2(sin(time*.7+z),cos(time*.65+seed*8.));
+  float dotGlow=exp(-dot(pt,pt)/(.00038+.0001*t));
+  vec2 spread=d.xy/d.z*f.z-f.xy;
+  float straight=smoothstep(.88,.99,max(abs(f.x),max(abs(f.y),abs(f.z))));
+  vec2 trail=spread*(.13+.3*accents.x)*straight;
+  vec2 smear=pt-trail*clamp(dot(pt,trail)/max(dot(trail,trail),.00001),0.,1.);
+  dotGlow+=.84*exp(-dot(smear,smear)/(.00026+.00007*t))*straight;
+  vec2 star=abs(turn(seed*5.)*pt);
+  dotGlow+=accents.z*exp(-81.*min(star.x,star.y)-15.*max(star.x,star.y));
+  light+=mix(vec3(.05,.82,1.5),vec3(1.4,.34,.16),seed)*dotGlow*
+    smoothstep(.83,.98,seed)*smoothstep(.12,.8,t)*exp(-.13*t)*(.6+accents.z*2.);
+ }
+ return light;
+}
+vec3 descent(vec2 uv){
+ vec3 ro=camPos, ray=normalize(camForward*(1.25-.09*accents.x)+camRight*uv.x+camUp*uv.y);
+ float t=.03,d=1.;
+ for(int i=0;i<151;i++){
+  d=terrain(wallSpace(ro+t*ray,t),true);
+  if(d<.0035||t>32.)break;
+  t+=clamp(d*.53,.003,.96);
+ }
+ vec3 fog=mix(vec3(.012,.027,.058),vec3(.055,.16,.23),exp(-2.5*length(uv)));
+ vec3 col=fog;
+ if(d<.0035 && t<=32.){
+  vec3 p=ro+t*ray,material=wallSpace(p,t),w=habitats(material);
+  vec2 e=vec2(.003,0.);
+  vec3 n=normalize(vec3(tissueAt(p+e.xyy)-tissueAt(p-e.xyy),
+                       tissueAt(p+e.yxy)-tissueAt(p-e.yxy),
+                       tissueAt(p+e.yyx)-tissueAt(p-e.yyx))+.000001);
+  vec3 l=normalize(ro+camRight*1.4+camUp*.8-p);
+  vec3 back=normalize(camForward*1.3+camUp*.7-camRight*.9);
+  float rim=pow(1.-max(dot(n,-ray),0.),2.7);
+  float key=max(.0,dot(n,l)),fill=max(0.,dot(n,back));
+  float ao=clamp(.26+.74*tissueAt(p+n*.19)/.19,.15,1.);
+  float glint=pow(max(0.,dot(n,normalize(l-ray))),28.);
+  vec3 pigment=w.x*vec3(.39,.085,.21)+w.y*vec3(.65,.30,.046)+w.z*vec3(.105,.14,.44);
+  vec3 light=w.x*vec3(.16,1.23,.95)+w.y*vec3(1.55,.56,.095)+w.z*vec3(.54,.37,1.7);
+  float lace=shellLace(material*1.34+.2*tissue(material));
+  float form=tissue(material*.90+.35*sin(material.yzx));
+  float seam=exp(-15.*abs(sin(3.1*form+.9*tissue(material*2.2))));
+  col=pigment*(.23*ao+key*1.48/(1.+t*t*.023))+
+      light*(fill*.18*ao+rim*.34)+vec3(1.4,1.22,1.06)*glint;
+  if(w.x>.01){
+   vec2 fan=garden(material);
+   col+=w.x*(1.-smoothstep(.025,.095,abs(fan.x)))*smoothstep(1.,4.8,fan.y)*
+        vec3(.32,1.05,1.12)*(.65+1.6*accents.z);
+  }
+  float wave=exp(-2.1*abs(t-23.*accents.w))*step(accents.w,1.4);
+  col+=light*(seam*(.28+.82*accents.z)+lace*(.10+.41*accents.y));
+  float afterglow=exp(-.72*abs(t-23.*accents.w))*step(accents.w,1.4);
+  col+=vec3(.44,1.65,1.9)*wave*(.36+rim*.8+lace);
+  col+=vec3(.52,.08,1.05)*afterglow*seam;
+  col=mix(col,fog,1.-exp(-.062*t));
+ }
+ return col+spores(ro,ray,min(t,32.));
+}
+vec3 decodeView(vec3 encoded){
+ return -log(max(vec3(.0001),1.-pow(encoded,vec3(1./.82))))/1.35;
+}
+vec3 scene(float id,vec2 p){
+ if(id==7.)return nacre(p);
+ if(id==6.)return descent(p);
+ if(id==5.){
+  // Carry the approach into the storm shot; settle back to its live camera.
+  if(chromPassage)p=(p+passageEye.xy*.28)/(1.+.55*abs(passageEye.z));
+  vec2 uv=.5+.5*p*vec2(size.y/size.x,1.);
+  return decodeView(texture2D(vortexView,uv).rgb);
+ }
+ if(id==4.)return chromeRibbon(p);
+ id=mod(id,4.);
+ if(id<1.5)return tunnel(p);
+ if(id<2.5)return aurora(p);
+ return lasers(p);
+}
+// Anchor each passage to a feature of the outgoing scene.
+vec2 exitPoint(float id){
+ float fit=min(1.,size.x/size.y*.96);
+ if(id==7.)return vec2(0.);
+ if(id==4.)return fit*vec2(.07,.02);
+ float kind=mod(id,4.);
+ if(kind<1.5)return .13*vec2(sin(time*.8),cos(time*.63));
+ if(kind<2.5){
+  float x=-.32*fit,z=.39;
+  return vec2(x,auroraHeight(x*.93+.12+z*.63,z));
+ }
+ return vec2(min(.91,.76*size.x/size.y),.46);
+}
+vec3 flyBetween(float id,float nextId,vec2 ray,float phase){
+ float travel=smoothstep(0.,1.,phase);
+ if(chromPassage && id==5. && nextId==4.){
+  // Shallow teeth occlude the approaching ribbon until the camera clears them.
+  vec4 wall=texture2D(vortexView,.5+.5*ray*vec2(size.y/size.x,1.));
+  float cut=mix(41.,-.75,1.-pow(1.-travel,2.4));
+  float opening=smoothstep(cut,cut+max(.55,.1*cut),40.*wall.a);
+  if(opening==0.)return decodeView(wall.rgb);
+  passageEye=mix(vec3(0.,0.,-1.65),vec3(-.020,.010,-.20),travel);
+  return mix(decodeView(wall.rgb),chromeRibbon(ray),opening);
+ }
+ vec2 target=(id==5. || id==6.)?vec2(0.):exitPoint(id);
+ float arch=sin(3.14159*travel);
+ vec2 eye=target*smoothstep(0.,.82,travel)+vec2(.12,.075)*arch*arch;
+ // Intersect the view ray with a small opening at the destination. Its
+ // outline grows by perspective as the remaining distance approaches zero.
+ float remaining=1.-travel;
+ vec2 offset=eye+remaining*ray-target;
+ float radius=mix(.0,.18,smoothstep(.07,.44,travel));
+ float kind=mod(id,4.);
+ vec2 aperture=offset;
+ if(chromPassage && id==4.)aperture=turn(.36)*aperture*vec2(.87,1.22);
+ if(kind==2.)aperture.y*=1.65;
+ if(kind==3.)aperture.x*=1.35;
+ float coverage=(1.-smoothstep(radius-.016,radius+.016,length(aperture)))*smoothstep(.06,.14,travel);
+ vec3 col=vec3(0.);
+ if(coverage<1.){
+  passageEye=vec3(eye,travel);
+  col=scene(id,(id==5. || id==6.)?eye+remaining*ray:ray);
+ }
+ if(coverage>0.){
+  // Already visible through the opening. Carry this forward velocity into
+  // the first beats of the next shot instead of resetting to another camera.
+  passageEye=vec3(-.055+.035*phase,.025-.015*phase,-.44+.24*phase);
+  vec2 through=ray+(eye-target)/max(remaining,.04);
+  col=mix(col,scene(nextId,through),coverage);
+ }
+ return col;
+}
+void main(){
+ vec2 p=(2.*gl_FragCoord.xy-size)/size.y;
+ float section=floor(showBeat/16.);
+ float progress=mod(showBeat,16.);
+ float id=1.+mod(section,4.);
+ float nextId=id==4. && hasVortex ? 5. : 1.+mod(id,4.);
+ bool grooveTour=tourScenes.x>0.;
+ if(grooveTour){id=tourScenes.x;nextId=tourScenes.y;}
+ vec3 col;
+ passageEye=vec3(0.);
+ if(flight>.5)col=descent(p);
+ else if(progress>=11.5)col=flyBetween(id,nextId,p,(progress-11.5)/4.5);
+ else{
+  if((section>0. || grooveTour) && progress<3.75){
+   float coast=1.-progress/3.75;
+   passageEye=vec3(-.020,.010,-.20)*coast*coast;
+  }
+  col=scene(id,p);
+ }
+ float grain=fract(sin(dot(mod(gl_FragCoord.xy,251.),vec2(12.9898,78.233)))*43758.5453);
+ // Preserve linear highlights in the WebGL 1 RGBA8 scene texture.
+ if(flight>.5){
+  col=max(col,vec3(0.));
+  vec3 encoded=col/(1.+col);
+  gl_FragColor=vec4(encoded+(grain-.5)/255.*smoothstep(0.,.012,encoded),1.);
+  return;
+ }
+ gl_FragColor=vec4(pow(1.-exp(-col*1.35),vec3(.82))+(grain-.5)*.017,1.);
+}
+</script><script>
+const RAVE_BPM = 148;
+
+function createScore(ctx, destination) {
+  const d = 60 / RAVE_BPM / 4;
+  const hz = note => 440 * 2 ** ((note - 69) / 12);
+  const roots = [0, 0, -2, -5];
+  // Each acid event is [pitch offset, accent | slide to next].
+  const patterns = [
+    [[0,1],null,[0,0],[3,2],[7,1],null,[0,0],[-2,0],null,[0,1],[12,2],[10,0],[7,1],null,[3,2],[0,0]],
+    [[0,1],[0,0],null,[7,1],[5,2],[3,0],null,[0,1],[-2,2],[0,0],[12,1],null,[10,0],[7,2],[3,0],[0,1]],
+    [[0,1],null,[12,2],[7,0],null,[0,0],[3,2],[0,1],[0,0],null,[7,0],[10,2],[12,1],null,[3,2],[0,0]],
+    [[0,1],[7,2],[12,0],null,[0,1],[3,2],[7,0],[10,1],null,[12,0],[15,2],[12,1],[7,0],null,[3,2],[0,0]]
+  ];
+  const intro = [[0,1],null,null,[3,2],[7,0],null,null,null,[0,0],null,null,[7,1],null,null,[3,2],[0,0]];
+  const bridge = [[12,1],null,null,null,null,null,[15,2],[12,0],null,null,[7,1],null,null,null,null,null];
+  const brightness = [320, 385, 460, 525, 560, 720, 610, 760, 220, 375, 475, 730, 1010, 730, 850, 1090];
+  const noise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.27), ctx.sampleRate);
+  const samples = noise.getChannelData(0);
+  let seed = 71361;
+  for (let i = 0; i < samples.length; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    samples[i] = seed / 2147483648 - 1;
+  }
+  const driveCurve = new Float32Array(257);
+  for (let i = 0; i < driveCurve.length; i++) {
+    driveCurve[i] = Math.tanh(1.85 * (i / 128 - 1)) / Math.tanh(1.85);
+  }
+  let playing;
+
+  function start(accentAnalyser, onKick) {
+    if (playing) return playing.beginning;
+    const output = ctx.createGain();
+    output.gain.value = 0.91;
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -12;
+    compressor.knee.value = 13;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.004;
+    compressor.release.value = 0.095;
+    compressor.connect(output).connect(destination);
+    output.connect(accentAnalyser);
+    const echo = ctx.createGain();
+    echo.gain.value = 0.3;
+    const effects = [];
+    for (const [steps, pan] of [[3, -0.76], [5, 0.76]]) {
+      const delay = ctx.createDelay();
+      delay.delayTime.value = d * steps;
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'bandpass';
+      tone.frequency.value = pan < 0 ? 1870 : 1120;
+      tone.Q.value = 0.48;
+      const feedback = ctx.createGain();
+      feedback.gain.value = 0.3;
+      const stereo = ctx.createStereoPanner();
+      stereo.pan.value = pan;
+      echo.connect(delay).connect(tone);
+      tone.connect(feedback).connect(delay);
+      tone.connect(stereo).connect(compressor);
+      effects.push(delay, tone, feedback, stereo);
+    }
+
+    const sources = new Set();
+    const beginning = ctx.currentTime + 0.045;
+    let step = 0;
+
+    function voice(source, nodes, time, duration) {
+      const ending = time + duration;
+      const active = { source, ending };
+      sources.add(active);
+      source.onended = () => {
+        sources.delete(active);
+        for (const node of [source, ...nodes]) node.disconnect();
+      };
+      source.start(time);
+      source.stop(ending);
+    }
+
+    function kick(time, volume) {
+      onKick(time, volume / 0.87);
+      const body = ctx.createOscillator();
+      const amp = ctx.createGain();
+      body.frequency.setValueAtTime(183, time);
+      body.frequency.exponentialRampToValueAtTime(54, time + 0.039);
+      body.frequency.exponentialRampToValueAtTime(45, time + 0.24);
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.linearRampToValueAtTime(volume, time + 0.002);
+      amp.gain.exponentialRampToValueAtTime(volume * 0.67, time + 0.054);
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + 0.28);
+      body.connect(amp).connect(compressor);
+      voice(body, [amp], time, 0.291);
+      percussion(time, 'click', volume * 0.075);
+    }
+
+    function percussion(time, kind, volume) {
+      const source = ctx.createBufferSource();
+      source.buffer = noise;
+      const filter = ctx.createBiquadFilter();
+      const clap = kind === 'clap';
+      filter.type = clap ? 'bandpass' : 'highpass';
+      filter.frequency.value = clap ? 1660 : kind === 'click' ? 3800 : 7100;
+      filter.Q.value = clap ? 1.05 : 0.28;
+      const amp = ctx.createGain();
+      const stereo = ctx.createStereoPanner();
+      stereo.pan.value = kind === 'closed' ? -0.24 : kind === 'open' ? 0.28 : 0;
+      const length = kind === 'click' ? 0.012 : kind === 'closed' ? 0.036 : 0.15;
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.linearRampToValueAtTime(volume, time + 0.002);
+      if (clap) {
+        amp.gain.exponentialRampToValueAtTime(volume * 0.23, time + 0.011);
+        amp.gain.linearRampToValueAtTime(volume * 0.79, time + 0.014);
+        amp.gain.exponentialRampToValueAtTime(volume * 0.14, time + 0.025);
+        amp.gain.linearRampToValueAtTime(volume * 0.53, time + 0.028);
+      }
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + length);
+      source.connect(filter).connect(amp).connect(stereo).connect(compressor);
+      if (clap) stereo.connect(echo);
+      voice(source, [filter, amp, stereo], time, length + 0.008);
+    }
+
+    function bass(time, pitch, volume) {
+      const body = ctx.createOscillator();
+      const amp = ctx.createGain();
+      body.type = 'triangle';
+      body.frequency.value = hz(pitch);
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.linearRampToValueAtTime(volume, time + 0.014);
+      amp.gain.exponentialRampToValueAtTime(volume * 0.77, time + 0.082);
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + 0.181);
+      body.connect(amp).connect(compressor);
+      voice(body, [amp], time, 0.19);
+    }
+
+    function acidLine(time, pattern, root, cutoffFloor, volume) {
+      const oscillator = ctx.createOscillator();
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.value = hz(root);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 12.5;
+      const drive = ctx.createWaveShaper();
+      drive.curve = driveCurve;
+      drive.oversample = '2x';
+      const amp = ctx.createGain();
+      amp.gain.value = 0.0001;
+      oscillator.connect(filter).connect(drive).connect(amp).connect(compressor);
+      amp.connect(echo);
+
+      pattern.forEach((event, position) => {
+        if (!event) return;
+        const [pitch, flags] = event;
+        const onset = time + position * d;
+        const previous = pattern[position - 1];
+        const slidingIn = previous && (previous[1] & 2);
+        const slidingOut = pattern[position + 1] && (flags & 2);
+        const accented = flags & 1;
+        const level = volume * (accented ? 1.36 : 0.67);
+        const cutoff = cutoffFloor * (accented ? 5.8 : 3.3);
+        if (slidingIn) {
+          oscillator.frequency.setValueAtTime(hz(root + previous[0]), onset);
+          oscillator.frequency.exponentialRampToValueAtTime(hz(root + pitch), onset + d * 0.59);
+        } else {
+          oscillator.frequency.setValueAtTime(hz(root + pitch), onset);
+          filter.frequency.setValueAtTime(cutoffFloor, onset);
+          amp.gain.setValueAtTime(0.0001, onset);
+        }
+        filter.frequency.exponentialRampToValueAtTime(cutoff, onset + (slidingIn ? 0.028 : 0.008));
+        filter.frequency.exponentialRampToValueAtTime(cutoffFloor * (slidingOut ? 1.45 : 0.66), onset + d * 0.91);
+        amp.gain.linearRampToValueAtTime(level, onset + (slidingIn ? 0.024 : 0.005));
+        amp.gain.exponentialRampToValueAtTime(
+          slidingOut ? level * 0.66 : 0.0001, onset + d * (slidingOut ? 0.98 : accented ? 0.84 : 0.66)
+        );
+      });
+      voice(oscillator, [filter, drive, amp], time, d * 16);
+    }
+
+    function stab(time, root, volume, wide) {
+      const notes = wide ? [0, 7, 12, 15, 19, 24] : [0, 7, 12, 15];
+      notes.forEach((pitch, index) => {
+        const oscillator = ctx.createOscillator();
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = hz(root + pitch);
+        oscillator.detune.value = (index % 2 ? 1 : -1) * (5 + index * 2);
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(wide ? 6900 : 3350, time);
+        filter.frequency.exponentialRampToValueAtTime(490, time + 0.19);
+        const amp = ctx.createGain();
+        amp.gain.setValueAtTime(0.0001, time);
+        amp.gain.linearRampToValueAtTime(volume / notes.length, time + 0.008);
+        amp.gain.exponentialRampToValueAtTime(0.0001, time + (wide ? 0.38 : 0.31));
+        const stereo = ctx.createStereoPanner();
+        stereo.pan.value = (index / (notes.length - 1) - 0.5) * 1.7;
+        oscillator.connect(filter).connect(amp).connect(stereo).connect(compressor);
+        stereo.connect(echo);
+        voice(oscillator, [filter, amp, stereo], time, 0.4);
+      });
+    }
+
+    function noiseRise(time) {
+      const source = ctx.createBufferSource();
+      source.buffer = noise;
+      source.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.Q.value = 0.62;
+      const amp = ctx.createGain();
+      const length = d * 15.25;
+      filter.frequency.setValueAtTime(320, time);
+      filter.frequency.exponentialRampToValueAtTime(7950, time + length);
+      amp.gain.setValueAtTime(0.0001, time);
+      amp.gain.exponentialRampToValueAtTime(0.19, time + length * 0.9);
+      amp.gain.exponentialRampToValueAtTime(0.0001, time + length);
+      source.connect(filter).connect(amp).connect(compressor);
+      voice(source, [filter, amp], time, length + 0.005);
+    }
+
+    function sequence(index, time) {
+      const beat = index % 16;
+      const bar = Math.floor(index / 16) % 16;
+      const root = roots[bar % 4];
+      const inBreak = bar >= 8 && bar < 12;
+      const drop = bar >= 12;
+
+      if (beat === 0) {
+        const pattern = bar < 2 ? intro : bar < 8 ? patterns[bar % 4] :
+          bar < 10 ? bridge : patterns[(bar + 1) % 4];
+        acidLine(time, pattern, 41 + root, brightness[bar], inBreak ? 0.12 : drop ? 0.215 : 0.16);
+        if (bar === 11) noiseRise(time);
+      }
+      if (beat % 4 === 0 && (!inBreak || (beat === 0 && bar % 2 === 0))) {
+        kick(time, (beat === 0 ? 0.87 : 0.73) * (inBreak ? 0.68 : 1));
+      }
+      if (beat % 4 === 2 && !inBreak) {
+        percussion(time, 'open', drop ? 0.23 : 0.16);
+        if (bar > 0) bass(time + 0.008, 29 + root, drop ? 0.33 : 0.24);
+      }
+      if (!inBreak && bar >= 2 && beat % 2 === 1) {
+        percussion(time + 0.009, 'closed', beat % 4 === 3 ? 0.119 : 0.081);
+      }
+      if (!inBreak && bar >= 2 && (beat === 4 || beat === 12)) {
+        percussion(time + 0.006, 'clap', drop ? 0.27 : 0.21);
+      }
+      const buildRoll = bar === 11 && beat >= 4 && beat < 15 && (beat % 2 === 0 || beat >= 11);
+      if ((bar === 10 && beat % 4 === 0) || buildRoll) {
+        percussion(time, 'clap', 0.058 + beat * 0.012);
+      }
+      const grooveStab = bar >= 4 && bar < 8 && (beat === 3 || (bar % 2 === 1 && beat === 10));
+      const breakStab = inBreak && (beat === 0 || (bar < 10 && beat === 9));
+      const dropStab = drop && (beat === 0 || beat === 7 || beat === 10);
+      if (grooveStab || breakStab || dropStab) {
+        stab(time, 53 + root, drop ? 0.34 : inBreak ? 0.22 : 0.24, drop || inBreak);
+      }
+      if (bar === 15 && beat === 15) stab(time, 53, 0.21, false);
+    }
+
+    function schedule() {
+      const now = ctx.currentTime;
+      step = Math.max(step, Math.ceil((now + 0.006 - beginning) / d));
+      while (beginning + step * d < now + 0.15) {
+        sequence(step, beginning + step * d);
+        step++;
+      }
+    }
+
+    schedule();
+    const timer = setInterval(schedule, 23);
+    playing = {
+      beginning,
+      stop() {
+        clearInterval(timer);
+        const now = ctx.currentTime;
+        const end = now + 0.025;
+        output.gain.setValueAtTime(output.gain.value, now);
+        output.gain.linearRampToValueAtTime(0, end);
+        for (const active of sources) {
+          if (active.ending > end) active.source.stop(end);
+        }
+        setTimeout(() => {
+          for (const node of [output, compressor, echo, ...effects]) node.disconnect();
+        }, 46);
+      }
+    };
+    return beginning;
+  }
+
+  function stop() {
+    if (!playing) return;
+    playing.stop();
+    playing = undefined;
+  }
+
+  return { start, stop };
+}
+
+const el=id=>document.getElementById(id);
+const canvas=el('screen'),statusLine=el('status'),play=el('play');
+const glOptions={alpha:false,antialias:false,depth:false};
+const gl2=canvas.getContext('webgl2',glOptions);
+const gl=gl2||canvas.getContext('webgl',glOptions);
+function createTunnelRoute() {
+ const cell = 14, repeat = 16 * cell, cut = 4.2, speed = 6.4;
+ const axes = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+ const intro = [0,0,2];
+ const addScaled = (a,b,s) => [a[0]+b[0]*s,a[1]+b[1]*s,a[2]+b[2]*s];
+ const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+ const clamp = (x,lo,hi) => Math.max(lo,Math.min(hi,x));
+ const mix = (a,b,t) => a+(b-a)*t;
+ const wrap = x => x-repeat*Math.floor((x+.5*repeat)/repeat);
+ const key = (node,axis,step) => addScaled(node,axes[axis],step).join(',');
+ const energyTimes = [1.6,2.4,1.3,9];
+
+ // The bend has collinear first and second derivatives at each end.
+ const bend = t => cut*t*t*t*(3+t*(-2.75+.75*t));
+ const bendDerivative = t => cut*t*t*(9+t*(-11+3.75*t));
+ const bendSpeed = t => Math.hypot(bendDerivative(1-t),bendDerivative(t));
+ const bendArc = (lo,hi) => (hi-lo)*(bendSpeed(lo)+4*bendSpeed(.5*(lo+hi))+bendSpeed(hi))/6;
+ const bendSamples = 64;
+ const bendDistances = [0];
+ for(let i=1;i<=bendSamples;i++){
+  const lo=(i-1)/bendSamples, hi=i/bendSamples;
+  const distance=bendArc(lo,hi);
+  bendDistances.push(bendDistances[i-1]+distance);
+ }
+ const bendLength=bendDistances[bendSamples];
+ function bendParameter(distance){
+  let lo=0, hi=bendSamples;
+  while(hi-lo>1){
+   const mid=(lo+hi)>>1;
+   if(bendDistances[mid]<=distance)lo=mid;
+   else hi=mid;
+  }
+  const within=(distance-bendDistances[lo])/(bendDistances[hi]-bendDistances[lo]);
+  const start=lo/bendSamples;
+  const estimate=(lo+clamp(within,0,1))/bendSamples;
+  const remainder=bendDistances[lo]+bendArc(start,estimate)-distance;
+  return clamp(estimate-remainder/bendSpeed(estimate),start,hi/bendSamples);
+ }
+ function rotate(vector,normal,sine,cosine){
+  const tangent=cross(normal,vector);
+  const projection=normal[0]*vector[0]+normal[1]*vector[1]+normal[2]*vector[2];
+  return addScaled(addScaled(vector.map(value=>value*cosine),tangent,sine),normal,projection*(1-cosine));
+ }
+
+ let leg, turnIndex, recentNodes, straightCount, automaticBends, verticalGap, pendingTurn;
+ let revision, previousTime, previousAudio, audioTime, average;
+ function reset(trackRevision){
+  revision=trackRevision;
+  previousTime=audioTime=0;
+  average=[0,0,0,.27];
+  previousAudio=average.slice();
+  turnIndex=0;
+  recentNodes=['0,0,0'];
+  pendingTurn=undefined;
+  straightCount=automaticBends=0;
+  verticalGap=4;
+  planLeg(0,[0,0,0],[0,0,-6.5],4,[1,0,0],[0,1,0]);
+ }
+ function randomAt(index){
+  let value=Math.imul(index+12609,0x9e3779b1);
+  value=Math.imul(value^(value>>>16),0x21f0aaad);
+  value=Math.imul(value^(value>>>15),0x735a2d97);
+  return ((value^(value>>>15))>>>0)/4294967296;
+ }
+ function chooseOutgoing(node,incoming){
+  if(turnIndex<intro.length&&intro[turnIndex]!==(incoming^1))return intro[turnIndex];
+  if(automaticBends>=4)return incoming;
+  const candidates=[];
+  const [kick,mids,hats]=average;
+  const verticalMood=clamp(.52*mids+1.4*hats,0,1);
+  for(let axis=0;axis<axes.length;axis++){
+   if(axis===(incoming^1))continue;
+   const vertical=axis===2||axis===3;
+   let weight;
+   if(axis===incoming)weight=1.35*(1-0.45*clamp(2.6*kick,0,1))/(1+1.8*straightCount);
+   else if(vertical)weight=(.42+1.75*verticalMood)*(.36+.64*clamp(verticalGap/3,0,1));
+   else weight=.8+1.4*kick;
+   const oldIndex=recentNodes.indexOf(key(node,axis,cell));
+   const onward=axes.reduce((count,_,next)=>count+Number(
+    next!==(axis^1)&&!recentNodes.includes(key(addScaled(node,axes[axis],cell),next,cell))),0);
+   candidates.push({axis,weight:weight*(.45+.11*onward),oldIndex});
+  }
+  const fresh=candidates.filter(candidate=>candidate.oldIndex<0);
+  if(!fresh.length)return candidates.reduce((a,b)=>a.oldIndex<b.oldIndex?a:b).axis;
+  let budget=randomAt(turnIndex)*fresh.reduce((sum,candidate)=>sum+candidate.weight,0);
+  for(const candidate of fresh){
+   budget-=candidate.weight;
+   if(budget<0)return candidate.axis;
+  }
+  return fresh[fresh.length-1].axis;
+ }
+ function planLeg(startTime,node,start,incoming,right,up){
+  const manualAxes={left:right.map(value=>-value),right,up,down:up.map(value=>-value)};
+  const requested=manualAxes[pendingTurn];
+  const outgoing=requested?axes.findIndex(axis=>axis.every((value,i)=>value===requested[i])):chooseOutgoing(node,incoming);
+  pendingTurn=undefined;
+  const forward=axes[incoming], exit=axes[outgoing];
+  const normal=incoming===outgoing?null:cross(forward,exit);
+  const nodeDistance=Math.hypot(node[0]-start[0],node[1]-start[1],node[2]-start[2]);
+  const lineLength=nodeDistance-(normal?cut:0);
+  const endTime=startTime+(lineLength+(normal?bendLength:0))/speed;
+  const turnDeadline=startTime+(nodeDistance-cut)/speed;
+  leg={startTime,endTime,turnDeadline,node,start,incoming,outgoing,forward,exit,normal,lineLength,right,up,manual:Boolean(requested)};
+ }
+ function nextLeg(){
+  const {endTime,node,incoming,exit,outgoing,normal,right,up,manual}=leg;
+  const nextNode=addScaled(node,exit,cell);
+  turnIndex++;
+  recentNodes.push(nextNode.join(','));
+  if(recentNodes.length>24)recentNodes.shift();
+  straightCount=outgoing===incoming?straightCount+1:0;
+  automaticBends=!manual&&outgoing!==incoming?automaticBends+1:0;
+  verticalGap=outgoing===2||outgoing===3?0:verticalGap+1;
+  planLeg(endTime,nextNode,addScaled(node,exit,normal?cut:0),outgoing,
+   normal?rotate(right,normal,1,0):right,normal?rotate(up,normal,1,0):up);
+ }
+ function requestTurn(direction){
+  if(!['left','right','up','down'].includes(direction)||!leg)return false;
+  pendingTurn=direction;
+  const {startTime,turnDeadline,node,start,incoming,right,up}=leg;
+  if(previousTime<=turnDeadline)planLeg(startTime,node,start,incoming,right,up);
+  return true;
+ }
+
+ function sample(time,accents,trackRevision){
+  if(revision!==trackRevision||time<previousTime)reset(trackRevision);
+  if(time>previousTime){
+   const kick=clamp(accents[0],0,1), mids=clamp(accents[1],0,1), hats=clamp(accents[2],0,1);
+   const audio=[kick,mids,hats,clamp(.27+.34*mids+1.45*hats+.6*kick,0,1)];
+   const frameDuration=time-previousTime;
+   function updateAudio(until){
+    const elapsed=until-audioTime;
+    const u0=(audioTime-previousTime)/frameDuration;
+    const u1=(until-previousTime)/frameDuration;
+    for(let i=0;i<average.length;i++){
+     const start=mix(previousAudio[i],audio[i],u0);
+     const end=mix(previousAudio[i],audio[i],u1);
+     const states=-Math.expm1(-elapsed/energyTimes[i]);
+     const ramp=elapsed>0?1-energyTimes[i]*states/elapsed:0;
+     average[i]+=(start-average[i])*states+(end-start)*ramp;
+    }
+    audioTime=until;
+   }
+   // Evaluate weights at the exact route boundary, using a time-weighted spectrum.
+   while(time>=leg.endTime){
+    updateAudio(leg.endTime);
+    nextLeg();
+   }
+   updateAudio(time);
+   previousTime=time;
+   previousAudio=audio;
+  }
+
+  const distance=(time-leg.startTime)*speed;
+  let {forward,right,up}=leg;
+  let position;
+  if(leg.normal&&distance>leg.lineLength){
+   const t=bendParameter(distance-leg.lineLength);
+   position=addScaled(addScaled(leg.node,forward,-bend(1-t)),leg.exit,bend(t));
+   const x=bendDerivative(1-t), y=bendDerivative(t), norm=Math.hypot(x,y);
+   const sine=y/norm, cosine=x/norm;
+   forward=addScaled(forward.map(value=>value*cosine),leg.exit,sine);
+   right=rotate(right,leg.normal,sine,cosine);
+   up=rotate(up,leg.normal,sine,cosine);
+  }else{
+   position=addScaled(leg.start,forward,distance);
+  }
+  return {position:position.map(wrap),forward,right,up,mood:average[3]};
+ }
+ return {sample,requestTurn};
+}
+
+function nextMusicAccent(groove,after){
+  if(!groove){
+   const step=60/RAVE_BPM;
+   return Math.ceil(after/step)*step;
+  }
+  let previous=groove(Math.max(0,after-.025)).kick;
+  for(let i=0;i<=40;i++){
+   const t=after+i*.025,kick=groove(t).kick;
+   if(kick>=.48 && previous<.48)return t;
+   previous=kick;
+  }
+  return after+1.;
+ }
+
+// Hold each view for real listening time, then leave and arrive on accents.
+function createSceneClock(withStorm,groove,meltingIntro=false,tunnelTour=false){
+ const first=meltingIntro?-1:0;
+ let lap=0;
+ let index=first,start=0,departure=0,end=0;
+ function schedule(){
+  const hold=tunnelTour && index%2===0?26:index===4?45:index===-1?20.57:15;
+  departure=nextMusicAccent(groove,start+hold);
+  end=nextMusicAccent(groove,departure+(index===4?3.5:1.9));
+ }
+ schedule();
+ function sample(time){
+  if(time<start){start=0;index=first;lap=0;schedule();}
+  while(time>=end){
+   start=end;index=index===-1?5:index+1;
+   const count=withStorm?(lap%2===0?6:5):4;
+   if(index===count){index=0;lap++;}
+   schedule();
+  }
+  sample.jaws=withStorm && lap%2===0;
+  const arrival=index===4?38:11.5,span=index===4?48:16;
+  const local=time<departure?arrival*(time-start)/(departure-start)
+   :arrival+(span-arrival)*(time-departure)/(end-departure);
+  return (index===5?112:16*index)+local;
+ }
+ return sample;
+}
+
+async function createRenderer(requestedScene){
+ if(!gl) throw Error('Tento prohlížeč neposkytl WebGL.');
+ const gallery=requestedScene==='galerie';
+ const lasersOnly=!requestedScene || requestedScene==='lasery';
+ const chromeOnly=requestedScene==='chrom';
+ let wholeFracture=new URLSearchParams(location.search).get('rozpad')==='kusy';
+ const auroraOnly=requestedScene==='zare';
+ const soloScene=lasersOnly || chromeOnly || auroraOnly;
+ const passage=requestedScene==='chrom-vir';
+ const musicConcert=requestedScene==='vsechny';
+ const concert=requestedScene==='koncert'||passage||musicConcert||(gallery&&!!gl2);
+ const stormOnly=requestedScene==='vir', shaderSet=requestedScene==='set'||concert;
+ if(shaderSet && !gl2)throw Error('Pro tento set je potřeba WebGL 2.');
+ if(stormOnly && !gl2)throw Error('Pro scénu Vír je potřeba WebGL 2.');
+ const positionLocation=0;
+ const vertexSource=`
+attribute vec2 pos;
+varying vec2 uv;
+void main(){
+ uv=pos*.5+.5;
+ gl_Position=vec4(pos,0.,1.);
+}`;
+ function makeProgram(fragmentSource,uniforms,vertex=vertexSource){
+  function compile(type,source){
+   const shader=gl.createShader(type);
+   gl.shaderSource(shader,source);
+   gl.compileShader(shader);
+   if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));
+   return shader;
+  }
+  const vertexShader=compile(gl.VERTEX_SHADER,vertex);
+  const fragment=compile(gl.FRAGMENT_SHADER,fragmentSource);
+  const program=gl.createProgram();
+  gl.attachShader(program,vertexShader);
+  gl.attachShader(program,fragment);
+  gl.bindAttribLocation(program,positionLocation,'pos');
+  gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragment);
+  if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+  return {
+   program,
+   uniforms:Object.fromEntries(uniforms.map(name=>[name,gl.getUniformLocation(program,name)])),
+  };
+ }
+ const tunnelSource=el('tunnel-frag').textContent;
+ const scenePass=stormOnly?null:makeProgram(el('frag').textContent.replace('// SHARED_TUNNEL',tunnelSource),['fogVolume','chromPassage','grainTone','impactTrail','musicCue','wholeFracture','starChart','chartSize','featuredStars','tourScenes','tunnelHits','vortexView','hasVortex','size','time','band','accents','percussion','wallAges','showBeat','flight','camPos','camForward','camRight','camUp','mood','rave']);
+ const u=scenePass?.uniforms;
+ const bindSky=stormOnly?null:await createPragueSky(gl);
+ let fogTexture=null,fogPass=null;
+ if(!(passage || stormOnly || chromeOnly || auroraOnly)){
+  fogPass=makeProgram(el('meeting-fog').textContent,['size','clock','plate']);
+  const fogImage=new Image();
+  fogImage.src='klubova-para.jpg';
+  await fogImage.decode();
+  fogTexture=gl.createTexture();
+  gl.activeTexture(gl.TEXTURE4);
+  gl.bindTexture(gl.TEXTURE_2D,fogTexture);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,fogImage);
+ }
+ let concertAssets=null;
+ let sprayPass=null,sprayTarget=null;
+ let vortexPass=null,jawMotionPass=null,meltPass=null;
+ if(gl2 && !soloScene){
+  const sources=['../vyboj/image.glsl'];
+  if(!stormOnly)sources.push('../lom-pixel/image.glsl','../lom-pixel/motion.glsl');
+  if(shaderSet && !passage)sources.push('../vyboj/taveni.glsl');
+  const [stormCode,jawsCode,motionCode,meltCode]=await Promise.all(sources.map(async url=>{
+   const response=await fetch(url,{cache:'no-cache'});
+   if(!response.ok)throw Error('Nepodařilo se načíst '+url);
+   return response.text();
+  }));
+  const vertex300='#version 300 es\nin vec2 pos;void main(){gl_Position=vec4(pos,0.,1.);}';
+  if(concert && !passage)concertAssets=await prepareConcert(gl,makeProgram,vertex300,stormCode);
+  if(shaderSet && !passage)meltPass=makeProgram(`#version 300 es
+precision highp float;
+#define VYBOJ_CAMERA_INPUT
+${concert?'':'#define VESPER_MELT_EXIT'}
+uniform float iTime,uTravel;
+uniform vec3 iResolution;
+uniform vec4 uOrbit;
+uniform highp sampler2D iChannel0,nextView;
+${meltCode}
+out vec4 result;void main(){mainImage(result,gl_FragCoord.xy);}`,['iTime','iResolution','uOrbit','iChannel0','nextView','uTravel'],vertex300);
+  const vortexSource=(sprayDefine='')=>`#version 300 es
+precision highp float;
+precision highp int;
+${sprayDefine}
+#define VYBOJ_VORTEX_ONLY
+#define VYBOJ_CAMERA_INPUT
+#define VESPER_PASSAGE
+${concert && !passage?'#define VESPER_CONCERT':''}
+${kingOnly && gallery?'#define VESPER_KING_ASCENT\nuniform vec2 uAscent;':''}
+${stormOnly?'#define VESPER_SOLO_STORM':''}
+${phraseCamera?'#define VESPER_PHRASE_CAMERA':''}
+uniform float iTime,time,uPassageClock,uJawExit;
+uniform int uJawStage;
+uniform vec3 iResolution,band,percussion,uSongBands;
+uniform vec4 uOrbit,uVortexShot;
+#ifdef VESPER_PHRASE_CAMERA
+uniform vec3 uStormCamera; // movement clock, sustained energy, phrase accent
+#endif
+uniform highp sampler2D iChannel0,iChannel1;
+#ifdef VESPER_SOLO_STORM
+uniform vec4 tunnelHits;
+#else
+const vec3 passageEye=vec3(0.);
+vec2 layerPoint(vec2 p,float depth){return p;}
+${tunnelSource}
+#define mainImage jawsImage
+${jawsCode??''}
+#undef mainImage
+void lomMain(out vec4 pixel,in vec2 coord){
+ float cover=1.;
+ vec4 teeth=vec4(0.);
+ if(uJawStage!=0 && uJawExit<1.){
+  jawsImage(teeth,coord);
+  if(uJawExit<=0.){pixel=teeth;return;}
+  float cut=mix(42.,-.8,pow(uJawExit,.58));
+  cover=smoothstep(cut,cut+max(.4,.12*cut),lomWallDepth);
+  if(cover<=0.){pixel=teeth;return;}
+ }
+ vec2 p=(2.*coord-iResolution.xy)/iResolution.y;
+ vec3 col=tunnel(p);
+ float grain=fract(sin(dot(mod(coord,251.),vec2(12.9898,78.233)))*43758.5453);
+ pixel=mix(teeth,vec4(pow(1.-exp(-col*1.35),vec3(.82))+(grain-.5)*.017,1.),cover);
+}
+#endif
+${stormCode}
+out vec4 result;
+void main(){
+ #ifdef VESPER_SOLO_STORM
+ mainImage(result,gl_FragCoord.xy);
+ #else
+ if(uJawStage==2){
+  lomMain(result,gl_FragCoord.xy);
+  ${passage?'result.a=clamp(lomWallDepth/40.,0.,1.);':''}
+ }else mainImage(result,gl_FragCoord.xy);
+ #endif
+}`;
+  if(stormOnly && gl.getExtension('EXT_color_buffer_float')){
+   // One column per spark. The two rows hold its head and orbital tangent.
+   const target=createTarget();
+   target.width=40;target.height=2;
+   gl.bindTexture(gl.TEXTURE_2D,target.texture);
+   gl.texStorage2D(gl.TEXTURE_2D,1,gl.RGBA32F,target.width,target.height);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+   gl.bindFramebuffer(gl.FRAMEBUFFER,target.framebuffer);
+   gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target.texture,0);
+   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE){
+    sprayTarget=target;
+    sprayPass=makeProgram(vortexSource('#define VESPER_WRITE_SPRAY'),['iTime','uSongBands','uPassageClock'],vertex300);
+   }else{
+    gl.deleteFramebuffer(target.framebuffer);gl.deleteTexture(target.texture);
+   }
+   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  }
+  const renderSource=vortexSource(sprayPass?'#define VESPER_CACHED_SPRAY':'');
+  vortexPass=makeProgram(renderSource,['uAscent','uDoorTravel','uDoorView','uStormCamera','swarmBirths','swarmPower','tunnelHits','iTime','time','iResolution','band','percussion','uPassageClock','uSongBands','uOrbit','uVortexShot','iChannel0','iChannel1','uJawStage','uJawExit'],vertex300);
+  if(!stormOnly)jawMotionPass=makeProgram(`#version 300 es
+precision highp float;precision highp int;
+uniform highp sampler2D iChannel0,iChannel1;
+uniform float iTimeDelta;uniform int iFrame;
+${motionCode}
+out vec4 result;void main(){mainImage(result,gl_FragCoord.xy);}`,['iChannel0','iChannel1','iTimeDelta','iFrame'],vertex300);
+ }
+
+ const postHeader=`
+precision highp float;
+varying vec2 uv;
+uniform sampler2D inputTexture;`;
+ const unpackScene=`
+vec3 readScene(vec2 coords){
+ vec3 encoded=texture2D(inputTexture,coords).rgb;
+ return encoded/max(1.-encoded,vec3(1./255.));
+}`;
+ // Bend a small patch of the rendered ring. Its reflection and coloured
+ // fringes move with the line because this pass samples the finished image.
+ const ringBendPass=stormOnly?null:makeProgram(postHeader+`
+uniform vec2 aspect, anchor;
+uniform vec2 bend;
+uniform float radius;
+void main(){
+ vec2 q=((uv-.5)*2.*aspect-anchor)/radius;
+ float patch=exp(-5.*q.x*q.x-19.*q.y*q.y);
+ vec2 offset=patch*bend*vec2(1.,sin(4.2*q.x+.45));
+ gl_FragColor=texture2D(inputTexture,uv-offset/(2.*aspect));
+}`,['inputTexture','aspect','anchor','bend','radius']);
+ const extractPass=stormOnly?null:makeProgram(postHeader+unpackScene+`
+// Extract each sample before averaging to retain thin, bright filaments.
+uniform vec2 texel;
+vec3 highlight(vec2 offset){
+ vec3 color=readScene(uv+offset*texel);
+ float peak=max(color.r,max(color.g,color.b));
+ float shoulder=clamp(peak-.52,0.,.8);
+ float excess=max(peak-.92,shoulder*shoulder*.625);
+ return color*(min(excess,4.)/max(peak,.001));
+}
+void main(){
+ vec3 light=highlight(vec2(0.))*2.;
+ light+=highlight(vec2(-1.25,-1.25));
+ light+=highlight(vec2( 1.25,-1.25));
+ light+=highlight(vec2(-1.25, 1.25));
+ light+=highlight(vec2( 1.25, 1.25));
+ // Store up to four linear units per channel for filtering in RGBA8.
+ gl_FragColor=vec4(light/24.,1.);
+}`,['inputTexture','texel']);
+ const blurPass=stormOnly?null:makeProgram(postHeader+`
+// Linear filtering combines nearby taps, with a longer tail for broad halos.
+uniform vec2 direction;
+vec3 pairAt(float radius){
+ vec2 delta=direction*radius;
+ return texture2D(inputTexture,uv-delta).rgb+texture2D(inputTexture,uv+delta).rgb;
+}
+void main(){
+ vec3 light=texture2D(inputTexture,uv).rgb*.20;
+ light+=pairAt(1.38)*.21;
+ light+=pairAt(3.23)*.12;
+ light+=pairAt(6.40)*.05;
+ light+=pairAt(10.)*.02;
+ gl_FragColor=vec4(light,1.);
+}`,['inputTexture','direction']);
+ const compositePass=stormOnly?null:makeProgram(postHeader+unpackScene+`
+uniform sampler2D bloomTexture;
+void main(){
+ vec3 sceneColor=readScene(uv);
+ vec3 bloom=texture2D(bloomTexture,uv).rgb*4.;
+ vec3 color=sceneColor+.78*bloom;
+ float peak=max(color.r,max(color.g,color.b));
+ vec3 film=pow(1.-exp(-color*1.35),vec3(.82));
+ vec3 saturated=pow(color/max(peak,.0001),vec3(.82))*pow(1.-exp(-peak*1.35),.82);
+ vec3 displayColor=mix(film,saturated,.24*smoothstep(.9,3.5,peak));
+ float grain=fract(sin(dot(mod(gl_FragCoord.xy,251.),vec2(12.9898,78.233)))*43758.5453);
+ gl_FragColor=vec4(displayColor+(grain-.5)*.012,1.);
+}`,['inputTexture','bloomTexture']);
+
+ const triangle=gl.createBuffer();
+ gl.bindBuffer(gl.ARRAY_BUFFER,triangle);
+ gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+ gl.enableVertexAttribArray(positionLocation);
+ gl.vertexAttribPointer(positionLocation,2,gl.FLOAT,false,0,0);
+
+ function createTarget(){
+  return {framebuffer:gl.createFramebuffer(),texture:gl.createTexture(),width:0,height:0};
+ }
+ const vortexTarget=stormOnly?null:createTarget();
+ // Keep the texture complete on frames that do not need a portal preview.
+ if(vortexTarget)resizeTarget(vortexTarget,1,1);
+ const fogTarget=fogPass?createTarget():null;
+ const sceneTarget=stormOnly?null:createTarget();
+ const glowTarget=stormOnly?null:createTarget();
+ const blurTarget=stormOnly?null:createTarget();
+ function resizeTarget(target,width,height){
+  if(target.width===width&&target.height===height)return;
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D,target.texture);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,target.framebuffer);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target.texture,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){
+   throw Error('WebGL nemohl vytvořit obrazovou texturu pro záři.');
+  }
+  target.width=width;
+  target.height=height;
+ }
+ function beginPass(pass,target){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,target?.framebuffer??null);
+  gl.viewport(0,0,target?.width??canvas.width,target?.height??canvas.height);
+  gl.useProgram(pass.program);
+ }
+ function bindInput(texture,location,unit=0){
+  gl.activeTexture(gl.TEXTURE0+unit);
+  gl.bindTexture(gl.TEXTURE_2D,texture);
+  gl.uniform1i(location,unit);
+ }
+ function drawTriangle(){gl.drawArrays(gl.TRIANGLES,0,3);}
+ const jawBins=new Uint8Array(512);
+ let jawSpectrum,jawState=[],jawRead=0,jawFrame=0,jawStamp=-1;
+ if(jawMotionPass){
+  jawSpectrum=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,jawSpectrum);
+  gl.texStorage2D(gl.TEXTURE_2D,1,gl.R8,512,1);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  jawState=[createTarget(),createTarget()];
+  for(const target of jawState)resizeTarget(target,3,1);
+ }
+ function advanceJaws(time){
+  if(projectionFrame?.spectrum)jawBins.set(projectionFrame.spectrum);
+  else if(projectionFrame){
+   const bands=projectionFrame.bands;
+   for(let i=0;i<512;i++)jawBins[i]=255*bands[i<5?0:i<62?1:2];
+  }else if(fft)for(let i=0;i<512;i++)jawBins[i]=(fft[2*i]+fft[2*i+1])*.5;
+  const v=jawMotionPass.uniforms;
+  beginPass(jawMotionPass,jawState[1-jawRead]);
+  bindInput(jawSpectrum,v.iChannel0,0);
+  gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,512,1,gl.RED,gl.UNSIGNED_BYTE,jawBins);
+  bindInput(jawState[jawRead].texture,v.iChannel1,1);
+  gl.uniform1i(v.iFrame,jawFrame++);
+  gl.uniform1f(v.iTimeDelta,jawStamp<0?0:Math.max(0,time-jawStamp));
+  gl.disable(gl.DITHER);drawTriangle();gl.enable(gl.DITHER);
+  jawRead=1-jawRead;jawStamp=time;
+ }
+ function drawBloom(){
+  beginPass(extractPass,glowTarget);
+  bindInput(sceneTarget.texture,extractPass.uniforms.inputTexture);
+  gl.uniform2f(extractPass.uniforms.texel,1/sceneTarget.width,1/sceneTarget.height);
+  drawTriangle();
+
+  beginPass(blurPass,blurTarget);
+  bindInput(glowTarget.texture,blurPass.uniforms.inputTexture);
+  gl.uniform2f(blurPass.uniforms.direction,1/glowTarget.width,0);
+  drawTriangle();
+
+  beginPass(blurPass,glowTarget);
+  bindInput(blurTarget.texture,blurPass.uniforms.inputTexture);
+  gl.uniform2f(blurPass.uniforms.direction,0,1/blurTarget.height);
+  drawTriangle();
+
+  beginPass(compositePass,null);
+  bindInput(sceneTarget.texture,compositePass.uniforms.inputTexture);
+  bindInput(glowTarget.texture,compositePass.uniforms.bloomTexture,1);
+  drawTriangle();
+ }
+ const primaryLabel=lasersOnly?'Lasery':chromeOnly?'Chromový preclík':requestedScene==='tunel'?'Duhový tunel':'Polární záře';
+ const primaryMode=soloScene || requestedScene==='tour' || requestedScene==='tunel';
+ let primaryActive=primaryMode, flying=!gallery && !stormOnly && !shaderSet && !primaryActive;
+ if(requestedScene===initialScene){
+ if(primaryActive){
+  el('steer').hidden=true;
+  canvas.setAttribute('aria-label',primaryLabel+' reagující na hudbu');
+ }
+ if(soloScene)el('mode').hidden=true;
+ if(chromeOnly){
+  const button=el('fracture');
+  button.hidden=false;
+  function labelFracture(){button.textContent=wholeFracture?'Rozpad od okrajů':'Rozpad na devět kusů';}
+  labelFracture();
+  button.onclick=()=>{wholeFracture=!wholeFracture;labelFracture();pausedView='';};
+ }
+ if(shaderSet){el('steer').hidden=true;el('mode').textContent='Živý útes';canvas.setAttribute('aria-label','Hudební set pixel shaderů');}
+ if(concert)el('mode').hidden=true;
+ if(musicConcert)canvas.setAttribute('aria-label','Všechny scény Vesper v rytmu skladby');
+ if(passage)canvas.setAttribute('aria-label','Průlet preclíkem a duhovým tunelem do horního oka tornáda a čelistí LOM');
+ if(stormOnly){
+  el('steer').hidden=el('mode').hidden=true;
+  canvas.setAttribute('aria-label','Obrácené tornádo se světelnou korónou reagující na hudbu');
+ }
+ el('mode').onclick=()=>{
+  if(concert || stormOnly || soloScene)return;
+  if(primaryMode){
+   const wasFlying=flying;
+   flying=!primaryActive && !flying;
+   primaryActive=wasFlying;
+  }else flying=!flying;
+  el('steer').hidden=!flying;
+  el('mode').textContent=primaryActive?'Střídat scény':flying?(primaryMode?primaryLabel:'Střídat scény'):'Živý útes';
+  canvas.setAttribute('aria-label',primaryActive?primaryLabel+' reagující na hudbu':flying?'Průlet organickým fraktálním útesem':'Hudební set pixel shaderů');
+ };
+ }
+ const idleStart=pageStart;
+ const tourOrder=[2,1,2,3]; // Aurora, tunnel, aurora, lasers.
+ const names=['TUNEL / GROOVE','ZÁŘE / BREAK','LASERY / DROP','CHROM / INTRO'];
+ let previousLabel='';
+ let sceneClock,tourClock,clockRevision=-1;
+ const tunnelRoute=createTunnelRoute();
+ const arrowTurns={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+ let steerTimer;
+ window.addEventListener('keydown',event=>{
+  const direction=arrowTurns[event.key];
+  if(renderFrame!==frame||!flying||!direction||event.defaultPrevented||event.repeat||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey)return;
+  if(event.target.closest?.('input,select,textarea,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'))return;
+  if(tunnelRoute.requestTurn(direction)){
+   event.preventDefault();
+   el('steer').textContent='Příští odbočka '+({left:'←',right:'→',up:'↑',down:'↓'})[direction];
+   clearTimeout(steerTimer);
+   steerTimer=setTimeout(()=>el('steer').textContent='← ↑ ↓ →　Volba odbočky',2100);
+  }
+ });
+ // Measure delivered animation intervals. Ignore tab switches and one-off stalls.
+ let flightScale=1,previousFrame=0,lastProbe=0,sampleCount=0;
+ const intervals=new Float32Array(12);
+ document.addEventListener('visibilitychange',()=>{previousFrame=0;sampleCount=0});
+ function adapt(now,enabled){
+  const dt=now-previousFrame;
+  if(!previousFrame||!enabled||document.hidden||dt>1000){sampleCount=0;previousFrame=now;return}
+  previousFrame=now;
+  intervals[sampleCount++]=dt;
+  if(sampleCount<intervals.length)return;
+  sampleCount=0;
+  // The storm alternates close volume views and thin, distant silhouettes.
+  // Respond to a cluster of slow frames without reacting to a single hitch.
+  const frameMs=intervals.sort()[stormOnly?9:6];
+  if(frameMs>22.5 && (!stormOnly || now-lastProbe>850)){
+   const minimum=stormOnly ? .68 : .36;
+   flightScale=Math.max(minimum,flightScale*Math.max(.60,Math.sqrt(16.67/frameMs)));
+   lastProbe=now;
+  }else if(frameMs<18 && flightScale<1 && now-lastProbe>3500){
+   flightScale=Math.min(1,flightScale*1.12);
+   lastProbe=now;
+  }
+ }
+ // Keep attacks alive after later kicks arrive. The fragment shader gives each
+ // birth its own trajectory and lifetime from the timestamp and the strength.
+ let liveCameraTime=-1,liveCameraMotion=0,liveCameraEnergy=0,liveCameraFocus=0;
+ function uploadStormCamera(v,t,groove,energy,accent){
+  if(groove){
+   gl.uniform3f(v.uStormCamera,groove.motion,groove.cameraEnergy,groove.cameraFocus);
+   return;
+  }
+  if(liveCameraTime<0 || t<liveCameraTime){
+   liveCameraMotion=0;liveCameraEnergy=energy;liveCameraFocus=0;
+  }
+  const dt=Math.max(0,Math.min(.25,t-liveCameraTime));
+  liveCameraTime=t;
+  liveCameraEnergy+=(energy-liveCameraEnergy)*(1-Math.exp(-dt/.6));
+  liveCameraFocus+=(accent-liveCameraFocus)*(1-Math.exp(-dt/.48));
+  liveCameraMotion+=dt*(.25+1.45*liveCameraEnergy);
+  gl.uniform3f(v.uStormCamera,liveCameraMotion,liveCameraEnergy,liveCameraFocus);
+ }
+ const swarmBirths=new Float32Array(4).fill(-10),swarmPower=new Float32Array(4);
+ let swarmClock=-1;
+ function uploadSwarm(uniforms,time,hits){
+  if(time<swarmClock)swarmBirths.fill(-10);
+  swarmClock=time;
+  for(let i=2;i>=0;i-=2){
+   const stamp=time-hits[i];
+   if(hits[i+1]<=0 || hits[i]>.33 || stamp-swarmBirths[0]<.36)continue;
+   swarmBirths.copyWithin(1,0,3);swarmPower.copyWithin(1,0,3);
+   swarmBirths[0]=stamp;swarmPower[0]=hits[i+1];
+  }
+  gl.uniform4fv(uniforms.swarmBirths,swarmBirths);
+  gl.uniform4fv(uniforms.swarmPower,swarmPower);
+ }
+ let bendStart=-10,bendRing=0,bendSide=1,bendHeight=1,bendStrength=0,previousSnare=0;
+ let crownClock=null,crownAge=0,crownHeight=0,crownPlaying=false;
+ let pausedView='',concertStart=null,concertRevision=-1,passageClock=null,musicClock=null;
+ function frame(now,output=null,portal=null){
+  const paused=started&&ctx.state==='suspended';
+  const adaptiveView=flying||stormOnly;
+  adapt(now,adaptiveView&&!paused);
+  const maxSide=flying?1600:1050;
+  const scale=Math.min(devicePixelRatio,1.5,maxSide/Math.max(innerWidth,innerHeight))*(adaptiveView?flightScale:1);
+  const w=Math.max(1,Math.round(innerWidth*scale)),h=Math.max(1,Math.round(innerHeight*scale));
+  const pausedKey=paused?[flying,w,h,trackRevision,sceneVersion].join('/'): '';
+  if(pausedKey && pausedKey===pausedView && !journey)return;
+  pausedView=pausedKey;
+  if(output)resizeTarget(output,w,h);
+  else if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+  // Use the sample reaching the audio output, including the device latency.
+  let clock=ctx?.currentTime??0;
+  if(started && !paused && selectedBuffer && ctx.getOutputTimestamp){
+   const stamp=ctx.getOutputTimestamp();
+   if(stamp.performanceTime>0)clock=Math.min(clock,stamp.contextTime+Math.max(0,performance.now()-stamp.performanceTime)/1000);
+  }
+  const remote=projectionFrame;
+  const time=remote?remote.time+Math.min(.15,(performance.now()-remote.received)/1000):started?Math.max(0,clock-trackStart):(now-idleStart)/1000;
+  const levels=remote?remote.bands:readBands();
+  if(sharedStream && now>=nextLevelUpdate){
+   liveLevel.value=Math.max(...levels);
+   if(liveLevel.value>.012)lastTabSignal=now;
+   const receiving=now-lastTabSignal<1500;
+   const message=receiving?'Přijímám zvuk z karty':'Z karty jde ticho. Spusť skladbu ve sdílené kartě.';
+   if(statusLine.textContent!==message)statusLine.textContent=message;
+   nextLevelUpdate=now+125;
+  }
+  const accents=remote?remote.accents:readAccents();
+  if(remote)liveTunnelHits.set(remote.hits);
+  const camera=stormOnly?null:tunnelRoute.sample(time,accents,trackRevision);
+  if(clockRevision!==trackRevision){
+   if(!stormOnly && !soloScene)sceneClock=createSceneClock(!!vortexPass,selectedBuffer?grooveMap:null,shaderSet);
+   if(requestedScene==='tour')tourClock=createSceneClock(false,selectedBuffer?grooveMap:null,false,true);
+   clockRevision=trackRevision;jawFrame=0;jawStamp=-1;swarmBirths.fill(-10);liveCameraTime=-1;
+   bendStart=-10;previousSnare=0;
+  }
+  if(concertRevision!==trackRevision){
+   concertStart=null;concertRevision=trackRevision;
+   if(musicConcert)musicClock=createMusicConcert(selectedBuffer?grooveMap:null,selectedBuffer?.duration??240);
+   if(passage)passageClock=createPassageClock(selectedBuffer?grooveMap:null);
+  }
+  if(concert && started && concertStart===null && levels.some(value=>value>.012))concertStart=time;
+  const cue=gallery?galleryCue(time):musicConcert?musicClock(started?time:0):passage?passageClock(started?time:0):concert?concertCue(concertStart===null?0:Math.max(0,time-concertStart)):null;
+  const grooveTour=primaryActive && !!tourClock;
+  const cycleBeat=cue?(cue.blend>0?11.5+4.5*cue.blend:(cue.arrival??4)):lasersOnly?36:chromeOnly?52:auroraOnly?20:stormOnly?64:grooveTour?tourClock(time):primaryActive?0:sceneClock(time);
+  const tourSection=Math.floor(cycleBeat/16);
+  const tourScene=cue?cue.from:grooveTour?tourOrder[tourSection]:0;
+  const nextTourScene=cue?cue.to:grooveTour?tourOrder[(tourSection+1)%tourOrder.length]:0;
+  const onRings=cue ? cue.from===1 && !cue.blend : !soloScene && primaryActive && (!grooveTour || (tourScene===1 && cycleBeat%16<11.5));
+  const ownGroove=selectedBuffer && grooveMap ? grooveMap(time) : null;
+  const beat=ownGroove ? ownGroove.beat : time*RAVE_BPM/60;
+  const inVortex=!!vortexPass&&!flying&&cycleBeat>=64&&cycleBeat<112;
+  const inJaws=!!vortexPass&&!flying&&cycleBeat>=112;
+  const previewVortex=!!vortexPass&&!flying&&!grooveTour&&cycleBeat>=59.5&&cycleBeat<64;
+  const melting=shaderSet&&!flying&&cycleBeat<0;
+  const meltTravel=melting?Math.max(0,(cycleBeat+4.5)/4.5):0;
+  const name=gallery?cue.label:cue?(!passage&&cue.external==='VÍR'&&cue.age>45?(cue.age>51?'KRYSTALOVÝ KRÁL':'ČELISTI / LOM'):cue.label):grooveTour?names[tourScene-1]:melting?'TAVENÍ':inJaws?'ČELISTI / LOM':inVortex?'VÍR / VÝBOJ':names[Math.floor(cycleBeat/16)%4];
+  const label=flying?'ŽIVÝ ÚTES':selectedBuffer?name.split(' / ')[0]:name;
+  if(!output && label!==previousLabel){el('sceneLabel').textContent=label;previousLabel=label}
+  if(flying){
+   const glowWidth=Math.ceil(w/4),glowHeight=Math.ceil(h/4);
+   resizeTarget(sceneTarget,w,h);
+   resizeTarget(glowTarget,glowWidth,glowHeight);
+   resizeTarget(blurTarget,glowWidth,glowHeight);
+  }
+  const kick=ownGroove?.kick??accents[0],snare=ownGroove?.snare??accents[1],hat=ownGroove?.hat??accents[2];
+  const sceneTime=ownGroove&&!flying?ownGroove.motion:time;
+  if(cue?.external){
+   const age=Math.max(0,cue.age??0),kind=cue.external;
+   const ratio=(kind==='VÍR' || kind==='LASTURA') ? .73 : 1;
+   const width=Math.max(1,Math.round(w*ratio)),height=Math.max(1,Math.round(h*ratio));
+   resizeTarget(vortexTarget,width,height);
+   if(kind==='LOM'){
+    beginPass(concertAssets.mesh,vortexTarget);
+    concertAssets.drawMesh(vortexTarget,age,levels,kick);
+   }else{
+    advanceJaws(time);
+    const pass=kind==='VÍR'?vortexPass:kind==='TAVENÍ'?meltPass:concertAssets.shell;
+    const v=pass.uniforms;
+    beginPass(pass,vortexTarget);
+    bindInput(jawSpectrum,v.iChannel0,0);
+    gl.uniform3f(v.iResolution,width,height,1);
+    gl.uniform1f(v.iTime,kind==='LASTURA'?age+(gallery?26:musicConcert?9:15):kind==='TAVENÍ'?age:time);
+    gl.uniform4f(v.uOrbit,0,0,time,.56*levels[0]+.28*levels[1]+.16*levels[2]);
+    if(kind==='VÍR'){
+     // Stay outside for the long phrase, climb through the original LOM teeth,
+     // then follow the original crystal ritual in the chamber beyond them.
+     const rail=cue.rail!==undefined?cue.rail:age<32?4.5*age/32:age<45?4.5+(age-32)*5.8/13:
+        age<51?10.3+(age-45)*(17.143-10.3)/6:17.143+(age-51)*.6;
+     if(kingOnly && gallery){
+      const playing=started || !!remote;
+      if(playing!==crownPlaying || time<crownClock){crownClock=null;crownAge=0;crownHeight=0;}
+      const dt=crownClock===null?0:Math.max(0,time-crownClock);
+      const before=crownAge;
+      crownPlaying=playing;crownClock=time;crownAge+=dt;
+      const growTime=Math.max(0,crownAge-5)-Math.max(0,before-5);
+      crownHeight+=growTime*(.85+1.9*levels[0]+2.6*kick+.55*levels[1]);
+      gl.uniform2f(v.uAscent,crownAge,crownHeight);
+     }
+     bindInput(jawState[jawRead].texture,v.iChannel1,1);
+     gl.uniform1i(v.uJawStage,cue.jaws?2:1);gl.uniform1f(v.uJawExit,0);gl.uniform1f(v.uPassageClock,rail);
+     gl.uniform1f(v.time,sceneTime);gl.uniform3fv(v.band,levels);gl.uniform3f(v.percussion,kick,snare,hat);
+     gl.uniform4fv(v.tunnelHits,ownGroove?.hits??liveTunnelHits);
+     gl.uniform3f(v.uSongBands,.44*levels[0]+.56*kick,.62*levels[1]+.38*snare,.42*levels[2]+.58*hat);
+     gl.uniform4f(v.uVortexShot,beat*.25,kick,snare,hat);
+    }else if(kind==='LASTURA'){
+     bindInput(concertAssets.texture,v.iChannel1,1);gl.uniform1f(v.uShellReadyAt,0);
+    }
+    drawTriangle();
+   }
+  }
+  if(melting || inVortex || previewVortex || inJaws){
+   const jawRoute=!stormOnly && sceneClock.jaws;
+   if(jawRoute)advanceJaws(time);
+   else {jawFrame=0;jawStamp=-1;}
+   const target=(previewVortex || melting)?vortexTarget:output;
+   if(!melting || meltTravel>0){
+    if(target && target!==output)resizeTarget(target,Math.max(1,Math.round(w*.70)),Math.max(1,Math.round(h*.70)));
+    const v=vortexPass.uniforms,age=Math.max(0,cycleBeat-64);
+    // Give the storm three phrases, then let its original camera fly up the lip.
+    const stormClock=stormOnly
+     ? 7.64*(.5-.5*Math.cos(time*2*Math.PI/49))**2
+     : age<38?4.*age/38:4.+6.65*Math.min(1,(age-38)/10);
+    const bass=.44*levels[0]+.56*kick,body=.62*levels[1]+.38*snare,air=.42*levels[2]+.58*hat;
+    if(sprayPass){
+     beginPass(sprayPass,sprayTarget);
+     const u=sprayPass.uniforms;
+     gl.uniform1f(u.iTime,time);gl.uniform1f(u.uPassageClock,stormClock);
+     gl.uniform3f(u.uSongBands,bass,body,air);drawTriangle();
+    }
+    beginPass(vortexPass,target);
+    if(sprayPass)bindInput(sprayTarget.texture,v.iChannel1,1);
+    if(!stormOnly){
+     bindInput(jawSpectrum,v.iChannel0,0);
+     bindInput(jawState[jawRead].texture,v.iChannel1,1);
+    }
+    gl.uniform1i(v.uJawStage,(inJaws||melting)?2:jawRoute?1:0);
+    const exit=Math.max(0,Math.min(1,(cycleBeat-123.5)/4.5));
+    gl.uniform1f(v.uJawExit,exit*exit*(3-2*exit));
+    gl.uniform1f(v.uPassageClock,stormClock);
+    gl.uniform1f(v.iTime,time);gl.uniform1f(v.time,sceneTime);
+    gl.uniform3f(v.iResolution,target?.width??w,target?.height??h,1);
+    const hits=ownGroove?.hits??liveTunnelHits;
+    gl.uniform4fv(v.tunnelHits,hits);
+    if(stormOnly){
+     uploadSwarm(v,time,hits);
+     gl.uniform1f(v.uDoorTravel,portal?journey.phase:0);
+     bindInput(portal?.texture??null,v.uDoorView,3);
+    }
+    if(phraseCamera)uploadStormCamera(v,time,ownGroove,.55*levels[0]+.30*levels[1]+.15*levels[2],Math.max(kick,.65*snare));
+    gl.uniform3fv(v.band,levels);gl.uniform3f(v.percussion,kick,snare,hat);
+    gl.uniform3f(v.uSongBands,bass,body,air);
+    gl.uniform4f(v.uOrbit,0,0,time,.55*levels[0]+.30*levels[1]+.15*levels[2]);
+    gl.uniform4f(v.uVortexShot,beat*.25,kick,accents[1],hat);
+    drawTriangle();
+   }
+   if(melting){
+    beginPass(meltPass,null);
+    const v=meltPass.uniforms;
+    bindInput(jawSpectrum,v.iChannel0,0);
+    bindInput(vortexTarget.texture,v.nextView,1);
+    gl.uniform3f(v.iResolution,w,h,1);
+    gl.uniform1f(v.iTime,time);
+    gl.uniform4f(v.uOrbit,0,0,time,.55*levels[0]+.30*levels[1]+.15*levels[2]);
+    gl.uniform1f(v.uTravel,meltTravel*meltTravel*(3.-2.*meltTravel));
+    drawTriangle();
+   }
+   if(melting||inVortex||inJaws)return;
+  }
+  // Latch the identity of an existing ring on a strong midrange attack.
+  // Following its depth keeps the bend attached as the rings pass the eye.
+  if(onRings && started && snare>=.51 && previousSnare<.51 && time-bendStart>1.25){
+   bendStart=time;bendSide=-bendSide;
+   bendRing=Math.floor((1.94+sceneTime*1.65)*1.65);
+   bendHeight=bendRing%3===0?-1:1;
+   bendStrength=.64+.36*snare;
+  }
+  previousSnare=snare;
+  const bendAge=time-bendStart;
+  const bendDepth=(bendRing+.5)/1.65-sceneTime*1.65;
+  const bending=onRings && bendAge>=0 && bendAge<.38 && bendDepth>.65;
+  if(bending)resizeTarget(sceneTarget,w,h);
+  const activeId=tourScene || 1+(tourSection%4);
+  const followingId=nextTourScene || 1+((tourSection+1)%4);
+  const showFog=fogPass && !flying && (activeId===3 || (cycleBeat%16>=11.5 && followingId===3));
+  if(showFog){
+   resizeTarget(fogTarget,Math.ceil(w*.8),Math.ceil(h*.8));
+   beginPass(fogPass,fogTarget);
+   const f=fogPass.uniforms;
+   bindInput(fogTexture,f.plate,0);
+   gl.uniform2f(f.size,fogTarget.width,fogTarget.height);
+   gl.uniform1f(f.clock,time);
+   drawTriangle();
+  }
+  beginPass(scenePass,(flying||bending)?sceneTarget:output);
+  bindSky(u,w,h);
+  bindInput(showFog?fogTarget.texture:vortexTarget.texture,u.fogVolume,4);
+  bindInput(portal?portal.texture:vortexTarget.texture,u.vortexView,2);
+  gl.uniform1i(u.chromPassage,passage?1:0);
+  gl.uniform1i(u.hasVortex,vortexPass?1:0);
+  gl.uniform1f(u.grainTone,ownGroove?.grain??0);
+  gl.uniform3f(u.impactTrail,ownGroove?.trail[0]??0,ownGroove?.trail[1]??0,ownGroove?.trail[2]??0);
+  gl.uniform3f(u.musicCue,ownGroove?.prepare??0,ownGroove?.impact??0,ownGroove?1:0);
+  gl.uniform1i(u.wholeFracture,wholeFracture?1:0);
+  gl.uniform1f(u.flight,flying?1:0);
+  gl.uniform2f(u.tourScenes,tourScene,nextTourScene);
+  gl.uniform1f(u.showBeat,cycleBeat);
+  gl.uniform2f(u.size,w,h);
+  gl.uniform1f(u.time,sceneTime);
+  gl.uniform3f(u.percussion,kick,snare,hat);
+  gl.uniform4fv(u.tunnelHits,ownGroove?.hits??liveTunnelHits);
+  gl.uniform3fv(u.band,levels);
+  gl.uniform4fv(u.accents,accents);
+  gl.uniform4fv(u.wallAges,wallAges);
+  gl.uniform3fv(u.camPos,camera.position);
+  gl.uniform3fv(u.camForward,camera.forward);
+  gl.uniform3fv(u.camRight,camera.right);
+  gl.uniform3fv(u.camUp,camera.up);
+  gl.uniform1f(u.mood,camera.mood);
+  const phrase=beat%64;
+  let intensity=.42+.32*levels[0]+.24*accents[1];
+  if(started&&!selectedBuffer&&!sharedStream){
+   if(phrase>=32&&phrase<48)intensity*=.27+.58*((phrase-32)/16)**3;
+   if(phrase>=48)intensity*=1.65;
+  }
+  gl.uniform2f(u.rave,intensity,ravePolarity*accents[0]);
+  drawTriangle();
+  if(bending){
+   const r=1/bendDepth-.08;
+   const aspect=w/h;
+   const attack=Math.min(1,bendAge/.075);
+   const release=Math.max(0,Math.min(1,(.38-bendAge)/.27));
+   const gain=bendStrength*attack*attack*(3-2*attack)*release*release*(3-2*release)
+             *Math.min(1,(bendDepth-.65)/.25);
+   const bend=ringBendPass.uniforms;
+   beginPass(ringBendPass,output);
+   bindInput(sceneTarget.texture,bend.inputTexture);
+   gl.uniform2f(bend.aspect,aspect,1);
+   gl.uniform2f(bend.anchor,.13*Math.sin(sceneTime*.8)+.54*r*bendSide,
+                            .13*Math.cos(sceneTime*.63)+.842*r*bendHeight);
+   gl.uniform2f(bend.bend,.105*bendSide*gain,.073*bendHeight*gain);
+   gl.uniform1f(bend.radius,r);
+   drawTriangle();
+  }
+  if(flying)drawBloom();
+ }
+ return frame;
+}
+let trackStart=0, lastBands=[0,0,0];
+const idleAccents=new Float32Array([0,0,0,4]);
+let lastAccents=idleAccents,sampleAccents,authoredKicks=[];
+const soundtrackParams=new URLSearchParams(location.search);
+const phraseCamera=soundtrackParams.get('scene')==='vir' && soundtrackParams.get('kamera')==='fraze';
+const defaultTrackName='Vesper Acid · 148 BPM';
+statusLine.textContent=defaultTrackName;
+let ctx,analyser,fft,score,source,selectedBuffer,trackName=defaultTrackName,started=false,loading=false;
+let sharedStream=null,sharedNode=null,sharedMeter=null,sharedSink=null;
+const liveLevel=el('liveLevel');
+let nextLevelUpdate=0,lastTabSignal=-Infinity;
+function audioSetup(){
+ if(ctx)return;
+ ctx=new AudioContext();analyser=ctx.createAnalyser();analyser.fftSize=2048;analyser.smoothingTimeConstant=.68;
+ fft=new Uint8Array(analyser.frequencyBinCount);analyser.connect(ctx.destination);score=createScore(ctx,analyser);
+}
+function readBands(){
+ if(!started||ctx.state!=='running') return lastBands;
+ analyser.getByteFrequencyData(fft);
+ function energy(lo,hi){
+  const k=fft.length*2/ctx.sampleRate;
+  const start=Math.max(1,Math.floor(lo*k)),end=Math.min(fft.length,Math.ceil(hi*k));
+  let sum=0;for(let i=start;i<end;i++)sum+=fft[i]*fft[i];
+  return Math.sqrt(sum/Math.max(1,end-start))/255;
+ }
+ lastBands=[energy(35,150),energy(250,1700),energy(3800,10500)];
+ return lastBands;
+}
+// Measure recent onsets separately from the legacy, smoothed color bands.
+let ravePolarity=1;
+const wallAges=new Float32Array(4).fill(8);
+const liveTunnelHits=new Float32Array([8,0,8,0]);
+function createAccentTracker(analyser,sampleRate){
+ const wallKicks=new Float64Array(4).fill(-Infinity);
+ wallAges.fill(8);liveTunnelHits.set([8,0,8,0]);ravePolarity=1;
+ const bins=new Float32Array(analyser.frequencyBinCount);
+ const binHz=sampleRate/analyser.fftSize;
+ const ranges=[[42,145],[250,1700],[3800,10500]].map(([lo,hi])=>[
+  Math.max(1,Math.ceil(lo/binHz)),Math.min(bins.length,Math.floor(hi/binHz)+1)
+ ]);
+ const accents=new Float32Array([0,0,0,4]);
+ let previousTime,previousBass=0,previousHigh=0,bassFloor=0,highFloor=0,midPeak=0;
+ let lastKick,lastHigh,kickStrength=0,highStrength=0;
+ function energy([start,end]){
+  let squares=0,peak=0;
+  for(let i=start;i<end;i++){
+   const power=10**(bins[i]/10);
+   squares+=power;
+   peak=Math.max(peak,power);
+  }
+  return .75*Math.sqrt(squares/Math.max(1,end-start))+.25*Math.sqrt(peak);
+ }
+ function sample(now,authoredKick,detectKick){
+  if(now===previousTime)return accents;
+  const elapsed=previousTime===undefined?1/60:now-previousTime;
+  previousTime=now;
+  analyser.getFloatFrequencyData(bins);
+  const bass=energy(ranges[0]),mids=energy(ranges[1]),high=energy(ranges[2]);
+  if(detectKick){
+   const rise=bass-previousBass;
+   if((lastKick===undefined||now-lastKick>.19)&&bass>.0018&&
+      rise>Math.max(.0009,bassFloor*.23)&&bass>1.35*bassFloor){
+    lastKick=now;
+    kickStrength=Math.min(1,.65+rise/Math.max(.003,bassFloor*1.8));
+   }
+  }else if(authoredKick){
+   lastKick=authoredKick.time;
+   kickStrength=authoredKick.strength;
+  }
+  const highRise=high-previousHigh;
+  if((lastHigh===undefined||now-lastHigh>.075)&&high>.00045&&
+     highRise>Math.max(.00032,highFloor*.38)&&high>1.3*highFloor){
+   lastHigh=now;
+   highStrength=Math.min(1,.55+highRise/Math.max(.0014,highFloor*1.4));
+  }
+  const floorBlend=1-Math.exp(-elapsed/.22);
+  bassFloor+=(bass-bassFloor)*floorBlend;
+  highFloor+=(high-highFloor)*floorBlend;
+  previousBass=bass;
+  previousHigh=high;
+  midPeak=Math.max(mids,midPeak*Math.exp(-elapsed/2.4));
+  const midLevel=Math.min(1,Math.max(0,mids-.0003)/Math.max(.008,midPeak));
+  const midTime=midLevel>accents[1]?.055:.24;
+  accents[1]+=(midLevel-accents[1])*(1-Math.exp(-elapsed/midTime));
+  if(lastKick!==undefined && lastKick>wallKicks[0]){
+   ravePolarity=-ravePolarity;
+   wallKicks.copyWithin(1,0,3);
+   wallKicks[0]=lastKick;
+   liveTunnelHits[3]=liveTunnelHits[1];liveTunnelHits[1]=kickStrength;
+  }
+  for(let i=0;i<4;i++)wallAges[i]=Math.min(8,now-wallKicks[i]);
+  liveTunnelHits[0]=wallAges[0];liveTunnelHits[2]=wallAges[1];
+  const kickAge=lastKick===undefined?4:now-lastKick;
+  accents[0]=lastKick===undefined?0:kickStrength*Math.exp(-kickAge/.115);
+  accents[2]=lastHigh===undefined?0:highStrength*Math.exp(-(now-lastHigh)/.09);
+  accents[3]=kickAge;
+  return accents;
+ }
+ return sample;
+}
+function readAccents(){
+ if(!started||ctx.state!=='running'||ctx.currentTime<trackStart)return lastAccents;
+ const now=ctx.currentTime;
+ while(authoredKicks.length>1&&authoredKicks[1].time<=now)authoredKicks.shift();
+ const authoredKick=authoredKicks[0];
+ lastAccents=sampleAccents(now,authoredKick?.time<=now?authoredKick:undefined,Boolean(selectedBuffer||sharedStream));
+ return lastAccents;
+}
+// Analyse the decoded song once. Looking up the envelopes on the playback
+// clock keeps short attacks visible even when an expensive frame misses one.
+// Rank bass onsets against the music on BOTH sides. A lone loud kick is
+// different from the first kick of a phrase that stays louder afterwards.
+function markPhraseAccents(energy,dt,hitTimes){
+ const prefix=new Float64Array(energy.length+1);
+ for(let i=0;i<energy.length;i++)prefix[i+1]=prefix[i]+energy[i];
+ function mean(start,end){
+  const a=Math.max(0,Math.round(start/dt)),b=Math.min(energy.length,Math.round(end/dt));
+  return b>a?(prefix[b]-prefix[a])/(b-a):0;
+ }
+ const candidates=[];
+ for(const t of hitTimes){
+  if(t<.50)continue;
+  const before=mean(t-1.65,t-.06),after=mean(t,t+.85);
+  const rest=mean(t-.32,t-.035),attack=mean(t,t+.15);
+  const rise=(after-before)/(after+before+.028);
+  const punch=(attack-rest)/(attack+rest+.03);
+  const score=.75*rise+.25*punch;
+  if(attack>.025 && after>.019)candidates.push({t,score,rise});
+ }
+ // Compare with neighbouring qualifying kicks, including those still to come.
+ // A repeating four-on-the-floor groove can have a sharp attack on every beat.
+ const ranked=[];
+ for(let i=0;i<candidates.length;i++){
+  const {t,score,rise}=candidates[i],nearby=[];
+  for(let j=i-1;j>=0 && t-candidates[j].t<3.8;j--)nearby.push(candidates[j].score);
+  for(let j=i+1;j<candidates.length && candidates[j].t-t<3.8;j++)nearby.push(candidates[j].score);
+  nearby.sort((a,b)=>a-b);
+  const typical=nearby[Math.floor(nearby.length*.65)]??0;
+  const contrast=score-typical;
+  if(score>.18 && (contrast>.055 || rise>.37))
+   ranked.push({t,score:Math.min(1,.56*score+.85*Math.max(0,contrast))});
+ }
+ ranked.sort((a,b)=>b.score-a.score);
+ const prepare=new Float32Array(energy.length),impact=new Float32Array(energy.length);
+ const cameraFocus=phraseCamera?new Float32Array(energy.length):null;
+ const occupied=new Uint8Array(energy.length);
+ for(const {t,score} of ranked){
+  const peak=Math.round(t/dt);
+  if(occupied[peak])continue;
+  const distance=Math.ceil(1.9/dt);
+  occupied.fill(1,Math.max(0,peak-distance),Math.min(energy.length,peak+distance+1));
+  const strength=Math.min(1,.40+1.9*score),lead=.26+.23*strength;
+  // Begin moving before the chosen accent and hold the view through its decay.
+  if(cameraFocus)for(let i=Math.max(0,peak-Math.ceil(1.05/dt));i<Math.min(energy.length,peak+1.65/dt);i++){
+   const age=(i-peak)*dt;
+   const x=Math.max(0,Math.min(1,age<0?1+age/1.05:1-(age-.22)/1.43));
+   cameraFocus[i]=Math.max(cameraFocus[i],strength*x*x*(3-2*x));
+  }
+  for(let i=Math.max(0,peak-Math.ceil(lead/dt));i<=peak;i++){
+   const age=(i-peak)*dt,x=Math.max(0,1+age/lead);
+   prepare[i]=strength*x*x*(3-2*x)*Math.min(1,-age/.055);
+  }
+  for(let i=Math.max(0,peak-Math.ceil(.045/dt));i<Math.min(energy.length,peak+Math.ceil(.75/dt));i++){
+   const age=(i-peak)*dt,x=Math.max(0,Math.min(1,1+age/.045));
+   impact[i]=strength*x*x*(3-2*x)*Math.exp(-Math.max(0,age)/.16);
+  }
+ }
+ return {prepare,impact,cameraFocus,energyAt:phraseCamera?t=>Math.min(1,4.4*mean(t-.60,t+.38)):null};
+}
+// Measure spectral spread as a timbre proxy. Compare relative band powers
+// so a louder copy of the same sound has the same character.
+function mapGrainTone(left,right,sampleRate){
+ const step=Math.round(sampleRate*.05),size=512,bins=16;
+ const coefficients=Float64Array.from({length:bins},(_,i)=>2*Math.cos(2*Math.PI*320*12**(i/(bins-1))/sampleRate));
+ const window=Float32Array.from({length:size},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/(size-1)));
+ const samples=new Float32Array(size),power=new Float64Array(bins);
+ const tone=new Float32Array(Math.ceil(left.length/step)),weight=new Float32Array(tone.length);
+ for(let frame=0;frame<tone.length;frame++){
+  const start=frame*step;
+  for(let j=0;j<size;j++)samples[j]=start+j<left.length ? .5*(left[start+j]+right[start+j])*window[j]:0;
+  let total=0,upper=0;
+  for(let k=0;k<bins;k++){
+   let a=0,b=0;
+   for(let j=0;j<size;j++){const next=samples[j]+coefficients[k]*a-b;b=a;a=next;}
+   const value=Math.max(0,a*a+b*b-coefficients[k]*a*b);
+   power[k]=value;total+=value;if(k>=8)upper+=value;
+  }
+  let entropy=0;
+  for(const value of power){const fraction=value/(total+1e-10);entropy-=fraction*Math.log(Math.max(1e-10,fraction));}
+  tone[frame]=.57*entropy/Math.log(bins)+.43*Math.sqrt(upper/(total+1e-10));
+  weight[frame]=Math.min(1,total/4);
+ }
+ // Smooth over short hats while retaining a sustained change of instrument.
+ const smooth=tone.map((_,i)=>{
+  let sum=0,den=0;
+  for(let j=Math.max(0,i-7);j<=Math.min(tone.length-1,i+2);j++){
+   const w=8-Math.abs(i-j);sum+=w*weight[j]*tone[j];den+=w;
+  }
+  return sum/den;
+ });
+ const sorted=smooth.slice().sort(),lo=sorted[Math.floor(sorted.length*.12)];
+ const span=Math.max(.16,sorted[Math.floor(sorted.length*.90)]-lo);
+ for(let i=0;i<smooth.length;i++){
+  const x=Math.max(0,Math.min(1,(smooth[i]-lo)/span));smooth[i]=x*x*(3-2*x);
+ }
+ return t=>{
+  const p=Math.min(smooth.length-1,t*sampleRate/step),i=Math.floor(p);
+  return smooth[i]+(p-i)*(smooth[Math.min(i+1,smooth.length-1)]-smooth[i]);
+ };
+}
+function mapTrackGroove(buffer){
+ const left=buffer.getChannelData(0);
+ const right=buffer.numberOfChannels>1 ? buffer.getChannelData(1) : left;
+ const hop=Math.max(1,Math.round(buffer.sampleRate/100));
+ const frames=Math.ceil(left.length/hop);
+ const kick=new Float32Array(frames),snare=new Float32Array(frames),hat=new Float32Array(frames);
+ const beat=new Float32Array(frames),motion=new Float32Array(frames);
+ const energy=new Float32Array(frames);
+ const kickIndex=new Uint32Array(frames),hitTimes=[],hitStrengths=[];
+ const dt=hop/buffer.sampleRate;
+ const stride=Math.max(1,Math.floor(buffer.sampleRate/18000));
+ const filter=hz=>1-Math.exp(-2*Math.PI*hz*stride/buffer.sampleRate);
+ const bassFilter=filter(140), midFilter=filter(750), airFilter=filter(4200);
+ let bass=0,mid=0,air=0,count=0,lastBeat=-10,spacing=.5;
+ const floor=[0,0,0],recent=[0,0,0],env=[0,0,0],last=[-10,-10,-10];
+ const noise=[.015,.007,.003],gap=[.205,.125,.072],tail=[.22,.16,.10];
+ const bands=[0,0,0];
+ for(let i=0;i<frames;i++){
+  bands.fill(0);
+  const start=i*hop,end=Math.min(start+hop,left.length);
+  for(let j=start;j<end;j+=stride){
+   const x=.5*(left[j]+right[j]);
+   bass+=bassFilter*(x-bass);mid+=midFilter*(x-mid);air+=airFilter*(x-air);
+   bands[0]+=bass*bass; bands[1]+=(air-mid)*(air-mid); bands[2]+=(x-air)*(x-air);
+  }
+  const now=i*dt,n=Math.ceil((end-start)/stride);
+  for(let k=0;k<3;k++){
+   const level=Math.sqrt(bands[k]/n);
+   energy[i]+=[.65,.27,.08][k]*level;
+   const rise=(level-recent[k])/Math.max(noise[k],floor[k]);
+   env[k]*=Math.exp(-dt/tail[k]);
+   if(now-last[k]>gap[k] && rise>.41 && level>Math.max(noise[k],1.32*floor[k])){
+    env[k]=Math.min(1,.30+.54*rise);
+    last[k]=now;
+    if(k===0){
+     if(count>0)spacing=Math.max(.24,Math.min(.95,now-lastBeat));
+     hitTimes.push(now);hitStrengths.push(env[0]);count++;lastBeat=now;
+    }
+   }
+   recent[k]+=.32*(level-recent[k]);floor[k]+=.033*(level-floor[k]);
+  }
+  kickIndex[i]=count;
+  kick[i]=env[0];snare[i]=env[1];hat[i]=env[2];
+  beat[i]=count ? count-1+Math.min(.98,(now-lastBeat)/spacing) : 0;
+  const activity=Math.min(1,3*floor[0]+5*floor[1]+7*floor[2]);
+  motion[i]=(i?motion[i-1]:0)+dt*(.77*activity+2.35*env[0]+.8*env[1]);
+ }
+ // Ease into each recorded transient from just before the attack. A short
+ // symmetric window rounds both sides without delaying the whole animation.
+ function soften(values,halfWidth){
+  const raw=values.slice();
+  let total=0;
+  const weights=[];
+  for(let j=-halfWidth;j<=halfWidth;j++){
+   const w=.5+.5*Math.cos(Math.PI*j/(halfWidth+1));weights.push(w);total+=w;
+  }
+  for(let i=0;i<frames;i++){
+   let value=0;
+   for(let j=-halfWidth;j<=halfWidth;j++)value+=weights[j+halfWidth]*raw[Math.min(frames-1,Math.max(0,i+j))];
+   values[i]=value/total;
+  }
+ }
+ soften(kick,7);soften(snare,6);soften(hat,4);soften(beat,8);
+ const cues=markPhraseAccents(energy,dt,hitTimes);
+ const grainAt=mapGrainTone(left,right,buffer.sampleRate);
+ const result={hits:new Float32Array(4),trail:new Float32Array(3)};
+ return time=>{
+  const position=Math.min(frames-1,(time%buffer.duration)/dt);
+  const i=Math.floor(position),j=Math.min(i+1,frames-1),f=position-i;
+  const lerp=values=>values[i]+f*(values[j]-values[i]);
+  for(let k=0;k<3;k++){
+   let pos=position-(k+1)*.08/dt;
+   if(pos<0 && time<buffer.duration){result.trail[k]=0;continue;}
+   pos=(pos%frames+frames)%frames;
+   const index=Math.floor(pos),next=(index+1)%frames;
+   const echo=cues.impact[index]+(pos-index)*(cues.impact[next]-cues.impact[index]);
+   const pulse=kick[index]+(pos-index)*(kick[next]-kick[index]);
+   result.trail[k]=Math.max(echo,.18*pulse);
+  }
+  result.grain=grainAt(time%buffer.duration);
+  result.energy=lerp(energy);
+  if(cues.cameraFocus){
+   result.cameraFocus=lerp(cues.cameraFocus);result.cameraEnergy=cues.energyAt(position*dt);
+  }
+  result.prepare=lerp(cues.prepare);result.impact=lerp(cues.impact);
+  result.kick=lerp(kick);result.snare=lerp(snare);result.hat=lerp(hat);
+  const loops=Math.floor(time/buffer.duration);
+  for(let j=0;j<2;j++){
+   const index=kickIndex[i]-1-j;
+   const valid=count>0 && (index>=0 || loops*count+index>=0);
+   if(valid){
+    const n=((index%count)+count)%count;
+    const stamp=(loops+Math.floor(index/count))*buffer.duration+hitTimes[n];
+    result.hits[2*j]=Math.min(8,Math.max(0,time-stamp));
+    result.hits[2*j+1]=hitStrengths[n];
+   }else{result.hits[2*j]=8;result.hits[2*j+1]=0;}
+  }
+  result.beat=lerp(beat)+loops*count;result.motion=lerp(motion)+loops*motion[frames-1];
+  return result;
+ };
+}
+let grooveMap;
+let trackRevision=0;
+function beginTrack(){
+ trackRevision++;
+ const accentAnalyser=ctx.createAnalyser();
+ accentAnalyser.fftSize=2048;
+ accentAnalyser.smoothingTimeConstant=0;
+ sampleAccents=createAccentTracker(accentAnalyser,ctx.sampleRate);
+ lastAccents=idleAccents;
+ lastBands=[0,0,0];
+ authoredKicks=[];
+ if(selectedBuffer){
+  source=ctx.createBufferSource();
+  source.buffer=selectedBuffer;
+  source.loop=true;
+  source.connect(analyser);
+  source.connect(accentAnalyser);
+  trackStart=ctx.currentTime;
+  source.start(trackStart);
+ }else{
+  trackStart=score.start(accentAnalyser,(time,strength)=>{
+   while(authoredKicks.length>1&&authoredKicks[1].time<=ctx.currentTime)authoredKicks.shift();
+   authoredKicks.push({time,strength});
+  });
+ }
+ started=true;
+}
+function sync(){
+ const on=started&&ctx.state==='running';
+ play.textContent=sharedStream?'Ukončit poslech':on?'Ⅱ Pauza':started?'▶ Pokračovat':'▶ Spustit';
+ statusLine.textContent=trackName;
+ liveLevel.hidden=!sharedStream;
+}
+function releaseTab(){
+ if(!sharedStream)return;
+ projectionSocket?.close();
+ const stream=sharedStream;sharedStream=null;
+ sharedNode.disconnect();sharedNode=null;sharedMeter.disconnect();sharedMeter=null;
+ sharedSink.disconnect();sharedSink=null;
+ stream.getTracks().forEach(track=>track.stop());
+ analyser.disconnect();analyser.connect(ctx.destination);
+ started=false;lastBands=[0,0,0];lastAccents=idleAccents;
+ trackName=defaultTrackName;trackRevision++;sync();
+}
+const tabAudio=el('tabAudio');
+tabAudio.hidden=!navigator.mediaDevices?.getDisplayMedia;
+tabAudio.onclick=async()=>{
+ if(loading)return;
+ loading=true;tabAudio.disabled=el('choose').disabled=play.disabled=true;
+ let capture=null;
+ try{
+  audioSetup();
+  const controller=typeof CaptureController==='function'?new CaptureController():undefined;
+  controller?.setFocusBehavior?.('no-focus-change');
+  capture=await navigator.mediaDevices.getDisplayMedia({
+   video:{displaySurface:'browser',frameRate:{max:1}},audio:{suppressLocalAudioPlayback:false},controller,
+   selfBrowserSurface:'exclude',systemAudio:'exclude'
+  });
+  await ctx.resume();
+  const audio=capture.getAudioTracks()[0];
+  if(!audio)throw Error('Vyber kartu přehrávače a zapni sdílení zvuku.');
+  const stream=capture;
+  const node=ctx.createMediaStreamSource(new MediaStream([audio]));
+  releaseTab();
+  if(source){source.stop();source.disconnect();source=null;}
+  score.stop();selectedBuffer=null;grooveMap=null;authoredKicks=[];
+  analyser.disconnect();
+  sharedMeter=ctx.createAnalyser();sharedMeter.fftSize=2048;sharedMeter.smoothingTimeConstant=0;
+  sharedSink=ctx.createGain();sharedSink.gain.value=0;
+  node.connect(analyser);node.connect(sharedMeter);
+  analyser.connect(sharedSink);sharedMeter.connect(sharedSink);sharedSink.connect(ctx.destination);
+  sampleAccents=createAccentTracker(sharedMeter,ctx.sampleRate);
+  sharedStream=stream;sharedNode=node;
+  const endCapture=()=>{
+   if(sharedStream!==stream)return;
+   releaseTab();
+   statusLine.textContent='Sdílení skončilo. Pro další poslech vyber Zvuk z karty.';
+  };
+  for(const track of stream.getTracks())track.addEventListener('ended',endCapture,{once:true});
+  for(const video of stream.getVideoTracks())video.enabled=false;
+  liveLevel.value=0;nextLevelUpdate=0;lastTabSignal=-Infinity;
+  capture=null;trackStart=ctx.currentTime;trackRevision++;started=true;
+  trackName='Živý zvuk z karty';sync();
+ }catch(error){
+  capture?.getTracks().forEach(track=>track.stop());
+  sync();statusLine.textContent=error.name==='NotAllowedError'?'Sdílení se nespustilo. Vyber kartu YouTube a zapni sdílení zvuku karty.':error.message;
+ }finally{loading=false;tabAudio.disabled=el('choose').disabled=play.disabled=false;}
+};
+play.onclick=async()=>{
+ if(sharedStream){releaseTab();return;}
+ if(loading)return;
+ loading=true;tabAudio.disabled=el('choose').disabled=play.disabled=true;
+ try{
+  audioSetup();
+  if(started&&ctx.state==='running')await ctx.suspend();
+  else{
+   await ctx.resume();
+   if(!started){
+    beginTrack();
+   }
+  }
+  sync();
+ }catch(e){statusLine.textContent='Zvuk se nepodařilo spustit. '+e.message}
+ finally{loading=false;tabAudio.disabled=el('choose').disabled=play.disabled=false}
+};
+el('choose').onclick=()=>el('file').click();
+el('file').onchange=async event=>{
+ const f=event.target.files[0];if(!f)return;
+ el('file').value='';loading=true;el('choose').disabled=play.disabled=true;
+ try{
+  audioSetup();await ctx.resume();statusLine.textContent='Načítám skladbu…';
+  const decoded=await ctx.decodeAudioData(await f.arrayBuffer());
+  const nextGroove=mapTrackGroove(decoded);
+  releaseTab();
+  if(source){source.stop();source.disconnect();source=null}
+  score.stop();selectedBuffer=decoded;grooveMap=nextGroove;trackName=f.name;beginTrack();sync();
+ }catch(e){sync();statusLine.textContent='Soubor se nepodařilo přehrát.'}
+ finally{loading=false;el('choose').disabled=play.disabled=false}
+};
+let controlsTimer;
+function showControls(){
+ clearTimeout(controlsTimer);
+ document.documentElement.classList.remove('hide-controls');
+ if(document.fullscreenElement)controlsTimer=setTimeout(()=>document.documentElement.classList.add('hide-controls'),2200);
+}
+for(const event of ['fullscreenchange','pointermove','pointerdown','keydown'])document.addEventListener(event,e=>{if(e.key?.toLowerCase()!=='c')showControls()});
+if(!document.fullscreenEnabled)el('full').hidden=true;
+const projectionKey=new URLSearchParams(location.hash.slice(1)).get('projekce');
+let projectionSocket=null,projectionActive=false,projectionFrame=null,projectionUnavailable=false;
+const bridge='ws://127.0.0.1:8743/';
+const canProject=location.origin==='http://127.0.0.1:8742' && [null,'vir','kral'].includes(soundtrackParams.get('scene'));
+function openProjection(){
+ if(projectionSocket)return;
+ sceneSteps=0;
+ const socket=new WebSocket(bridge+'open'+location.search);
+ projectionSocket=socket;
+ socket.onmessage=()=>{
+  if(!sharedStream){socket.close();return}
+  const bands=readBands(),accents=readAccents();
+  const spectrum=Array.from({length:512},(_,i)=>(fft[2*i]+fft[2*i+1])>>1);
+  socket.send(JSON.stringify({time:ctx.currentTime-trackStart,bands,accents:Array.from(accents),hits:Array.from(liveTunnelHits),spectrum,sceneSteps}));
+  projectionActive=true;
+ };
+ socket.onclose=()=>{
+  const wasActive=projectionActive;
+  projectionSocket=null;projectionActive=false;
+  if(!wasActive && sharedStream){
+   projectionUnavailable=true;
+   statusLine.textContent='Projekce není dostupná. Dalším stiskem otevřeš běžnou celou obrazovku.';
+  }
+ };
+}
+if(projectionKey && canProject){
+ document.title='Vesper — projekce';
+ document.querySelector('header').hidden=true;
+ for(const child of document.querySelector('nav').children)child.hidden=child.id!=='full';
+ document.querySelector('footer>div').hidden=true;
+ const receiver=new WebSocket(bridge+encodeURIComponent(projectionKey));
+ let pending=false,lastRequest=0,lastSteps=0;
+ function requestFrame(now){
+  if(receiver.readyState!==WebSocket.OPEN)return;
+  if(!pending && now-lastRequest>=30){
+   pending=true;lastRequest=now;receiver.send('frame');
+  }
+  requestAnimationFrame(requestFrame);
+ }
+ receiver.onopen=()=>requestAnimationFrame(requestFrame);
+ receiver.onmessage=event=>{
+  projectionFrame=JSON.parse(event.data);
+  projectionFrame.received=performance.now();pending=false;
+  const steps=projectionFrame.sceneSteps??0;
+  if(steps!==lastSteps)switchScene(steps-lastSteps);
+  lastSteps=steps;
+ };
+ receiver.onclose=()=>{
+  projectionFrame=null;
+  document.querySelector('footer>div').hidden=false;
+  statusLine.textContent='Projekce skončila.';
+ };
+}
+el('full').onclick=()=>{
+ if(document.fullscreenElement)return document.exitFullscreen();
+ if(canProject && sharedStream && !projectionKey && !projectionUnavailable)return openProjection();
+ return document.documentElement.requestFullscreen({navigationUI:'hide'});
+};
+const defaultScene=gl2?'kral':'lasery';
+const initialScene=projectionKey?defaultScene:(soundtrackParams.get('scene')??defaultScene);
+const kingOnly=soundtrackParams.get('scene')==='kral';
+const pageStart=performance.now();
+// The tunnel reaches the storm, the roof opens onto LOM, then the teeth reveal the court.
+const choices=[
+ {key:'vir',id:5,label:'VÍR / VÝBOJ'},
+ {id:5,label:'ČELISTI / LOM',external:'VÍR',jaws:true},
+ {key:'kral',id:5,label:'KRYSTALOVÝ KRÁL',external:'VÍR',court:true},
+ {id:6,label:'ŽIVÝ ÚTES'}, {id:7,label:'PERLEŤOVÝ FRAKTÁL'},
+ {id:5,label:'TAVENÍ',external:'TAVENÍ'}, {key:'zare',id:2,label:'POLÁRNÍ ZÁŘE'},
+ {id:5,label:'LASTURA',external:'LASTURA'}, {key:'lasery',id:3,label:'LASERY'},
+ {id:5,label:'LOM',external:'LOM'}, {key:'chrom',id:4,label:'CHROM'},
+ {key:'tunel',id:1,label:'DUHOVÝ TUNEL'}
+].filter(scene=>gl2 || scene.id!==5);
+let renderFrame,sceneVersion=0,sceneSteps=0,shownChoice=choices.findIndex(scene=>scene.key===initialScene),sceneStart=null;
+let journey=null,pendingSteps=0,preparing=false,doorTarget=null,arrivalStart=-Infinity;
+const renderers=new Map();
+function rendererFor(key){
+ if(!renderers.has(key)){
+  renderers.set(key,createRenderer(key).catch(error=>{renderers.delete(key);throw error}));
+ }
+ return renderers.get(key);
+}
+function galleryCue(time){
+ if(kingOnly){
+  // Begin after the teeth have opened and the king has taken the blade.
+  const age=(performance.now()-pageStart)/1000;
+  const king=choices[shownChoice];
+  return {from:king.id,to:king.id,label:king.label,blend:0,arrival:4,
+          age,external:king.external,rail:1.25*13.714286+2.7+age*.6};
+ }
+ if(sceneStart===null || time<sceneStart)sceneStart=time-(choices[shownChoice]?.court?4:0);
+ const from=choices[shownChoice],to=journey?choices[journey.index]:from;
+ if(journey && journey.entryTime===null)journey.entryTime=time;
+ if(journey)journey.lastTime=time;
+ const incomingAge=journey?Math.max(0,time-journey.entryTime):0;
+ if(journey && from.jaws && to.court){
+  // This interval of the original concert shader opens the teeth by their depth.
+  return {from:5,to:5,arrival:4,label:from.label,external:'VÍR',
+          rail:1.25*13.714286+2.3*journey.phase,age:incomingAge};
+ }
+ const leavingStorm=journey && from.key==='vir';
+ const visible=leavingStorm?to:from;
+ const external=visible.external?visible:to;
+ const age=external===from?Math.max(0,time-sceneStart):incomingAge;
+ return {from:visible.id,to:to.id,label:visible.label,
+  blend:journey && !leavingStorm?Math.min(.9999,journey.phase):0,
+  arrival:journey?4:Math.min(4,Math.max(0,(performance.now()-arrivalStart)/140)),
+  age,external:external.external,jaws:external.jaws,
+  rail:external.jaws?12:1.25*13.714286+(age%18)*.6};
+}
+async function switchScene(step=1){
+ if(kingOnly || !renderFrame || step<=0)return;
+ pendingSteps+=step;
+ if(preparing || journey)return;
+ await beginJourney();
+}
+async function beginJourney(){
+ preparing=true;pendingSteps--;
+ if(shownChoice<0){
+  const label=el('sceneLabel').textContent;
+  shownChoice=choices.findIndex(scene=>scene.key===(initialScene||'lasery'));
+  if(shownChoice<0)shownChoice=choices.findIndex(scene=>scene.label===label);
+  if(shownChoice<0)shownChoice=choices.findIndex(scene=>scene.label.includes(label.split(' / ')[0]));
+  if(shownChoice<0)shownChoice=0;
+ }
+ const index=(shownChoice+1)%choices.length;
+ const from=choices[shownChoice],to=choices[index];
+ try{
+  const gallery=await rendererFor('galerie');
+  const storm=(from.key==='vir'||to.key==='vir')?await rendererFor('vir'):null;
+  if(storm && !doorTarget)doorTarget={framebuffer:gl.createFramebuffer(),texture:gl.createTexture(),width:0,height:0};
+  journey={index,gallery,storm,start:null,entryTime:null,phase:0,
+           duration:from.key==='vir'?1950:from.jaws?1650:1350};
+  sceneVersion++;
+  el('mode').hidden=el('fracture').hidden=el('steer').hidden=true;
+ }catch(error){
+  pendingSteps=0;statusLine.textContent='Přechod se nepodařilo načíst. '+error.message;
+ }finally{preparing=false;}
+}
+function drawJourney(now){
+ const trip=journey,from=choices[shownChoice],to=choices[trip.index];
+ if(trip.start===null)trip.start=now;
+ trip.phase=Math.min(1,(now-trip.start)/trip.duration);
+ if(from.key==='vir'){
+  trip.gallery(now,doorTarget);
+  trip.storm(now,null,doorTarget);
+ }else if(to.key==='vir'){
+  trip.storm(now,doorTarget);
+  trip.gallery(now,null,doorTarget);
+ }else trip.gallery(now);
+ if(trip.phase<1)return;
+ shownChoice=trip.index;
+ renderFrame=to.key==='vir'?trip.storm:trip.gallery;
+ sceneStart=trip.entryTime;
+ if(from.jaws && to.court)sceneStart=trip.lastTime-2.3/.6;
+ arrivalStart=(from.key==='vir'||from.jaws)?-Infinity:now;
+ journey=null;sceneVersion++;
+ el('sceneLabel').textContent=to.label;
+ canvas.setAttribute('aria-label',to.label+' reagující na hudbu');
+ if(pendingSteps)beginJourney();
+}
+window.addEventListener('keydown',event=>{
+ if(kingOnly || event.key.toLowerCase()!=='c'||event.repeat||event.ctrlKey||event.altKey||event.metaKey||event.defaultPrevented)return;
+ if(event.target.closest?.('input,select,textarea,[contenteditable="true"]'))return;
+ event.preventDefault();
+ if(projectionActive)sceneSteps++;
+ else switchScene();
+});
+el('full').title=kingOnly?'Celá obrazovka':'Celá obrazovka · C přepíná shadery';
+const openCourt=initialScene==='kral';
+if(openCourt && !gl2)statusLine.textContent='Krystalový král potřebuje WebGL 2.';
+if(openCourt && gl2){
+ const label=choices[shownChoice].label;
+ el('sceneLabel').textContent=label;
+ canvas.setAttribute('aria-label',label+' reagující na hudbu');
+ el('mode').hidden=el('steer').hidden=true;
+}
+if(!kingOnly || gl2)rendererFor(openCourt?(gl2?'galerie':'lasery'):initialScene).then(frame=>{
+ renderFrame=frame;
+ function draw(now){
+  if(!projectionActive){
+   if(journey)drawJourney(now);
+   else renderFrame(now);
+  }
+  requestAnimationFrame(draw);
+ }
+ requestAnimationFrame(draw);
+}).catch(e=>{statusLine.textContent='Shader se nepodařilo spustit. '+e.message;play.disabled=el('choose').disabled=true;});
+</script></html>

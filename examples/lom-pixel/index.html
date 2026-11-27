@@ -1,0 +1,131 @@
+<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lom / Pixel · Shadertoy</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080608;color:#fff0e9;font:14px system-ui,sans-serif}canvas{position:fixed;inset:0;width:100%;height:100%}footer{position:fixed;left:5vw;right:5vw;bottom:5vh;display:flex;align-items:end;justify-content:space-between;gap:20px}h1{font:italic 500 clamp(48px,8vw,112px)/.9 Georgia,serif;margin:0 0 12px;letter-spacing:-.07em}p{font:12px monospace;margin:0}nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.controls{display:grid;gap:10px;justify-items:end}.speed{display:flex;align-items:center;gap:9px;font-size:13px;background:#171219e8;padding:8px 12px;border-radius:18px}.speed input{width:min(22vw,135px);accent-color:#ffc79f}.speed output{min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}details{position:relative}summary{cursor:pointer;color:#ffe3d0;padding:9px}details .export{position:absolute;right:0;bottom:100%;width:min(260px,76vw);background:#201820;padding:12px;border:1px solid #897278;border-radius:12px;z-index:2}.export button{margin-bottom:6px}.export p{line-height:1.5}.controls nav button{white-space:nowrap}button{padding:12px 18px;background:#171219d9;color:#fae8df;border:1px solid #897278;border-radius:30px;cursor:pointer}button:first-child{background:#ffe3d0;color:#261b22}@media(max-width:800px){footer{align-items:start;flex-direction:column;gap:12px}.controls{justify-items:start}}
+#credit{margin-top:6px;font:11px system-ui,sans-serif;color:#decfcf}#credit a{color:inherit}</style><canvas id="screen" aria-label="Průlet temnými krystaly ke žhavému jádru"></canvas><footer><div><h1>Lom / Pixel</h1><p id="status" role="status">Shadertoy · Image + Buffer A</p><p id="credit"><a href="https://opengameart.org/content/bitten-by-the-rave-spider" target="_blank" rel="noopener">Bitten by the Rave Spider · Woolly Jammoth</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p></div><div class="controls"><label class="speed">Vliv hudby na rychlost <input id="speedAmount" type="range" min="0" max="100" value="35"><output id="speedValue" for="speedAmount">35 %</output></label>
+<nav><button id="play">▶ Spustit</button><button id="choose">Vlastní skladba</button><details><summary>Shadertoy</summary><div class="export"><button id="copy">Kopírovat Image</button><button id="copyMotion">Kopírovat Buffer A</button><p>V obou passech nastav iChannel0 na stejnou hudbu a iChannel1 na Buffer A.</p></div></details><input hidden id="file" type="file" accept="audio/*"></nav></div></footer>
+<script>
+const el=id=>document.getElementById(id),canvas=el('screen'),play=el('play'),statusLine=el('status');
+
+let ctx,fft,spectrum,source=null,started=false,epoch=0,trackName=statusLine.textContent;
+function setup(){
+ if(ctx)return;
+ ctx=new AudioContext();fft=ctx.createAnalyser();fft.fftSize=1024;fft.smoothingTimeConstant=.22;
+ spectrum=new Uint8Array(fft.frequencyBinCount);fft.connect(ctx.destination);
+}
+function label(){play.textContent=ctx.state==='running'&&started?'Ⅱ Pauza':'▶ Pokračovat';statusLine.textContent=trackName}
+function startBuffer(buffer,name,loopStart=0){
+ const next=ctx.createBufferSource();next.buffer=buffer;next.loop=true;next.loopStart=loopStart;
+ next.connect(fft);const when=ctx.currentTime;next.start(when);
+ if(source){source.stop();source.disconnect()}
+ source=next;epoch=when;started=true;trackName=name;label();
+}
+async function startDefault(){
+ try{
+  const response=await fetch('../lom/bitten_by_the_rave_spider.ogg');
+  if(!response.ok)throw Error('Hudební soubor se nepodařilo načíst.');
+  const buffer=await ctx.decodeAudioData(await response.arrayBuffer());
+  startBuffer(buffer,'140 BPM · Bitten by the Rave Spider',16*4*60/140);
+ }catch{throw Error("Skladbu se nepodařilo načíst. Můžeš vybrat vlastní soubor.");
+ }
+}
+play.onclick=async()=>{
+ play.disabled=el('choose').disabled=true;
+ try{setup();if(started&&ctx.state==='running')await ctx.suspend();
+ else{await ctx.resume();if(!started)await startDefault()}label()}
+ catch(e){statusLine.textContent=e.message}finally{play.disabled=el('choose').disabled=false}
+};
+el('choose').onclick=()=>el('file').click();
+el('file').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;e.target.value='';play.disabled=el('choose').disabled=true;
+ try{setup();await ctx.resume();startBuffer(await ctx.decodeAudioData(await f.arrayBuffer()),f.name)}
+ catch(e){statusLine.textContent='Soubor se nepodařilo načíst.'}finally{play.disabled=el('choose').disabled=false}
+};
+async function render(){
+ async function sourceText(file){
+  const response=await fetch(file);
+  if(!response.ok)throw Error('Shader nelze načíst.');
+  return response.text();
+ }
+ const [body,motionBody]=await Promise.all([sourceText('./image.glsl'),sourceText('./motion.glsl')]);
+ const slider=el('speedAmount');
+ slider.oninput=()=>{el('speedValue').value=slider.value+' %'};
+ function copySource(button,getSource,file){
+  el(button).onclick=async()=>{
+   const text=getSource();
+   try{await navigator.clipboard.writeText(text);statusLine.textContent='GLSL zkopírováno.'}
+   catch{
+    const link=document.createElement('a');
+    link.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
+    link.download=file;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);
+   }
+  };
+ }
+ copySource('copy',()=>body,'image.glsl');
+ copySource('copyMotion',()=>motionBody.replace(/^#define LOM_SPEED_AMOUNT [0-9.]+$/m,
+     '#define LOM_SPEED_AMOUNT '+(Number(slider.value)/100).toFixed(2)),'motion.glsl');
+ const gl=canvas.getContext('webgl2',{depth:false,antialias:false,alpha:false});
+ if(!gl)throw Error('Pro náhled je potřeba WebGL 2.');
+ const vertex='#version 300 es\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2.-1.,0.,1.);}';
+ const header='#version 300 es\nprecision highp float;precision highp int;uniform vec3 iResolution;uniform float iTime,iTimeDelta;uniform int iFrame;uniform highp sampler2D iChannel0,iChannel1;out vec4 pixel;\n';
+ function compile(fragment){
+  const program=gl.createProgram();
+  for(const [kind,code] of [[gl.VERTEX_SHADER,vertex],[gl.FRAGMENT_SHADER,header+fragment+'\nvoid main(){mainImage(pixel,gl_FragCoord.xy);}']]){
+   const shader=gl.createShader(kind);gl.shaderSource(shader,code);gl.compileShader(shader);
+   if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));
+   gl.attachShader(program,shader);
+  }
+  gl.linkProgram(program);
+  if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+  gl.useProgram(program);
+  gl.uniform1i(gl.getUniformLocation(program,'iChannel0'),0);
+  gl.uniform1i(gl.getUniformLocation(program,'iChannel1'),1);
+  return program;
+ }
+ const image=compile(body);
+ const motion=compile('uniform float uSpeedAmount;\n#define LOM_SPEED_AMOUNT uSpeedAmount\n'+motionBody);
+ const resolution=gl.getUniformLocation(image,'iResolution'),time=gl.getUniformLocation(image,'iTime');
+ const stepTime=gl.getUniformLocation(motion,'iTimeDelta'),frameIndex=gl.getUniformLocation(motion,'iFrame');
+ const strength=gl.getUniformLocation(motion,'uSpeedAmount');
+ function makeTexture(format,width,height){
+  const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
+  gl.texStorage2D(gl.TEXTURE_2D,1,format,width,height);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  return tex;
+ }
+ const audioTexture=makeTexture(gl.R8,512,2);
+ const states=Array.from({length:2},()=>{
+  const tex=makeTexture(gl.RGBA8,3,1),fb=gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Buffer pohybu nelze vytvořit.');
+  return {tex,fb};
+ });
+ gl.bindTexture(gl.TEXTURE_2D,audioTexture);
+ gl.disable(gl.DITHER);
+ const idle=performance.now();
+ let previousSource=null,previousTime=0,index=0,read=0;
+ function frame(now){
+  const scale=Math.min(devicePixelRatio,850/Math.max(innerWidth,innerHeight)),w=Math.max(1,Math.round(innerWidth*scale)),h=Math.max(1,Math.round(innerHeight*scale));
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+  if(source!==previousSource){index=0;previousSource=source}
+  const clock=started?ctx.currentTime-epoch:(now-idle)/1000;
+  if(started&&ctx.state==='running'){
+   fft.getByteFrequencyData(spectrum);
+   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,audioTexture);
+   gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,512,1,gl.RED,gl.UNSIGNED_BYTE,spectrum);
+  }
+  gl.useProgram(motion);gl.bindFramebuffer(gl.FRAMEBUFFER,states[1-read].fb);
+  gl.viewport(0,0,3,1);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,states[read].tex);
+  gl.uniform1f(stepTime,index===0?0:clock-previousTime);gl.uniform1i(frameIndex,index++);
+  gl.uniform1f(strength,started?Number(slider.value)/100:0);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  read=1-read;previousTime=clock;
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.useProgram(image);
+  gl.bindTexture(gl.TEXTURE_2D,states[read].tex);
+  gl.viewport(0,0,w,h);gl.uniform3f(resolution,w,h,1);gl.uniform1f(time,clock);
+  gl.drawArrays(gl.TRIANGLES,0,3);requestAnimationFrame(frame);
+ }requestAnimationFrame(frame);
+}
+render().catch(e=>statusLine.textContent=e.message);
+</script></html>
